@@ -29,3 +29,6 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+
+# Match logs (may contain opponents' agent ids)
+logs/
