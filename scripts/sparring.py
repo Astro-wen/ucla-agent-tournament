@@ -2,6 +2,7 @@
 
     python scripts/sparring.py status                 # claim status of both agents
     python scripts/sparring.py play <session_id>      # both join, both play (two `python -m agent`), stop when done
+    python scripts/sparring.py play latest [game_type] # same, on the newest waiting room (default pokemon_vgc_doubles_draft)
 
 Agents come from env files: .env (Yoriko_Red) and .env.apocalypse (Apocalypse_Red).
 Each agent's raw payloads land in logs/<agent>/<session_id>.jsonl (see agent/agent.py record()).
@@ -60,6 +61,14 @@ def main() -> None:
     if cmd == "status":
         return
     sid = sys.argv[2]
+    if sid == "latest":
+        want = sys.argv[3] if len(sys.argv) > 3 else "pokemon_vgc_doubles_draft"
+        rooms = [s for s in agents[0].call("list_sessions", status=["waiting"]).get("sessions", [])
+                 if s["game_type"] == want and s["current_participants"] == 0]
+        if not rooms:
+            sys.exit(f"no waiting {want} room with 0 participants")
+        sid = max(rooms, key=lambda s: s.get("created_at", ""))["session_id"]
+        print("latest room:", sid)
     if any(a.me.get("status") != "claimed" for a in agents):
         sys.exit("both agents must be claimed first")
     (ROOT / "logs").mkdir(exist_ok=True)

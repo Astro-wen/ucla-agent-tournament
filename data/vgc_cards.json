@@ -260,6 +260,26 @@
   ]
  },
  {
+  "card_id": "vgc-great-tusk",
+  "species": "Great Tusk",
+  "item": "Booster Energy",
+  "ability": "Protosynthesis",
+  "nature": "Jolly",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 252,
+   "spe": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Headlong Rush",
+   "Close Combat",
+   "Rock Slide",
+   "Protect"
+  ]
+ },
+ {
   "card_id": "vgc-grimmsnarl",
   "species": "Grimmsnarl",
   "item": "Light Clay",
@@ -598,6 +618,26 @@
    "Ruination",
    "Spikes",
    "Earthquake",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-torkoal",
+  "species": "Torkoal",
+  "item": "Charcoal",
+  "ability": "Drought",
+  "nature": "Quiet",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "spa": 252,
+   "spd": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Eruption",
+   "Heat Wave",
+   "Yawn",
    "Protect"
   ]
  },
