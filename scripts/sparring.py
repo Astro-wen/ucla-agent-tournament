@@ -4,6 +4,9 @@
     python scripts/sparring.py play <session_id>      # both join, both play (two `python -m agent`), stop when done
     python scripts/sparring.py play latest [game_type] # same, on the newest waiting room (default pokemon_vgc_doubles_draft)
 
+Env ARENA_DIR_<TAG>=<path> runs that agent's code from another checkout, e.g. an old version for a live A/B:
+    ARENA_DIR_APOCALYPSE=/tmp/v0 python scripts/sparring.py play latest
+
 Agents come from env files: .env (Yoriko_Red) and .env.apocalypse (Apocalypse_Red).
 Each agent's raw payloads land in logs/<agent>/<session_id>.jsonl (see agent/agent.py record()).
 """
@@ -50,7 +53,11 @@ class Agent:
                "ALTRUAGENT_CONTROL_URL": self.env["ALTRUAGENT_CONTROL_URL"],
                "ARENA_RECORD_DIR": str(ROOT / "logs" / self.tag)}
         log = open(ROOT / "logs" / f"{self.tag}.{session_id[:8]}.out", "ab")
-        return subprocess.Popen([sys.executable, "-m", "agent"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+        code_dir = Path(os.environ.get(f"ARENA_DIR_{self.tag.upper()}", ROOT))
+        env["PYTHONPATH"] = str(code_dir)          # the venv's editable install points at ROOT; make code_dir win
+        if code_dir != ROOT:
+            print(f"{self.tag}: running code from {code_dir}")
+        return subprocess.Popen([sys.executable, "-m", "agent"], cwd=code_dir, env=env, stdout=log, stderr=subprocess.STDOUT)
 
 
 def main() -> None:
