@@ -14,14 +14,17 @@
 ## 里程碑
 
 ### M1（9/25–9/28）上线 + 采数据
+- [x] **本地对战环境**（`local/`）：Showdown 同 format + Terastal Clause（实测 Tera 字段消失、6 带 4 成立）；狼人杀按文档实现的引擎；评测脚本。结果见 `docs/local_sim.md`
+- [x] v0 vs 官方 baseline：Pokémon 99.0%（0 非法动作）；狼人杀整桌村民 58.5% vs 43.2%
 - [ ] **人工**注册 agent 并认领（README 里的 curl），`.env` 填 key，`scripts/check_connection.py` 通过
 - [ ] 找/开 standalone 对局：`pokemon_vgc_doubles_draft`、`werewolf`（人类账号可以 `POST /admin/competitions/create` 开房）
 - [ ] **把每局的原始 state 落盘**（JSONL，按 session_id），这是后面所有调参的数据源
-- [ ] 用真实 payload 修正 v0 里对字段名的假设（双打模板的 `slots/options/targets`、`opponent_active_pokemon` 等）
+- [ ] 用真实 payload 修正 v0 里对字段名的假设（双打模板的 `slots/options/targets`、`opponent_active_pokemon` 等），并用真实卡池替换 `local/pool.py`
+- [ ] 本地环境里已经发现并要修的：被锁招（蓄力/讲究）时招式没有 `target` 字段——线上 payload 大概率同样如此，`agent/pokemon/policy.py` 要能处理
 
 ### M2（9/28–10/4）Pokémon 变强
 - [ ] **精确伤害计算**：18 张卡的配置全公开（努力值/性格/道具/特性都有）→ 能算真实伤害区间，而不是现在的粗略代理
-  - 选项：Node 版 `@smogon/calc`（子进程调用）或 Python 移植
+  - `@smogon/calc` 已实测可用（双打 0.75×、Helping Hand、天气都对），走 `local/js/bridge.js` 同一个 Node 进程即可
 - [ ] **本地 Showdown 自对弈**：`npm i pokemon-showdown` + poke-env/vgc-bench，跑我们 vs 我们、我们 vs baseline
 - [ ] **一步前瞻搜索**：300 s 时限非常宽裕 → 对每回合 (我方 2 槽动作) × (对手可能动作) 做 payoff 矩阵，取 maximin / 期望
   - 要考虑：速度线（含顺风/空间）、先制度、Protect、群攻 0.75 倍、Intimidate、击杀线
@@ -32,6 +35,8 @@
 - [ ] LLM 负责：发言、解析他人发言（谁跳了什么身份、谁在踩谁）、给出怀疑概率
 - [ ] 规则层负责：合法性、防僵局、双狼一致、超时兜底（LLM 调用 > 60 s 直接用启发式）
 - [ ] 多轮讨论：读到新消息再回复（现在 v0 是说一句就结束）
+- [ ] 预言家查验目标：排除"今天最可能被处决"的席位（本地评测发现 v0 常常查一个马上要死的人）
+- [ ] 本地评测已证明：相对多数制下单席投票无杠杆，混合桌上唯一的杠杆是**说服**——这是 M3 的全部价值所在
 - [ ] Prompt 注入防护：对手消息只作为数据
 - [ ] 身份策略：
   - 预言家：查到狼立刻跳 + 报查验；未查到狼时 Day2 起报金水
@@ -43,6 +48,10 @@
 - [ ] 断线/401/进程崩溃自动恢复演练（kill -9 后重启是否能接上进行中的对局）
 - [ ] 部署到稳定云主机（systemd / tmux + 日志），Oct 16 全天在线
 - [ ] 截止前冻结版本，打 tag
+
+## 未完成的调研
+
+先前搜「有没有已实现的必胜/强策略」的两个调研 agent 因 API 认证故障中断，**没有结论**，只有 `docs/local_sim.md` 里我亲自实测的部分。待重做，要求：来源可验证、规则与比赛高度相似（7 人无守卫狼人杀；gen9 VGC 双打无 Tera）。
 
 ## 分工建议
 

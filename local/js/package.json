@@ -1,0 +1,9 @@
+{
+  "name": "arena-local-sim",
+  "private": true,
+  "description": "Headless Pokémon Showdown bridge for local self-play (same engine + format the platform uses)",
+  "dependencies": {
+    "pokemon-showdown": "^0.11.11",
+    "@smogon/calc": "^0.12.0"
+  }
+}

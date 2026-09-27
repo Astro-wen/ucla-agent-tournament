@@ -1,0 +1,79 @@
+// JSON-lines bridge around the Pokémon Showdown `Battle` class.
+// One battle per process. Python sends one JSON object per line on stdin:
+//   {"cmd":"start","format":"gen9vgc2025regi@@@Terastal Clause","p1":[sets],"p2":[sets],"seed":[1,2,3,4]}
+//   {"cmd":"choose","p1":"team 1234","p2":"move 1 1, move 2 2"}   (omit a side that has no request)
+//   {"cmd":"validate","sets":[sets]}
+// and gets back one JSON object per line: {"requests":{"p1":..,"p2":..},"state":{..},"ended":bool,"winner":..,"log":[..]}
+'use strict';
+const readline = require('readline');
+const {Battle, TeamValidator} = require('pokemon-showdown');
+
+let battle = null;
+let logOffset = 0;
+
+function pokeView(p, omniscient) {
+  if (!p) return null;
+  const v = {
+    species: p.species.name, id: p.species.id, types: p.getTypes().map(t => t.toUpperCase()),
+    current_hp: p.hp, max_hp: p.maxhp, current_hp_fraction: p.maxhp ? p.hp / p.maxhp : 0,
+    status: p.status || null, fainted: p.fainted, active: p.isActive, boosts: p.boosts,
+    base_stats: p.species.baseStats, position: p.position,
+  };
+  if (omniscient) { v.item = p.item; v.ability = p.ability; v.moves = p.moves; v.stats = p.storedStats; }
+  return v;
+}
+
+function sideView(side, omniscient) {
+  return {
+    active: side.active.map(p => pokeView(p, omniscient)),
+    team: side.pokemon.map(p => pokeView(p, omniscient)),
+    side_conditions: Object.keys(side.sideConditions),
+  };
+}
+
+function snapshot() {
+  const req = {};
+  for (const s of battle.sides) req[s.id] = s.activeRequest && !s.activeRequest.wait ? s.activeRequest : null;
+  const newLog = battle.log.slice(logOffset); logOffset = battle.log.length;
+  return {
+    requests: req,
+    state: {
+      turn: battle.turn, weather: battle.field.weather || null,
+      terrain: battle.field.terrain || null, pseudo_weather: Object.keys(battle.field.pseudoWeather),
+      p1: sideView(battle.sides[0], true), p2: sideView(battle.sides[1], true),
+    },
+    ended: battle.ended, winner: battle.winner || null, log: newLog,
+  };
+}
+
+const rl = readline.createInterface({input: process.stdin});
+rl.on('line', line => {
+  let msg;
+  try { msg = JSON.parse(line); } catch (e) { return out({error: 'bad json'}); }
+  try {
+    if (msg.cmd === 'start') {
+      battle = new Battle({formatid: msg.format, seed: msg.seed});
+      logOffset = 0;
+      battle.setPlayer('p1', {name: msg.p1name || 'p1', team: msg.p1});
+      battle.setPlayer('p2', {name: msg.p2name || 'p2', team: msg.p2});
+      return out(snapshot());
+    }
+    if (msg.cmd === 'choose') {
+      for (const sid of ['p1', 'p2']) {
+        if (msg[sid] == null) continue;
+        const ok = battle.choose(sid, msg[sid]);
+        if (!ok) return out({error: 'bad_choice', side: sid, choice: msg[sid],
+                             detail: battle.sides[sid === 'p1' ? 0 : 1].choice.error, ...snapshot()});
+      }
+      return out(snapshot());
+    }
+    if (msg.cmd === 'validate') {
+      const v = TeamValidator.get(msg.format || 'gen9vgc2025regi');
+      return out({problems: msg.sets.map(s => v.validateSet(s, {}) || null)});
+    }
+    if (msg.cmd === 'quit') process.exit(0);
+    out({error: 'unknown cmd'});
+  } catch (e) { out({error: 'exception', detail: String(e && e.stack || e)}); }
+});
+
+function out(o) { process.stdout.write(JSON.stringify(o) + '\n'); }
