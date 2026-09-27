@@ -35,7 +35,8 @@ function one(c) {
     const move = new Move(gen, c.move, {isCrit: !!c.isCrit, hits: c.hits});
     const r = calculate(gen, atk, def, move, field);
     let rolls = r.damage;
-    if (Array.isArray(rolls) && Array.isArray(rolls[0])) rolls = rolls.map(x => x.reduce((a, b) => a + b, 0)); // multi-hit
+    // Multi-hit moves: one 16-roll array per hit -> the total of roll i over all hits (not the sum of one hit's rolls).
+    if (Array.isArray(rolls) && Array.isArray(rolls[0])) rolls = rolls[0].map((_, i) => rolls.reduce((a, h) => a + (h[i] || 0), 0));
     if (!Array.isArray(rolls)) rolls = [rolls];
     const [min, max] = r.range();
     let desc = '';
