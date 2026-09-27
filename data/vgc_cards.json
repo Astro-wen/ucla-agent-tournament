@@ -300,6 +300,26 @@
   ]
  },
  {
+  "card_id": "vgc-gyarados",
+  "species": "Gyarados",
+  "item": "Sitrus Berry",
+  "ability": "Intimidate",
+  "nature": "Adamant",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 252,
+   "spe": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Waterfall",
+   "Earthquake",
+   "Taunt",
+   "Protect"
+  ]
+ },
+ {
   "card_id": "vgc-hatterene",
   "species": "Hatterene",
   "item": "Safety Goggles",
@@ -562,6 +582,66 @@
   ]
  },
  {
+  "card_id": "vgc-salamence",
+  "species": "Salamence",
+  "item": "Lum Berry",
+  "ability": "Intimidate",
+  "nature": "Timid",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "spa": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Draco Meteor",
+   "Hurricane",
+   "Tailwind",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-sneasler",
+  "species": "Sneasler",
+  "item": "Aguav Berry",
+  "ability": "Unburden",
+  "nature": "Jolly",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "atk": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Fake Out",
+   "Close Combat",
+   "Dire Claw",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-sylveon",
+  "species": "Sylveon",
+  "item": "Wiki Berry",
+  "ability": "Pixilate",
+  "nature": "Modest",
+  "level": 50,
+  "evs": {
+   "hp": 244,
+   "spa": 252,
+   "spd": 12
+  },
+  "ivs": {},
+  "moves": [
+   "Hyper Voice",
+   "Shadow Ball",
+   "Calm Mind",
+   "Protect"
+  ]
+ },
+ {
   "card_id": "vgc-talonflame",
   "species": "Talonflame",
   "item": "Sharp Beak",
@@ -658,6 +738,26 @@
    "Bleakwind Storm",
    "Taunt",
    "Tailwind",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-urshifu-rapid-strike",
+  "species": "Urshifu-Rapid-Strike",
+  "item": "Mystic Water",
+  "ability": "Unseen Fist",
+  "nature": "Adamant",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "atk": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Surging Strikes",
+   "Close Combat",
+   "Aqua Jet",
    "Protect"
   ]
  },

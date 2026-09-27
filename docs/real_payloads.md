@@ -76,3 +76,17 @@ option：招式 `{type:"move", move_id, base_power, category, move_type, current
 ### 还没见到、仍是假设的
 - 被锁招（蓄力、讲究道具、Encore）时的模板——本地模拟器里此时招式无目标，平台行为未见。
 - 狼人杀全部 payload（需要 7 个 agent 才能开局）。
+
+## 2026-09-27 · 伤害计算器对真实对局的校准（`scripts/calibrate_calc.py`）
+
+用 7 局真实 VGC 对局的 `protocol_log` 逐次对比：双方卡牌配置已知（选秀公开），按日志重放能力变化、场地、天气、双墙、帮助，预测区间 vs 实际掉血（我方真实 HP；对手按 100 分制 ±1）。
+
+**119 次非暴击单段命中：114 次落在计算器区间内（96%）。** 其余 5 次：
+- 2 次 **气势披带**（Garchomp、Chien-Pao 满血吃必杀留 1 血）——计算器只算伤害，agent 的 P(KO) 需要自己处理满血披带 / 结实。
+- 1 次 **大将（Supreme Overlord）**（Kingambit 队友倒下越多攻击越高）——需要把己方倒下数传给计算器（`alliesFainted`）。
+- 2 次是校准脚本没追踪状态异常 / 单目标群攻，非 agent 问题。
+
+平台字段格式补充：`fields` 形如 `{"GRASSY_TERRAIN": 0}`、`{"PSYCHIC_TERRAIN": 4}`（值为剩余回合）；这几局没有出现过天气、双墙或顺风，`weather` / `side_conditions` 一直是 `{}`，格式未验证。`protocol_log` 是整局累积的完整协议（从 `|init|battle` 开始）。
+
+## 2026-09-27 · 线上 A/B：v1（Yoriko）vs v0（Apocalypse）
+2 局，v0 2 胜。确认 v1 在官方运行器下全程走精确计算路径（本地重放 10/10 决策完全一致、进程日志无告警）。第二局输在选秀/首发（对手拿到 Tornadus + Rillaboom 首发），双方选秀与首发代码相同。样本太小，不构成 v1 更弱的证据；本地 400 局 v1 对 v0 为 66.8%。
