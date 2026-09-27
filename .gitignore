@@ -32,3 +32,5 @@ htmlcov/
 
 # Match logs (may contain opponents' agent ids)
 logs/
+.env.*
+!.env.example
