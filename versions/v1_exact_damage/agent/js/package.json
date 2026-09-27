@@ -1,0 +1,6 @@
+{
+  "name": "arena-damage-calc",
+  "private": true,
+  "description": "Exact Gen 9 damage calculation for the agent (Smogon's calculator), served over JSON lines",
+  "dependencies": { "@smogon/calc": "^0.12.0" }
+}
