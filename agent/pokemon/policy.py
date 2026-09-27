@@ -18,6 +18,7 @@ import logging
 from . import dex
 from .calc import DamageCalc, calc_field, calc_pokemon, move_name
 from .dex import to_id
+from .stats import acts_first, effective_speed, move_priority
 from .typechart import effectiveness
 
 log = logging.getLogger("agent.policy")
@@ -50,6 +51,26 @@ GENERIC_CARD = {"evs": {"hp": 4, "atk": 252, "spa": 252, "spe": 252}, "nature": 
 FIRST_TURN_ONLY = {"fakeout", "firstimpression"}
 FLINCH_IMMUNE_ABILITIES = {"innerfocus", "shielddust"}
 ALLY_SUPPORT_MOVES = {"helpinghand", "pollenpuff", "decorate", "coaching"}
+
+# ---- speed-aware KO races and Protect (same points scale) -------------------------------------------------------
+PROTECT_MOVES = {"protect", "detect", "spikyshield", "silktrap", "banefulbunker", "burningbulwark", "kingsshield",
+                 "obstruct"}
+# Partner moves that leave a threat unable to hurt a Protecting mon next turn (slept, burned, slowed, outsped...).
+CRIPPLE_MOVES = {"spore", "sleeppowder", "hypnosis", "yawn", "willowisp", "thunderwave", "nuzzle", "icywind",
+                 "electroweb", "tailwind", "trickroom", "encore", "taunt", "snarl", "partingshot"}
+REMOVE_BASE = 15.0        # KO a foe *before it acts*: + this ...
+REMOVE_DANGER = 60.0      # ... + this x its danger (fraction of our current HP its best move removes)
+PROTECT_SAVE = 90.0       # our mon surviving a KO this turn while the partner removes / cripples the threat
+PROTECT_ALONE = 0.2       # share of PROTECT_SAVE when nothing deals with the threat (a plain one-turn stall)
+PROTECT_MIN_DANGER = 0.2  # below this P(KO'd this turn) Protect is pointless ...
+PROTECT_IDLE = -40.0      # ... and scores this
+PROTECT_AGAIN = -300.0    # Protect twice in a row (succeeds 1/3 in Gen 9): never
+STALL_BONUS = 30.0        # Protect through the last turns of an opposing Tailwind / Trick Room
+FAKE_OUT_LIKELY = 0.9     # a fresh foe that carries Fake Out uses it
+SUCKER_PUNCH_ACC = 0.8    # fails into status moves / Protect
+TAILWIND_TURNS, TRICK_ROOM_TURNS = 4, 5
+SASH_ITEMS = {"focussash"}
+SASH_ABILITIES = {"sturdy"}
 
 
 def _stat(sp: str, key: str, default: int = 90) -> int:
@@ -194,6 +215,61 @@ def _target_status_value(mid: str, o: dict, card: dict | None) -> float:
     return 8.0
 
 
+def _first(p) -> float:
+    """acts_first() result as a probability (speed tie = coin flip)."""
+    return 1.0 if p is True else 0.0 if p is False else 0.5
+
+
+def _cond_ids(x) -> set[str]:
+    """Side conditions / fields as ids; the platform sends dicts ({"TAILWIND": turn}), the local sim lists too."""
+    if isinstance(x, (dict, list, tuple, set)):
+        return {to_id(str(k)) for k in x}
+    return set()
+
+
+def _speed_view(mon: dict | None) -> dict:
+    """A battle view safe for stats.effective_speed / move_priority: hidden foe item dropped, boosts a dict."""
+    v = dict(mon or {})
+    if not v.get("item") or to_id(str(v.get("item"))) in ("unknownitem", "unknown", "none"):
+        v["item"] = None
+    if not isinstance(v.get("boosts"), dict):
+        v["boosts"] = {}
+    return v
+
+
+def _sashed(mon: dict | None, card: dict | None) -> bool:
+    """Focus Sash / Sturdy at full HP: no single hit KOs it."""
+    mon = mon or {}
+    try:
+        frac = mon.get("current_hp_fraction")
+        full = frac is None or float(frac) >= 1.0
+    except (TypeError, ValueError):
+        full = True
+    if not full:
+        return False
+    item = mon.get("item")
+    if not item or item == "unknown_item":
+        item = (card or {}).get("item")
+    ability = mon.get("ability") or (card or {}).get("ability")
+    return to_id(item or "") in SASH_ITEMS or to_id(ability or "") in SASH_ABILITIES
+
+
+def _pko(rolls, acc: float, cur: int, sash: bool = False) -> float:
+    """P(one hit KOs a defender with `cur` HP left), accuracy included."""
+    if sash or not rolls:
+        return 0.0
+    return acc * sum(r >= cur for r in rolls) / len(rolls)
+
+
+def _pair_ko(a: tuple, b: tuple, cur: int, sash: bool = False) -> float:
+    """P(two hits on the same defender KO it this turn), accuracy included (a Sash only stops a lone hit)."""
+    ra, pa = a
+    rb, pb = b
+    n = (len(ra) * len(rb)) or 1
+    both = sum(x + y >= cur for x in ra for y in rb) / n
+    return pa * pb * both + pa * (1 - pb) * _pko(ra, 1.0, cur, sash) + (1 - pa) * pb * _pko(rb, 1.0, cur, sash)
+
+
 class PokemonPolicy:
     def __init__(self):
         self.cards: dict[str, dict] = {}        # our drafted sets by species id
@@ -202,6 +278,10 @@ class PokemonPolicy:
         self.prev_active: list[str | None] = [None, None]
         self.me: str | None = None
         self.last_exact: bool = False           # did the last battle decision use the exact calculator?
+        self.prev_opp: list[str | None] = [None, None]
+        self.last_move: dict[int, tuple[str, str | None]] = {}   # slot -> (species, move id) of our last action
+        self.cond_first: dict[str, int] = {}    # "opp_tailwind" / "my_tailwind" / "trickroom" -> first turn seen
+        self.last_speed: dict | None = None     # speed model of the last doubles decision (debugging / tests)
 
     def _track_draft(self, obs: dict, me: str | None) -> None:
         """Full sets are only visible while a card is still in `available_cards`; rosters/picks carry just
@@ -396,6 +476,167 @@ class PokemonPolicy:
             weights[j] = 0.7 + 0.6 * d
         return curs, danger, weights
 
+    def _speed_model(self, obs: dict, actives: list, opps: list, table: dict) -> dict:
+        """Who moves first and who KOs whom this turn, from exact stats + the damage table.
+
+        threat[(j, i)] = (P(foe j's best move KOs our slot i), expected fraction of i's HP it removes, its priority,
+        spread?) ; focus[(j, i)] = P(foe j aims at our slot i) ; fake_out[(j, i)] = P(a fresh foe j flinches i)."""
+        f_me = calc_field(obs, True)
+        terrain = f_me.get("terrain")
+        tr = "trickroom" in _cond_ids(obs.get("fields"))
+        my_side = {k: 1 for k in _cond_ids(obs.get("side_conditions"))}
+        opp_side = {k: 1 for k in _cond_ids(obs.get("opponent_side_conditions"))}
+        mine = {i: a for i, a in enumerate(list(actives)[:2]) if a and not a.get("fainted")}
+        foes = {j: o for j, o in enumerate(list(opps)[:2]) if o and not o.get("fainted")}
+        my_card = {i: self.cards.get(to_id(a.get("species", ""))) for i, a in mine.items()}
+        foe_card = {j: self.opponent_set(o.get("species", "")) for j, o in foes.items()}
+        my_view = {i: _speed_view(a) for i, a in mine.items()}
+        foe_view = {j: _speed_view(o) for j, o in foes.items()}
+        my_spe = {i: effective_speed(my_view[i], my_card[i], my_side, f_me) for i in mine}
+        foe_spe = {j: effective_speed(foe_view[j], foe_card[j], opp_side, f_me) for j in foes}
+        my_sash = {i: _sashed(a, my_card[i]) for i, a in mine.items()}
+
+        threat: dict = {}
+        for k, r in table.items():
+            if k[0] != "opp" or not r or k[1] not in foes or k[4] not in mine:
+                continue
+            j, mid, i = k[1], k[2], k[4]
+            if mid in FIRST_TURN_ONLY:                   # Fake Out: only its flinch matters (fake_out below)
+                continue
+            m = dex.move(mid)
+            acc = _acc_of(m)
+            cur = _cur_hp(mine[i], r)
+            useful, _ = _hit_stats(r["rolls"], cur)
+            pko = _pko(r["rolls"], acc, cur, my_sash[i])
+            pts = 100.0 * acc * useful + KO_BONUS * pko
+            prio = move_priority(mid, foe_view[j], foe_card[j], terrain)
+            by_prio = dict(threat[(j, i)][5]) if (j, i) in threat else {}
+            by_prio[prio] = max(by_prio.get(prio, 0.0), pko)          # a priority move may KO us first
+            if (j, i) not in threat or pts > threat[(j, i)][4]:
+                threat[(j, i)] = (pko, acc * useful, prio, m.get("target") in SPREAD_TARGETS, pts, by_prio)
+            else:
+                threat[(j, i)] = threat[(j, i)][:5] + (by_prio,)
+
+        focus: dict = {}
+        foe_prio: dict = {}
+        for j in foes:
+            pts = {i: threat[(j, i)][4] if (j, i) in threat else 0.0 for i in mine}
+            for i in mine:
+                t = threat.get((j, i))
+                if len(mine) == 1 or (t and t[3]):
+                    focus[(j, i)] = 1.0
+                    continue
+                o = pts[1 - i] if (1 - i) in pts else 0.0
+                tot = pts[i] ** 2 + o ** 2
+                focus[(j, i)] = 0.5 if tot <= 0 else min(0.9, max(0.15, pts[i] ** 2 / tot))
+            aim = max(mine, key=lambda i: pts[i], default=None)
+            foe_prio[j] = threat[(j, aim)][2] if aim is not None and (j, aim) in threat else 0
+
+        fake_out: dict = {}
+        for j, o in foes.items():
+            sp = to_id(o.get("species", ""))
+            moves = {to_id(x) for x in ((foe_card[j] or {}).get("moves") or o.get("moves") or [])}
+            if "fakeout" not in moves or (j < len(self.prev_opp) and self.prev_opp[j] == sp):
+                continue
+            open_ = [i for i, a in mine.items() if not _flinch_blocked(a, my_card[i], obs)]
+            for i in open_:
+                fake_out[(j, i)] = FAKE_OUT_LIKELY / len(open_)
+
+        # Speed control running out: which foes outspeed us only because of it (a Protect stalls those turns).
+        turn = int(obs.get("turn") or 0)
+        stall: dict = {}
+        tw_left = self._cond_left("opp_tailwind", turn) if "tailwind" in opp_side else None
+        tr_left = self._cond_left("trickroom", turn) if tr else None
+        for (j, i), t in threat.items():
+            if t[0] < 0.15 and t[1] < 0.4:
+                continue
+            now = _first(acts_first(foe_spe[j], t[2], my_spe[i], 0, tr))
+            if now <= 0.5:
+                continue
+            if tw_left is not None and tw_left <= 2 and \
+                    _first(acts_first(foe_spe[j] / 2, t[2], my_spe[i], 0, tr)) < now:
+                stall[i] = True
+            if tr_left is not None and tr_left <= 2 and \
+                    _first(acts_first(foe_spe[j], t[2], my_spe[i], 0, False)) < now:
+                stall[i] = True
+        return {"tr": tr, "terrain": terrain, "my_spe": my_spe, "foe_spe": foe_spe, "threat": threat,
+                "focus": focus, "foe_prio": foe_prio, "fake_out": fake_out, "stall": stall,
+                "foe_sash": {j: _sashed(o, foe_card[j]) for j, o in foes.items()},
+                "mine": set(mine), "foes": set(foes)}
+
+    def _prep_cand(self, c: dict, sm: dict | None, curs: dict) -> None:
+        """Per-candidate speed facts, computed once: P(it acts), P(it KOs / flinches each foe before that foe acts)."""
+        c.update(pa1=1.0, thr={}, pf={}, ko={}, kob={}, use={}, nb={})
+        if sm is None or not c.get("acts") or c["slot"] not in sm["mine"]:
+            return
+        i, prio = c["slot"], c.get("prio", 0)
+        mine_spe = sm["my_spe"][i]
+        pa = 1.0
+        for j in sm["foes"]:
+            t = sm["threat"].get((j, i))
+            hit = 0.0
+            if t:
+                ko_first = max(pko * (1.0 - _first(acts_first(mine_spe, prio, sm["foe_spe"][j], fp, sm["tr"])))
+                               for fp, pko in t[5].items())
+                hit = sm["focus"].get((j, i), 0.5) * ko_first
+            fo = sm["fake_out"].get((j, i), 0.0)
+            if fo:
+                fo *= 1.0 - _first(acts_first(mine_spe, prio, sm["foe_spe"][j], 3, sm["tr"]))
+                hit = fo + (1.0 - FAKE_OUT_LIKELY) * hit
+            c["thr"][j] = hit
+            pa *= 1.0 - hit
+        c["pa1"] = pa
+        for j, (rolls, acc) in c["foe"].items():
+            if j not in sm["foes"]:
+                continue
+            cur = curs.get(j, 1)
+            c["pf"][j] = _first(acts_first(mine_spe, prio, sm["foe_spe"][j], sm["foe_prio"].get(j, 0), sm["tr"]))
+            c["ko"][j] = _pko(rolls, acc, cur, sm["foe_sash"].get(j, False))
+            c["kob"][j] = c["pf"][j] * c["ko"][j]
+            c["use"][j] = acc * _hit_stats(rolls, cur)[0]
+        for j in sm["foes"]:
+            flinch = 0.0
+            if c.get("flinch") == j:
+                flinch = _first(acts_first(mine_spe, 3, sm["foe_spe"][j], sm["foe_prio"].get(j, 0), sm["tr"]))
+            n = min(1.0, c["kob"].get(j, 0.0) + flinch)
+            if n:
+                c["nb"][j] = pa * n
+
+    def _protect_value(self, c: dict, other: dict, sm: dict | None, obs: dict, turn: int) -> float:
+        """Protect: worth it when this slot is likely KO'd this turn and the partner removes / cripples the threat,
+        or to stall the last turns of an opposing Tailwind / Trick Room. Never twice in a row, never idly."""
+        i = c["slot"]
+        if self._protected_last(i, c.get("species", "")) or c.get("choice"):
+            return PROTECT_AGAIN                         # a Choice item would lock this mon into Protect
+        if sm is None or i not in sm["mine"]:
+            return _status_value(c.get("mid", "protect"), c.get("hp", 1.0), turn, obs)
+        keep, v = 1.0, 0.0
+        for j in sm["foes"]:
+            t = sm["threat"].get((j, i))
+            if not t:
+                continue
+            d = sm["focus"].get((j, i), 0.5) * t[0] * (1.0 - other.get("nb", {}).get(j, 0.0))
+            if d <= 0:
+                continue
+            keep *= 1.0 - d
+            helps = max(other.get("pa1", 1.0) * other.get("ko", {}).get(j, 0.0),
+                        0.5 * other.get("use", {}).get(j, 0.0))
+            if other.get("mid") in CRIPPLE_MOVES and other.get("target") in (0, j + 1):
+                helps = max(helps, 0.5)
+            v += PROTECT_SAVE * d * (PROTECT_ALONE + (1.0 - PROTECT_ALONE) * min(1.0, helps))
+        try:
+            hp = min(1.0, max(0.0, float(c.get("hp", 1.0))))
+        except (TypeError, ValueError):
+            hp = 1.0
+        v *= 0.3 + 0.7 * hp                            # saving a mon on its last few HP is worth less
+        danger = 1.0 - keep
+        stall = sm["stall"].get(i, False)
+        if danger < PROTECT_MIN_DANGER:
+            v = PROTECT_IDLE
+        if stall:
+            v = max(v, 0.0) + STALL_BONUS
+        return v
+
     # ---- battle --------------------------------------------------------
     def _singles(self, st: dict, obs: dict) -> dict:
         la = (st.get("legal_actions") or {}).get("actions") or []
@@ -461,6 +702,7 @@ class PokemonPolicy:
         opps = obs.get("opponent_active_pokemon") or [None, None]
         turn = obs.get("turn", 0)
         slots = tmpl.get("slots", [])
+        self._track_conditions(obs)
         table = self._exact_table(obs, tmpl, actives, opps)
         self.last_exact = table is not None
         pick = None
@@ -472,8 +714,55 @@ class PokemonPolicy:
                 pick = None
         if pick is None:
             pick = self._doubles_heuristic(obs, slots, actives, opps, turn)
+        self._remember(obs, pick, actives)
         self.prev_active = [to_id((a or {}).get("species", "")) or None for a in (list(actives) + [None, None])[:2]]
+        self.prev_opp = [to_id((o or {}).get("species", "")) or None for o in (list(opps) + [None, None])[:2]]
         return {"action": {"type": "doubles_turn", **pick}}
+
+    # ---- memory across turns (the policy instance lives for the whole match) ----
+    def _track_conditions(self, obs: dict) -> None:
+        """First turn we saw each speed-control condition, to know how many turns of it are left."""
+        try:
+            turn = int(obs.get("turn") or 0)
+            now = {"opp_tailwind": "tailwind" in _cond_ids(obs.get("opponent_side_conditions")),
+                   "my_tailwind": "tailwind" in _cond_ids(obs.get("side_conditions")),
+                   "trickroom": "trickroom" in _cond_ids(obs.get("fields"))}
+            for k, on in now.items():
+                if not on:
+                    self.cond_first.pop(k, None)
+                elif k not in self.cond_first or self.cond_first[k] > turn:
+                    self.cond_first[k] = turn
+        except Exception:
+            log.warning("condition tracking failed", exc_info=True)
+
+    def _cond_left(self, key: str, turn: int) -> int | None:
+        """Turns of a condition left *including* this one (it was set the turn before we first saw it)."""
+        if key not in self.cond_first:
+            return None
+        total = TRICK_ROOM_TURNS if key == "trickroom" else TAILWIND_TURNS
+        return max(1, total - 1 - (turn - self.cond_first[key]))
+
+    def _remember(self, obs: dict, pick: dict, actives: list) -> None:
+        """Last action per slot (Protect twice in a row fails). Forced-switch states only change the switching slot."""
+        try:
+            forced_state = any(_forced(obs, i) for i in (0, 1))
+            for i in (0, 1):
+                c = pick.get(f"slot_{i}") or {}
+                me = actives[i] if i < len(actives) else None
+                sp = to_id((me or {}).get("species", ""))
+                if c.get("type") == "move":
+                    if not forced_state:
+                        self.last_move[i] = (sp, to_id(c.get("move_id", "")))
+                elif c.get("type") == "switch":
+                    self.last_move[i] = (to_id(c.get("species", "")), None)
+                elif not forced_state:
+                    self.last_move.pop(i, None)
+        except Exception:
+            log.warning("could not remember last actions", exc_info=True)
+
+    def _protected_last(self, i: int, species: str) -> bool:
+        last = self.last_move.get(i)
+        return bool(last) and last[0] == to_id(species or "") and last[1] in PROTECT_MOVES
 
     def _slot_mon(self, slot: dict, actives: list) -> dict | None:
         i = slot.get("slot", 0)
@@ -482,6 +771,13 @@ class PokemonPolicy:
 
     def _doubles_exact(self, obs, slots, actives, opps, turn, table) -> dict | None:
         curs, danger, weights = self._foe_weights(table, actives, opps)
+        try:
+            sm = self._speed_model(obs, actives, opps, table)
+        except Exception:
+            log.warning("speed model failed; scoring without move order", exc_info=True)
+            sm = None
+        self.last_speed = sm
+        terrain = (sm or {}).get("terrain")
         per_slot = []
         for slot in slots:
             i = slot["slot"]
@@ -494,56 +790,85 @@ class PokemonPolicy:
                     v = self._switch_value(opt, opps) if _forced(obs, i) else -50.0
                     cands.append({"cand": _concrete(opt), "base": v, "foe": {}, "flinch": None})
                 elif opt.get("type") == "move":
-                    cands.extend(self._move_choices(opt, i, me, actives, opps, turn, fresh, obs, table, danger))
+                    cands.extend(self._move_choices(opt, i, me, actives, opps, turn, fresh, obs, table, danger,
+                                                    terrain, sm))
                 else:
                     cands.append({"cand": {"type": "pass"}, "base": -100.0, "foe": {}, "flinch": None})
             if not cands:
                 cands.append({"cand": _concrete(slot["options"][0]) if slot.get("options") else {"type": "pass"},
                               "base": -100.0, "foe": {}, "flinch": None})
+            for c in cands:
+                c.setdefault("slot", i)
+                c.setdefault("acts", False)
+                c.setdefault("kind", c["cand"].get("type"))
+                c.setdefault("species", my_sp)
+                c.setdefault("hp", (me or {}).get("current_hp_fraction", 1.0) or 1.0)
+                self._prep_cand(c, sm, curs)
             per_slot.append((i, cands))
 
         def solo(c):
             return c["base"] + sum(weights.get(j, 1.0) * acc * _points(rolls, curs.get(j, 1))
                                    for j, (rolls, acc) in c["foe"].items())
 
-        pick = {}
-        if len(per_slot) == 2:
-            (i0, c0s), (i1, c1s) = per_slot
-            solo0, solo1 = [solo(c) for c in c0s], [solo(c) for c in c1s]
-            cache: dict = {}
-            best, best_v = None, -1e18
-            for a, c0 in enumerate(c0s):
-                for b, c1 in enumerate(c1s):
-                    if c0["cand"].get("type") == "switch" and c1["cand"].get("type") == "switch" \
-                            and to_id(c0["cand"].get("species")) == to_id(c1["cand"].get("species")):
-                        continue
-                    v = solo0[a] + solo1[b]
-                    if c0["flinch"] is not None and c0["flinch"] == c1["flinch"]:
-                        v -= FAKE_OUT_BONUS
-                    for j in c0["foe"].keys() & c1["foe"].keys():      # both hit foe j: joint value replaces the sum
-                        da, db = c0["foe"][j], c1["foe"][j]
-                        key = (id(da), id(db), j)
-                        if key not in cache:
-                            cache[key] = _pair_points(da, db, curs.get(j, 1))
-                        v += weights.get(j, 1.0) * (cache[key] - da[1] * _points(da[0], curs.get(j, 1))
-                                                    - db[1] * _points(db[0], curs.get(j, 1)))
-                    if v > best_v:
-                        best, best_v = (c0, c1), v
-            if best is None:
-                return None
-            pick[f"slot_{i0}"], pick[f"slot_{i1}"] = best[0]["cand"], best[1]["cand"]
-        else:
-            used = set()
-            for i, cands in per_slot:
-                ranked = sorted(cands, key=solo, reverse=True)
-                choice = next((c for c in ranked if not (c["cand"].get("type") == "switch"
-                                                          and to_id(c["cand"].get("species")) in used)), ranked[0])
-                if choice["cand"].get("type") == "switch":
-                    used.add(to_id(choice["cand"].get("species")))
-                pick[f"slot_{i}"] = choice["cand"]
-        return pick
+        def remove_w(j):
+            return REMOVE_BASE + REMOVE_DANGER * danger.get(j, 0.5)
 
-    def _move_choices(self, opt, i, me, actives, opps, turn, fresh, obs, table, danger) -> list[dict]:
+        def p_act(c, other):
+            if not c["thr"]:
+                return c["pa1"]
+            p = 1.0
+            for j, t in c["thr"].items():
+                p *= 1.0 - t * (1.0 - other["nb"].get(j, 0.0))
+            return p
+
+        dummy = {"cand": None, "base": 0.0, "foe": {}, "flinch": None, "slot": -1, "acts": False, "kind": "none",
+                 "pa1": 1.0, "thr": {}, "pf": {}, "ko": {}, "kob": {}, "use": {}, "nb": {}, "mid": ""}
+        lists = [cands for _, cands in per_slot][:2]
+        while len(lists) < 2:
+            lists.append([dummy])
+        solos = [[solo(c) for c in lst] for lst in lists]
+        cache: dict = {}
+        best, best_v = None, -1e18
+        for a, c0 in enumerate(lists[0]):
+            for b, c1 in enumerate(lists[1]):
+                if c0["kind"] == "switch" and c1["kind"] == "switch" \
+                        and to_id(c0["cand"].get("species")) == to_id(c1["cand"].get("species")):
+                    continue
+                pa0, pa1 = p_act(c0, c1), p_act(c1, c0)
+                v = pa0 * solos[0][a] + pa1 * solos[1][b]
+                if c0["kind"] == "protect":
+                    v += self._protect_value(c0, c1, sm, obs, turn)
+                if c1["kind"] == "protect":
+                    v += self._protect_value(c1, c0, sm, obs, turn)
+                if c0["flinch"] is not None and c0["flinch"] == c1["flinch"]:
+                    v -= FAKE_OUT_BONUS
+                for j in c0["foe"].keys() & c1["foe"].keys():      # both hit foe j: joint value replaces the sum
+                    da, db = c0["foe"][j], c1["foe"][j]
+                    key = (id(da), id(db), j)
+                    if key not in cache:
+                        cur = curs.get(j, 1)
+                        cache[key] = (_pair_points(da, db, cur) - da[1] * _points(da[0], cur)
+                                      - db[1] * _points(db[0], cur),
+                                      _pair_ko(da, db, cur, bool(sm and sm["foe_sash"].get(j))))
+                    v += pa0 * pa1 * weights.get(j, 1.0) * cache[key][0]
+                if sm is not None:                                  # KOs that land before the target acts
+                    for j in c0["kob"].keys() | c1["kob"].keys():
+                        n0, n1 = pa0 * c0["kob"].get(j, 0.0), pa1 * c1["kob"].get(j, 0.0)
+                        rem = 1.0 - (1.0 - n0) * (1.0 - n1)
+                        if j in c0["kob"] and j in c1["kob"]:
+                            k0, k1 = c0["ko"][j], c1["ko"][j]
+                            extra = cache[(id(c0["foe"][j]), id(c1["foe"][j]), j)][1] - (1 - (1 - k0) * (1 - k1))
+                            if extra > 0:
+                                rem += extra * pa0 * pa1 * min(c0["pf"][j], c1["pf"][j])
+                        v += remove_w(j) * min(1.0, rem)
+                if v > best_v:
+                    best, best_v = (c0, c1), v
+        if best is None:
+            return None
+        return {f"slot_{i}": c["cand"] for (i, _), c in zip(per_slot, best)}
+
+    def _move_choices(self, opt, i, me, actives, opps, turn, fresh, obs, table, danger,
+                      terrain=None, sm=None) -> list[dict]:
         """Every legal target of one move option as a candidate: base points + per-foe damage distributions."""
         mid = to_id(opt.get("move_id", ""))
         m = dex.move(mid)
@@ -554,8 +879,19 @@ class PokemonPolicy:
         card = self._card(self.cards, me)
         sun = calc_field(obs, True).get("weather") == "Sun"
         acc = _acc_of(m, opt)
+        if mid == "suckerpunch":
+            acc *= SUCKER_PUNCH_ACC
         alive = {j: o for j, o in enumerate(list(opps)[:2]) if o and not o.get("fainted")}
         ally = actives[1 - i] if i < 2 and len(actives) > 1 - i else None
+        protect = mid in PROTECT_MOVES and not damaging
+        item = (me or {}).get("item")
+        if not item or item == "unknown_item":
+            item = card.get("item")
+        choice = to_id(item or "").startswith("choice")
+        try:
+            prio = move_priority(mid, _speed_view(me), self.cards.get(my_sp), terrain)
+        except Exception:
+            prio = int(m.get("priority", 0) or 0)
         out = []
 
         def dist(j):
@@ -577,13 +913,13 @@ class PokemonPolicy:
                         base = -20.0
                     elif not _flinch_blocked(o, self.opponent_set(o.get("species", "")), obs):
                         base, flinch = FAKE_OUT_BONUS + 100.0 * danger.get(j, 0.5), j
-                if damaging:
+                if damaging and not (mid in FIRST_TURN_ONLY and not fresh):   # a stale Fake Out fails: no damage
                     d = dist(j)
                     if d:
                         foe[j] = d
                     else:
                         base += heuristic(j)
-                else:
+                elif not damaging:
                     base += _target_status_value(mid, o, self.opponent_set(o.get("species", "")))
             elif t == 0:
                 if m.get("target") in SPREAD_TARGETS and damaging:
@@ -604,17 +940,21 @@ class PokemonPolicy:
                     pts = [acc * _points(d[0], _cur_hp(alive[j], table[("me", i, mid, "opp", j)])) if d else heuristic(j)
                            for j, d in zip(alive, vals)]
                     base = sum(pts) / len(pts) if pts else 0.0
-                else:
+                elif not protect:
                     base = _status_value(mid, hp, turn, obs)
+                    if sm is not None and mid in ("tailwind", "trickroom"):
+                        base = _speed_control_value(mid, sm, obs, base)
             else:                                                # ally-targeting: only support moves make sense
-                base = 15.0 if mid in ALLY_SUPPORT_MOVES else -100.0
+                ally_up = bool(ally) and not ally.get("fainted")
+                base = 15.0 if mid in ALLY_SUPPORT_MOVES and ally_up else -100.0
             if m.get("selfdestruct") and damaging:
                 base -= SELF_KO_PENALTY
             out.append({"cand": {"type": "move", "move_id": opt["move_id"], "target": t}, "base": base,
-                        "foe": foe, "flinch": flinch})
+                        "foe": foe, "flinch": flinch, "kind": "protect" if protect and t == 0 else "move",
+                        "acts": not protect, "prio": prio, "mid": mid, "target": t, "choice": choice})
         if not out:
             out.append({"cand": {"type": "move", "move_id": opt["move_id"], "target": targets[0]}, "base": -1.0,
-                        "foe": {}, "flinch": None})
+                        "foe": {}, "flinch": None, "acts": not protect, "prio": prio, "mid": mid, "target": targets[0]})
         return out
 
     def _doubles_heuristic(self, obs, slots, actives, opps, turn) -> dict:
@@ -675,6 +1015,9 @@ class PokemonPolicy:
                             v -= 0.9 * move_value(mid, my_sp, at)
                 else:
                     v = _status_value(mid, hp, turn, obs)
+                    if mid in PROTECT_MOVES and (self._protected_last(i, my_sp) or to_id(
+                            self.cards.get(my_sp, {}).get("item") or "").startswith("choice")):
+                        v = -50.0                                   # Protect twice in a row fails 2/3; Choice locks it
             else:  # ally-targeting (negative); only support moves make sense
                 v = 15.0 if mid in ALLY_SUPPORT_MOVES else -100
             if v > best_v:
@@ -718,6 +1061,28 @@ def _status_value(mid: str, hp: float, turn: int, obs: dict) -> float:
     if mid == "spore":
         return 55.0
     return 8.0
+
+
+def _speed_control_value(mid: str, sm: dict, obs: dict, default: float) -> float:
+    """Tailwind / Trick Room valued by how many (our mon, foe) speed matchups they flip for us."""
+    pairs = [(i, j) for i in sm["mine"] for j in sm["foes"]]
+    if not pairs:
+        return default
+    me, foe, tr = sm["my_spe"], sm["foe_spe"], sm["tr"]
+
+    def first(i, j, my_mult=1.0, trick=tr):
+        return _first(acts_first(me[i] * my_mult, 0, foe[j], 0, trick))
+
+    if mid == "tailwind":
+        if "tailwind" in _cond_ids(obs.get("side_conditions")) or tr:
+            return -10.0
+        gain = sum(first(i, j, 2.0) - first(i, j) for i, j in pairs)
+        return 20.0 + 50.0 * min(1.0, gain / 2)
+    # Trick Room: using it while it is up ends it
+    gain = sum(first(i, j, 1.0, not tr) - first(i, j) for i, j in pairs)
+    if tr:
+        return 40.0 if gain > 0 else -60.0
+    return max(-30.0, min(80.0, 10.0 + 25.0 * gain))
 
 
 def _concrete(opt: dict) -> dict:
