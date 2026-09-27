@@ -57,3 +57,19 @@ def test_calc_inputs_use_display_names_and_unknown_item_is_dropped():
     assert p["species"] == "Iron Hands" and "item" not in p and p["ability"] == "Quark Drive"
     f = calc_field({"is_doubles": True, "side_conditions": {"tailwind": 1}, "weather": {"SunnyDay": 3}, "fields": {}}, True)
     assert f["gameType"] == "Doubles" and f["attackerSide"]["isTailwind"] and f["weather"] == "Sun"
+
+
+@pytest.mark.skipif(_js_dir() is None, reason="agent/js has no node_modules")
+def test_foe_hp_percentage_is_rescaled_multiscale_respected():
+    """Platform foes report HP out of 100: passing it as a fraction keeps full-HP abilities (Multiscale) correct."""
+    dc = DamageCalc.get()
+    nite = {"species": "dragonite", "current_hp": 100, "max_hp": 100, "current_hp_fraction": 1.0, "ability": "multiscale"}
+    card = {"species": "Dragonite", "nature": "Adamant", "evs": {"hp": 4, "atk": 252, "spe": 252}, "level": 50,
+            "ability": "Multiscale", "item": "Loaded Dice"}
+    atk = {"species": "Iron Valiant", "level": 50, "nature": "Timid", "evs": {"spa": 252, "spe": 252}}
+    full, half = dc.batch([
+        {"attacker": atk, "defender": calc_pokemon(nite, card), "move": "Moonblast", "field": {"gameType": "Doubles"}},
+        {"attacker": atk, "defender": calc_pokemon({**nite, "current_hp": 50, "current_hp_fraction": 0.5}, card),
+         "move": "Moonblast", "field": {"gameType": "Doubles"}}])
+    assert "curHP" not in calc_pokemon(nite, card)
+    assert full["max"] * 2 <= half["max"] + 2                     # Multiscale halves damage only at full HP

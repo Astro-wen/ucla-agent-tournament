@@ -34,3 +34,7 @@ htmlcov/
 logs/
 .env.*
 !.env.example
+
+# ladder snapshot (scripts/freeze_champion.sh)
+champion/
+.claude/

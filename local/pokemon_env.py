@@ -258,7 +258,7 @@ class Match:
         my_side = req["side"]["pokemon"]
         force = req.get("forceSwitch") or [False, False]
         active_views = [_pv(p) for p in me["active"]]
-        opp_views = [_pv(p) for p in opp["active"]]
+        opp_views = [_foe_view(p) for p in opp["active"]]
         slots, moves_out, switches_out = [], [], []
         bench = [(j, p) for j, p in enumerate(my_side) if not p["active"] and "fnt" not in p["condition"]]
         n_slots = len(req["active"]) if req.get("active") else len(force)
@@ -297,7 +297,7 @@ class Match:
                "weather": st["weather"], "fields": st["pseudo_weather"] + ([st["terrain"]] if st["terrain"] else []),
                "active_pokemon": active_views, "opponent_active_pokemon": opp_views,
                "team": {f"{sid}: {p['species']}": p for p in map(_pv, me["team"]) if p},
-               "opponent_team": {f"opp: {p['species']}": p for p in map(_pv, opp["team"]) if p and p.get("revealed", True)},
+               "opponent_team": {f"opp: {p['species']}": p for p in map(_foe_view, opp["team"]) if p and p.get("revealed", True)},
                "available_moves": moves_out, "available_switches": switches_out,
                "force_switch": force if not req.get("active") else [False] * n_slots,
                "side_conditions": {c: 1 for c in me["side_conditions"]},
@@ -319,6 +319,16 @@ def _pv(p: dict | None) -> dict | None:
     return {"species": p["id"], "name": p["species"], "types": p["types"], "current_hp": p["current_hp"],
             "max_hp": p["max_hp"], "current_hp_fraction": p["current_hp_fraction"], "status": p["status"],
             "fainted": p["fainted"], "active": p["active"], "boosts": p["boosts"], "base_stats": p["base_stats"]}
+
+
+def _foe_view(p: dict | None) -> dict | None:
+    """Opponent Pokémon as the real platform shows it: HP out of 100 (docs/real_payloads.md), no item/ability/moves."""
+    v = _pv(p)
+    if v is None:
+        return None
+    pct = 0 if v["fainted"] else max(1, round(100 * v["current_hp_fraction"]))
+    return {**v, "current_hp": pct, "max_hp": 100, "current_hp_fraction": pct / 100,
+            "item": "unknown_item", "ability": None, "moves": []}
 
 
 def _targets(kind: str, slot: int, opp_views: list) -> list[int]:
