@@ -9,7 +9,11 @@ send them, and chat is clipped to the platform limits.
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
+import time
+from pathlib import Path
 
 from altruagent import TERMINATE_MESSAGING, DecisionContext, GameState, LegalAction, SendMessage
 
@@ -21,6 +25,28 @@ log = logging.getLogger("agent")
 
 MAX_CHATS_PER_WINDOW = 5
 MAX_WORDS = 50
+RECORD_DIR = os.environ.get("ARENA_RECORD_DIR", "logs")   # every state we act on -> logs/<session>.jsonl
+
+
+def record(kind: str, context: DecisionContext, state: GameState, out=None) -> None:
+    """Append the raw platform payload (and what we answered) so real schemas can be checked offline."""
+    try:
+        Path(RECORD_DIR).mkdir(parents=True, exist_ok=True)
+        with open(Path(RECORD_DIR) / f"{context.session_id}.jsonl", "a") as f:
+            f.write(json.dumps({"t": time.time(), "kind": kind, "game_type": context.game_type,
+                                "raw": state.raw, "out": _jsonable(out)}) + "\n")
+    except Exception:
+        log.debug("record failed", exc_info=True)
+
+
+def _jsonable(x):
+    if x is None or isinstance(x, (dict, str, int, float, bool)):
+        return x
+    if hasattr(x, "action_id"):
+        return {"action_id": x.action_id, "input": getattr(x, "input", None)}
+    if hasattr(x, "content"):
+        return {"content": x.content, "recipients": getattr(x, "recipients", None)}
+    return str(x)
 
 
 class Contestant:
@@ -32,6 +58,11 @@ class Contestant:
 
     # ---- moves -----------------------------------------------------------
     def choose_action(self, state: GameState, context: DecisionContext):
+        out = self._choose_action(state, context)
+        record("action", context, state, out)
+        return out
+
+    def _choose_action(self, state: GameState, context: DecisionContext):
         game = context.game_type or state.game_name or ""
         st = state.raw
         try:
@@ -78,6 +109,11 @@ class Contestant:
 
     # ---- Werewolf discussion ----------------------------------------------
     def choose_message(self, state: GameState, context: DecisionContext):
+        out = self._choose_message(state, context)
+        record("message", context, state, out)
+        return out
+
+    def _choose_message(self, state: GameState, context: DecisionContext):
         st = state.raw
         self.ww.observe(st)
         day = (st.get("game_state") or {}).get("day")

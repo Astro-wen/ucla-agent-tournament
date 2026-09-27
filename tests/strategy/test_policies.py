@@ -149,3 +149,16 @@ def test_adapter_werewolf_chat_then_terminate_and_clipped():
     m2 = c.choose_message(gs, ctx("werewolf"))
     assert isinstance(m2, SendMessage) and not m2.recipients          # PM to self -> broadcast
     assert c.choose_message(gs, ctx("werewolf")) is TERMINATE_MESSAGING
+
+
+def test_every_decision_is_recorded(tmp_path, monkeypatch):
+    import json
+    import agent.agent as A
+    monkeypatch.setattr(A, "RECORD_DIR", str(tmp_path))
+    c = Contestant()
+    raw = ww_state("Your role: VILLAGER", "day_vote", [0, 1, 7]) | {"game_type": "werewolf"}
+    c.choose_action(GameState.from_mcp_state(raw), ctx("werewolf"))
+    c.choose_message(GameState.from_mcp_state(raw | {"phase": "messaging"}), ctx("werewolf"))
+    lines = [json.loads(l) for l in (tmp_path / "sid.jsonl").read_text().splitlines()]
+    assert [l["kind"] for l in lines] == ["action", "message"]
+    assert lines[0]["raw"]["your_position"] == 3 and lines[0]["out"]["action_id"] == "0"
