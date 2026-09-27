@@ -80,6 +80,26 @@
   ]
  },
  {
+  "card_id": "vgc-baxcalibur",
+  "species": "Baxcalibur",
+  "item": "Loaded Dice",
+  "ability": "Thermal Exchange",
+  "nature": "Jolly",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "atk": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Icicle Spear",
+   "Glaive Rush",
+   "Ice Shard",
+   "Protect"
+  ]
+ },
+ {
   "card_id": "vgc-chi-yu",
   "species": "Chi-Yu",
   "item": "Choice Specs",
@@ -97,6 +117,46 @@
    "Dark Pulse",
    "Overheat",
    "Snarl"
+  ]
+ },
+ {
+  "card_id": "vgc-chien-pao",
+  "species": "Chien-Pao",
+  "item": "Focus Sash",
+  "ability": "Sword of Ruin",
+  "nature": "Jolly",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "atk": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Icicle Crash",
+   "Sacred Sword",
+   "Sucker Punch",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-cresselia",
+  "species": "Cresselia",
+  "item": "Sitrus Berry",
+  "ability": "Levitate",
+  "nature": "Bold",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "def": 252,
+   "spd": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Icy Wind",
+   "Moonblast",
+   "Helping Hand",
+   "Protect"
   ]
  },
  {
@@ -157,6 +217,26 @@
    "Dazzling Gleam",
    "Psychic",
    "Helping Hand"
+  ]
+ },
+ {
+  "card_id": "vgc-flutter-mane",
+  "species": "Flutter Mane",
+  "item": "Booster Energy",
+  "ability": "Protosynthesis",
+  "nature": "Timid",
+  "level": 50,
+  "evs": {
+   "spa": 252,
+   "spd": 4,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Moonblast",
+   "Shadow Ball",
+   "Icy Wind",
+   "Protect"
   ]
  },
  {
@@ -357,6 +437,26 @@
    "Light Screen",
    "Dazzling Gleam",
    "Foul Play"
+  ]
+ },
+ {
+  "card_id": "vgc-landorus-therian",
+  "species": "Landorus-Therian",
+  "item": "Choice Scarf",
+  "ability": "Intimidate",
+  "nature": "Jolly",
+  "level": 50,
+  "evs": {
+   "atk": 252,
+   "def": 4,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Earthquake",
+   "Rock Slide",
+   "U-turn",
+   "Protect"
   ]
  },
  {
