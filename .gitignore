@@ -30,8 +30,11 @@ htmlcov/
 .idea/
 .DS_Store
 
-# Match logs (may contain opponents' agent ids)
-logs/
+# Match logs: only the real platform recordings of our two agents are kept in git
+# (checked: no API keys, tokens or personal data); everything else in logs/ stays local.
+logs/*
+!logs/yoriko/
+!logs/apocalypse/
 .env.*
 !.env.example
 
