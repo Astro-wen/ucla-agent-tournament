@@ -260,6 +260,26 @@
   ]
  },
  {
+  "card_id": "vgc-gholdengo",
+  "species": "Gholdengo",
+  "item": "Air Balloon",
+  "ability": "Good as Gold",
+  "nature": "Timid",
+  "level": 50,
+  "evs": {
+   "spa": 252,
+   "spd": 4,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Make It Rain",
+   "Shadow Ball",
+   "Nasty Plot",
+   "Protect"
+  ]
+ },
+ {
   "card_id": "vgc-great-tusk",
   "species": "Great Tusk",
   "item": "Booster Energy",
@@ -377,6 +397,26 @@
    "Helping Hand",
    "Dazzling Gleam",
    "Psychic"
+  ]
+ },
+ {
+  "card_id": "vgc-iron-bundle",
+  "species": "Iron Bundle",
+  "item": "Booster Energy",
+  "ability": "Quark Drive",
+  "nature": "Timid",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "spa": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Freeze-Dry",
+   "Hydro Pump",
+   "Encore",
+   "Protect"
   ]
  },
  {
@@ -537,6 +577,26 @@
    "Ice Beam",
    "Recover",
    "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-porygon2",
+  "species": "Porygon2",
+  "item": "Eviolite",
+  "ability": "Download",
+  "nature": "Quiet",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "spa": 252,
+   "spd": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Trick Room",
+   "Tri Attack",
+   "Ice Beam",
+   "Recover"
   ]
  },
  {

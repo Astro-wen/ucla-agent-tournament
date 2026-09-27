@@ -89,4 +89,4 @@ option：招式 `{type:"move", move_id, base_power, category, move_type, current
 平台字段格式补充：`fields` 形如 `{"GRASSY_TERRAIN": 0}`、`{"PSYCHIC_TERRAIN": 4}`（值为剩余回合）；这几局没有出现过天气、双墙或顺风，`weather` / `side_conditions` 一直是 `{}`，格式未验证。`protocol_log` 是整局累积的完整协议（从 `|init|battle` 开始）。
 
 ## 2026-09-27 · 线上 A/B：v1（Yoriko）vs v0（Apocalypse）
-2 局，v0 2 胜。确认 v1 在官方运行器下全程走精确计算路径（本地重放 10/10 决策完全一致、进程日志无告警）。第二局输在选秀/首发（对手拿到 Tornadus + Rillaboom 首发），双方选秀与首发代码相同。样本太小，不构成 v1 更弱的证据；本地 400 局 v1 对 v0 为 66.8%。
+5 局：**v1 3 胜 2 负**（前两局 v0 胜，后三局 v1 胜）。确认 v1 在官方运行器下全程走精确计算路径（本地重放 10/10 决策完全一致、进程日志无告警）。第二局输在选秀/首发（对手拿到 Tornadus + Rillaboom 首发），双方选秀与首发代码相同。样本太小，不构成 v1 更弱的证据；本地 400 局 v1 对 v0 为 66.8%。
