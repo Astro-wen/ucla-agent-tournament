@@ -1,15 +1,26 @@
-"""Baseline Pokémon policy (v0): draft, team preview, singles + VGC doubles turns.
+"""Pokémon policy: draft, team preview, singles + VGC doubles turns.
 
-Scoring is a transparent expected-damage heuristic (power x STAB x type x accuracy
-x attacker stat) plus hand-tuned VGC bonuses (Fake Out, Intimidate, Tailwind,
-spread moves). It is meant to beat random/first-option bots and give the LLM or
-search-based brain a safe fallback. See docs/strategy.md for the upgrade plan.
+Battle moves are scored with Smogon's exact damage calculator (agent/pokemon/calc.py): ONE batched node
+round trip per decision covers every (our active, move, legal target) plus the foes' known moves against
+our actives. A hit is worth its expected damage as a fraction of the defender's *current* HP (capped, so
+overkill earns nothing) plus a KO bonus weighted by P(KO) over the 16 rolls and the move's accuracy;
+foes are weighted by how dangerous they are to us. In doubles both slots are chosen jointly, so two
+attacks are not wasted on one low-HP foe and both slots never Fake Out the same target.
+
+When the calculator is unavailable (no node / node_modules, bridge error) every decision falls back to
+the transparent base-stat heuristic `move_value()` with the same VGC bonuses (Fake Out, Intimidate,
+Tailwind, spread moves), exactly as v0 played. See docs/strategy.md for the upgrade plan.
 """
 from __future__ import annotations
 
+import logging
+
 from . import dex
+from .calc import DamageCalc, calc_field, calc_pokemon, move_name
 from .dex import to_id
 from .typechart import effectiveness
+
+log = logging.getLogger("agent.policy")
 
 # Rough VGC Reg-I priors (restricteds + common support). Tune from match logs.
 STAPLES = {
@@ -29,13 +40,24 @@ ABILITIES = {"intimidate": 2.0, "prankster": 0.8, "drought": 1.0, "drizzle": 1.0
              "asonespectrier": 0.5, "innerfocus": 0.3}
 SPREAD_TARGETS = {"allAdjacentFoes", "allAdjacent"}
 
+# ---- exact-damage scoring scale ("points"): removing all of a foe's current HP = 100, a KO adds KO_BONUS.
+KO_BONUS = 50.0
+FAKE_OUT_BONUS = 1000.0          # Fake Out on a fresh mon stays dominant (v0 behaviour)
+ALLY_HIT_WEIGHT = 0.9            # allAdjacent moves: our partner's damage counts against the move
+SELF_KO_PENALTY = 150.0          # Explosion & co.
+HEURISTIC_TO_POINTS = 1 / 3.5    # move_value() (~400 for a STAB super-effective 120 BP hit) -> points, when one calc fails
+GENERIC_CARD = {"evs": {"hp": 4, "atk": 252, "spa": 252, "spe": 252}, "nature": "Hardy", "level": 50}
+FIRST_TURN_ONLY = {"fakeout", "firstimpression"}
+FLINCH_IMMUNE_ABILITIES = {"innerfocus", "shielddust"}
+ALLY_SUPPORT_MOVES = {"helpinghand", "pollenpuff", "decorate", "coaching"}
+
 
 def _stat(sp: str, key: str, default: int = 90) -> int:
     return dex.base_stats(sp).get(key, default)
 
 
 def move_value(move_id: str, attacker: str, defender_types: list[str], extra: dict | None = None) -> float:
-    """Expected single-target damage proxy of one move against one defender."""
+    """Expected single-target damage proxy of one move against one defender (base-stat heuristic, the fallback)."""
     m = {**dex.move(move_id), **{k: v for k, v in (extra or {}).items() if v is not None}}
     bp = m.get("basePower") or m.get("base_power") or 0
     if not bp:
@@ -74,6 +96,104 @@ def card_score(card: dict, roster: list[dict]) -> float:
     return s
 
 
+# ---- exact-damage helpers ---------------------------------------------------------------------------
+def _types(mon: dict | None) -> list[str]:
+    mon = mon or {}
+    return [str(x).upper() for x in (mon.get("types") or dex.types_of(mon.get("species", "")))]
+
+
+def _damaging(m: dict, opt: dict | None = None) -> bool:
+    cat = (m.get("category") or (opt or {}).get("category") or "").lower()
+    if cat:
+        return cat != "status"
+    return bool(m.get("basePower") or (opt or {}).get("base_power"))
+
+
+def _acc_of(m: dict, opt: dict | None = None) -> float:
+    """Accuracy as a probability; the platform sends 0-1 floats, the dex 0-100 ints or True."""
+    a = (opt or {}).get("accuracy")
+    if a is None:
+        a = m.get("accuracy", 100)
+    if a is True or a is None:
+        return 1.0
+    try:
+        a = float(a)
+    except (TypeError, ValueError):
+        return 1.0
+    return a / 100 if a > 1 else a
+
+
+def _cur_hp(mon: dict | None, res: dict) -> int:
+    """Defender's current HP on the calculator's own scale (the platform reports foe HP as a percentage)."""
+    frac = (mon or {}).get("current_hp_fraction")
+    try:
+        frac = 1.0 if frac is None else float(frac)
+    except (TypeError, ValueError):
+        frac = 1.0
+    return max(1, int(round(min(1.0, max(0.0, frac)) * (res.get("defender_hp") or 1))))
+
+
+def _hit_stats(rolls, cur: int) -> tuple[float, float]:
+    """(expected fraction of the defender's current HP removed, P(KO)) given that the move hits."""
+    n = len(rolls) or 1
+    return sum(min(r, cur) for r in rolls) / n / cur, sum(r >= cur for r in rolls) / n
+
+
+def _points(rolls, cur: int) -> float:
+    useful, pko = _hit_stats(rolls, cur)
+    return 100.0 * useful + KO_BONUS * pko
+
+
+def _pair_points(a: tuple, b: tuple, cur: int) -> float:
+    """Value of two attacks (rolls, acc) landing on the same defender this turn: joint KO odds, no double counting."""
+    ra, pa = a
+    rb, pb = b
+    both = _points([x + y for x in ra for y in rb], cur)
+    return pa * pb * both + pa * (1 - pb) * _points(ra, cur) + (1 - pa) * pb * _points(rb, cur)
+
+
+def _adjust_rolls(rolls, m: dict, mid: str, mon: dict | None, card: dict | None, sun: bool) -> list:
+    """Per-turn expected damage of charge / recharge moves (a two-turn move is worth about half)."""
+    f = 1.0
+    flags = m.get("flags") or {}
+    item = to_id((mon or {}).get("item") or (card or {}).get("item") or "")
+    if flags.get("charge") and item != "powerherb" and not (sun and mid in ("solarbeam", "solarblade")):
+        f *= 0.45
+    if flags.get("recharge"):
+        f *= 0.65
+    return [r * f for r in rolls] if f != 1.0 else list(rolls)
+
+
+def _flinch_blocked(o: dict, card: dict | None, obs: dict) -> bool:
+    ability = to_id(o.get("ability") or (card or {}).get("ability") or "")
+    item = to_id((card or {}).get("item") or "")
+    if o.get("item") and o.get("item") != "unknown_item":
+        item = to_id(o["item"])
+    if ability in FLINCH_IMMUNE_ABILITIES or item == "covertcloak":
+        return True
+    if calc_field(obs, True).get("terrain") == "Psychic" and "FLYING" not in _types(o) and ability != "levitate":
+        return True
+    return False
+
+
+def _target_status_value(mid: str, o: dict, card: dict | None) -> float:
+    """Status moves aimed at a foe (the v0 heuristic gave these 0)."""
+    types, status = _types(o), o.get("status")
+    ability = to_id(o.get("ability") or (card or {}).get("ability") or "")
+    if mid in ("spore", "sleeppowder", "stunspore"):
+        if "GRASS" in types or ability == "overcoat" or status:
+            return 0.0
+        return 55.0 if mid == "spore" else 25.0
+    if mid == "willowisp":
+        bs = o.get("base_stats") or dex.base_stats(o.get("species", ""))
+        return 0.0 if "FIRE" in types or status else (35.0 if bs.get("atk", 0) >= bs.get("spa", 0) else 15.0)
+    if mid == "thunderwave":
+        return 0.0 if "ELECTRIC" in types or "GROUND" in types or status else 20.0
+    if mid in ("taunt", "encore", "disable"):
+        return 10.0
+    return 8.0
+
+
 class PokemonPolicy:
     def __init__(self):
         self.cards: dict[str, dict] = {}        # our drafted sets by species id
@@ -81,6 +201,7 @@ class PokemonPolicy:
         self.seen: dict[str, dict] = dex.card_catalog()   # card_id -> full set (real catalog + this draft)
         self.prev_active: list[str | None] = [None, None]
         self.me: str | None = None
+        self.last_exact: bool = False           # did the last battle decision use the exact calculator?
 
     def _track_draft(self, obs: dict, me: str | None) -> None:
         """Full sets are only visible while a card is still in `available_cards`; rosters/picks carry just
@@ -96,6 +217,14 @@ class PokemonPolicy:
     def opponent_set(self, species: str) -> dict | None:
         return self.opp_cards.get(to_id(species))
 
+    @staticmethod
+    def _card(store: dict, mon: dict | None) -> dict:
+        """The drafted set of a Pokémon for the calculator, or a generic 252/252 spread when unknown."""
+        card = store.get(to_id((mon or {}).get("species", ""))) or {}
+        out = dict(GENERIC_CARD)
+        out.update({k: v for k, v in card.items() if v not in (None, {}, [])})
+        return out
+
     # ---- dispatch ------------------------------------------------------
     def act(self, st: dict) -> dict:
         obs = st.get("observation") or {}
@@ -103,6 +232,8 @@ class PokemonPolicy:
         if phase == "draft":
             return self._draft(st, obs)
         if phase == "teambuild":
+            for s in DEFAULT_OU_TEAM:
+                self.cards.setdefault(to_id(s["species"]), s)
             return {"action": {"type": "submit_team", "team": DEFAULT_OU_TEAM}}
         if phase == "team_preview":
             return self._preview(obs)
@@ -181,19 +312,122 @@ class PokemonPolicy:
         return {"action": {"type": "select_lineup", "bring": bring, "leads": leads},
                 "reasoning_summary": f"bring {bring}, lead {leads}"}
 
+    # ---- battle: exact damage table ------------------------------------
+    def _exact_table(self, obs: dict, tmpl: dict, actives: list, opps: list) -> dict | None:
+        """Every damage calc of this decision in ONE DamageCalc.batch(): each (our slot, move) against each live foe
+        (and our partner for allAdjacent moves), plus each foe's known moves against our actives (threat weights).
+        Keys: (attacker side, slot, move id, defender side, slot) -> calc result or None. None = calc unavailable."""
+        dc = DamageCalc.get()
+        if not dc.enabled:
+            return None
+        try:
+            f_me, f_opp = calc_field(obs, True), calc_field(obs, False)
+            mine = {i: a for i, a in enumerate(list(actives)[:2]) if a and not a.get("fainted")}
+            foes = {j: o for j, o in enumerate(list(opps)[:2]) if o and not o.get("fainted")}
+            my_in = {i: calc_pokemon(a, self._card(self.cards, a)) for i, a in mine.items()}
+            foe_in = {j: calc_pokemon(o, self._card(self.opp_cards, o)) for j, o in foes.items()}
+            calcs, keys = [], []
+
+            def add(key, atk, dfn, mid, field):
+                keys.append(key)
+                calcs.append({"attacker": atk, "defender": dfn, "move": move_name(mid), "field": field})
+
+            for slot in tmpl.get("slots", []):
+                i = slot.get("slot")
+                if i not in mine:
+                    continue
+                for opt in slot.get("options", []):
+                    if opt.get("type") != "move":
+                        continue
+                    mid = to_id(opt.get("move_id", ""))
+                    m = dex.move(mid)
+                    if not _damaging(m, opt):
+                        continue
+                    tgt = m.get("target")
+                    if tgt in SPREAD_TARGETS:
+                        hits = len(foes) + (1 if tgt == "allAdjacent" and (1 - i) in mine else 0)
+                        field = f_me if hits > 1 else {**f_me, "gameType": "Singles"}   # lone target: no spread cut
+                        for j in foes:
+                            add(("me", i, mid, "opp", j), my_in[i], foe_in[j], mid, field)
+                        if tgt == "allAdjacent" and (1 - i) in mine:
+                            add(("me", i, mid, "me", 1 - i), my_in[i], my_in[1 - i], mid, field)
+                    else:
+                        for j in foes:
+                            add(("me", i, mid, "opp", j), my_in[i], foe_in[j], mid, f_me)
+            for j, o in foes.items():
+                card = self.opponent_set(o.get("species", "")) or {}
+                for mv in (card.get("moves") or o.get("moves") or [])[:4]:
+                    mid = to_id(mv)
+                    m = dex.move(mid)
+                    if not _damaging(m):
+                        continue
+                    tgt = m.get("target")
+                    hits = len(mine) + (1 if tgt == "allAdjacent" and (1 - j) in foes else 0)
+                    field = f_opp if tgt in SPREAD_TARGETS and hits > 1 else {**f_opp, "gameType": "Singles"}
+                    for i in mine:
+                        add(("opp", j, mid, "me", i), foe_in[j], my_in[i], mid, field)
+            res = dc.batch(calcs)
+            if res is None:
+                return None
+            return dict(zip(keys, res))
+        except Exception:
+            log.warning("exact damage table failed; using the heuristic", exc_info=True)
+            return None
+
+    def _foe_weights(self, table: dict, actives: list, opps: list) -> tuple[dict, dict, dict]:
+        """Per live foe j: current HP on the calc scale, danger (fraction of our current HP its best move removes)
+        and the target weight 0.7..1.3 derived from it."""
+        curs, danger, weights = {}, {}, {}
+        for j, o in enumerate(list(opps)[:2]):
+            if not o or o.get("fainted"):
+                continue
+            r = next((r for k, r in table.items() if k[3] == "opp" and k[4] == j and r), None)
+            curs[j] = _cur_hp(o, r) if r else 1
+            d = None
+            for k, r in table.items():
+                if k[0] == "opp" and k[1] == j and r:
+                    i = k[4]
+                    me = actives[i] if i < len(actives) else None
+                    useful, _ = _hit_stats(r["rolls"], _cur_hp(me, r))
+                    d = max(d or 0.0, _acc_of(dex.move(k[2])) * useful)
+            if d is None:
+                d = min(1.0, _threat(o) / 300)
+            danger[j] = d
+            weights[j] = 0.7 + 0.6 * d
+        return curs, danger, weights
+
     # ---- battle --------------------------------------------------------
     def _singles(self, st: dict, obs: dict) -> dict:
         la = (st.get("legal_actions") or {}).get("actions") or []
-        me = (obs.get("active_pokemon") or {}).get("species", "")
+        me_mon = obs.get("active_pokemon") or {}
+        me = me_mon.get("species", "")
         opp = obs.get("opponent_active_pokemon") or {}
-        opp_types = [t.upper() for t in (opp.get("types") or dex.types_of(opp.get("species", "")))]
+        opp_types = _types(opp)
+        table = self._singles_table(obs, la, me_mon, opp)
+        self.last_exact = table is not None
+        card = self._card(self.cards, me_mon)
+        sun = calc_field(obs, True).get("weather") == "Sun"
         best, best_v = None, -1.0
         for a in la:
             act = a["input"].get("action") or {}
             if act.get("type") == "move":
-                v = move_value(act.get("move_id", ""), me, opp_types,
-                               {"basePower": act.get("base_power"), "type": act.get("move_type"),
-                                "category": act.get("category"), "accuracy": act.get("accuracy")})
+                mid = to_id(act.get("move_id", ""))
+                m = dex.move(mid)
+                extra = {"basePower": act.get("base_power"), "type": act.get("move_type"),
+                         "category": act.get("category"), "accuracy": act.get("accuracy")}
+                r = (table or {}).get(mid)
+                if table is None:
+                    v = move_value(mid, me, opp_types, extra)
+                elif not _damaging(m, act):
+                    v = _target_status_value(mid, opp, self.opponent_set(opp.get("species", ""))) \
+                        if mid not in ("protect", "detect", "spikyshield", "silktrap", "banefulbunker") \
+                        else _status_value(mid, me_mon.get("current_hp_fraction", 1.0) or 1.0, obs.get("turn", 0), obs)
+                elif r:
+                    v = _acc_of(m, act) * _points(_adjust_rolls(r["rolls"], m, mid, me_mon, card, sun), _cur_hp(opp, r))
+                    if m.get("selfdestruct"):
+                        v -= SELF_KO_PENALTY
+                else:
+                    v = move_value(mid, me, opp_types, extra) * HEURISTIC_TO_POINTS
             else:
                 v = 5.0 if obs.get("force_switch") else 0.0
             if v > best_v:
@@ -201,17 +435,196 @@ class PokemonPolicy:
         best = best or la[0]
         return {k: v for k, v in best["input"].items() if k not in ("session_id", "state_version")}
 
+    def _singles_table(self, obs: dict, la: list, me_mon: dict, opp: dict) -> dict | None:
+        dc = DamageCalc.get()
+        if not dc.enabled or not me_mon.get("species") or not opp.get("species") or opp.get("fainted"):
+            return None
+        try:
+            atk = calc_pokemon(me_mon, self._card(self.cards, me_mon))
+            dfn = calc_pokemon(opp, self._card(self.opp_cards, opp))
+            field = calc_field(obs, True)
+            mids = []
+            for a in la:
+                act = a["input"].get("action") or {}
+                mid = to_id(act.get("move_id", ""))
+                if act.get("type") == "move" and mid and _damaging(dex.move(mid), act) and mid not in mids:
+                    mids.append(mid)
+            res = dc.batch([{"attacker": atk, "defender": dfn, "move": move_name(mid), "field": field} for mid in mids])
+            return None if res is None else dict(zip(mids, res))
+        except Exception:
+            log.warning("singles damage table failed; using the heuristic", exc_info=True)
+            return None
+
     def _doubles(self, st: dict, obs: dict) -> dict:
         tmpl = st["legal_actions"]["actions"][0]["input"]["action"]
         actives = obs.get("active_pokemon") or [None, None]
         opps = obs.get("opponent_active_pokemon") or [None, None]
         turn = obs.get("turn", 0)
+        slots = tmpl.get("slots", [])
+        table = self._exact_table(obs, tmpl, actives, opps)
+        self.last_exact = table is not None
+        pick = None
+        if table is not None:
+            try:
+                pick = self._doubles_exact(obs, slots, actives, opps, turn, table)
+            except Exception:
+                log.warning("exact doubles scoring failed; using the heuristic", exc_info=True)
+                pick = None
+        if pick is None:
+            pick = self._doubles_heuristic(obs, slots, actives, opps, turn)
+        self.prev_active = [to_id((a or {}).get("species", "")) or None for a in (list(actives) + [None, None])[:2]]
+        return {"action": {"type": "doubles_turn", **pick}}
+
+    def _slot_mon(self, slot: dict, actives: list) -> dict | None:
+        i = slot.get("slot", 0)
+        me = actives[i] if isinstance(i, int) and i < len(actives) else None
+        return me or slot.get("active") or ({"species": slot["species"]} if slot.get("species") else None)
+
+    def _doubles_exact(self, obs, slots, actives, opps, turn, table) -> dict | None:
+        curs, danger, weights = self._foe_weights(table, actives, opps)
+        per_slot = []
+        for slot in slots:
+            i = slot["slot"]
+            me = self._slot_mon(slot, actives)
+            my_sp = to_id((me or {}).get("species", ""))
+            fresh = self.prev_active[i] != my_sp if i < 2 else True
+            cands = []
+            for opt in slot.get("options", []):
+                if opt.get("type") == "switch":
+                    v = self._switch_value(opt, opps) if _forced(obs, i) else -50.0
+                    cands.append({"cand": _concrete(opt), "base": v, "foe": {}, "flinch": None})
+                elif opt.get("type") == "move":
+                    cands.extend(self._move_choices(opt, i, me, actives, opps, turn, fresh, obs, table, danger))
+                else:
+                    cands.append({"cand": {"type": "pass"}, "base": -100.0, "foe": {}, "flinch": None})
+            if not cands:
+                cands.append({"cand": _concrete(slot["options"][0]) if slot.get("options") else {"type": "pass"},
+                              "base": -100.0, "foe": {}, "flinch": None})
+            per_slot.append((i, cands))
+
+        def solo(c):
+            return c["base"] + sum(weights.get(j, 1.0) * acc * _points(rolls, curs.get(j, 1))
+                                   for j, (rolls, acc) in c["foe"].items())
+
+        pick = {}
+        if len(per_slot) == 2:
+            (i0, c0s), (i1, c1s) = per_slot
+            solo0, solo1 = [solo(c) for c in c0s], [solo(c) for c in c1s]
+            cache: dict = {}
+            best, best_v = None, -1e18
+            for a, c0 in enumerate(c0s):
+                for b, c1 in enumerate(c1s):
+                    if c0["cand"].get("type") == "switch" and c1["cand"].get("type") == "switch" \
+                            and to_id(c0["cand"].get("species")) == to_id(c1["cand"].get("species")):
+                        continue
+                    v = solo0[a] + solo1[b]
+                    if c0["flinch"] is not None and c0["flinch"] == c1["flinch"]:
+                        v -= FAKE_OUT_BONUS
+                    for j in c0["foe"].keys() & c1["foe"].keys():      # both hit foe j: joint value replaces the sum
+                        da, db = c0["foe"][j], c1["foe"][j]
+                        key = (id(da), id(db), j)
+                        if key not in cache:
+                            cache[key] = _pair_points(da, db, curs.get(j, 1))
+                        v += weights.get(j, 1.0) * (cache[key] - da[1] * _points(da[0], curs.get(j, 1))
+                                                    - db[1] * _points(db[0], curs.get(j, 1)))
+                    if v > best_v:
+                        best, best_v = (c0, c1), v
+            if best is None:
+                return None
+            pick[f"slot_{i0}"], pick[f"slot_{i1}"] = best[0]["cand"], best[1]["cand"]
+        else:
+            used = set()
+            for i, cands in per_slot:
+                ranked = sorted(cands, key=solo, reverse=True)
+                choice = next((c for c in ranked if not (c["cand"].get("type") == "switch"
+                                                          and to_id(c["cand"].get("species")) in used)), ranked[0])
+                if choice["cand"].get("type") == "switch":
+                    used.add(to_id(choice["cand"].get("species")))
+                pick[f"slot_{i}"] = choice["cand"]
+        return pick
+
+    def _move_choices(self, opt, i, me, actives, opps, turn, fresh, obs, table, danger) -> list[dict]:
+        """Every legal target of one move option as a candidate: base points + per-foe damage distributions."""
+        mid = to_id(opt.get("move_id", ""))
+        m = dex.move(mid)
+        targets = opt.get("targets") or [0]
+        damaging = _damaging(m, opt)
+        my_sp = to_id((me or {}).get("species", ""))
+        hp = (me or {}).get("current_hp_fraction", 1.0) or 1.0
+        card = self._card(self.cards, me)
+        sun = calc_field(obs, True).get("weather") == "Sun"
+        acc = _acc_of(m, opt)
+        alive = {j: o for j, o in enumerate(list(opps)[:2]) if o and not o.get("fainted")}
+        ally = actives[1 - i] if i < 2 and len(actives) > 1 - i else None
+        out = []
+
+        def dist(j):
+            r = table.get(("me", i, mid, "opp", j))
+            return (_adjust_rolls(r["rolls"], m, mid, me, card, sun), acc) if r else None
+
+        def heuristic(j):
+            return move_value(mid, my_sp, _types(alive[j])) * HEURISTIC_TO_POINTS
+
+        for t in targets:
+            base, foe, flinch = 0.0, {}, None
+            if t in (1, 2):
+                j = t - 1
+                if j not in alive:
+                    continue
+                o = alive[j]
+                if mid in FIRST_TURN_ONLY:
+                    if not fresh:
+                        base = -20.0
+                    elif not _flinch_blocked(o, self.opponent_set(o.get("species", "")), obs):
+                        base, flinch = FAKE_OUT_BONUS + 100.0 * danger.get(j, 0.5), j
+                if damaging:
+                    d = dist(j)
+                    if d:
+                        foe[j] = d
+                    else:
+                        base += heuristic(j)
+                else:
+                    base += _target_status_value(mid, o, self.opponent_set(o.get("species", "")))
+            elif t == 0:
+                if m.get("target") in SPREAD_TARGETS and damaging:
+                    for j in alive:
+                        d = dist(j)
+                        if d:
+                            foe[j] = d
+                        else:
+                            base += heuristic(j)
+                    if m.get("target") == "allAdjacent" and ally and not ally.get("fainted"):
+                        r = table.get(("me", i, mid, "me", 1 - i))
+                        if r:
+                            base -= ALLY_HIT_WEIGHT * acc * _points(r["rolls"], _cur_hp(ally, r))
+                        else:
+                            base -= ALLY_HIT_WEIGHT * move_value(mid, my_sp, _types(ally)) * HEURISTIC_TO_POINTS
+                elif damaging:                                   # locked / auto-targeted single-target move
+                    vals = [dist(j) for j in alive]
+                    pts = [acc * _points(d[0], _cur_hp(alive[j], table[("me", i, mid, "opp", j)])) if d else heuristic(j)
+                           for j, d in zip(alive, vals)]
+                    base = sum(pts) / len(pts) if pts else 0.0
+                else:
+                    base = _status_value(mid, hp, turn, obs)
+            else:                                                # ally-targeting: only support moves make sense
+                base = 15.0 if mid in ALLY_SUPPORT_MOVES else -100.0
+            if m.get("selfdestruct") and damaging:
+                base -= SELF_KO_PENALTY
+            out.append({"cand": {"type": "move", "move_id": opt["move_id"], "target": t}, "base": base,
+                        "foe": foe, "flinch": flinch})
+        if not out:
+            out.append({"cand": {"type": "move", "move_id": opt["move_id"], "target": targets[0]}, "base": -1.0,
+                        "foe": {}, "flinch": None})
+        return out
+
+    def _doubles_heuristic(self, obs, slots, actives, opps, turn) -> dict:
+        """v0 per-slot heuristic (base-stat damage proxy); the fallback when the calculator is unavailable."""
         pick, used_switch = {}, set()
-        for slot in tmpl.get("slots", []):
+        for slot in slots:
             i = slot["slot"]
             me = actives[i] if i < len(actives) else None
             my_sp = to_id((me or {}).get("species", "") or slot.get("species", ""))
-            fresh = self.prev_active[i] != my_sp
+            fresh = self.prev_active[i] != my_sp if i < 2 else True
             best, best_v = None, -1e9
             for opt in slot.get("options", []):
                 if opt.get("type") == "switch":
@@ -230,8 +643,7 @@ class PokemonPolicy:
             if best.get("type") == "switch":
                 used_switch.add(to_id(best.get("species")))
             pick[f"slot_{i}"] = best
-        self.prev_active = [to_id((a or {}).get("species", "")) or None for a in (list(actives) + [None, None])[:2]]
-        return {"action": {"type": "doubles_turn", **pick}}
+        return pick
 
     def _best_target(self, opt, my_sp, me, actives, opps, i, turn, fresh, obs):
         mid = to_id(opt.get("move_id", ""))
@@ -264,7 +676,7 @@ class PokemonPolicy:
                 else:
                     v = _status_value(mid, hp, turn, obs)
             else:  # ally-targeting (negative); only support moves make sense
-                v = 15.0 if mid in ("helpinghand", "pollenpuff", "decorate", "coaching") else -100
+                v = 15.0 if mid in ALLY_SUPPORT_MOVES else -100
             if v > best_v:
                 best, best_v = {"type": "move", "move_id": opt["move_id"], "target": t}, v
         if best is None:

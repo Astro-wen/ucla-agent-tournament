@@ -93,7 +93,10 @@ def calc_pokemon(mon: dict | None, card: dict | None, species: str | None = None
     sp = species or mon.get("species") or (card or {}).get("species") or ""
     entry = dex.species(sp)
     out = {"species": entry.get("name") or sp, "level": (card or {}).get("level", 50)}
-    item = mon.get("item") or (card or {}).get("item")
+    # The platform hides a foe's item ("unknown_item") and ability (None) until revealed: use its drafted card then.
+    item = mon.get("item")
+    if not item or item == "unknown_item":
+        item = (card or {}).get("item")
     if item and item != "unknown_item":
         out["item"] = dex.item_name(item)
     ability = mon.get("ability") or (card or {}).get("ability")
@@ -106,9 +109,12 @@ def calc_pokemon(mon: dict | None, card: dict | None, species: str | None = None
     boosts = {k: v for k, v in (mon.get("boosts") or {}).items() if k in ("atk", "def", "spa", "spd", "spe") and v}
     if boosts:
         out["boosts"] = boosts
-    if mon.get("max_hp") and mon.get("current_hp") is not None:
-        # the calc needs curHP in ITS stat scale; platform HP is Showdown's real HP, same scale when the set is known
-        out["curHP"] = int(mon["current_hp"])
+    frac = mon.get("current_hp_fraction")
+    if frac is None and mon.get("max_hp"):
+        frac = (mon.get("current_hp") or 0) / mon["max_hp"]
+    if frac is not None:
+        # Fraction, not raw HP: the platform reports foe HP out of 100, ours in real HP; calc.js rescales.
+        out["hpFraction"] = round(float(frac), 4)
     if mon.get("status"):
         out["status"] = mon["status"]
     return out

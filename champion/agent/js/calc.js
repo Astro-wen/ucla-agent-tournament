@@ -1,7 +1,9 @@
 // Batch damage-calc server: one JSON object per line on stdin -> one per line on stdout.
 //   {"id":1,"calcs":[{"attacker":{...},"defender":{...},"move":"Heat Wave","field":{...}}, ...]}
 //   -> {"id":1,"results":[{"min":300,"max":354,"rolls":[...16 ints],"defender_hp":210,"desc":"..."} | {"error":"..."}]}
-// Pokémon fields: species (display name), item, ability, nature, evs, ivs, level, boosts, curHP, status, teraType(ignored).
+// Pokémon fields: species (display name), item, ability, nature, evs, ivs, level, boosts, curHP, status, teraType(ignored),
+//   hpFraction (0..1): current HP as a fraction of max, scaled to the calculator's own max HP. Prefer it over curHP:
+//   the platform reports FOE HP as a percentage (x/100), so a raw curHP would mis-state e.g. Multiscale at full HP.
 // Field: gameType ("Doubles"|"Singles"), weather, terrain, isGravity, attackerSide/defenderSide:
 //   {isTailwind,isHelpingHand,isReflect,isLightScreen,isAuroraVeil,isFriendGuard,isProtected,isSR,spikes,isBattery,isPowerSpot}
 'use strict';
@@ -13,6 +15,11 @@ function mon(p) {
   const opts = {};
   for (const k of ['item', 'ability', 'nature', 'evs', 'ivs', 'level', 'boosts', 'curHP', 'status', 'abilityOn']) {
     if (p[k] !== undefined && p[k] !== null && p[k] !== '') opts[k] = p[k];
+  }
+  if (typeof p.hpFraction === 'number') {
+    const full = new Pokemon(gen, p.species, opts);
+    const f = Math.min(1, Math.max(0, p.hpFraction));
+    opts.curHP = f >= 1 ? full.maxHP() : Math.max(f > 0 ? 1 : 0, Math.round(f * full.maxHP()));
   }
   return new Pokemon(gen, p.species, opts);
 }
