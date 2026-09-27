@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import glob
 import json
+import os
 import sys
 import time
+
+os.environ["ARENA_RECORD"] = "0"          # replaying must not re-record the sessions it reads
 
 from altruagent import DecisionContext, GameState, LegalAction, SendMessage
 

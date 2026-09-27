@@ -13,11 +13,13 @@ game_state, players, legal_actions, new_messages, ...) so the deployed
 """
 from __future__ import annotations
 
+import os
 import random
 from dataclasses import dataclass, field
 
 from altruagent import TERMINATE_MESSAGING, DecisionContext, GameState, LegalAction, SendMessage
 
+os.environ["ARENA_RECORD"] = "0"      # never record simulated games (agent/agent.py record())
 N = 7
 ABSTAIN = 7
 

@@ -12,6 +12,7 @@ platform's 300 s timer would do: a random legal choice, counted as `invalid`.
 from __future__ import annotations
 
 import logging
+import os
 import random
 from dataclasses import dataclass, field
 
@@ -20,6 +21,7 @@ from altruagent import DecisionContext, GameState, LegalAction
 from .pool import POOL, to_showdown_set
 from .showdown import Showdown
 
+os.environ["ARENA_RECORD"] = "0"      # never record simulated games (agent/agent.py record())
 log = logging.getLogger("local.pokemon")
 GAME = "pokemon_vgc_doubles_draft"
 SNAKE = "ABBAABBAABBA"

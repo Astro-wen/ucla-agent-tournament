@@ -29,7 +29,11 @@ RECORD_DIR = os.environ.get("ARENA_RECORD_DIR", "logs")   # every state we act o
 
 
 def record(kind: str, context: DecisionContext, state: GameState, out=None) -> None:
-    """Append the raw platform payload (and what we answered) so real schemas can be checked offline."""
+    """Append the raw platform payload (and what we answered) so real schemas can be checked offline.
+
+    Off when ARENA_RECORD=0 — local simulators and replays set it, otherwise a 400-game ladder writes GBs."""
+    if os.environ.get("ARENA_RECORD", "1") == "0":
+        return
     try:
         Path(RECORD_DIR).mkdir(parents=True, exist_ok=True)
         with open(Path(RECORD_DIR) / f"{context.session_id}.jsonl", "a") as f:

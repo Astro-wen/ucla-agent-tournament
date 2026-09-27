@@ -155,6 +155,7 @@ def test_every_decision_is_recorded(tmp_path, monkeypatch):
     import json
     import agent.agent as A
     monkeypatch.setattr(A, "RECORD_DIR", str(tmp_path))
+    monkeypatch.setenv("ARENA_RECORD", "1")          # local simulators switch recording off process-wide
     c = Contestant()
     raw = ww_state("Your role: VILLAGER", "day_vote", [0, 1, 7]) | {"game_type": "werewolf"}
     c.choose_action(GameState.from_mcp_state(raw), ctx("werewolf"))
@@ -186,3 +187,13 @@ def test_policy_remembers_full_opponent_sets_from_draft():
                                                      "opponent_roster": [{"species": "incineroar"}, {"species": "garchomp"}]}}
     pol.act(prev)
     assert pol.opponent_set("garchomp")["moves"][1] == "Rock Slide"
+
+
+
+def test_recording_can_be_switched_off(tmp_path, monkeypatch):
+    import agent.agent as A
+    monkeypatch.setattr(A, "RECORD_DIR", str(tmp_path))
+    monkeypatch.setenv("ARENA_RECORD", "0")
+    raw = ww_state("Your role: VILLAGER", "day_vote", [0, 1, 7]) | {"game_type": "werewolf"}
+    Contestant().choose_action(GameState.from_mcp_state(raw), ctx("werewolf"))
+    assert not list(tmp_path.iterdir())
