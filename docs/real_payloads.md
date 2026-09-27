@@ -54,7 +54,9 @@ legal：`draft_pick:<card_id>`，`input.action = {"type":"draft_pick","card_id":
 **`rosters` / `picks` 只有 `card_id + species`**；完整配置只在卡还在 `available_cards` 时可见，Team Preview 的 `opponent_roster` 里对手 `item="unknown_item"`、`ability=null`、`moves=[]`。
 → 策略必须自己记住见过的每张卡（`PokemonPolicy._track_draft` + `data/vgc_cards.json` 真实卡目录，已实现并测试）。
 
-**真实卡池（这一局，18 张，无限定级传说）**：Amoonguss, Arcanine, Archaludon, Basculegion, Chi-Yu, Garchomp, Grimmsnarl, Incineroar, Iron Hands, Iron Treads, Klefki, Milotic, Rillaboom, Sableye, Talonflame, Thundurus, Ting-Lu, Whimsicott。完整配置在 `data/vgc_cards.json`。卡池是否每局固定未知，每局都会自动并入目录（`python -m local.pool --harvest`）。
+**卡池不是固定的**：每局从一个更大的卡集里抽 18 张。第一局（21f93775）与第二局（aaf9a12f）只有 8 张重叠，两局并集 28 张，全部无限定级传说，全部通过 Showdown 合法性校验。已见卡集（`data/vgc_cards.json`，每局 `python -m local.pool --harvest` 自动并入）：
+Amoonguss, Arcanine, Archaludon, Basculegion, Chi-Yu, Dondozo, Dragonite, Farigiraf, Garchomp, Grimmsnarl, Hatterene, Incineroar, Indeedee-F, Iron Hands, Iron Treads, Iron Valiant, Kingambit, Klefki, Lucario, Milotic, Rillaboom, Sableye, Talonflame, Thundurus, Ting-Lu, Tornadus, Whimsicott, Wo-Chien。
+值得注意：有 **Trick Room** 手（Farigiraf、Hatterene）和 Follow Me（Indeedee-F）、双 Tailwind 手（Tornadus、Dragonite、Whimsicott、Talonflame）——速度控制是这个卡集的核心博弈。
 
 ### Team Preview
 与 gen9same 相同：`select_lineup`，模板 `{roster, bring_count: 4, lead_count: 2, instructions}`。

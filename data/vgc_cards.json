@@ -100,6 +100,66 @@
   ]
  },
  {
+  "card_id": "vgc-dondozo",
+  "species": "Dondozo",
+  "item": "Leftovers",
+  "ability": "Unaware",
+  "nature": "Adamant",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 252,
+   "spd": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Wave Crash",
+   "Earthquake",
+   "Liquidation",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-dragonite",
+  "species": "Dragonite",
+  "item": "Loaded Dice",
+  "ability": "Multiscale",
+  "nature": "Adamant",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 252,
+   "spe": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Extreme Speed",
+   "Scale Shot",
+   "Tailwind",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-farigiraf",
+  "species": "Farigiraf",
+  "item": "Electric Seed",
+  "ability": "Armor Tail",
+  "nature": "Quiet",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "spa": 252,
+   "spd": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Trick Room",
+   "Dazzling Gleam",
+   "Psychic",
+   "Helping Hand"
+  ]
+ },
+ {
   "card_id": "vgc-garchomp",
   "species": "Garchomp",
   "item": "Focus Sash",
@@ -140,6 +200,26 @@
   ]
  },
  {
+  "card_id": "vgc-hatterene",
+  "species": "Hatterene",
+  "item": "Safety Goggles",
+  "ability": "Magic Bounce",
+  "nature": "Quiet",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "spa": 252,
+   "spd": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Trick Room",
+   "Dazzling Gleam",
+   "Psychic",
+   "Mystical Fire"
+  ]
+ },
+ {
   "card_id": "vgc-incineroar",
   "species": "Incineroar",
   "item": "Safety Goggles",
@@ -157,6 +237,26 @@
    "Knock Off",
    "Parting Shot",
    "Flare Blitz"
+  ]
+ },
+ {
+  "card_id": "vgc-indeedee-f",
+  "species": "Indeedee-F",
+  "item": "Rocky Helmet",
+  "ability": "Psychic Surge",
+  "nature": "Bold",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "def": 252,
+   "spd": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Follow Me",
+   "Helping Hand",
+   "Dazzling Gleam",
+   "Psychic"
   ]
  },
  {
@@ -200,6 +300,46 @@
   ]
  },
  {
+  "card_id": "vgc-iron-valiant",
+  "species": "Iron Valiant",
+  "item": "Booster Energy",
+  "ability": "Quark Drive",
+  "nature": "Timid",
+  "level": 50,
+  "evs": {
+   "spa": 252,
+   "spd": 4,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Moonblast",
+   "Close Combat",
+   "Thunderbolt",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-kingambit",
+  "species": "Kingambit",
+  "item": "Black Glasses",
+  "ability": "Supreme Overlord",
+  "nature": "Adamant",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 252,
+   "spe": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Sucker Punch",
+   "Iron Head",
+   "Kowtow Cleave",
+   "Protect"
+  ]
+ },
+ {
   "card_id": "vgc-klefki",
   "species": "Klefki",
   "item": "Light Clay",
@@ -217,6 +357,26 @@
    "Light Screen",
    "Dazzling Gleam",
    "Foul Play"
+  ]
+ },
+ {
+  "card_id": "vgc-lucario",
+  "species": "Lucario",
+  "item": "Life Orb",
+  "ability": "Inner Focus",
+  "nature": "Jolly",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "atk": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Close Combat",
+   "Bullet Punch",
+   "Poison Jab",
+   "Protect"
   ]
  },
  {
@@ -342,6 +502,26 @@
   ]
  },
  {
+  "card_id": "vgc-tornadus",
+  "species": "Tornadus",
+  "item": "Mental Herb",
+  "ability": "Prankster",
+  "nature": "Timid",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "spd": 4,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Bleakwind Storm",
+   "Taunt",
+   "Tailwind",
+   "Protect"
+  ]
+ },
+ {
   "card_id": "vgc-whimsicott",
   "species": "Whimsicott",
   "item": "Focus Sash",
@@ -359,6 +539,26 @@
    "Moonblast",
    "Encore",
    "Light Screen"
+  ]
+ },
+ {
+  "card_id": "vgc-wo-chien",
+  "species": "Wo-Chien",
+  "item": "Sitrus Berry",
+  "ability": "Tablets of Ruin",
+  "nature": "Careful",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "spa": 4,
+   "spd": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Leech Seed",
+   "Foul Play",
+   "Giga Drain",
+   "Protect"
   ]
  }
 ]
