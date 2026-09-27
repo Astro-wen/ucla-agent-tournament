@@ -6,7 +6,18 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-DATA = Path(__file__).resolve().parents[2] / "data"
+
+
+def repo_root() -> Path:
+    """Walk up until we find data/pokedex.json — works from agent/ and from a champion/agent/ copy."""
+    p = Path(__file__).resolve()
+    for d in p.parents:
+        if (d / "data" / "pokedex.json").exists():
+            return d
+    return p.parents[2]
+
+
+DATA = repo_root() / "data"
 
 
 def to_id(name: str) -> str:
@@ -25,6 +36,14 @@ def species(name: str) -> dict:
 
 def move(name: str) -> dict:
     return _load("moves").get(to_id(name), {})
+
+
+def item_name(item: str) -> str:
+    return _load("items").get(to_id(item), {}).get("name") or item
+
+
+def ability_name(ability: str) -> str:
+    return _load("abilities").get(to_id(ability), {}).get("name") or ability
 
 
 def types_of(name: str) -> list[str]:
