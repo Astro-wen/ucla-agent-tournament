@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 
-from . import dex
+from . import dex, matchup
 from .calc import DamageCalc, calc_field, calc_pokemon, move_name
 from .dex import to_id
 from .typechart import effectiveness
@@ -267,6 +267,10 @@ class PokemonPolicy:
         me = (st.get("current_actor") or {}).get("agent_id") or obs.get("current_seat")
         self.me = me
         self._track_draft(obs, me)
+        try:                    # boot the calculator's node process now, so team preview doesn't pay its start-up
+            DamageCalc.get()._start()
+        except Exception:
+            log.debug("calc warm-up failed", exc_info=True)
         taken = {to_id(c.get("species", "")) for c in (obs.get("rosters") or {}).get(me, [])}
         roster = [self.cards[s] for s in taken if s in self.cards] or [
             {"species": c.get("species", "")} for c in (obs.get("rosters") or {}).get(me, [])]
@@ -281,14 +285,50 @@ class PokemonPolicy:
 
     # ---- team preview --------------------------------------------------
     def _preview(self, obs: dict) -> dict:
-        mine = obs.get("your_roster", [])
-        opp = obs.get("opponent_roster", [])
+        mine = [p for p in (obs.get("your_roster") or []) if isinstance(p, dict) and p.get("species")]
+        opp = [p for p in (obs.get("opponent_roster") or []) if isinstance(p, dict) and p.get("species")]
         # Picks made after our last draft turn never reached us as a draft state: resolve by species.
         by_species = {to_id(c.get("species", "")): c for c in self.seen.values()}
         for p in opp:
             sid = to_id(p.get("species", ""))
             if sid not in self.opp_cards and sid in by_species:
                 self.opp_cards[sid] = by_species[sid]
+        for p in mine:                                   # e.g. a restarted process that never saw the draft
+            sid = to_id(p.get("species", ""))
+            if sid not in self.cards and sid in by_species:
+                self.cards[sid] = by_species[sid]
+        try:
+            out = self._preview_matrix(mine, opp)
+            if out is not None:
+                return out
+        except Exception:
+            log.warning("matchup-matrix preview failed; using the heuristic", exc_info=True)
+        return self._preview_heuristic(mine, opp)
+
+    def _preview_matrix(self, mine: list[dict], opp: list[dict]) -> dict | None:
+        """Exact 6x6 matchup matrix -> bring 4 / lead 2 (matchup.py). None when the calc is unavailable."""
+        if len(mine) < 4 or not opp:
+            return None
+        ours = [matchup.Mon(p, self.cards.get(to_id(p.get("species", "")))) for p in mine]
+        theirs = [matchup.Mon(p, self.opponent_set(p.get("species", ""))) for p in opp]
+        if any(not m.sid for m in ours + theirs) or len({m.sid for m in ours}) != len(ours):
+            return None
+        mx = matchup.matchup_matrix(ours, theirs)
+        if mx is None:
+            return None
+        base = [card_score(self.cards.get(m.sid) or {"species": m.sid, "moves": m.moves, "ability": m.ability}, [])
+                / 40 for m in ours]
+        bring_i, leads_i, score = matchup.choose_lineup(ours, theirs, mx, base)
+        # Echo the roster's own species strings (the platform validates bring/leads against them).
+        bring = [mine[i]["species"] for i in bring_i]
+        leads = [mine[i]["species"] for i in leads_i]
+        if len(set(bring)) != 4 or len(set(leads)) != 2 or not set(leads) <= set(bring):
+            return None
+        return {"action": {"type": "select_lineup", "bring": bring, "leads": leads},
+                "reasoning_summary": f"matchup matrix: bring {bring}, lead {leads} (score {score:.2f})"}
+
+    def _preview_heuristic(self, mine: list[dict], opp: list[dict]) -> dict:
+        """v0 preview (card value + base-stat offense into their types); the fallback when the calc is unavailable."""
         opp_types = [[t.upper() for t in (p.get("types") or dex.types_of(p.get("species", "")))] for p in opp]
 
         def value(p: dict) -> float:
