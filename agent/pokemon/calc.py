@@ -93,7 +93,10 @@ def calc_pokemon(mon: dict | None, card: dict | None, species: str | None = None
     sp = species or mon.get("species") or (card or {}).get("species") or ""
     entry = dex.species(sp)
     out = {"species": entry.get("name") or sp, "level": (card or {}).get("level", 50)}
-    item = mon.get("item") or (card or {}).get("item")
+    # The platform hides a foe's item ("unknown_item") and ability (None) until revealed: use its drafted card then.
+    item = mon.get("item")
+    if not item or item == "unknown_item":
+        item = (card or {}).get("item")
     if item and item != "unknown_item":
         out["item"] = dex.item_name(item)
     ability = mon.get("ability") or (card or {}).get("ability")
