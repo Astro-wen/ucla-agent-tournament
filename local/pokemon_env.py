@@ -120,7 +120,7 @@ def _sid(x: str) -> str:
 class Match:
     def __init__(self, sd: Showdown, players: list[Player], rng: random.Random, pool: list[dict] | None = None):
         self.sd, self.players, self.rng = sd, players, rng
-        self.pool = pool or rng.sample(POOL, 18)
+        self.pool = pool or rng.sample(POOL, min(18, len(POOL)))
         self.ids = ["agent-a", "agent-b"]
         self.version = 0
         self.invalid = [0, 0]

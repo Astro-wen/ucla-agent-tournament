@@ -15,7 +15,10 @@
 | 等级 | `Adjust Level = 50` 在直接用 `Battle` 类时不生效 | 本地必须自己把 set 的 `level` 写成 50（平台卡牌本来就是 50，`local/pool.py` 也是） |
 | `@smogon/calc` 双打修正 | Chi-Yu Heat Wave vs Amoonguss：单打 402–474，双打 300–354（≈0.75×）；Helping Hand + 晴天 672–792 | 精确伤害计算可用，含群攻 0.75×、场地/天气/Helping Hand |
 
-结论：**对战阶段可以 100% 复现**（同引擎、同 format、Tera 关、6 带 4）。**选秀阶段是平台自定义的**，我按 `docs/platform/pokemon.md` 重写了一份（18 卡蛇形、道具条款）；卡池 `local/pool.py` 是我手写的 26 套常见 Reg I 配置，全部通过 Showdown 的 TeamValidator，但**不是平台真实卡池**。
+结论：**对战阶段可以 100% 复现**（同引擎、同 format、Tera 关、6 带 4）。**选秀阶段是平台自定义的**，我按 `docs/platform/pokemon.md` 重写了一份（18 卡蛇形、道具条款）。
+
+卡池：`local/pool.py` 优先读 `data/vgc_cards.json`——**从真实对局记录里采集的平台卡**（2026-09-26 第一局 VGC 后为 18 张，全部通过 Showdown TeamValidator）；没有时退回手写的 26 套。
+与真实平台对照（`docs/real_payloads.md`）：同 29 组（槽位, 招式）的可选目标集合 **0 处不一致**。
 
 狼人杀：平台引擎不公开，`local/werewolf_env.py` 严格按 `docs/platform/werewolf.md` 实现（2 狼 1 预 4 民、第一夜平安、分票取低座位、死亡亮身份、每天一次公开讨论窗口 5 条 × 50 词、顺序暗投相对多数、平票无人、三天僵局狼胜、±1）。**状态 payload 按平台文档的形状构造**，所以 `agent/agent.py` 里部署用的 `Contestant` 在这里一行不改地跑。
 
@@ -37,10 +40,12 @@ python -m local.eval_werewolf --games 2000        # 也可 --ref random
 
 **Pokémon VGC 双打选秀**（各 300 局，轮流先手/后手）
 
-| 对手 | 胜率 | 95% CI | 我方非法动作 |
+| 对手 | 手写卡池 | **真实卡池** | 我方非法动作 |
 |---|---|---|---|
-| official_baseline | **297/300 = 99.0%** | [97.1%, 99.7%] | 0 |
-| random | **299/300 = 99.7%** | [98.1%, 99.9%] | 0 |
+| official_baseline | 297/300 = 99.0% | **293/300 = 97.7%**，95% CI [95.3%, 98.9%] | 0 |
+| random | 299/300 = 99.7% | **292/300 = 97.3%**，95% CI [94.8%, 98.6%] | 0 |
+
+真实卡池没有限定级传说、辅助型更多（Prankster ×4、双墙），对局更长（平均 7.4 vs 5.1 回合），胜率略降。
 
 **狼人杀**（各 2000 局，同种子配对比较）
 
@@ -59,4 +64,4 @@ python -m local.eval_werewolf --games 2000        # 也可 --ref random
 
 1. 预言家夜里查验时会查"最可疑"= 平票取最小座位 = 明天就要被投出去的人，查验浪费。应排除最可能被处决的席位。
 2. Pokémon 出招不看对手防御、不看速度、不预测对手。`@smogon/calc` 已验证可用，接进 bridge 即可做精确伤害。
-3. 卡池是手写的，等拿到 key 抓一次真实选秀 payload 后替换。
+3. ~~卡池是手写的~~ → 已换成真实卡池。

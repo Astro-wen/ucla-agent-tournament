@@ -43,7 +43,34 @@ legal actions：`move:0..3`、`switch:0..4`；`input.action` 例：`{"type":"mov
 
 `can_tera: true` 出现在 gen9customgame 的 observation 里，但 legal actions 里没有任何 tera 动作，与文档"信息性字段"一致。
 
+## 2026-09-26 · `pokemon_vgc_doubles_draft` · Yoriko_Red vs Apocalypse_Red（session 21f93775）
+
+房间由人类账号在 dashboard 创建；两边都是 v0。Yoriko 26 次决策（6 选秀 + 1 首发 + 19 回合），打到第 17 回合 Yoriko 胜。两边进程日志 0 条 warning / 回退。
+
+### 选秀
+observation：`available_card_ids, available_cards, battle_format(gen9vgc2025regi), current_seat, draft_complete, first_drafter, phase, pick_number, picks, picks_remaining, rosters, unused_card_ids`
+卡：`card_id, species, item, ability, nature, level(50), evs, ivs({}), moves`（招式为显示名，如 "Flare Blitz"）
+legal：`draft_pick:<card_id>`，`input.action = {"type":"draft_pick","card_id":…}`
+**`rosters` / `picks` 只有 `card_id + species`**；完整配置只在卡还在 `available_cards` 时可见，Team Preview 的 `opponent_roster` 里对手 `item="unknown_item"`、`ability=null`、`moves=[]`。
+→ 策略必须自己记住见过的每张卡（`PokemonPolicy._track_draft` + `data/vgc_cards.json` 真实卡目录，已实现并测试）。
+
+**真实卡池（这一局，18 张，无限定级传说）**：Amoonguss, Arcanine, Archaludon, Basculegion, Chi-Yu, Garchomp, Grimmsnarl, Incineroar, Iron Hands, Iron Treads, Klefki, Milotic, Rillaboom, Sableye, Talonflame, Thundurus, Ting-Lu, Whimsicott。完整配置在 `data/vgc_cards.json`。卡池是否每局固定未知，每局都会自动并入目录（`python -m local.pool --harvest`）。
+
+### Team Preview
+与 gen9same 相同：`select_lineup`，模板 `{roster, bring_count: 4, lead_count: 2, instructions}`。
+
+### 双打回合（与 v0 的假设一致）
+observation 新增 `target_legend`；`active_pokemon` / `opponent_active_pokemon` 是**长度 2 的列表**；`available_moves` / `available_switches` 是 `[[…],[…]]`；`force_switch` 是 `[bool, bool]`。
+唯一 legal action `doubles_turn`，模板 `{type, slots, target_legend, instructions}`；每个 slot：`slot, board_position(-1/-2), active(完整宝可梦视图，含 boosts), force_switch, options`。
+option：招式 `{type:"move", move_id, base_power, category, move_type, current_pp, accuracy, targets}`；换人 `{type:"switch", species}`；`{type:"pass"}`。
+
+实测目标集合：
+- 单体招式：slot 0 → `[-2, 1, 2]`，slot 1 → `[-1, 1, 2]`（**`-1/-2` 是固定站位，不是"自己/队友"**；单体招式可以打队友）
+- 群攻 / 自身 / 场地：`[0]`（Earthquake、Heat Wave、Rock Slide、Snarl、Protect、Rage Powder）
+- 强制换人：需要换人的槽只有 `switch`，另一槽只有 `[{"type":"pass"}]`
+
+本地模拟器对同样的 29 组（槽位, 招式）给出的目标集合与真实平台 **0 处不一致**。
+
 ### 还没见到、仍是假设的
-- **双打回合模板**（`doubles_turn` 的 `slots / options / targets`）——等 VGC 房。
-- 选秀阶段 observation（`available_cards` 等）——等 VGC 房。
-- 狼人杀全部 payload。
+- 被锁招（蓄力、讲究道具、Encore）时的模板——本地模拟器里此时招式无目标，平台行为未见。
+- 狼人杀全部 payload（需要 7 个 agent 才能开局）。

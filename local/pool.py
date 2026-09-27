@@ -1,11 +1,18 @@
-"""A local stand-in for the platform's 18-card VGC draft pool.
+"""The VGC draft pool used by the local environment.
 
-The platform's real pool is not public. These are common Regulation I sets,
-written by hand and checked for legality by Showdown's TeamValidator
-(`python -m local.pool` runs the check). Only two restricted Pokémon are in
-the pool so a roster can never exceed the format's "Limit Two Restricted".
+Preferred source: data/vgc_cards.json — the real platform cards, harvested from
+recorded draft payloads (`python -m local.pool --harvest`). The platform sends
+`ivs: {}`; locally we fill 31s (Showdown's validator needs them for legendaries).
+Fallback: HANDWRITTEN, common Reg I sets written before we had real data.
+`python -m local.pool` checks every card with Showdown's TeamValidator.
 """
 from __future__ import annotations
+
+import glob
+import json
+from pathlib import Path
+
+CATALOG = Path(__file__).resolve().parents[1] / "data" / "vgc_cards.json"
 
 RESTRICTED = {"Kyogre", "Miraidon"}
 
@@ -24,7 +31,7 @@ def card(cid, species, item, ability, nature, evs, moves, level=50):
             "level": level, "evs": evs, "ivs": dict(EVENT_IVS.get(species, ALL31)), "moves": moves}
 
 
-POOL = [
+HANDWRITTEN = [
     card("vgc-incineroar", "Incineroar", "Safety Goggles", "Intimidate", "Careful",
          {"hp": 252, "atk": 4, "def": 100, "spd": 148, "spe": 4}, ["Fake Out", "Flare Blitz", "Knock Off", "Parting Shot"]),
     card("vgc-rillaboom", "Rillaboom", "Assault Vest", "Grassy Surge", "Adamant",
@@ -80,6 +87,30 @@ POOL = [
 ]
 
 
+def load_real() -> list[dict]:
+    if not CATALOG.exists():
+        return []
+    return [{**c, "ivs": dict(c.get("ivs") or EVENT_IVS.get(c["species"], ALL31))}
+            for c in json.loads(CATALOG.read_text())]
+
+
+def harvest(log_glob: str = "logs/*/*.jsonl") -> int:
+    """Merge every card seen in recorded draft payloads into data/vgc_cards.json."""
+    cards = {c["card_id"]: c for c in (json.loads(CATALOG.read_text()) if CATALOG.exists() else [])}
+    for f in glob.glob(log_glob):
+        for line in open(f):
+            o = json.loads(line).get("raw", {}).get("observation")
+            if isinstance(o, dict) and o.get("phase") == "draft":
+                for c in o.get("available_cards", []):
+                    cards[c["card_id"]] = c
+    CATALOG.parent.mkdir(exist_ok=True)
+    CATALOG.write_text(json.dumps(sorted(cards.values(), key=lambda c: c["card_id"]), indent=1))
+    return len(cards)
+
+
+POOL = load_real() or HANDWRITTEN
+
+
 def to_showdown_set(c: dict) -> dict:
     return {"name": c["species"], "species": c["species"], "item": c["item"], "ability": c["ability"],
             "nature": c["nature"], "level": c.get("level", 50), "evs": dict(c["evs"]), "ivs": dict(c.get("ivs") or {}),
@@ -87,6 +118,11 @@ def to_showdown_set(c: dict) -> dict:
 
 
 if __name__ == "__main__":
+    import sys
+    if "--harvest" in sys.argv:
+        print(f"{harvest()} cards in {CATALOG}")
+        POOL = load_real()
+    print(f"pool source: {'real platform cards' if load_real() else 'handwritten'} ({len(POOL)} cards)")
     from .showdown import Showdown
     with Showdown() as sd:
         probs = sd.validate([to_showdown_set(c) for c in POOL])

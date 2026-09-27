@@ -162,3 +162,27 @@ def test_every_decision_is_recorded(tmp_path, monkeypatch):
     lines = [json.loads(l) for l in (tmp_path / "sid.jsonl").read_text().splitlines()]
     assert [l["kind"] for l in lines] == ["action", "message"]
     assert lines[0]["raw"]["your_position"] == 3 and lines[0]["out"]["action_id"] == "0"
+
+
+def test_policy_remembers_full_opponent_sets_from_draft():
+    pol = PokemonPolicy()
+    inc = {"card_id": "vgc-incineroar", "species": "Incineroar", "item": "Safety Goggles", "ability": "Intimidate",
+           "moves": ["Fake Out", "Knock Off", "Parting Shot", "Flare Blitz"]}
+    rill = {"card_id": "vgc-rillaboom", "species": "Rillaboom", "item": "Assault Vest", "ability": "Grassy Surge",
+            "moves": ["Fake Out", "Wood Hammer", "Grassy Glide", "U-turn"]}
+    gar = {"card_id": "vgc-garchomp", "species": "Garchomp", "item": "Focus Sash", "ability": "Rough Skin",
+           "moves": ["Earthquake", "Rock Slide", "Iron Head", "Protect"]}
+    # Opponent already took Incineroar before our first draft state (only card_id + species visible).
+    st = {"phase": "draft", "current_actor": {"agent_id": "me"},
+          "observation": {"phase": "draft", "current_seat": "me", "available_cards": [rill, gar],
+                          "rosters": {"me": [], "opp": [{"card_id": "vgc-incineroar", "species": "Incineroar"}]}},
+          "legal_actions": {"actions": [{"action_id": "draft_pick:vgc-rillaboom", "input": {"action": {"card_id": "vgc-rillaboom"}}},
+                                        {"action_id": "draft_pick:vgc-garchomp", "input": {"action": {"card_id": "vgc-garchomp"}}}]}}
+    pol.seen.setdefault("vgc-incineroar", inc)          # from the real catalog in production
+    pol.act(st)
+    assert pol.opponent_set("Incineroar")["item"] == "Safety Goggles"
+    # Garchomp was offered to us, the opponent took it after our last draft turn: recovered at team preview.
+    prev = {"phase": "team_preview", "observation": {"your_roster": [{"species": "rillaboom"}] * 6,
+                                                     "opponent_roster": [{"species": "incineroar"}, {"species": "garchomp"}]}}
+    pol.act(prev)
+    assert pol.opponent_set("garchomp")["moves"][1] == "Rock Slide"

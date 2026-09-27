@@ -77,8 +77,24 @@ def card_score(card: dict, roster: list[dict]) -> float:
 class PokemonPolicy:
     def __init__(self):
         self.cards: dict[str, dict] = {}        # our drafted sets by species id
+        self.opp_cards: dict[str, dict] = {}    # opponent's drafted sets by species id
+        self.seen: dict[str, dict] = dex.card_catalog()   # card_id -> full set (real catalog + this draft)
         self.prev_active: list[str | None] = [None, None]
         self.me: str | None = None
+
+    def _track_draft(self, obs: dict, me: str | None) -> None:
+        """Full sets are only visible while a card is still in `available_cards`; rosters/picks carry just
+        card_id + species and team preview hides items/moves. Remember every set we ever see."""
+        for c in obs.get("available_cards") or []:
+            self.seen[c["card_id"]] = c
+        for seat, roster in (obs.get("rosters") or {}).items():
+            target = self.cards if seat == me else self.opp_cards
+            for r in roster:
+                full = self.seen.get(r.get("card_id"), {"species": r.get("species", "")})
+                target[to_id(full.get("species", r.get("species", "")))] = full
+
+    def opponent_set(self, species: str) -> dict | None:
+        return self.opp_cards.get(to_id(species))
 
     # ---- dispatch ------------------------------------------------------
     def act(self, st: dict) -> dict:
@@ -119,6 +135,7 @@ class PokemonPolicy:
     def _draft(self, st: dict, obs: dict) -> dict:
         me = (st.get("current_actor") or {}).get("agent_id") or obs.get("current_seat")
         self.me = me
+        self._track_draft(obs, me)
         taken = {to_id(c.get("species", "")) for c in (obs.get("rosters") or {}).get(me, [])}
         roster = [self.cards[s] for s in taken if s in self.cards] or [
             {"species": c.get("species", "")} for c in (obs.get("rosters") or {}).get(me, [])]
@@ -135,6 +152,12 @@ class PokemonPolicy:
     def _preview(self, obs: dict) -> dict:
         mine = obs.get("your_roster", [])
         opp = obs.get("opponent_roster", [])
+        # Picks made after our last draft turn never reached us as a draft state: resolve by species.
+        by_species = {to_id(c.get("species", "")): c for c in self.seen.values()}
+        for p in opp:
+            sid = to_id(p.get("species", ""))
+            if sid not in self.opp_cards and sid in by_species:
+                self.opp_cards[sid] = by_species[sid]
         opp_types = [[t.upper() for t in (p.get("types") or dex.types_of(p.get("species", "")))] for p in opp]
 
         def value(p: dict) -> float:

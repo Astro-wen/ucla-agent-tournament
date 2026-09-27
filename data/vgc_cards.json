@@ -1,0 +1,364 @@
+[
+ {
+  "card_id": "vgc-amoonguss",
+  "species": "Amoonguss",
+  "item": "Rocky Helmet",
+  "ability": "Regenerator",
+  "nature": "Bold",
+  "level": 50,
+  "evs": {
+   "hp": 244,
+   "def": 172,
+   "spd": 92
+  },
+  "ivs": {},
+  "moves": [
+   "Spore",
+   "Rage Powder",
+   "Pollen Puff",
+   "Sludge Bomb"
+  ]
+ },
+ {
+  "card_id": "vgc-arcanine",
+  "species": "Arcanine",
+  "item": "Safety Goggles",
+  "ability": "Intimidate",
+  "nature": "Adamant",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 252,
+   "spe": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Flare Blitz",
+   "Extreme Speed",
+   "Snarl",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-archaludon",
+  "species": "Archaludon",
+  "item": "Leftovers",
+  "ability": "Stamina",
+  "nature": "Bold",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "def": 252,
+   "spa": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Body Press",
+   "Draco Meteor",
+   "Flash Cannon",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-basculegion",
+  "species": "Basculegion",
+  "item": "Life Orb",
+  "ability": "Adaptability",
+  "nature": "Adamant",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "atk": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Wave Crash",
+   "Aqua Jet",
+   "Liquidation",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-chi-yu",
+  "species": "Chi-Yu",
+  "item": "Choice Specs",
+  "ability": "Beads of Ruin",
+  "nature": "Timid",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "spa": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Heat Wave",
+   "Dark Pulse",
+   "Overheat",
+   "Snarl"
+  ]
+ },
+ {
+  "card_id": "vgc-garchomp",
+  "species": "Garchomp",
+  "item": "Focus Sash",
+  "ability": "Rough Skin",
+  "nature": "Jolly",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "atk": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Earthquake",
+   "Rock Slide",
+   "Iron Head",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-grimmsnarl",
+  "species": "Grimmsnarl",
+  "item": "Light Clay",
+  "ability": "Prankster",
+  "nature": "Careful",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 4,
+   "spd": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Light Screen",
+   "Reflect",
+   "Spirit Break",
+   "Thunder Wave"
+  ]
+ },
+ {
+  "card_id": "vgc-incineroar",
+  "species": "Incineroar",
+  "item": "Safety Goggles",
+  "ability": "Intimidate",
+  "nature": "Careful",
+  "level": 50,
+  "evs": {
+   "hp": 244,
+   "def": 12,
+   "spd": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Fake Out",
+   "Knock Off",
+   "Parting Shot",
+   "Flare Blitz"
+  ]
+ },
+ {
+  "card_id": "vgc-iron-hands",
+  "species": "Iron Hands",
+  "item": "Assault Vest",
+  "ability": "Quark Drive",
+  "nature": "Adamant",
+  "level": 50,
+  "evs": {
+   "hp": 236,
+   "atk": 252,
+   "spe": 20
+  },
+  "ivs": {},
+  "moves": [
+   "Fake Out",
+   "Close Combat",
+   "Wild Charge",
+   "Drain Punch"
+  ]
+ },
+ {
+  "card_id": "vgc-iron-treads",
+  "species": "Iron Treads",
+  "item": "Booster Energy",
+  "ability": "Quark Drive",
+  "nature": "Jolly",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "atk": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Earthquake",
+   "Iron Head",
+   "High Horsepower",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-klefki",
+  "species": "Klefki",
+  "item": "Light Clay",
+  "ability": "Prankster",
+  "nature": "Careful",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 4,
+   "spd": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Reflect",
+   "Light Screen",
+   "Dazzling Gleam",
+   "Foul Play"
+  ]
+ },
+ {
+  "card_id": "vgc-milotic",
+  "species": "Milotic",
+  "item": "Chesto Berry",
+  "ability": "Competitive",
+  "nature": "Calm",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "def": 4,
+   "spd": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Scald",
+   "Ice Beam",
+   "Recover",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-rillaboom",
+  "species": "Rillaboom",
+  "item": "Assault Vest",
+  "ability": "Grassy Surge",
+  "nature": "Adamant",
+  "level": 50,
+  "evs": {
+   "hp": 236,
+   "atk": 116,
+   "def": 4,
+   "spd": 4,
+   "spe": 148
+  },
+  "ivs": {},
+  "moves": [
+   "Fake Out",
+   "Wood Hammer",
+   "Grassy Glide",
+   "U-turn"
+  ]
+ },
+ {
+  "card_id": "vgc-sableye",
+  "species": "Sableye",
+  "item": "Mental Herb",
+  "ability": "Prankster",
+  "nature": "Careful",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 4,
+   "spd": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Foul Play",
+   "Fake Out",
+   "Will-O-Wisp",
+   "Taunt"
+  ]
+ },
+ {
+  "card_id": "vgc-talonflame",
+  "species": "Talonflame",
+  "item": "Sharp Beak",
+  "ability": "Gale Wings",
+  "nature": "Jolly",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 4,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Tailwind",
+   "Brave Bird",
+   "Taunt",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-thundurus",
+  "species": "Thundurus",
+  "item": "Life Orb",
+  "ability": "Defiant",
+  "nature": "Timid",
+  "level": 50,
+  "evs": {
+   "spa": 252,
+   "spd": 4,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Thunderbolt",
+   "Sludge Bomb",
+   "Taunt",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-ting-lu",
+  "species": "Ting-Lu",
+  "item": "Leftovers",
+  "ability": "Vessel of Ruin",
+  "nature": "Careful",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 4,
+   "spd": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Ruination",
+   "Spikes",
+   "Earthquake",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-whimsicott",
+  "species": "Whimsicott",
+  "item": "Focus Sash",
+  "ability": "Prankster",
+  "nature": "Timid",
+  "level": 50,
+  "evs": {
+   "hp": 4,
+   "spa": 252,
+   "spe": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Tailwind",
+   "Moonblast",
+   "Encore",
+   "Light Screen"
+  ]
+ }
+]

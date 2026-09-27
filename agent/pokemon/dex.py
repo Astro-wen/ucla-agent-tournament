@@ -33,3 +33,9 @@ def types_of(name: str) -> list[str]:
 
 def base_stats(name: str) -> dict:
     return species(name).get("baseStats", {})
+
+
+def card_catalog() -> dict[str, dict]:
+    """Real platform draft cards harvested from logs (data/vgc_cards.json), keyed by card_id."""
+    data = _load("vgc_cards")
+    return {c["card_id"]: dict(c) for c in data} if isinstance(data, list) else {}
