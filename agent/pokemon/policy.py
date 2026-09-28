@@ -207,6 +207,19 @@ class PokemonPolicy:
         self.opp_prev_active: list[str | None] = [None, None]   # foes on the field at our previous decision
         self.last_protect: dict[str, int] = {}  # our species -> turn it last chose Protect (no Protect chains)
         self.last_lookahead: dict | None = None  # diagnostics of the last joint lookahead (None = not used)
+        self.last_timing: dict | None = None     # last doubles decision: exact table / lookahead / total ms
+        self.warmed = False                      # did this policy already warm the damage calculator?
+
+    def _warm_calc(self) -> None:
+        """Pay the node + @smogon/calc start-up before the first battle decision (the draft, teambuild and team
+        preview phases have time to spare), once per policy. Never raises."""
+        if self.warmed:
+            return
+        self.warmed = True
+        try:
+            DamageCalc.get().warm()
+        except Exception:
+            log.warning("damage calc warm-up failed", exc_info=True)
 
     def _track_draft(self, obs: dict, me: str | None) -> None:
         """Full sets are only visible while a card is still in `available_cards`; rosters/picks carry just
@@ -241,6 +254,8 @@ class PokemonPolicy:
     def act(self, st: dict) -> dict:
         obs = st.get("observation") or {}
         phase = st.get("phase")
+        if phase in ("draft", "teambuild", "team_preview"):
+            self._warm_calc()
         if phase == "draft":
             return self._draft(st, obs)
         if phase == "teambuild":
@@ -366,6 +381,11 @@ class PokemonPolicy:
                     else:
                         for j in foes:
                             add(("me", i, mid, "opp", j), my_in[i], foe_in[j], mid, f_me)
+                        if (1 - i) in mine and any(isinstance(t, int) and t < 0 for t in opt.get("targets") or []):
+                            # aimed at our own partner (the lookahead scores that row with its real damage);
+                            # our side's screens are the defender's
+                            add(("me", i, mid, "me", 1 - i), my_in[i], my_in[1 - i], mid,
+                                {**f_me, "defenderSide": f_me["attackerSide"]})
             for j, o in foes.items():
                 for mid in self.foe_moves(o):
                     m = dex.move(mid)
@@ -475,9 +495,11 @@ class PokemonPolicy:
         turn = obs.get("turn", 0)
         slots = tmpl.get("slots", [])
         table = self._exact_table(obs, tmpl, actives, opps)
+        t_table = time.monotonic()
         self.last_exact = table is not None
         self.last_lookahead = None
         pick = ctx = None
+        la_ms = None
         if table is not None:
             try:
                 ctx = self._exact_context(obs, slots, actives, opps, turn, table)
@@ -486,15 +508,22 @@ class PokemonPolicy:
                 log.warning("exact doubles scoring failed; using the heuristic", exc_info=True)
                 pick = ctx = None
         if pick is not None and ctx is not None:
-            try:                                  # one-step joint lookahead; None = keep the exact pair pick
-                better = joint_lookahead(self, obs, tmpl, actives, opps, turn, table, ctx, pick, t0)
+            # One-step joint lookahead; None = keep the exact pair pick. Its TIME_CAP clock starts here: it bounds
+            # the lookahead's own work, never the calculator start-up or round trip spent above.
+            la_t0 = time.monotonic()
+            try:
+                better = joint_lookahead(self, obs, tmpl, actives, opps, turn, table, ctx, pick, la_t0,
+                                         seed_key=(st.get("session_id"), st.get("state_version"), turn))
                 if better is not None:
                     pick = better
             except Exception:
                 log.warning("joint lookahead failed; keeping the exact pair pick", exc_info=True)
                 self.last_lookahead = None
+            la_ms = round(1000 * (time.monotonic() - la_t0), 1)
         if pick is None:
             pick = self._doubles_heuristic(obs, slots, actives, opps, turn)
+        self.last_timing = {"table_ms": round(1000 * (t_table - t0), 1), "lookahead_ms": la_ms,
+                            "total_ms": round(1000 * (time.monotonic() - t0), 1)}
         self._remember_protect(pick, slots, actives, turn)
         self.prev_active = [to_id((a or {}).get("species", "")) or None for a in (list(actives) + [None, None])[:2]]
         self.opp_prev_active = [to_id((o or {}).get("species", "")) or None
