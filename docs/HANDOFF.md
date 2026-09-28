@@ -1,21 +1,25 @@
-# 交接：在另一台机器上继续（2026-09-27）
+# 交接：在另一台机器上继续（2026-09-27，09-28 更新）
 
 ## 现在到哪了
 
 - **2026-09-27 起在新机器上开发**：Windows 11 Pro + WSL2 Ubuntu 24.04，仓库在 `~/ucla-agent-tournament`。从 Windows 侧改 WSL 里的文件会变成 root 所有，改完要 chown 回来。
-- **冠军 v2（main / `champion/`，09-28）**：v1 + 双打一回合联合前瞻（sm-k6 参数）。对 v1 1200 局 60.1%，8 对手面板平均 70–72%。详见 `docs/progress.md`。
+- **冠军 v3（main / `champion/`，09-28）**：v2.1 前瞻 + 计算器修正 + 速度 / 守住 + 90×90 首发博弈 + 模型化选秀。对 v2 冠军 86.0% / 85.0%（种子 7 / 11），对 v1 90.8%，8 对手面板 92.9–94.3%。**尚无真实平台对局**。v2 对 v1 真实平台 10 局 8 胜 2 负。详见 `docs/progress.md`。
 - **两个 agent 已注册并认领**：Yoriko_Red（主力）、Apocalypse_Red（陪练）。密钥不在 git 里（本机备份在 `~/.config/altruagent/`）。
-- **第三轮（选秀模型、90×90 首发博弈、速度与守住、计算器修正）本地都过了擂台，正在整合成 v3**，工作目录在本机 `~/exp4`（`~/exp2/patches/` 是各方向补丁）。这些实验目录不在 git 里。
-- **比赛日由主办方的服务器运行我们交上去的 agent**（不是我们自己挂机），提交形式待确认。
+- **赛事情报 09-28 大更新，先读 `docs/competition_brief.md`**：提交窗口改为 10/6–10/13；游戏列表改为宝可梦、红警、王者荣耀、狼人杀（平台上只有宝可梦和狼人杀能玩）；VGC 计时 90 s 预览 / 55 s 每回合 / 420 s 总时间；谁运行 agent 仍未知（按自托管准备）。
+- 旧版本对比需要各自的计算器：`champion/agent/js/node_modules` 和 `versions/*/agent/js/node_modules` 是指向 `agent/js/node_modules` 的符号链接（已 gitignore），新机器上要重建，否则旧版会用新 calc.js，擂台测不准。
+- 实验目录（不在 git 里）：`~/exp`（v2）、`~/exp2`（第三轮各方向）、`~/exp3`（v2.1、8 对手面板 panelkit、参数扫描）、`~/exp4`（v3 整合，`MERGE_NOTES.md`）。
 
-## 下一步（按优先级）
+## 下一步（按优先级，依据 docs/competition_brief.md）
 
-1. **把 v3 合进 main**：整合完成后按 `~/exp4/MERGE_NOTES.md` 落地，默认参数保持 sm-k6，冻结为新冠军并存档 `versions/`。
-2. **真实平台 A/B**：新冠军 vs 旧冠军（`ARENA_DIR_APOCALYPSE=<旧版目录> python scripts/sparring.py play latest`，房间在 Human dashboard 创建，同一账号同时只能有一个进行中的房间）。
-3. **计算器健壮性**：`DamageCalc.batch` 一次往返失败就永久关闭计算器，应改为自动重启；缓存清理顺序（v3 已修）。
-4. **狼人杀**：合并 `candidates/r2-ww-seer-and-villager`；发言说服需要大模型（Nebius 学生认证审核中）。
-5. **提交打包**：主办方运行我们的 agent，确认他们要的格式（代码仓库 / 容器 / 入口命令）、是否有 Node、能否调用外部 API。
-6. **官方模板更新**：`upstream`（UCLA-Trustworthy-AI-Lab/altruagent-starter）有新提交，`git fetch upstream && git merge upstream/main` 后跑全套检查。
+1. **真实平台 A/B：v3 vs v2**（`ARENA_DIR_APOCALYPSE=~/ab/v2 python scripts/sparring.py play <id>`；房间在 Human dashboard 创建，需要人登录；同一账号同时只能有一个进行中的房间）。至少 20 局，15 胜以上算明显领先，10 胜以下就停下来对比真实卡池和本地卡池。
+2. **送分题：控时与防崩溃**：按真实计时（55 s / 420 s / 90 s）给每步设硬预算并在总时间紧张时降级；未知游戏 / 阶段 / 动作模板只记日志、安全出手，不进入「崩溃 → 冷却」循环；断线重连；`DamageCalc` 一次失败就永久关闭的问题改为自动重启；多场同时进行时的压力测试。
+3. **公开理由**：每步附简短可读的理由（会显示给观众），绝不写底牌。
+4. **宝可梦其他格式冒烟测试**：官方演示是 Gen 9 OU 公开选秀单打；单打 / teambuild 路径、无 Node 时的实力都要测。和官方示例 agent（basic / smoke / llm_agent）以及开源强 bot 做基准。
+5. **选秀模型换成混合对手群体重新拟合**，并把 4 张新卡加进目录（`python -m local.pool --harvest`）。
+6. **狼人杀**：合并 `candidates/r2-ww-seer-and-villager` 并按模拟结论调整；注意狼人杀可能不计分（技能文档写「Standalone competitions only」），单个座位对投票影响有限，投入要看回报。发言说服需要大模型（Nebius 已不是赞助商，额度来源要重新核对）。
+7. **自托管方案**：美西云主机（平台在 AWS us-west-2）、自动重启、装 Node、无人值守演练数小时；同时保证代码可打包、不依赖 LLM 也满实力。
+8. **每天只读监控**：上游 starter 提交、altruagent-game.com 更新、平台前端 build id、`/tournaments`、`/config/games`。测试 dashboard 一上线就登录记录规则原文。
+9. **问主办方**（由主人本人发）：问题清单见 `docs/competition_brief.md` 第 7 节。
 
 ## 新机器准备
 

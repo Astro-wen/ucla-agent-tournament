@@ -28,13 +28,28 @@ WARM_CALC = {"attacker": {"species": "Pikachu", "level": 50}, "defender": {"spec
              "move": "Thunderbolt", "field": {"gameType": "Doubles"}}
 
 
-def _js_dir() -> Path | None:
+def _js_paths() -> tuple[Path, Path] | None:
+    """(directory of the calc.js to run, node_modules directory to resolve @smogon/calc from).
+
+    A champion copy (champion/agent/js) keeps its OWN calc.js but has no node_modules (freeze_champion.sh drops
+    them): it must still run its own calc.js, borrowing the repo's node_modules via NODE_PATH. Falling back to the
+    repo's agent/js/calc.js instead would silently give the champion the candidate's calculator on a ladder."""
     here = Path(__file__).resolve().parent.parent / "js"          # agent/js next to this package
     root = dex.repo_root() / "agent" / "js"                         # the real one when we run as a champion copy
-    for d in (here, root):
-        if (d / "calc.js").exists() and (d / "node_modules").exists():
-            return d
-    return None
+    script = next((d for d in (here, root) if (d / "calc.js").exists()), None)
+    modules = next((d / "node_modules" for d in (here, root) if (d / "node_modules").exists()), None)
+    if script is None or modules is None:
+        return None
+    return script, modules
+
+
+def _js_dir() -> Path | None:
+    """Directory of the calc.js this package runs (None = calculator unavailable)."""
+    p = _js_paths()
+    return p[0] if p else None
+
+
+CACHE_MAX = 20000                 # calc results kept across decisions (cleared, never partially evicted)
 
 
 class DamageCalc:
@@ -62,7 +77,10 @@ class DamageCalc:
             return False
         try:
             self.ready = False
-            self.proc = subprocess.Popen(["node", str(_js_dir() / "calc.js")], stdin=subprocess.PIPE,
+            script, modules = _js_paths()
+            env = dict(os.environ)
+            env["NODE_PATH"] = os.pathsep.join(x for x in (str(modules), env.get("NODE_PATH", "")) if x)
+            self.proc = subprocess.Popen(["node", str(script / "calc.js")], stdin=subprocess.PIPE, env=env,
                                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
             self.starts += 1
             return True
@@ -94,7 +112,8 @@ class DamageCalc:
 
     def warm(self) -> bool:
         """Start node and load the calculator now with one dummy calc, so the next real batch is a plain round trip.
-        Idempotent (a no-op while the process is up and has answered); False when the calculator is unavailable."""
+        Idempotent (a no-op while the process is up and has answered); False when the calculator is unavailable.
+        The dummy answer never enters the cache (batch()'s clear-before-insert cache order is untouched)."""
         if not self.enabled:
             return False
         if self.ready and self.proc is not None and self.proc.poll() is None:
@@ -106,38 +125,79 @@ class DamageCalc:
         if not calcs:
             return []
         keys = [json.dumps(c, sort_keys=True) for c in calcs]
-        todo = [(i, k) for i, k in enumerate(keys) if k not in self.cache]
+        # This batch's answers are collected here, not re-read from the cache: the old code cleared an overflowing
+        # cache AFTER inserting the batch and then read the batch back from the empty cache, so every calc of that
+        # decision (a battle turn, the lookahead's table, a whole team-preview batch) silently came back None.
+        got = {k: self.cache[k] for k in keys if k in self.cache}
+        todo = [(i, k) for i, k in enumerate(keys) if k not in got]
         if todo:
             res = self._roundtrip([calcs[i] for i, _ in todo])
             if res is None:
                 return None
+            if len(self.cache) + len(todo) > CACHE_MAX:
+                self.cache.clear()                       # clear BEFORE inserting the current batch
             for (i, k), r in zip(todo, res):
                 self.cache[k] = r
-            if len(self.cache) > 20000:
-                self.cache.clear()
+                got[k] = r
         out = []
         for k in keys:
-            r = self.cache.get(k)
+            r = got.get(k)
             out.append(None if not r or "error" in r else r)
         return out
 
 
 # ---------------------------------------------------------------- building calc inputs from platform data
-def calc_pokemon(mon: dict | None, card: dict | None, species: str | None = None) -> dict:
-    """Merge a battle-state Pokémon view with its drafted card into a calculator input."""
+# Consumed items whose effect stays while the holder is in: the calculator only applies Protosynthesis / Quark Drive's
+# Booster Energy boost while it sees the item, so a spent Booster Energy is still passed on (main's behaviour).
+_EFFECT_OUTLIVES_ITEM = frozenset({"boosterenergy"})
+# Major statuses @smogon/calc understands. The platform sends them upper case ("BRN", "PAR", ...), the local sim lower
+# case; calc.js silently ignores anything else, so a platform burn used to leave physical damage un-halved.
+CALC_STATUSES = frozenset({"brn", "par", "psn", "tox", "slp", "frz"})
+
+
+def view_item(mon: dict | None, card: dict | None):
+    """The item a battle view's Pokémon holds, for every model that reads items (calc input, lookahead, Sash checks).
+
+    The platform hides a foe's item ("unknown_item") until revealed: the drafted card's item then. A view that
+    explicitly shows an empty slot (foe None / ours "": the platform clears it on |-enditem|) has lost the card's
+    item: a used Focus Sash, a knocked-off Loaded Dice (else still scored at 4-5 hits), a popped Air Balloon, a spent
+    Electric Seed. It is not brought back, except an item whose effect outlives it (Booster Energy)."""
+    mon = mon or {}
+    item = mon.get("item")
+    if not item or item == "unknown_item":
+        card_item = (card or {}).get("item")
+        gone = "item" in mon and item in (None, "")
+        if not gone or to_id(card_item or "") in _EFFECT_OUTLIVES_ITEM:
+            item = card_item
+    return item if item and item != "unknown_item" else None
+
+
+def calc_status(status) -> str | None:
+    """A view's status as the calculator's id ("BRN" -> "brn"); None for no / unknown status (e.g. "fnt")."""
+    s = to_id(str(status or ""))
+    return s if s in CALC_STATUSES else None
+
+
+def calc_pokemon(mon: dict | None, card: dict | None, species: str | None = None,
+                 allies_fainted: int | None = None) -> dict:
+    """Merge a battle-state Pokémon view with its drafted card into a calculator input.
+
+    `allies_fainted`: the side's fainted count Supreme Overlord locked in when this Pokémon came in (only passed
+    on for a Supreme Overlord holder)."""
     mon = mon or {}
     sp = species or mon.get("species") or (card or {}).get("species") or ""
     entry = dex.species(sp)
     out = {"species": entry.get("name") or sp, "level": (card or {}).get("level", 50)}
-    # The platform hides a foe's item ("unknown_item") and ability (None) until revealed: use its drafted card then.
-    item = mon.get("item")
-    if not item or item == "unknown_item":
-        item = (card or {}).get("item")
-    if item and item != "unknown_item":
+    # The platform hides a foe's item ("unknown_item") and ability (None) until revealed: use its drafted card then
+    # (an item the view shows as gone stays gone, see view_item).
+    item = view_item(mon, card)
+    if item:
         out["item"] = dex.item_name(item)
     ability = mon.get("ability") or (card or {}).get("ability")
     if ability:
         out["ability"] = dex.ability_name(ability)
+    if allies_fainted and to_id(ability or "") == "supremeoverlord":
+        out["alliesFainted"] = max(0, min(5, int(allies_fainted)))
     if card:
         out["nature"] = card.get("nature", "Hardy")
         out["evs"] = card.get("evs") or {}
@@ -151,8 +211,9 @@ def calc_pokemon(mon: dict | None, card: dict | None, species: str | None = None
     if frac is not None:
         # Fraction, not raw HP: the platform reports foe HP out of 100, ours in real HP; calc.js rescales.
         out["hpFraction"] = round(float(frac), 4)
-    if mon.get("status"):
-        out["status"] = mon["status"]
+    status = calc_status(mon.get("status"))
+    if status:
+        out["status"] = status                   # lower case: calc.js ignores the platform's "BRN" / "PAR"
     return out
 
 

@@ -59,20 +59,24 @@ def effective_speed(mon: dict, card: dict | None, side: dict | None = None, fiel
             or (ability == "quarkdrive" and "electric" in terrain)
         if active and boosted_stat == "spe":
             spe *= 1.5
-    if (mon.get("status") or "") == "par":
+    if to_id(str(mon.get("status") or "")) == "par":          # the platform sends "PAR", the local sim "par"
         spe *= 0.5
     if "tailwind" in {to_id(k) for k in (side or {})}:
         spe *= 2
     return spe
 
 
-def move_priority(move_id: str, mon: dict | None = None, card: dict | None = None) -> int:
+def move_priority(move_id: str, mon: dict | None = None, card: dict | None = None, terrain: str | None = None) -> int:
+    """Priority bracket of a move, with Prankster / Gale Wings / Triage and Grassy Glide in Grassy Terrain."""
     m = dex.move(move_id)
-    pr = int(m.get("priority", 0))
+    pr = int(m.get("priority", 0) or 0)
     ability = to_id((mon or {}).get("ability") or (card or {}).get("ability") or "")
     if ability == "prankster" and m.get("category") == "Status":
         pr += 1
-    if ability == "galewings" and m.get("type") == "Flying" and (mon or {}).get("current_hp_fraction", 1.0) >= 1.0:
+    hp = (mon or {}).get("current_hp_fraction")
+    if ability == "galewings" and m.get("type") == "Flying" and (hp is None or float(hp) >= 1.0):
+        pr += 1
+    if to_id(move_id) == "grassyglide" and "grassy" in to_id(str(terrain or "")):
         pr += 1
     if ability == "triage" and m.get("flags", {}).get("heal"):
         pr += 3

@@ -1,7 +1,7 @@
 # Project notes for Claude
 
 Our entry in the UCLA Trustworthy AI Lab × SAIR AI Agent Gaming Tournament (AltruAgent platform).
-Submission window closes **2026-10-09**; live competition **2026-10-16**. Start by reading `docs/HANDOFF.md`.
+Submission window **2026-10-06 – 10-13** (altruagent-game.com, updated 09-27; treat 10-09 as our internal safety deadline); live competition **2026-10-16**. Start by reading `docs/HANDOFF.md`, then `docs/competition_brief.md` (rules, organizers, per-game notes, open questions).
 The owner is new to this domain: explain in plain Chinese, define terms.
 
 ## Rules

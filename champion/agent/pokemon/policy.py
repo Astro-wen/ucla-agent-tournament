@@ -3,9 +3,16 @@
 Battle moves are scored with Smogon's exact damage calculator (agent/pokemon/calc.py): ONE batched node
 round trip per decision covers every (our active, move, legal target) plus the foes' known moves against
 our actives. A hit is worth its expected damage as a fraction of the defender's *current* HP (capped, so
-overkill earns nothing) plus a KO bonus weighted by P(KO) over the 16 rolls and the move's accuracy;
+overkill earns nothing) plus a KO bonus weighted by P(KO) over the rolls and the move's accuracy;
 foes are weighted by how dangerous they are to us. In doubles both slots are chosen jointly, so two
 attacks are not wasted on one low-HP foe and both slots never Fake Out the same target.
+calc.js already folds in Focus Sash / Sturdy (a single hit on a full-HP holder leaves 1 HP, both sides),
+multi-hit totals and hit-count odds; Supreme Overlord's fainted-ally count comes from `_fallen_counts()`.
+
+Doubles also use move order (`_speed_model`, exact speeds from the drafted sets, priority brackets, Tailwind,
+Trick Room, paralysis, Scarf): an action is worth P(we act before a foe KOs us) x its points, a KO that lands
+before the target acts earns REMOVE_* on top, Protect is valued by `_protect_value`, Tailwind / Trick Room by
+how many speed matchups they flip, and Focus Sash / Sturdy at full HP stop a lone single-hit KO.
 
 When the calculator is unavailable (no node / node_modules, bridge error) every decision falls back to
 the transparent base-stat heuristic `move_value()` with the same VGC bonuses (Fake Out, Intimidate,
@@ -17,9 +24,11 @@ import logging
 import time
 
 from . import dex
-from .calc import DamageCalc, calc_field, calc_pokemon, move_name
+from . import preview as preview_matrix
+from .calc import DamageCalc, calc_field, calc_pokemon, move_name, view_item
 from .dex import to_id
 from .lookahead import PROTECT_MOVES, joint_lookahead
+from .stats import acts_first, effective_speed, move_priority
 from .typechart import effectiveness
 
 log = logging.getLogger("agent.policy")
@@ -41,6 +50,7 @@ ABILITIES = {"intimidate": 2.0, "prankster": 0.8, "drought": 1.0, "drizzle": 1.0
              "electricsurge": 0.8, "psychicsurge": 0.8, "unseenfist": 0.8, "asoneglastrier": 0.5,
              "asonespectrier": 0.5, "innerfocus": 0.3}
 SPREAD_TARGETS = {"allAdjacentFoes", "allAdjacent"}
+USE_DRAFTER = True               # draft with agent/pokemon/drafter.py (search over the rest of the draft)
 
 # ---- exact-damage scoring scale ("points"): removing all of a foe's current HP = 100, a KO adds KO_BONUS.
 KO_BONUS = 50.0
@@ -52,6 +62,30 @@ GENERIC_CARD = {"evs": {"hp": 4, "atk": 252, "spa": 252, "spe": 252}, "nature": 
 FIRST_TURN_ONLY = {"fakeout", "firstimpression"}
 FLINCH_IMMUNE_ABILITIES = {"innerfocus", "shielddust"}
 ALLY_SUPPORT_MOVES = {"helpinghand", "pollenpuff", "decorate", "coaching"}
+
+# ---- speed-aware KO races and Protect (same points scale) -------------------------------------------------------
+# PROTECT_MOVES (protect, detect, spikyshield, silktrap, banefulbunker, burningbulwark, kingsshield, obstruct) is
+# imported from lookahead.py: the lookahead and speed-protect defined the same set, one definition now serves both.
+# Any of these used last turn makes the next Protect succeed only 1/3 of the time (Gen 9 stall counter).
+STALL_MOVES = PROTECT_MOVES | {"wideguard", "quickguard", "endure", "maxguard"}
+# Partner moves that leave a threat unable to hurt a Protecting mon next turn (slept, burned, slowed, outsped...).
+CRIPPLE_MOVES = {"spore", "sleeppowder", "hypnosis", "yawn", "willowisp", "thunderwave", "nuzzle", "icywind",
+                 "electroweb", "tailwind", "trickroom", "encore", "taunt", "snarl", "partingshot"}
+REMOVE_BASE = 15.0        # KO a foe *before it acts*: + this ...
+REMOVE_DANGER = 60.0      # ... + this x its danger (fraction of our current HP its best move removes)
+PROTECT_SAVE = 90.0       # our mon surviving a KO this turn while the partner removes / cripples the threat
+PROTECT_ALONE = 0.2       # share of PROTECT_SAVE when nothing deals with the threat (a plain one-turn stall)
+PROTECT_MIN_DANGER = 0.2  # below this P(KO'd this turn) Protect is pointless ...
+PROTECT_IDLE = -40.0      # ... and scores this
+PROTECT_AGAIN = -300.0    # Protect twice in a row (succeeds 1/3 in Gen 9): never
+PROTECT_ABSORB = 40.0     # x expected non-lethal fraction of our HP the foes' attacks on this slot would remove
+STALL_BONUS = 30.0        # Protect through the last turns of an opposing Tailwind / Trick Room
+FAKE_OUT_LIKELY = 0.9     # a fresh foe that carries Fake Out uses it
+SUCKER_PUNCH_ACC = 0.8    # fails into status moves / Protect
+TIE_BREAK = 1e-6          # x stand-alone points: only decides exact ties in the joint scoring
+TAILWIND_TURNS, TRICK_ROOM_TURNS = 4, 5
+SASH_ITEMS = {"focussash"}
+SASH_ABILITIES = {"sturdy"}
 
 
 def _stat(sp: str, key: str, default: int = 90) -> int:
@@ -135,23 +169,37 @@ def _cur_hp(mon: dict | None, res: dict) -> int:
     return max(1, int(round(min(1.0, max(0.0, frac)) * (res.get("defender_hp") or 1))))
 
 
-def _hit_stats(rolls, cur: int) -> tuple[float, float]:
-    """(expected fraction of the defender's current HP removed, P(KO)) given that the move hits."""
+def _hit_stats(rolls, cur: int, sash: bool = False) -> tuple[float, float]:
+    """(expected fraction of the defender's current HP removed, P(KO)) given that the move hits.
+    `sash`: Focus Sash / Sturdy at full HP, so a lone hit leaves the defender on 1 HP (never a KO)."""
     n = len(rolls) or 1
+    if sash and cur > 1:
+        return sum(min(r, cur - 1) for r in rolls) / n / cur, 0.0
     return sum(min(r, cur) for r in rolls) / n / cur, sum(r >= cur for r in rolls) / n
 
 
-def _points(rolls, cur: int) -> float:
-    useful, pko = _hit_stats(rolls, cur)
+def _points(rolls, cur: int, sash: bool = False) -> float:
+    useful, pko = _hit_stats(rolls, cur, sash)
     return 100.0 * useful + KO_BONUS * pko
 
 
-def _pair_points(a: tuple, b: tuple, cur: int) -> float:
-    """Value of two attacks (rolls, acc) landing on the same defender this turn: joint KO odds, no double counting."""
+def _pair_rolls(ra, rb, cur: int, sash_a: bool = False, sash_b: bool = False) -> list:
+    """Total damage of two hits on the same defender. Behind a Sash the first damaging hit leaves 1 HP and the
+    second finishes it; only a lone damaging hit (the other did 0) is stopped."""
+    if not (sash_a or sash_b):
+        return [x + y for x in ra for y in rb]
+    cap = cur - 1
+    return [x + y if x > 0 and y > 0 else (min(x, cap) if sash_a else x) if y <= 0 else (min(y, cap) if sash_b else y)
+            for x in ra for y in rb]
+
+
+def _pair_points(a: tuple, b: tuple, cur: int, sash_a: bool = False, sash_b: bool = False) -> float:
+    """Value of two attacks (rolls, acc) landing on the same defender this turn: joint KO odds, no double counting.
+    sash_a / sash_b: the defender's Focus Sash / Sturdy stops a lone hit of a / b (False for multi-hit moves)."""
     ra, pa = a
     rb, pb = b
-    both = _points([x + y for x in ra for y in rb], cur)
-    return pa * pb * both + pa * (1 - pb) * _points(ra, cur) + (1 - pa) * pb * _points(rb, cur)
+    both = _points(_pair_rolls(ra, rb, cur, sash_a, sash_b), cur)
+    return pa * pb * both + pa * (1 - pb) * _points(ra, cur, sash_a) + (1 - pa) * pb * _points(rb, cur, sash_b)
 
 
 def _adjust_rolls(rolls, m: dict, mid: str, mon: dict | None, card: dict | None, sun: bool) -> list:
@@ -178,6 +226,44 @@ def _flinch_blocked(o: dict, card: dict | None, obs: dict) -> bool:
     return False
 
 
+def _side_fainted(obs: dict, key: str) -> int:
+    """Fainted Pokémon on one side, from the `team` / `opponent_team` views (dicts keyed "p1: Name")."""
+    team = obs.get(key)
+    if isinstance(team, dict):
+        return sum(1 for v in team.values() if isinstance(v, dict) and v.get("fainted"))
+    return 0
+
+
+def _log_fallen(obs: dict) -> dict | None:
+    """Supreme Overlord's locked-in counts from the protocol log: {(side, species id): fallen} for every Pokémon
+    whose latest switch-in is in the log (0 unless a `|-start|<pos>|fallenN` line followed it; Showdown fixes the
+    count on entry, later faints don't raise it). None when there is no log or our side id is unknown."""
+    lines = obs.get("protocol_log")
+    if not isinstance(lines, list) or not lines:
+        return None
+    mine = next((str(k).split(":")[0].strip() for k in (obs.get("team") or {})), None)
+    if mine not in ("p1", "p2"):
+        return None
+    pos_sp: dict[str, str] = {}
+    out: dict[tuple, int] = {}
+    for line in lines:
+        if not isinstance(line, str) or not line.startswith("|"):
+            continue
+        parts = line.split("|")
+        if len(parts) < 4:
+            continue
+        tag, pos = parts[1], parts[2].split(":")[0].strip()
+        if tag in ("switch", "drag", "replace"):
+            sp = to_id(parts[3].split(",")[0])
+            pos_sp[pos] = sp
+            out[("me" if pos[:2] == mine else "opp", sp)] = 0
+        elif tag == "-start" and parts[3].startswith("fallen"):
+            sp = pos_sp.get(pos) or to_id(parts[2].split(":", 1)[-1])
+            digits = "".join(ch for ch in parts[3] if ch.isdigit())
+            out[("me" if pos[:2] == mine else "opp", sp)] = min(5, int(digits or 0))
+    return out
+
+
 def _target_status_value(mid: str, o: dict, card: dict | None) -> float:
     """Status moves aimed at a foe (the v0 heuristic gave these 0)."""
     types, status = _types(o), o.get("status")
@@ -196,6 +282,89 @@ def _target_status_value(mid: str, o: dict, card: dict | None) -> float:
     return 8.0
 
 
+def _first(p) -> float:
+    """acts_first() result as a probability (speed tie = coin flip)."""
+    return 1.0 if p is True else 0.0 if p is False else 0.5
+
+
+def _cond_ids(x) -> set[str]:
+    """Side conditions / fields as ids; the platform sends dicts ({"TAILWIND": turn}), the local sim lists too."""
+    if isinstance(x, (dict, list, tuple, set)):
+        return {to_id(str(k)) for k in x}
+    return set()
+
+
+def _speed_view(mon: dict | None) -> dict:
+    """A battle view safe for stats.effective_speed / move_priority: hidden foe item dropped, boosts a dict, status an
+    id ("PAR" on the platform, "par" in the local sim)."""
+    v = dict(mon or {})
+    if not v.get("item") or to_id(str(v.get("item"))) in ("unknownitem", "unknown", "none"):
+        v["item"] = None
+    if not isinstance(v.get("boosts"), dict):
+        v["boosts"] = {}
+    v["status"] = to_id(str(v.get("status") or "")) or None
+    return v
+
+
+def _sashed(mon: dict | None, card: dict | None) -> bool:
+    """Focus Sash / Sturdy at full HP: no single hit KOs it."""
+    mon = mon or {}
+    try:
+        frac = mon.get("current_hp_fraction")
+        full = frac is None or float(frac) >= 1.0
+    except (TypeError, ValueError):
+        full = True
+    if not full:
+        return False
+    # Hidden item -> the drafted card's; a slot the view shows as empty (used Sash) stays empty: the same rule as the
+    # calculator's input (calc.view_item), whose calc.js caps a full-HP Sash / Sturdy hit at max HP - 1 itself.
+    item = view_item(mon, card)
+    ability = mon.get("ability") or (card or {}).get("ability")
+    return to_id(item or "") in SASH_ITEMS or to_id(ability or "") in SASH_ABILITIES
+
+
+def _pko(rolls, acc: float, cur: int, sash: bool = False) -> float:
+    """P(one hit KOs a defender with `cur` HP left), accuracy included."""
+    if sash or not rolls:
+        return 0.0
+    return acc * sum(r >= cur for r in rolls) / len(rolls)
+
+
+def _pair_ko(a: tuple, b: tuple, cur: int, sash_a: bool = False, sash_b: bool = False) -> float:
+    """P(two hits on the same defender KO it this turn), accuracy included (a Sash only stops a lone hit)."""
+    ra, pa = a
+    rb, pb = b
+    both = _pair_rolls(ra, rb, cur, sash_a, sash_b)
+    both = sum(t >= cur for t in both) / (len(both) or 1)
+    return pa * pb * both + pa * (1 - pb) * _pko(ra, 1.0, cur, sash_a) + (1 - pa) * pb * _pko(rb, 1.0, cur, sash_b)
+
+
+def _breaks_sash(mid: str) -> bool:
+    """Multi-hit moves: the first hit leaves a Sash / Sturdy mon on 1 HP, the next one KOs it."""
+    return bool(dex.move(mid).get("multihit"))
+
+
+def _sash_for(foe_sash: dict, c: dict, j: int) -> bool:
+    """Does foe j's full-HP Focus Sash / Sturdy stop candidate c's lone hit (multi-hit moves break it)?"""
+    return bool(foe_sash.get(j)) and not c.get("mh")
+
+
+def _p_act(c: dict, other: dict) -> float:
+    """P(candidate c's slot acts this turn): no foe KOs / Fake-Outs it first, unless the partner (`other`) removes or
+    flinches that foe before it moves."""
+    if not c["thr"]:
+        return c["pa1"]
+    p = 1.0
+    for j, t in c["thr"].items():
+        p *= 1.0 - t * (1.0 - other["nb"].get(j, 0.0))
+    return p
+
+
+# The partner of a lone slot in the joint scoring (acts never, scores 0).
+_DUMMY_CAND = {"cand": None, "base": 0.0, "solo": 0.0, "foe": {}, "flinch": None, "slot": -1, "acts": False,
+               "kind": "none", "pa1": 1.0, "thr": {}, "pf": {}, "ko": {}, "kob": {}, "use": {}, "nb": {}, "mid": ""}
+
+
 class PokemonPolicy:
     def __init__(self):
         self.cards: dict[str, dict] = {}        # our drafted sets by species id
@@ -207,6 +376,17 @@ class PokemonPolicy:
         self.opp_prev_active: list[str | None] = [None, None]   # foes on the field at our previous decision
         self.last_protect: dict[str, int] = {}  # our species -> turn it last chose Protect (no Protect chains)
         self.last_lookahead: dict | None = None  # diagnostics of the last joint lookahead (None = not used)
+        # Supreme Overlord without a protocol log: the side's fainted count when each Pokémon was first seen active.
+        self._active_sets: dict[str, set] = {}
+        self._entry_fallen: dict[tuple, int] = {}
+        self.prev_opp: list[str | None] = [None, None]
+        self.last_move: dict[int, tuple[str, str | None]] = {}   # slot -> (species, move id) of our last action
+        self.cond_set: dict[str, int] = {}      # "opp_tailwind" / "my_tailwind" / "trickroom" -> turn it was set
+        self.last_speed: dict | None = None     # speed model of the last doubles decision (debugging / tests)
+        self.debug_pairs: list | None = None    # set to [] to collect (value, slot-0 choice, slot-1 choice) per pair
+        self.draft_pool: dict[str, dict] = {}   # card_id -> full set of every card offered in THIS match's draft
+        self.draft_info: dict = {}              # last drafter search summary (depth, nodes, ms, top picks)
+        self.drafter_kwargs: dict = {}          # Drafter(...) overrides (node budget / max_depth / top_k), experiments only
         self.last_timing: dict | None = None     # last doubles decision: exact table / lookahead / total ms
         self.warmed = False                      # did this policy already warm the damage calculator?
 
@@ -242,6 +422,34 @@ class PokemonPolicy:
         moves = [to_id(m) for m in (card.get("moves") or o.get("moves") or [])[:4] if m]
         return moves or _guess_moves(to_id(o.get("species", "")))
 
+    def _fallen_counts(self, obs: dict, actives: list, opps: list) -> dict:
+        """{("me"|"opp", slot): fainted allies Supreme Overlord counts for that active}. Exact from the protocol log
+        (the platform sends it); otherwise the side's fainted count when we first saw the Pokémon active (can be one
+        too high if an ally fainted in the same turn it switched in). {} on any error: the calc then assumes 0."""
+        try:
+            sides = (("me", list(actives or []), "team"), ("opp", list(opps or []), "opponent_team"))
+            for side, mons, key in sides:
+                now = {to_id(m.get("species", "")) for m in mons
+                       if isinstance(m, dict) and m.get("species") and not m.get("fainted")}
+                n = _side_fainted(obs, key)
+                for sp in now - self._active_sets.get(side, set()):
+                    self._entry_fallen[(side, sp)] = n
+                self._active_sets[side] = now
+            from_log = _log_fallen(obs)
+            out = {}
+            for side, mons, _ in sides:
+                for i, m in enumerate(mons[:2]):
+                    if not isinstance(m, dict) or not m.get("species"):
+                        continue
+                    k = (side, to_id(m["species"]))
+                    n = from_log[k] if from_log is not None and k in from_log else self._entry_fallen.get(k, 0)
+                    if n:
+                        out[(side, i)] = n
+            return out
+        except Exception:
+            log.warning("fainted-ally tracking failed; Supreme Overlord assumed off", exc_info=True)
+            return {}
+
     @staticmethod
     def _card(store: dict, mon: dict | None) -> dict:
         """The drafted set of a Pokémon for the calculator, or a generic 252/252 spread when unknown."""
@@ -263,7 +471,7 @@ class PokemonPolicy:
                 self.cards.setdefault(to_id(s["species"]), s)
             return {"action": {"type": "submit_team", "team": DEFAULT_OU_TEAM}}
         if phase == "team_preview":
-            return self._preview(obs)
+            return self._preview(obs, str(st.get("session_id") or ""))
         if obs.get("is_doubles"):
             return self._doubles(st, obs)
         return self._singles(st, obs)
@@ -294,6 +502,13 @@ class PokemonPolicy:
         me = (st.get("current_actor") or {}).get("agent_id") or obs.get("current_seat")
         self.me = me
         self._track_draft(obs, me)
+        for c in obs.get("available_cards") or []:           # this match's pool (item-blocked cards included)
+            if isinstance(c, dict) and c.get("card_id"):
+                self.draft_pool[c["card_id"]] = c
+        try:                    # boot the calculator's node process now, so team preview doesn't pay its start-up
+            DamageCalc.get()._start()
+        except Exception:
+            log.debug("calc warm-up failed", exc_info=True)
         taken = {to_id(c.get("species", "")) for c in (obs.get("rosters") or {}).get(me, [])}
         roster = [self.cards[s] for s in taken if s in self.cards] or [
             {"species": c.get("species", "")} for c in (obs.get("rosters") or {}).get(me, [])]
@@ -302,12 +517,151 @@ class PokemonPolicy:
         cards = [c for c in obs.get("available_cards", []) if c["card_id"] in legal_ids] \
             or obs.get("available_cards", [])
         best = max(cards, key=lambda c: card_score(c, roster))
+        why = f"{best['species']}: best value + synergy with current roster"
+        if USE_DRAFTER:
+            try:
+                cid = self._drafter_pick(obs, me, legal_ids)
+                hit = next((c for c in cards if c["card_id"] == cid), None)
+                if hit is not None:
+                    best = hit
+                    why = f"{best['species']}: drafter {self.draft_info}"
+            except Exception:
+                log.warning("drafter failed; keeping the card_score pick", exc_info=True)
         self.cards[to_id(best["species"])] = best
         return {"action": {"type": "draft_pick", "card_id": best["card_id"]},
-                "reasoning_summary": f"{best['species']}: best value + synergy with current roster"}
+                "reasoning_summary": why[:300]}
+
+    def _drafter_pick(self, obs: dict, me: str | None, legal_ids: set) -> str:
+        """Search the rest of the draft (agent/pokemon/drafter.py). Raises on anything unexpected."""
+        from .drafter import Drafter
+        rosters = {seat: list(ro or []) for seat, ro in (obs.get("rosters") or {}).items()}
+        for p in obs.get("picks") or []:                     # `picks` backs up `rosters` if one is incomplete
+            seat, cid = p.get("seat_id"), p.get("card_id")
+            if seat is not None and cid and all(r.get("card_id") != cid for r in rosters.get(seat, [])):
+                rosters.setdefault(seat, []).append({"card_id": cid, "species": p.get("species", "")})
+        taken_ids = {r.get("card_id") for ro in rosters.values() for r in ro}
+
+        def full(r: dict) -> dict:
+            cid = r.get("card_id")
+            c = self.draft_pool.get(cid) or self.seen.get(cid)
+            return c if c else {"card_id": cid, "species": r.get("species", "")}
+
+        mine = [full(r) for r in rosters.get(me) or []]
+        opp = [full(r) for seat, ro in rosters.items() if seat != me for r in ro]
+        pool = [c for cid, c in self.draft_pool.items() if cid not in taken_ids]
+        n_taken = len(mine) + len(opp)
+        pick_no = obs.get("pick_number")
+        if isinstance(pick_no, int) and 1 <= pick_no <= 12:
+            n_taken = pick_no - 1                             # the platform's own count decides whose turn it is
+        d = Drafter(prior_score=lambda c: card_score(c, []), **self.drafter_kwargs)
+        cid = d.pick(pool, mine, opp, legal_ids, n_taken=n_taken)
+        self.draft_info = d.info
+        return cid
 
     # ---- team preview --------------------------------------------------
-    def _preview(self, obs: dict) -> dict:
+    def _preview(self, obs: dict, session_id: str = "") -> dict:
+        """Matrix-game lineup (agent/pokemon/preview.py); the v0/v1 heuristic on any failure or timeout."""
+        self._new_battle()               # whichever path answers: team preview starts a new battle
+        try:
+            # Picks made after our last draft turn never reached us as a draft state: resolve by species (the
+            # battle's opponent_set() needs these whichever preview path answers).
+            by_species = {to_id(c.get("species", "")): c for c in self.seen.values()}
+            for p in obs.get("opponent_roster") or []:
+                sid = to_id(p.get("species", ""))
+                if sid not in self.opp_cards and sid in by_species:
+                    self.opp_cards[sid] = by_species[sid]
+                elif sid not in self.opp_cards and not preview_matrix.resolve_card(sid, self.opp_cards):
+                    # masked forme at preview ("urshifu" for Urshifu-Rapid-Strike): battle views use the full id
+                    card = preview_matrix.resolve_card(sid, {}, by_species)
+                    if card:
+                        self.opp_cards[to_id(card.get("species", ""))] = card
+        except Exception:
+            log.debug("opponent set recovery failed", exc_info=True)
+        try:
+            out = self._preview_matrix(obs, session_id)
+            if out is not None:
+                return out
+        except Exception:
+            log.warning("preview matrix failed; using the heuristic preview", exc_info=True)
+        return self._preview_heuristic(obs)
+
+    def _new_battle(self) -> None:
+        """Forget per-battle memory at team preview. calc-fixes' Supreme Overlord entry counts used to be cleared at
+        the top of the old `_preview`, which preview-matrix renamed to `_preview_heuristic`: there the reset only ran
+        when the matrix path failed, so the counts leaked into the next battle. The battle trackers of the lookahead
+        (Protect chains, foes seen last turn) and of speed-protect (last action per slot, Tailwind / Trick Room start
+        turns, who was on the field) are per battle too and are reset with them. Draft knowledge (our / their sets)
+        is kept: it belongs to the match."""
+        self._active_sets.clear()
+        self._entry_fallen.clear()
+        self.prev_active = [None, None]
+        self.prev_opp = [None, None]
+        self.opp_prev_active = [None, None]
+        self.last_protect.clear()
+        self.last_move.clear()
+        self.cond_set.clear()
+
+    def _preview_matrix(self, obs: dict, session_id: str) -> dict | None:
+        fmt = to_id(obs.get("battle_format") or "")
+        if fmt and "vgc" not in fmt and "doubles" not in fmt:
+            return None                     # the race models VGC doubles; singles 6-bring-4 keeps the heuristic
+        mine = [p for p in (obs.get("your_roster") or []) if isinstance(p, dict) and p.get("species")]
+        opp = [p for p in (obs.get("opponent_roster") or []) if isinstance(p, dict) and p.get("species")]
+        if not (4 <= len(mine) <= 6 and 4 <= len(opp) <= 6):
+            return None
+        sids = [to_id(p["species"]) for p in mine]
+        if len(set(sids)) != len(sids):
+            return None
+        by_species = {to_id(c.get("species", "")): c for c in self.seen.values() if isinstance(c, dict)}
+        my_cards = [preview_matrix.resolve_card(s, self.cards, by_species) for s in sids]
+        opp_cards = [preview_matrix.resolve_card(p["species"], self.opp_cards, by_species) for p in opp]
+        seed = f"{session_id}|{','.join(sids)}|{','.join(to_id(p['species']) for p in opp)}"
+        guess = None
+        if float(preview_matrix.KNOBS.get("prior_w", 0) or 0) > 0:
+            try:
+                guess = self._guess_opponent_lineup(mine, opp, opp_cards)
+            except Exception:
+                log.debug("opponent lineup guess failed", exc_info=True)
+        res = preview_matrix.choose(mine, my_cards, opp, opp_cards, seed_text=seed, opp_guess=guess)
+        if res is None:
+            return None
+        # Echo the roster's own species strings (the platform validates bring/leads against them).
+        bring = [mine[i]["species"] for i in res["bring"]]
+        leads = [mine[i]["species"] for i in res["leads"]]
+        if len(set(bring)) != 4 or len(set(leads)) != 2 or not set(leads) <= set(bring):
+            return None
+        info = res.get("info") or {}
+        return {"action": {"type": "select_lineup", "bring": bring, "leads": leads},
+                "reasoning_summary": f"preview matrix game: bring {bring}, lead {leads} "
+                                     f"(value {info.get('value')}, p {info.get('p')}, {info.get('t_total')}s)"}
+
+    @staticmethod
+    def _guess_opponent_lineup(mine: list[dict], opp: list[dict], opp_cards: list) -> tuple | None:
+        """The lineup the opponent would pick with our own heuristic preview (a prior for a typical agent), as
+        opponent-roster indices (lead, lead, bench, bench). They see our masked formes, as we see theirs."""
+        other = PokemonPolicy()
+        other.seen = {}
+        sids = []
+        for p, c in zip(opp, opp_cards):
+            sid = to_id((c or {}).get("species") or p.get("species", ""))
+            sids.append(sid)
+            if c:
+                other.cards[sid] = c
+        seen_by_them = []
+        for p in mine:
+            sid = to_id(p.get("species", ""))
+            base = preview_matrix.base_species(sid)
+            seen_by_them.append({"species": base, "types": dex.types_of(base)} if base != sid
+                                else {"species": sid, "types": p.get("types") or dex.types_of(sid)})
+        out = other._preview_heuristic({"your_roster": [{"species": s} for s in sids],
+                                        "opponent_roster": seen_by_them})["action"]
+        idx = {s: k for k, s in enumerate(sids)}
+        leads = [idx[to_id(s)] for s in out["leads"]]
+        rest = [idx[to_id(s)] for s in out["bring"] if idx[to_id(s)] not in leads]
+        return tuple(leads + rest) if len(leads) == 2 and len(rest) == 2 else None
+
+    def _preview_heuristic(self, obs: dict) -> dict:
+        """v0/v1 preview (card value + base-stat offense into their types): the fallback."""
         mine = obs.get("your_roster", [])
         opp = obs.get("opponent_roster", [])
         # Picks made after our last draft turn never reached us as a draft state: resolve by species.
@@ -351,8 +705,11 @@ class PokemonPolicy:
             f_me, f_opp = calc_field(obs, True), calc_field(obs, False)
             mine = {i: a for i, a in enumerate(list(actives)[:2]) if a and not a.get("fainted")}
             foes = {j: o for j, o in enumerate(list(opps)[:2]) if o and not o.get("fainted")}
-            my_in = {i: calc_pokemon(a, self._card(self.cards, a)) for i, a in mine.items()}
-            foe_in = {j: calc_pokemon(o, self._card(self.opp_cards, o)) for j, o in foes.items()}
+            fallen = self._fallen_counts(obs, actives, opps)
+            my_in = {i: calc_pokemon(a, self._card(self.cards, a), allies_fainted=fallen.get(("me", i)))
+                     for i, a in mine.items()}
+            foe_in = {j: calc_pokemon(o, self._card(self.opp_cards, o), allies_fainted=fallen.get(("opp", j)))
+                      for j, o in foes.items()}
             calcs, keys = [], []
 
             def add(key, atk, dfn, mid, field):
@@ -428,6 +785,176 @@ class PokemonPolicy:
             weights[j] = 0.7 + 0.6 * d
         return curs, danger, weights
 
+    def _speed_model(self, obs: dict, actives: list, opps: list, table: dict) -> dict:
+        """Who moves first and who KOs whom this turn, from exact stats + the damage table.
+
+        threat[(j, i)] = (P(foe j's best move KOs our slot i), expected fraction of i's HP it removes, its priority,
+        spread?) ; focus[(j, i)] = P(foe j aims at our slot i) ; fake_out[(j, i)] = P(a fresh foe j flinches i)."""
+        f_me = calc_field(obs, True)
+        terrain = f_me.get("terrain")
+        tr = "trickroom" in _cond_ids(obs.get("fields"))
+        my_side = {k: 1 for k in _cond_ids(obs.get("side_conditions"))}
+        opp_side = {k: 1 for k in _cond_ids(obs.get("opponent_side_conditions"))}
+        mine = {i: a for i, a in enumerate(list(actives)[:2]) if a and not a.get("fainted")}
+        foes = {j: o for j, o in enumerate(list(opps)[:2]) if o and not o.get("fainted")}
+        my_card = {i: self.cards.get(to_id(a.get("species", ""))) for i, a in mine.items()}
+        foe_card = {j: self.opponent_set(o.get("species", "")) for j, o in foes.items()}
+        my_view = {i: _speed_view(a) for i, a in mine.items()}
+        foe_view = {j: _speed_view(o) for j, o in foes.items()}
+        my_spe = {i: effective_speed(my_view[i], my_card[i], my_side, f_me) for i in mine}
+        foe_spe = {j: effective_speed(foe_view[j], foe_card[j], opp_side, f_me) for j in foes}
+        my_sash = {i: _sashed(a, my_card[i]) for i, a in mine.items()}
+
+        threat: dict = {}
+        for k, r in table.items():
+            # k[3] == "me" only: the lookahead's table also holds a foe's Earthquake into ITS OWN partner
+            # (("opp", j, mid, "opp", 1 - j)), which must not count as a threat to our slot 1 - j.
+            if k[0] != "opp" or k[3] != "me" or not r or k[1] not in foes or k[4] not in mine:
+                continue
+            j, mid, i = k[1], k[2], k[4]
+            if mid in FIRST_TURN_ONLY:                   # Fake Out: only its flinch matters (fake_out below)
+                continue
+            m = dex.move(mid)
+            acc = _acc_of(m)
+            cur = _cur_hp(mine[i], r)
+            sash = my_sash[i] and not m.get("multihit")
+            useful, _ = _hit_stats(r["rolls"], cur, sash)
+            pko = _pko(r["rolls"], acc, cur, sash)
+            pts = 100.0 * acc * useful + KO_BONUS * pko
+            prio = move_priority(mid, foe_view[j], foe_card[j], terrain)
+            by_prio = dict(threat[(j, i)][5]) if (j, i) in threat else {}
+            by_prio[prio] = max(by_prio.get(prio, 0.0), pko)          # a priority move may KO us first
+            if (j, i) not in threat or pts > threat[(j, i)][4]:
+                threat[(j, i)] = (pko, acc * useful, prio, m.get("target") in SPREAD_TARGETS, pts, by_prio)
+            else:
+                threat[(j, i)] = threat[(j, i)][:5] + (by_prio,)
+
+        focus: dict = {}
+        foe_prio: dict = {}
+        for j in foes:
+            pts = {i: threat[(j, i)][4] if (j, i) in threat else 0.0 for i in mine}
+            for i in mine:
+                t = threat.get((j, i))
+                if len(mine) == 1 or (t and t[3]):
+                    focus[(j, i)] = 1.0
+                    continue
+                o = pts[1 - i] if (1 - i) in pts else 0.0
+                tot = pts[i] ** 2 + o ** 2
+                focus[(j, i)] = 0.5 if tot <= 0 else min(0.9, max(0.15, pts[i] ** 2 / tot))
+            aim = max(mine, key=lambda i: pts[i], default=None)
+            foe_prio[j] = threat[(j, aim)][2] if aim is not None and (j, aim) in threat else 0
+
+        fake_out: dict = {}
+        for j, o in foes.items():
+            sp = to_id(o.get("species", ""))
+            moves = {to_id(x) for x in ((foe_card[j] or {}).get("moves") or o.get("moves") or [])}
+            if "fakeout" not in moves or (j < len(self.prev_opp) and self.prev_opp[j] == sp):
+                continue
+            open_ = [i for i, a in mine.items() if not _flinch_blocked(a, my_card[i], obs)]
+            for i in open_:
+                fake_out[(j, i)] = FAKE_OUT_LIKELY / len(open_)
+
+        # Speed control running out: which foes outspeed us only because of it (a Protect stalls those turns).
+        turn = int(obs.get("turn") or 0)
+        stall: dict = {}
+        tw_left = self._cond_left("opp_tailwind", turn) if "tailwind" in opp_side else None
+        tr_left = self._cond_left("trickroom", turn) if tr else None
+        for (j, i), t in threat.items():
+            if t[0] < 0.15 and t[1] < 0.4:
+                continue
+            now = _first(acts_first(foe_spe[j], t[2], my_spe[i], 0, tr))
+            if now <= 0.5:
+                continue
+            if tw_left is not None and tw_left <= 2 and \
+                    _first(acts_first(foe_spe[j] / 2, t[2], my_spe[i], 0, tr)) < now:
+                stall[i] = True
+            if tr_left is not None and tr_left <= 2 and \
+                    _first(acts_first(foe_spe[j], t[2], my_spe[i], 0, False)) < now:
+                stall[i] = True
+        return {"tr": tr, "terrain": terrain, "my_spe": my_spe, "foe_spe": foe_spe, "threat": threat,
+                "focus": focus, "foe_prio": foe_prio, "fake_out": fake_out, "stall": stall,
+                "foe_sash": {j: _sashed(o, foe_card[j]) for j, o in foes.items()},
+                "mine": set(mine), "foes": set(foes)}
+
+    def _prep_cand(self, c: dict, sm: dict | None, curs: dict) -> None:
+        """Per-candidate speed facts, computed once: P(it acts), P(it KOs / flinches each foe before that foe acts)."""
+        c.update(pa1=1.0, thr={}, pf={}, ko={}, kob={}, use={}, nb={})
+        if sm is None or not c.get("acts") or c["slot"] not in sm["mine"]:
+            return
+        i, prio = c["slot"], c.get("prio", 0)
+        mine_spe = sm["my_spe"][i]
+        pa = 1.0
+        for j in sm["foes"]:
+            t = sm["threat"].get((j, i))
+            hit = 0.0
+            if t:
+                ko_first = max(pko * (1.0 - _first(acts_first(mine_spe, prio, sm["foe_spe"][j], fp, sm["tr"])))
+                               for fp, pko in t[5].items())
+                hit = sm["focus"].get((j, i), 0.5) * ko_first
+            fo = sm["fake_out"].get((j, i), 0.0)
+            if fo:
+                fo *= 1.0 - _first(acts_first(mine_spe, prio, sm["foe_spe"][j], 3, sm["tr"]))
+                hit = fo + (1.0 - FAKE_OUT_LIKELY) * hit
+            c["thr"][j] = hit
+            pa *= 1.0 - hit
+        c["pa1"] = pa
+        for j, (rolls, acc) in c["foe"].items():
+            if j not in sm["foes"]:
+                continue
+            cur = curs.get(j, 1)
+            sash = sm["foe_sash"].get(j, False) and not c.get("mh")
+            c["pf"][j] = _first(acts_first(mine_spe, prio, sm["foe_spe"][j], sm["foe_prio"].get(j, 0), sm["tr"]))
+            c["ko"][j] = _pko(rolls, acc, cur, sash)
+            c["kob"][j] = c["pf"][j] * c["ko"][j]
+            c["use"][j] = acc * _hit_stats(rolls, cur, sash)[0]
+        for j in sm["foes"]:
+            flinch = 0.0
+            if c.get("flinch") == j:
+                flinch = _first(acts_first(mine_spe, 3, sm["foe_spe"][j], sm["foe_prio"].get(j, 0), sm["tr"]))
+            n = min(1.0, c["kob"].get(j, 0.0) + flinch)
+            if n:
+                c["nb"][j] = pa * n
+
+    def _protect_value(self, c: dict, other: dict, sm: dict | None, obs: dict, turn: int) -> float:
+        """Protect: worth it when this slot is likely KO'd this turn and the partner removes / cripples the threat,
+        a little for the chip damage it wastes while the partner attacks, or to stall the last turns of an opposing
+        Tailwind / Trick Room. Never twice in a row (any stall move last turn), never with a Choice item, never idly.
+        The partner's allAdjacent self-hit (Earthquake next to us) is refunded in the joint loop."""
+        i = c["slot"]
+        if self._protected_last(i, c.get("species", "")) or c.get("choice"):
+            return PROTECT_AGAIN                         # a Choice item would lock this mon into Protect
+        if sm is None or i not in sm["mine"]:
+            return _status_value(c.get("mid", "protect"), c.get("hp", 1.0), turn, obs)
+        keep, v, absorb = 1.0, 0.0, 0.0
+        for j in sm["foes"]:
+            t = sm["threat"].get((j, i))
+            if not t:
+                continue
+            aim = sm["focus"].get((j, i), 0.5) * (1.0 - other.get("nb", {}).get(j, 0.0))
+            if other.get("acts"):                       # chip damage wasted while the partner gets a free hit
+                absorb += aim * t[1] * (1.0 - t[0])     # (lethal hits are the KO-save part below)
+            d = aim * t[0]
+            if d <= 0:
+                continue
+            keep *= 1.0 - d
+            helps = max(other.get("pa1", 1.0) * other.get("ko", {}).get(j, 0.0),
+                        0.5 * other.get("use", {}).get(j, 0.0))
+            if other.get("mid") in CRIPPLE_MOVES and other.get("target") in (0, j + 1):
+                helps = max(helps, 0.5)
+            v += PROTECT_SAVE * d * (PROTECT_ALONE + (1.0 - PROTECT_ALONE) * min(1.0, helps))
+        try:
+            hp = min(1.0, max(0.0, float(c.get("hp", 1.0))))
+        except (TypeError, ValueError):
+            hp = 1.0
+        danger = 1.0 - keep
+        if danger < PROTECT_MIN_DANGER:
+            v = PROTECT_IDLE
+        v += PROTECT_ABSORB * absorb
+        v *= 0.3 + 0.7 * hp if v > 0 else 1.0           # saving a mon on its last few HP is worth less
+        if sm["stall"].get(i, False):
+            v = max(v, 0.0) + STALL_BONUS
+        return v
+
     # ---- battle --------------------------------------------------------
     def _singles(self, st: dict, obs: dict) -> dict:
         la = (st.get("legal_actions") or {}).get("actions") or []
@@ -455,7 +982,9 @@ class PokemonPolicy:
                         if mid not in ("protect", "detect", "spikyshield", "silktrap", "banefulbunker") \
                         else _status_value(mid, me_mon.get("current_hp_fraction", 1.0) or 1.0, obs.get("turn", 0), obs)
                 elif r:
-                    v = _acc_of(m, act) * _points(_adjust_rolls(r["rolls"], m, mid, me_mon, card, sun), _cur_hp(opp, r))
+                    sash = not m.get("multihit") and _sashed(opp, self.opponent_set(opp.get("species", "")))
+                    v = _acc_of(m, act) * _points(_adjust_rolls(r["rolls"], m, mid, me_mon, card, sun), _cur_hp(opp, r),
+                                                  sash)
                     if m.get("selfdestruct"):
                         v -= SELF_KO_PENALTY
                 else:
@@ -472,7 +1001,8 @@ class PokemonPolicy:
         if not dc.enabled or not me_mon.get("species") or not opp.get("species") or opp.get("fainted"):
             return None
         try:
-            atk = calc_pokemon(me_mon, self._card(self.cards, me_mon))
+            fallen = self._fallen_counts(obs, [me_mon], [opp])
+            atk = calc_pokemon(me_mon, self._card(self.cards, me_mon), allies_fainted=fallen.get(("me", 0)))
             dfn = calc_pokemon(opp, self._card(self.opp_cards, opp))
             field = calc_field(obs, True)
             mids = []
@@ -494,6 +1024,7 @@ class PokemonPolicy:
         opps = obs.get("opponent_active_pokemon") or [None, None]
         turn = obs.get("turn", 0)
         slots = tmpl.get("slots", [])
+        self._track_conditions(obs)
         table = self._exact_table(obs, tmpl, actives, opps)
         t_table = time.monotonic()
         self.last_exact = table is not None
@@ -524,11 +1055,69 @@ class PokemonPolicy:
             pick = self._doubles_heuristic(obs, slots, actives, opps, turn)
         self.last_timing = {"table_ms": round(1000 * (t_table - t0), 1), "lookahead_ms": la_ms,
                             "total_ms": round(1000 * (time.monotonic() - t0), 1)}
-        self._remember_protect(pick, slots, actives, turn)
-        self.prev_active = [to_id((a or {}).get("species", "")) or None for a in (list(actives) + [None, None])[:2]]
-        self.opp_prev_active = [to_id((o or {}).get("species", "")) or None
-                                if o and not o.get("fainted") else None for o in (list(opps) + [None, None])[:2]]
+        self._remember_protect(pick, slots, actives, turn)       # lookahead: no Protect chains (species -> turn)
+        self._remember(obs, pick, actives)                       # speed-protect: last action per slot (stall moves)
+        # Who was on the field for a whole turn (Fake Out freshness, ours and theirs). A forced-switch state is
+        # mid-turn: a mon that came in during this turn (U-turn, Parting Shot, Eject Button) and is visible there
+        # still gets its Fake Out next turn, so only the normal start-of-turn states are remembered. The lookahead's
+        # own foe memory (opp_prev_active) follows the same rule (merge: it used to update in forced states too).
+        if not any(_forced(obs, i) for i in (0, 1)):
+            self.prev_active = [to_id((a or {}).get("species", "")) or None for a in (list(actives) + [None, None])[:2]]
+            self.prev_opp = [to_id((o or {}).get("species", "")) or None for o in (list(opps) + [None, None])[:2]]
+            self.opp_prev_active = [to_id((o or {}).get("species", "")) or None
+                                    if o and not o.get("fainted") else None for o in (list(opps) + [None, None])[:2]]
         return {"action": {"type": "doubles_turn", **pick}}
+
+    # ---- memory across turns (the policy instance lives for the whole match) ----
+    def _track_conditions(self, obs: dict) -> None:
+        """The turn each speed-control condition was set, to know how many turns of it are left.
+
+        We see every turn, so a condition first seen at the start of turn T was set during turn T-1; one first seen in
+        our forced-switch state of turn T (a faint / U-turn later in that turn; `turn` is still T) was set during T.
+        (The platform's dict value is that start turn too, e.g. {"TAILWIND": 4}; the local sim sends 1 for every side
+        condition and lists for fields, so it is not relied on.)"""
+        try:
+            turn = int(obs.get("turn") or 0)
+            set_turn = turn if any(_forced(obs, i) for i in (0, 1)) else turn - 1
+            now = {"opp_tailwind": "tailwind" in _cond_ids(obs.get("opponent_side_conditions")),
+                   "my_tailwind": "tailwind" in _cond_ids(obs.get("side_conditions")),
+                   "trickroom": "trickroom" in _cond_ids(obs.get("fields"))}
+            for k, on in now.items():
+                if not on:
+                    self.cond_set.pop(k, None)
+                elif k not in self.cond_set or self.cond_set[k] > turn:
+                    self.cond_set[k] = set_turn
+        except Exception:
+            log.warning("condition tracking failed", exc_info=True)
+
+    def _cond_left(self, key: str, turn: int) -> int | None:
+        """Turns of a condition left *including* this one (Tailwind: the turn it is set + 3, Trick Room: + 4)."""
+        if key not in self.cond_set:
+            return None
+        total = TRICK_ROOM_TURNS if key == "trickroom" else TAILWIND_TURNS
+        return max(1, total - (turn - self.cond_set[key]))
+
+    def _remember(self, obs: dict, pick: dict, actives: list) -> None:
+        """Last action per slot (Protect twice in a row fails). Forced-switch states only change the switching slot."""
+        try:
+            forced_state = any(_forced(obs, i) for i in (0, 1))
+            for i in (0, 1):
+                c = pick.get(f"slot_{i}") or {}
+                me = actives[i] if i < len(actives) else None
+                sp = to_id((me or {}).get("species", ""))
+                if c.get("type") == "move":
+                    if not forced_state:
+                        self.last_move[i] = (sp, to_id(c.get("move_id", "")))
+                elif c.get("type") == "switch":
+                    self.last_move[i] = (to_id(c.get("species", "")), None)
+                elif not forced_state:
+                    self.last_move.pop(i, None)
+        except Exception:
+            log.warning("could not remember last actions", exc_info=True)
+
+    def _protected_last(self, i: int, species: str) -> bool:
+        last = self.last_move.get(i)
+        return bool(last) and last[0] == to_id(species or "") and last[1] in STALL_MOVES
 
     def _remember_protect(self, pick: dict, slots: list, actives: list, turn) -> None:
         try:
@@ -547,8 +1136,24 @@ class PokemonPolicy:
         return me or slot.get("active") or ({"species": slot["species"]} if slot.get("species") else None)
 
     def _exact_context(self, obs, slots, actives, opps, turn, table) -> dict:
-        """Per-slot candidates with exact damage distributions, shared by the pair scorer and the lookahead."""
+        """Per-slot candidates with exact damage distributions, shared by the pair scorer and the lookahead.
+
+        Merge (lookahead x speed-protect): the lookahead's refactor split the exact scorer into this context + a
+        pair scorer (`_pair_value`) that the lookahead reuses; speed-protect's doubles scoring lives inside both:
+        the speed model, per-candidate speed facts (`_prep_cand`), Sash-aware stand-alone points here, and the
+        joint P(act) / Protect / KO-before-it-acts terms in `_pair_value`."""
         curs, danger, weights = self._foe_weights(table, actives, opps)
+        try:
+            sm = self._speed_model(obs, actives, opps, table)
+        except Exception:
+            log.warning("speed model failed; scoring without move order", exc_info=True)
+            sm = None
+        self.last_speed = sm
+        terrain = (sm or {}).get("terrain")
+        # Focus Sash / Sturdy at full HP: a lone single-hit move can't KO (also without the speed model).
+        foe_sash = (sm or {}).get("foe_sash") or {
+            j: _sashed(o, self.opponent_set(o.get("species", ""))) for j, o in enumerate(list(opps)[:2])
+            if o and not o.get("fainted")}
         per_slot, fresh_of = [], {}
         for slot in slots:
             i = slot["slot"]
@@ -562,69 +1167,108 @@ class PokemonPolicy:
                     v = self._switch_value(opt, opps) if _forced(obs, i) else -50.0
                     cands.append({"cand": _concrete(opt), "base": v, "foe": {}, "flinch": None})
                 elif opt.get("type") == "move":
-                    cands.extend(self._move_choices(opt, i, me, actives, opps, turn, fresh, obs, table, danger))
+                    cands.extend(self._move_choices(opt, i, me, actives, opps, turn, fresh, obs, table, danger,
+                                                    terrain, sm))
                 else:
                     cands.append({"cand": {"type": "pass"}, "base": -100.0, "foe": {}, "flinch": None})
             if not cands:
                 cands.append({"cand": _concrete(slot["options"][0]) if slot.get("options") else {"type": "pass"},
                               "base": -100.0, "foe": {}, "flinch": None})
+            for c in cands:
+                c.setdefault("slot", i)
+                c.setdefault("acts", False)
+                c.setdefault("kind", c["cand"].get("type"))
+                c.setdefault("species", my_sp)
+                c.setdefault("hp", (me or {}).get("current_hp_fraction", 1.0) or 1.0)
+                self._prep_cand(c, sm, curs)
             per_slot.append((i, cands))
 
         def solo(c):
-            return c["base"] + sum(weights.get(j, 1.0) * acc * _points(rolls, curs.get(j, 1))
+            return c["base"] + sum(weights.get(j, 1.0) * acc * _points(rolls, curs.get(j, 1), _sash_for(foe_sash, c, j))
                                    for j, (rolls, acc) in c["foe"].items())
 
         for _, cands in per_slot:
             for c in cands:
                 c["solo"] = solo(c)
         return {"per_slot": per_slot, "curs": curs, "danger": danger, "weights": weights, "fresh": fresh_of,
-                "cache": {}}
+                "cache": {}, "sm": sm, "foe_sash": foe_sash, "obs": obs, "turn": turn}
 
-    def _pair_value(self, ctx: dict, c0: dict, c1: dict) -> float | None:
-        """The exact pair score of two slot choices (None = illegal together)."""
-        if c0["cand"].get("type") == "switch" and c1["cand"].get("type") == "switch" \
+    def _pair_value(self, ctx: dict, c0: dict, c1: dict, tie_break: bool = True) -> float | None:
+        """The exact pair score of two slot choices (None = illegal together): speed-protect's joint scoring.
+
+        Each slot's stand-alone points count x P(it acts before a foe KOs / flinches it), with the partner's KO /
+        Fake Out before that foe acts raising it; Protect is valued by `_protect_value` (and refunds the partner's
+        Earthquake self-hit); two hits on one foe use the joint (Sash-aware) KO odds; a KO that lands before the
+        target acts earns REMOVE_* on top. `tie_break` adds TIE_BREAK x (stand-alone points): it only decides exact
+        ties, e.g. a slot that is surely KO'd first (P(act) = 0) never picks the first listed target, our partner."""
+        if c0["kind"] == "switch" and c1["kind"] == "switch" \
                 and to_id(c0["cand"].get("species")) == to_id(c1["cand"].get("species")):
             return None
-        curs, weights, cache = ctx["curs"], ctx["weights"], ctx["cache"]
-        v = c0["solo"] + c1["solo"]
+        curs, weights, cache, danger = ctx["curs"], ctx["weights"], ctx["cache"], ctx["danger"]
+        sm, foe_sash, obs, turn = ctx.get("sm"), ctx.get("foe_sash") or {}, ctx.get("obs") or {}, ctx.get("turn", 0)
+        pa0, pa1 = _p_act(c0, c1), _p_act(c1, c0)
+        v = pa0 * c0["solo"] + pa1 * c1["solo"]
+        if c0["kind"] == "protect":
+            v += self._protect_value(c0, c1, sm, obs, turn) + pa1 * c1.get("ally_pen", 0.0)
+        if c1["kind"] == "protect":
+            v += self._protect_value(c1, c0, sm, obs, turn) + pa0 * c0.get("ally_pen", 0.0)
         if c0["flinch"] is not None and c0["flinch"] == c1["flinch"]:
             v -= FAKE_OUT_BONUS
         for j in c0["foe"].keys() & c1["foe"].keys():      # both hit foe j: joint value replaces the sum
             da, db = c0["foe"][j], c1["foe"][j]
             key = (id(da), id(db), j)
             if key not in cache:
-                cache[key] = _pair_points(da, db, curs.get(j, 1))
-            v += weights.get(j, 1.0) * (cache[key] - da[1] * _points(da[0], curs.get(j, 1))
-                                        - db[1] * _points(db[0], curs.get(j, 1)))
+                cur = curs.get(j, 1)
+                sa, sb = _sash_for(foe_sash, c0, j), _sash_for(foe_sash, c1, j)
+                cache[key] = (_pair_points(da, db, cur, sa, sb) - da[1] * _points(da[0], cur, sa)
+                              - db[1] * _points(db[0], cur, sb),
+                              _pair_ko(da, db, cur, sa, sb))
+            v += pa0 * pa1 * weights.get(j, 1.0) * cache[key][0]
+        if sm is not None:                                  # KOs that land before the target acts
+            for j in c0["kob"].keys() | c1["kob"].keys():
+                n0, n1 = pa0 * c0["kob"].get(j, 0.0), pa1 * c1["kob"].get(j, 0.0)
+                rem = 1.0 - (1.0 - n0) * (1.0 - n1)
+                if j in c0["kob"] and j in c1["kob"]:
+                    k0, k1 = c0["ko"][j], c1["ko"][j]
+                    extra = cache[(id(c0["foe"][j]), id(c1["foe"][j]), j)][1] - (1 - (1 - k0) * (1 - k1))
+                    if extra > 0:
+                        rem += extra * pa0 * pa1 * min(c0["pf"][j], c1["pf"][j])
+                v += (REMOVE_BASE + REMOVE_DANGER * danger.get(j, 0.5)) * min(1.0, rem)
+        if tie_break:
+            v += TIE_BREAK * (c0["solo"] + c1["solo"])
         return v
 
     def _doubles_exact(self, ctx: dict) -> dict | None:
+        """Best joint pair by `_pair_value` (a lone slot is paired with a do-nothing dummy, as in speed-protect)."""
         per_slot = ctx["per_slot"]
-        pick = {}
+        lists = [cands for _, cands in per_slot][:2]
+        while len(lists) < 2:
+            lists.append([dict(_DUMMY_CAND)])
+        best, best_v = None, -1e18
+        dbg = self.debug_pairs
+        if dbg is not None:
+            dbg.clear()
+        for c0 in lists[0]:
+            for c1 in lists[1]:
+                v = self._pair_value(ctx, c0, c1, tie_break=False)
+                if v is None:
+                    continue
+                if dbg is not None:
+                    dbg.append((round(v, 1), c0["cand"], c1["cand"]))
+                # Exact ties go to the better stand-alone moves: a slot that is surely KO'd before it moves has
+                # P(act) = 0, so all its options score the same -- without this the first listed target (-1 / -2,
+                # our own partner) would win and a Close Combat would hit the ally if the model is wrong.
+                v += TIE_BREAK * (c0["solo"] + c1["solo"])
+                if v > best_v:
+                    best, best_v = (c0, c1), v
+        if best is None:
+            return None
         if len(per_slot) == 2:
-            (i0, c0s), (i1, c1s) = per_slot
-            best, best_v = None, -1e18
-            for c0 in c0s:
-                for c1 in c1s:
-                    v = self._pair_value(ctx, c0, c1)
-                    if v is not None and v > best_v:
-                        best, best_v = (c0, c1), v
-            if best is None:
-                return None
-            pick[f"slot_{i0}"], pick[f"slot_{i1}"] = best[0]["cand"], best[1]["cand"]
             ctx["best_pair"] = best
-        else:
-            used = set()
-            for i, cands in per_slot:
-                ranked = sorted(cands, key=lambda c: c["solo"], reverse=True)
-                choice = next((c for c in ranked if not (c["cand"].get("type") == "switch"
-                                                          and to_id(c["cand"].get("species")) in used)), ranked[0])
-                if choice["cand"].get("type") == "switch":
-                    used.add(to_id(choice["cand"].get("species")))
-                pick[f"slot_{i}"] = choice["cand"]
-        return pick
+        return {f"slot_{i}": c["cand"] for (i, _), c in zip(per_slot, best)}
 
-    def _move_choices(self, opt, i, me, actives, opps, turn, fresh, obs, table, danger) -> list[dict]:
+    def _move_choices(self, opt, i, me, actives, opps, turn, fresh, obs, table, danger,
+                      terrain=None, sm=None) -> list[dict]:
         """Every legal target of one move option as a candidate: base points + per-foe damage distributions."""
         mid = to_id(opt.get("move_id", ""))
         m = dex.move(mid)
@@ -635,8 +1279,17 @@ class PokemonPolicy:
         card = self._card(self.cards, me)
         sun = calc_field(obs, True).get("weather") == "Sun"
         acc = _acc_of(m, opt)
+        if mid == "suckerpunch":
+            acc *= SUCKER_PUNCH_ACC
         alive = {j: o for j, o in enumerate(list(opps)[:2]) if o and not o.get("fainted")}
         ally = actives[1 - i] if i < 2 and len(actives) > 1 - i else None
+        protect = mid in PROTECT_MOVES and not damaging
+        choice = to_id(view_item(me, card) or "").startswith("choice")   # a knocked-off Choice item no longer locks
+        try:
+            prio = move_priority(mid, _speed_view(me), self.cards.get(my_sp), terrain)
+        except Exception:
+            prio = int(m.get("priority", 0) or 0)
+        mh = _breaks_sash(mid)
         out = []
 
         def dist(j):
@@ -647,7 +1300,7 @@ class PokemonPolicy:
             return move_value(mid, my_sp, _types(alive[j])) * HEURISTIC_TO_POINTS
 
         for t in targets:
-            base, foe, flinch = 0.0, {}, None
+            base, foe, flinch, ally_pen = 0.0, {}, None, 0.0
             if t in (1, 2):
                 j = t - 1
                 if j not in alive:
@@ -658,13 +1311,13 @@ class PokemonPolicy:
                         base = -20.0
                     elif not _flinch_blocked(o, self.opponent_set(o.get("species", "")), obs):
                         base, flinch = FAKE_OUT_BONUS + 100.0 * danger.get(j, 0.5), j
-                if damaging:
+                if damaging and not (mid in FIRST_TURN_ONLY and not fresh):   # a stale Fake Out fails: no damage
                     d = dist(j)
                     if d:
                         foe[j] = d
                     else:
                         base += heuristic(j)
-                else:
+                elif not damaging:
                     base += _target_status_value(mid, o, self.opponent_set(o.get("species", "")))
             elif t == 0:
                 if m.get("target") in SPREAD_TARGETS and damaging:
@@ -677,25 +1330,33 @@ class PokemonPolicy:
                     if m.get("target") == "allAdjacent" and ally and not ally.get("fainted"):
                         r = table.get(("me", i, mid, "me", 1 - i))
                         if r:
-                            base -= ALLY_HIT_WEIGHT * acc * _points(r["rolls"], _cur_hp(ally, r))
+                            ally_pen = ALLY_HIT_WEIGHT * acc * _points(r["rolls"], _cur_hp(ally, r))
                         else:
-                            base -= ALLY_HIT_WEIGHT * move_value(mid, my_sp, _types(ally)) * HEURISTIC_TO_POINTS
+                            ally_pen = ALLY_HIT_WEIGHT * move_value(mid, my_sp, _types(ally)) * HEURISTIC_TO_POINTS
+                        base -= ally_pen                 # refunded when the partner Protects (joint scoring)
                 elif damaging:                                   # locked / auto-targeted single-target move
                     vals = [dist(j) for j in alive]
-                    pts = [acc * _points(d[0], _cur_hp(alive[j], table[("me", i, mid, "opp", j)])) if d else heuristic(j)
-                           for j, d in zip(alive, vals)]
+                    pts = [acc * _points(d[0], _cur_hp(alive[j], table[("me", i, mid, "opp", j)]),
+                                         not mh and _sashed(alive[j], self.opponent_set(alive[j].get("species", ""))))
+                           if d else heuristic(j) for j, d in zip(alive, vals)]
                     base = sum(pts) / len(pts) if pts else 0.0
-                else:
+                elif not protect:
                     base = _status_value(mid, hp, turn, obs)
+                    if sm is not None and mid in ("tailwind", "trickroom"):
+                        base = _speed_control_value(mid, sm, obs, base)
             else:                                                # ally-targeting: only support moves make sense
-                base = 15.0 if mid in ALLY_SUPPORT_MOVES else -100.0
+                ally_up = bool(ally) and not ally.get("fainted")
+                base = 15.0 if mid in ALLY_SUPPORT_MOVES and ally_up else -100.0
             if m.get("selfdestruct") and damaging:
                 base -= SELF_KO_PENALTY
             out.append({"cand": {"type": "move", "move_id": opt["move_id"], "target": t}, "base": base,
-                        "foe": foe, "flinch": flinch})
+                        "foe": foe, "flinch": flinch, "kind": "protect" if protect and t == 0 else "move",
+                        "acts": not protect, "prio": prio, "mid": mid, "target": t, "choice": choice, "mh": mh,
+                        "ally_pen": ally_pen})
         if not out:
             out.append({"cand": {"type": "move", "move_id": opt["move_id"], "target": targets[0]}, "base": -1.0,
-                        "foe": {}, "flinch": None})
+                        "foe": {}, "flinch": None, "acts": not protect, "prio": prio, "mid": mid, "target": targets[0],
+                        "mh": mh})
         return out
 
     def _doubles_heuristic(self, obs, slots, actives, opps, turn) -> dict:
@@ -756,6 +1417,9 @@ class PokemonPolicy:
                             v -= 0.9 * move_value(mid, my_sp, at)
                 else:
                     v = _status_value(mid, hp, turn, obs)
+                    if mid in PROTECT_MOVES and (self._protected_last(i, my_sp) or to_id(
+                            self.cards.get(my_sp, {}).get("item") or "").startswith("choice")):
+                        v = -50.0                                   # Protect twice in a row fails 2/3; Choice locks it
             else:  # ally-targeting (negative); only support moves make sense
                 v = 15.0 if mid in ALLY_SUPPORT_MOVES else -100
             if v > best_v:
@@ -820,6 +1484,28 @@ def _status_value(mid: str, hp: float, turn: int, obs: dict) -> float:
     if mid == "spore":
         return 55.0
     return 8.0
+
+
+def _speed_control_value(mid: str, sm: dict, obs: dict, default: float) -> float:
+    """Tailwind / Trick Room valued by how many (our mon, foe) speed matchups they flip for us."""
+    pairs = [(i, j) for i in sm["mine"] for j in sm["foes"]]
+    if not pairs:
+        return default
+    me, foe, tr = sm["my_spe"], sm["foe_spe"], sm["tr"]
+
+    def first(i, j, my_mult=1.0, trick=tr):
+        return _first(acts_first(me[i] * my_mult, 0, foe[j], 0, trick))
+
+    if mid == "tailwind":
+        if "tailwind" in _cond_ids(obs.get("side_conditions")) or tr:
+            return -10.0
+        gain = sum(first(i, j, 2.0) - first(i, j) for i, j in pairs)
+        return 20.0 + 50.0 * min(1.0, gain / 2)
+    # Trick Room: using it while it is up ends it
+    gain = sum(first(i, j, 1.0, not tr) - first(i, j) for i, j in pairs)
+    if tr:
+        return 40.0 if gain > 0 else -60.0
+    return max(-30.0, min(80.0, 10.0 + 25.0 * gain))
 
 
 def _concrete(opt: dict) -> dict:
