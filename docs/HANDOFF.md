@@ -12,8 +12,8 @@
 ## 下一步（按优先级，依据 docs/competition_brief.md）
 
 1. **真实平台 A/B：v3 vs v2**（`ARENA_DIR_APOCALYPSE=~/ab/v2 python scripts/sparring.py play <id>`；房间在 Human dashboard 创建，需要人登录；同一账号同时只能有一个进行中的房间）。至少 20 局，15 胜以上算明显领先，10 胜以下就停下来对比真实卡池和本地卡池。
-2. **送分题：控时与防崩溃**：按真实计时（55 s / 420 s / 90 s）给每步设硬预算并在总时间紧张时降级；未知游戏 / 阶段 / 动作模板只记日志、安全出手，不进入「崩溃 → 冷却」循环；断线重连；`DamageCalc` 一次失败就永久关闭的问题改为自动重启；多场同时进行时的压力测试。
-3. **公开理由**：每步附简短可读的理由（会显示给观众），绝不写底牌。
+2. ~~控时与防崩溃~~、~~公开理由~~：v3.1 已完成（见 `docs/progress.md`）。剩下：首次真实对局确认观战页显示公开理由、平台如何扣总时间；传输层断线重连在官方 `altruagent/`（上游），不要改。
+3. **多场并发压力测试**：`scripts/stress_concurrency.py`，在比赛用的机器上跑 N=8。
 4. **宝可梦其他格式冒烟测试**：官方演示是 Gen 9 OU 公开选秀单打；单打 / teambuild 路径、无 Node 时的实力都要测。和官方示例 agent（basic / smoke / llm_agent）以及开源强 bot 做基准。
 5. **选秀模型换成混合对手群体重新拟合**，并把 4 张新卡加进目录（`python -m local.pool --harvest`）。
 6. **狼人杀**：合并 `candidates/r2-ww-seer-and-villager` 并按模拟结论调整；注意狼人杀可能不计分（技能文档写「Standalone competitions only」），单个座位对投票影响有限，投入要看回报。发言说服需要大模型（Nebius 已不是赞助商，额度来源要重新核对）。

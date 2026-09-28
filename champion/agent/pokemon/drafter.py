@@ -46,6 +46,7 @@ import sys
 import time
 from pathlib import Path
 
+from .. import timecontrol
 from .dex import to_id
 
 log = logging.getLogger("agent.drafter")
@@ -61,6 +62,7 @@ MODEL_PATH = Path(__file__).resolve().parent / "draft_model.json"
 # an unloaded machine, it does not bind in practice -- but it can no longer shrink under load.
 NODE_BUDGET = 120_000
 SAFETY_WALL_S = 2.0      # wall-clock guard only (~7x the node budget's CPU time); never binds on a sane machine
+DEADLINE_SHARE = 0.5     # ... nor past this share of the draft pick's time left (agent/timecontrol.py)
 TIE_EPS = 0.05           # root values within this (logit) of the best are a tie: the larger immediate gain wins
 TOP_K = 5                # branching of the minimax part
 MAX_DEPTH = 4            # picks searched exactly (the root pick included); the rest is greedy
@@ -345,7 +347,9 @@ class Drafter:
         seq_me = [ch == me_letter for ch in seq]           # True = our pick
         m, P, S = self._tables(cards)
         budget = self.node_budget                           # the calc tables (first pick only) are not search work
-        wall = time.monotonic() + self.wall_cap
+        # the wall also never runs past DEADLINE_SHARE of the pick's time left (agent/timecontrol.py); unchanged
+        # outside a decision and whenever the deadline is far (always, unless the machine is badly overloaded)
+        wall = time.monotonic() + timecontrol.cap(self.wall_cap, DEADLINE_SHARE)
         items = [to_id(c.get("item") or "") or None for c in cards]
         n = len(cards)
 
@@ -444,6 +448,6 @@ class Drafter:
                 pass
         self.info = {"depth": depth_done, "nodes": nodes[0], "ms": round(1000 * (time.monotonic() - t0), 1),
                      "value": round(values[best], 3), "fitted": self.model.fitted,
-                     "budget_hit": budget_hit, "ties": len(near),
+                     "budget_hit": budget_hit, "wall_hit": wall_hit[0], "ties": len(near),
                      "top": sorted(((round(values[c], 3), cards[c]["species"]) for c in roots), reverse=True)[:4]}
         return cards[best]["card_id"]
