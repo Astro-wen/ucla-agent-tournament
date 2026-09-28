@@ -17,7 +17,8 @@ import os
 import random
 from dataclasses import dataclass, field
 
-from altruagent import TERMINATE_MESSAGING, DecisionContext, GameState, LegalAction, SendMessage
+from altruagent import TERMINATE_MESSAGING, DecisionContext, GameState, LegalAction, SendMessage, WithReasoning
+from altruagent.runner import _validate_decision
 
 os.environ["ARENA_RECORD"] = "0"      # never record simulated games (agent/agent.py record())
 N = 7
@@ -49,7 +50,11 @@ class ContestantSeat(Seat):
         return DecisionContext(session_id="local", tournament_id=None, game_type="werewolf", agent_id="ours")
 
     def choose(self, raw: dict) -> str:
-        out = self.agent.choose_action(GameState.from_mcp_state(raw), self._ctx())
+        gs = GameState.from_mcp_state(raw)
+        out = self.agent.choose_action(gs, self._ctx())
+        if isinstance(out, WithReasoning):          # public reasoning: checked like the real runner, then unwrapped
+            _validate_decision(out, gs.legal_actions)
+            out = out.action
         return out.action_id if isinstance(out, LegalAction) else str(out)
 
     def message(self, raw: dict):

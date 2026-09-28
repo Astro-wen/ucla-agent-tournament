@@ -67,6 +67,19 @@ from altruagent import AltruAgentClient; c = AltruAgentClient(); print(c.join_to
 
 `agent/agent.py` 把每次决策的原始局面写到 `logs/<session_id>.jsonl`（可用 `ARENA_RECORD_DIR` 改目录）。比赛后 `python -m local.pool --harvest` 把新见到的卡并入 `data/vgc_cards.json`。
 
+## 公开理由（reasoning_summary）
+
+每步出手会附一句公开理由（`agent/reasoning.py`），观众能看到，我们按「对手也能实时看到」来写，所以只用公开信息、固定模板：
+
+- 狼人杀：夜里一律不写（夜里只有狼和预言家行动，写一句就暴露身份）；白天投票对所有身份、所有目标都是同一句「Day N vote cast. Ballots stay hidden until everyone has voted.」。
+- 宝可梦选秀：选秀是轮流且立刻公开的，写刚选的那张卡和一条属性相克事实，不写道具、特性、招式，也不提卡池里还没被选的卡。
+- 宝可梦队伍预览和对战（双方同时出手）：默认 `safe` 模式只写回合数和公开的击倒数，内容与我们选了什么无关。
+
+开关是环境变量 `ARENA_REASONING`（启动 `python -m agent` 前设置）：
+- 不设或 `safe`：上面的默认行为。
+- `detail`：预览写两只首发，对战写本回合选的招式、目标、换人（从不写别的选项）。只有在主办方确认观战要等双方都出手后才显示时再用，否则对手可能先看到我们的守住或换人。
+- `off`（或 `0`）：完全不附理由，发给平台的内容与加这个功能之前一模一样。
+
 ## 上线前检查清单
 
 - [ ] `git pull` 到冻结的 tag；`python -m pytest -q` 全绿

@@ -308,13 +308,15 @@ def _only_switches(slot: dict) -> bool:
 
 
 # ---------------------------------------------------------------------------------------------- entry point
-def joint_lookahead(pol, obs, tmpl, actives, opps, turn, table, ctx, pick, t0, seed_key=None) -> dict | None:
+def joint_lookahead(pol, obs, tmpl, actives, opps, turn, table, ctx, pick, t0, seed_key=None,
+                    time_cap: float | None = None) -> dict | None:
     """The lookahead's joint pick ({"slot_0": .., "slot_1": ..}) or None to keep the exact pair pick.
     t0: time.monotonic() when the caller hands over (after its calc round trip); TIME_CAP counts from it.
-    seed_key (e.g. (session id, state version, turn)) seeds LOOKAHEAD_MIX=sample's draw."""
+    seed_key (e.g. (session id, state version, turn)) seeds LOOKAHEAD_MIX=sample's draw.
+    time_cap: a tighter cap than TIME_CAP for this call (the decision's deadline, agent/timecontrol.py)."""
     start = time.monotonic()
     try:
-        out = _Search(pol, obs, tmpl, actives, opps, turn, table, ctx, pick, t0, seed_key).run()
+        out = _Search(pol, obs, tmpl, actives, opps, turn, table, ctx, pick, t0, seed_key, time_cap).run()
     except Exception:
         log.warning("joint lookahead crashed; keeping the exact pair pick", exc_info=True)
         out = None
@@ -330,11 +332,12 @@ def joint_lookahead(pol, obs, tmpl, actives, opps, turn, table, ctx, pick, t0, s
 
 
 class _Search:
-    def __init__(self, pol, obs, tmpl, actives, opps, turn, table, ctx, pick, t0, seed_key=None):
+    def __init__(self, pol, obs, tmpl, actives, opps, turn, table, ctx, pick, t0, seed_key=None, time_cap=None):
         from . import policy as P                    # late import: policy imports this module
         self.P, self.pol, self.obs, self.tmpl, self.table, self.ctx, self.pick, self.t0 = \
             P, pol, obs, tmpl, table, ctx, pick, t0
         self.seed_key = seed_key
+        self.time_cap = time_cap
         self.actives = (list(actives or []) + [None, None])[:2]
         self.opps = (list(opps or []) + [None, None])[:2]
         self.turn = turn if isinstance(turn, int) else 0
@@ -391,10 +394,11 @@ class _Search:
         col_w = softmax_weights([c[0].pre + c[1].pre for c in cols], foe_temp()) if fw_mode == "softmax" else None
         best, best_key, pick_key, scored = None, None, None, []
         matrix, keys = [], []
+        cap = self._cap()
         for n, row in enumerate(rows):
-            if time.monotonic() - self.t0 > TIME_CAP:
+            if time.monotonic() - self.t0 > cap:
                 STATS["timeouts"] += 1
-                log.warning("joint lookahead hit the %.1fs cap after %d/%d rows", TIME_CAP, n, len(rows))
+                log.warning("joint lookahead hit the %.2fs cap after %d/%d rows", cap, n, len(rows))
                 return None
             vals = [self._simulate(row, col) for col in cols]
             score = row_score(vals, w_worst, w_mean, col_w)
@@ -434,6 +438,11 @@ class _Search:
                                    "ms": round(1000 * (time.monotonic() - self.t0), 1), "choice": out,
                                    "mix_mode": mode, "mix": mix, "alpha": w_worst, "foe_weight": fw_mode}
         return out
+
+    def _cap(self) -> float:
+        """TIME_CAP (read per call: tests shrink it), or the tighter cap the caller passed (decision deadline)."""
+        cap = getattr(self, "time_cap", None)          # (tests build bare _Search objects)
+        return TIME_CAP if cap is None else min(TIME_CAP, cap)
 
     def _pick_row(self, rows):
         want = [self.pick.get(f"slot_{s['slot']}") for s in self.tmpl.get("slots", [])]
@@ -487,7 +496,7 @@ class _Search:
     def _mix(self, mode, rows, cols, matrix, keys, pick_row):
         """(row index, diagnostics) from our equilibrium strategy on the top-MIX_K subgame, or None to keep
         the robust row. Only rows already built from the policy's legal candidates can come out."""
-        deadline = min(self.t0 + TIME_CAP, time.monotonic() + MIX_TIME)
+        deadline = min(self.t0 + self._cap(), time.monotonic() + MIX_TIME)
         if time.monotonic() >= deadline or not rows or not cols:
             return None
         ok = [n for n in range(len(rows)) if keys[n][1] > -1e17 and all(math.isfinite(v) for v in matrix[n])

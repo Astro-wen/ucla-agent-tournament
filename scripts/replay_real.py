@@ -2,6 +2,11 @@
 
     python scripts/replay_real.py            # all logs/*/*.jsonl
     python scripts/replay_real.py --no-calc  # same, with the damage calculator disabled (heuristic fallback path)
+    python scripts/replay_real.py --show-reasoning   # also print every public reasoning line
+
+Each move is first put through the official runner's own `_validate_decision` (the shapes it accepts, including
+the WithReasoning wrapper), and each public reasoning line is checked (length cap, ASCII whitelist, leak guard);
+the time to build the line is reported on its own.
 """
 from __future__ import annotations
 
@@ -13,18 +18,26 @@ import time
 
 os.environ["ARENA_RECORD"] = "0"          # replaying must not re-record the sessions it reads
 
-from altruagent import DecisionContext, GameState, LegalAction, SendMessage
+from altruagent import DecisionContext, GameState, LegalAction, WithReasoning
+from altruagent.runner import _validate_decision
 
+from agent import reasoning
 from agent.agent import Contestant, doubles_ok
 from agent.pokemon.calc import DamageCalc
+
+
+def _p99(xs: list[float]) -> float:
+    return xs[int(len(xs) * 0.99) - 1] if xs else 0.0
 
 
 def main() -> int:
     if "--no-calc" in sys.argv:
         DamageCalc.get().enabled = False
+    show = "--show-reasoning" in sys.argv
     files = sorted(glob.glob("logs/*/*.jsonl"))
-    n = fails = 0
+    n = fails = with_reason = 0
     times: list[float] = []
+    reason_times: list[float] = []
     for f in files:
         c = Contestant()                                        # one instance per match, like the runner
         for line in open(f):
@@ -43,9 +56,28 @@ def main() -> int:
             finally:
                 times.append(time.perf_counter() - t)
             n += 1
-            obs = raw.get("observation") if isinstance(raw.get("observation"), dict) else {}
             bad = None
-            if raw.get("phase") == "moving" and obs.get("is_doubles"):
+            if rec["kind"] == "action":
+                try:
+                    _validate_decision(out, gs.legal_actions)   # exactly what the official runner does first
+                except Exception as e:                          # noqa: BLE001
+                    bad = f"runner rejects {out!r}: {e}"
+                if isinstance(out, WithReasoning):
+                    with_reason += 1
+                    text = out.reasoning_summary
+                    if not isinstance(text, str) or text != reasoning.sanitize(text) \
+                            or reasoning.leaks(text, raw.get("game_type") or ""):
+                        bad = f"bad public reasoning {text!r}"
+                    if show:
+                        print(f"REASON {raw.get('phase')}: {text}")
+                    out = out.action
+                    t = time.perf_counter()                     # the line alone, same inputs as in choose_action
+                    reasoning.attach(out, raw, ctx.game_type or "", c.reasoning_mode)
+                    reason_times.append(time.perf_counter() - t)
+            obs = raw.get("observation") if isinstance(raw.get("observation"), dict) else {}
+            if bad:
+                pass
+            elif raw.get("phase") == "moving" and obs.get("is_doubles"):
                 if not (isinstance(out, dict) and doubles_ok(raw, out)):
                     bad = f"illegal doubles answer {out}"
             elif raw.get("phase") == "team_preview":
@@ -62,10 +94,13 @@ def main() -> int:
                 fails += 1
                 print(f"ILLEGAL {f} {raw.get('phase')}: {bad}")
     times.sort()
-    p99 = times[int(len(times) * 0.99) - 1] if times else 0
+    reason_times.sort()
     print(f"replayed {n} real decisions from {len(files)} files: {fails} failures | "
-          f"decision time avg {1000 * sum(times) / max(1, len(times)):.1f} ms, p99 {1000 * p99:.1f} ms, "
+          f"decision time avg {1000 * sum(times) / max(1, len(times)):.1f} ms, p99 {1000 * _p99(times):.1f} ms, "
           f"max {1000 * (times[-1] if times else 0):.0f} ms")
+    print(f"public reasoning (mode {reasoning.mode_from_env()}) on {with_reason} decisions: build avg "
+          f"{1000 * sum(reason_times) / max(1, len(reason_times)):.3f} ms, p99 {1000 * _p99(reason_times):.3f} ms, "
+          f"max {1000 * (reason_times[-1] if reason_times else 0):.3f} ms")
     return 1 if fails else 0
 
 

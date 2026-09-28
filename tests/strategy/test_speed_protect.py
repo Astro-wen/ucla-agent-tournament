@@ -394,6 +394,7 @@ def test_no_attack_into_our_own_live_partner_on_real_states():
     from altruagent import DecisionContext, GameState
     from agent.agent import Contestant
     from agent.pokemon.dex import to_id
+    from agent.reasoning import unwrap
     bad = []
     for f in _recorded_sessions():
         c = Contestant()
@@ -405,7 +406,7 @@ def test_no_attack_into_our_own_live_partner_on_real_states():
             obs = raw.get("observation") or {}
             ctx = DecisionContext(session_id="replay", tournament_id=None,
                                   game_type=raw.get("game_type") or "pokemon_vgc_doubles_draft", agent_id="me")
-            out = c.choose_action(GameState.from_mcp_state(raw), ctx)
+            out = unwrap(c.choose_action(GameState.from_mcp_state(raw), ctx))
             if raw.get("phase") != "moving" or not obs.get("is_doubles") or not isinstance(out, dict):
                 continue
             acts = list(obs.get("active_pokemon") or []) + [None, None]

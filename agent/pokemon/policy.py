@@ -23,7 +23,10 @@ from __future__ import annotations
 import logging
 import time
 
+from .. import timecontrol
 from . import dex
+from . import drafter as drafter_mod
+from . import lookahead as lookahead_mod
 from . import preview as preview_matrix
 from .calc import DamageCalc, calc_field, calc_pokemon, move_name, view_item
 from .dex import to_id
@@ -51,6 +54,13 @@ ABILITIES = {"intimidate": 2.0, "prankster": 0.8, "drought": 1.0, "drizzle": 1.0
              "asonespectrier": 0.5, "innerfocus": 0.3}
 SPREAD_TARGETS = {"allAdjacentFoes", "allAdjacent"}
 USE_DRAFTER = True               # draft with agent/pokemon/drafter.py (search over the rest of the draft)
+# ---- time control (agent/timecontrol.py): below these the bounded step is skipped, not started
+MIN_LOOKAHEAD_S = 0.05           # joint lookahead (normally ~30 ms, TIME_CAP 2.5 s)
+MIN_DRAFTER_S = 0.02             # drafter search wall (normally < 0.3 s, SAFETY_WALL_S 2 s)
+MIN_PREVIEW_S = 0.25             # preview matrix game (normally 0.5-2.7 s incl. its calc batch, wall cap 6 s)
+DRAFTER_SHARE = 0.5              # the drafter's search may use this share of the draft pick's time left
+PREVIEW_SHARE = 0.8              # the preview matrix game (calc batch + search) may use this share
+BATTLE_PHASES = ("moving",)      # the platform's battle phase (docs/real_payloads.md)
 
 # ---- exact-damage scoring scale ("points"): removing all of a foe's current HP = 100, a KO adds KO_BONUS.
 KO_BONUS = 50.0
@@ -389,6 +399,9 @@ class PokemonPolicy:
         self.drafter_kwargs: dict = {}          # Drafter(...) overrides (node budget / max_depth / top_k), experiments only
         self.last_timing: dict | None = None     # last doubles decision: exact table / lookahead / total ms
         self.warmed = False                      # did this policy already warm the damage calculator?
+        self.lookahead_skipped = 0               # doubles decisions whose deadline left no time for the lookahead
+        self.degraded: list[str] = []            # time-control degradations of the current match (diagnostics)
+        self._reported: set = set()              # unknown phases already reported on stderr
 
     def _warm_calc(self) -> None:
         """Pay the node + @smogon/calc start-up before the first battle decision (the draft, teambuild and team
@@ -461,6 +474,8 @@ class PokemonPolicy:
     # ---- dispatch ------------------------------------------------------
     def act(self, st: dict) -> dict:
         obs = st.get("observation") or {}
+        if not isinstance(obs, dict):
+            raise TypeError(f"observation is a {type(obs).__name__}, not a dict")
         phase = st.get("phase")
         if phase in ("draft", "teambuild", "team_preview"):
             self._warm_calc()
@@ -472,9 +487,21 @@ class PokemonPolicy:
             return {"action": {"type": "submit_team", "team": DEFAULT_OU_TEAM}}
         if phase == "team_preview":
             return self._preview(obs, str(st.get("session_id") or ""))
+        if phase not in BATTLE_PHASES:
+            kind = _battle_kind(st, obs)
+            if kind is None:                    # an unknown phase that is not a battle turn: the safe fallback
+                self._report(("phase", phase), "unknown Pokémon phase %r: answering with the safe fallback", phase)
+                return self.fallback(st)
+            self._report(("phase", phase), "unknown Pokémon phase %r looks like a %s turn: playing it", phase, kind)
+            return self._doubles(st, obs) if kind == "doubles" else self._singles(st, obs)
         if obs.get("is_doubles"):
             return self._doubles(st, obs)
         return self._singles(st, obs)
+
+    def _report(self, key, msg: str, *args) -> None:
+        if key not in self._reported:
+            self._reported.add(key)
+            log.error(msg, *args)
 
     def fallback(self, st: dict) -> dict:
         la = (st.get("legal_actions") or {}).get("actions") or []
@@ -488,6 +515,9 @@ class PokemonPolicy:
                     if opt.get("type") == "switch" and to_id(opt.get("species")) in used:
                         continue
                     pick[f"slot_{slot['slot']}"] = _concrete(opt)
+                    foes = [t for t in (opt.get("targets") or []) if isinstance(t, int) and t > 0]
+                    if opt.get("type") == "move" and foes:      # never the first listed target: our own partner
+                        pick[f"slot_{slot['slot']}"]["target"] = foes[0]
                     if opt.get("type") == "switch":
                         used.add(to_id(opt.get("species")))
                     break
@@ -518,7 +548,11 @@ class PokemonPolicy:
             or obs.get("available_cards", [])
         best = max(cards, key=lambda c: card_score(c, roster))
         why = f"{best['species']}: best value + synergy with current roster"
-        if USE_DRAFTER:
+        drafter_time = timecontrol.cap(drafter_mod.SAFETY_WALL_S, DRAFTER_SHARE)
+        if USE_DRAFTER and timecontrol.current() is not None and drafter_time < MIN_DRAFTER_S:
+            log.warning("no time left for the drafter (%.2fs); keeping the card_score pick", drafter_time)
+            self.degraded.append("draft:card_score")
+        elif USE_DRAFTER:
             try:
                 cid = self._drafter_pick(obs, me, legal_ids)
                 hit = next((c for c in cards if c["card_id"] == cid), None)
@@ -581,8 +615,9 @@ class PokemonPolicy:
             out = self._preview_matrix(obs, session_id)
             if out is not None:
                 return out
-        except Exception:
+        except Exception as e:
             log.warning("preview matrix failed; using the heuristic preview", exc_info=True)
+            self.degraded.append(f"preview:{type(e).__name__}")
         return self._preview_heuristic(obs)
 
     def _new_battle(self) -> None:
@@ -616,13 +651,22 @@ class PokemonPolicy:
         my_cards = [preview_matrix.resolve_card(s, self.cards, by_species) for s in sids]
         opp_cards = [preview_matrix.resolve_card(p["species"], self.opp_cards, by_species) for p in opp]
         seed = f"{session_id}|{','.join(sids)}|{','.join(to_id(p['species']) for p in opp)}"
+        knobs = None
+        if timecontrol.current() is not None:        # the matrix game never runs past the preview's deadline
+            wall = timecontrol.cap(float(preview_matrix.KNOBS.get("wall_cap_s", 6.0)), PREVIEW_SHARE)
+            if wall < MIN_PREVIEW_S:
+                log.warning("no time left for the preview matrix game (%.2fs); heuristic preview", wall)
+                self.degraded.append("preview:heuristic")
+                return None
+            if wall < float(preview_matrix.KNOBS.get("wall_cap_s", 6.0)):
+                knobs = {"wall_cap_s": wall}
         guess = None
         if float(preview_matrix.KNOBS.get("prior_w", 0) or 0) > 0:
             try:
                 guess = self._guess_opponent_lineup(mine, opp, opp_cards)
             except Exception:
                 log.debug("opponent lineup guess failed", exc_info=True)
-        res = preview_matrix.choose(mine, my_cards, opp, opp_cards, seed_text=seed, opp_guess=guess)
+        res = preview_matrix.choose(mine, my_cards, opp, opp_cards, seed_text=seed, opp_guess=guess, knobs=knobs)
         if res is None:
             return None
         # Echo the roster's own species strings (the platform validates bring/leads against them).
@@ -1038,13 +1082,20 @@ class PokemonPolicy:
             except Exception:
                 log.warning("exact doubles scoring failed; using the heuristic", exc_info=True)
                 pick = ctx = None
-        if pick is not None and ctx is not None:
+        la_cap = None                          # the decision deadline's cap on the lookahead (None: no deadline)
+        if timecontrol.current() is not None:
+            la_cap = timecontrol.cap(lookahead_mod.TIME_CAP)
+        if pick is not None and ctx is not None and la_cap is not None and la_cap < MIN_LOOKAHEAD_S:
+            log.warning("no time left for the joint lookahead (%.2fs); keeping the exact pair pick", la_cap)
+            self.lookahead_skipped += 1
+        elif pick is not None and ctx is not None:
             # One-step joint lookahead; None = keep the exact pair pick. Its TIME_CAP clock starts here: it bounds
             # the lookahead's own work, never the calculator start-up or round trip spent above.
             la_t0 = time.monotonic()
             try:
+                kw = {} if la_cap is None or la_cap >= lookahead_mod.TIME_CAP else {"time_cap": la_cap}
                 better = joint_lookahead(self, obs, tmpl, actives, opps, turn, table, ctx, pick, la_t0,
-                                         seed_key=(st.get("session_id"), st.get("state_version"), turn))
+                                         seed_key=(st.get("session_id"), st.get("state_version"), turn), **kw)
                 if better is not None:
                     pick = better
             except Exception:
@@ -1464,6 +1515,21 @@ def _guess_moves(species: str) -> list[str]:
     bs = dex.base_stats(species)
     table = PHYSICAL_STAB if bs.get("atk", 0) >= bs.get("spa", 0) else SPECIAL_STAB
     return [table[t] for t in dex.types_of(species) if t in table] + ["protect"]
+
+
+def _battle_kind(st: dict, obs: dict) -> str | None:
+    """"doubles" / "singles" when a state of an unknown phase is shaped like a battle turn, else None."""
+    try:
+        la = (st.get("legal_actions") or {}).get("actions") or []
+        act = ((la[0].get("input") or {}).get("action") or {}) if la else {}
+        if act.get("type") == "doubles_turn" and isinstance(act.get("slots"), list):
+            return "doubles"
+        ids = [str(a.get("action_id", "")) for a in la]
+        if ids and all(i.startswith(("move:", "switch:")) for i in ids) and isinstance(obs.get("active_pokemon"), dict):
+            return "singles"
+    except Exception:
+        return None
+    return None
 
 
 def _forced(obs: dict, i: int) -> bool:

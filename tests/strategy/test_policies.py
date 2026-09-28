@@ -3,6 +3,7 @@ from altruagent import TERMINATE_MESSAGING, DecisionContext, GameState, SendMess
 
 from agent.agent import Contestant, doubles_ok
 from agent.pokemon.policy import PokemonPolicy, card_score
+from agent.reasoning import unwrap
 from agent.werewolf.policy import WerewolfPolicy
 from agent.werewolf.state import parse
 
@@ -119,7 +120,7 @@ def ctx(game):
 def test_adapter_doubles_returns_validated_dict():
     raw = doubles_state(1) | {"session_id": "sid", "game_type": "pokemon_vgc_doubles_draft",
                                "is_current_actor": True}
-    out = Contestant().choose_action(GameState.from_mcp_state(raw), ctx("pokemon_vgc_doubles_draft"))
+    out = unwrap(Contestant().choose_action(GameState.from_mcp_state(raw), ctx("pokemon_vgc_doubles_draft")))
     assert isinstance(out, dict) and out["type"] == "doubles_turn" and doubles_ok(raw, out)
 
 
@@ -135,7 +136,7 @@ def test_adapter_survives_policy_crash():
     c = Contestant()
     c.ww.act = lambda st: 1 / 0
     raw = ww_state("Your role: VILLAGER", "day_vote", [0, 1, 7]) | {"game_type": "werewolf"}
-    out = c.choose_action(GameState.from_mcp_state(raw), ctx("werewolf"))
+    out = unwrap(c.choose_action(GameState.from_mcp_state(raw), ctx("werewolf")))
     assert out.action_id == "0"
 
 

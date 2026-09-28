@@ -9,6 +9,7 @@ import pytest
 from agent.agent import Contestant, doubles_ok
 from agent.pokemon.calc import DamageCalc, _js_dir, calc_pokemon
 from agent.pokemon.policy import KO_BONUS, PokemonPolicy, _hit_stats, _pair_points, _points
+from agent.reasoning import unwrap
 
 needs_calc = pytest.mark.skipif(_js_dir() is None, reason="agent/js has no node_modules")
 
@@ -176,7 +177,7 @@ def test_replay_real_recorded_states():
             gs = GameState.from_mcp_state(raw)
             ctx = DecisionContext(session_id="replay", tournament_id=None, game_type=d.get("game_type") or "pokemon_vgc_doubles_draft", agent_id="me")
             t = time.perf_counter()
-            out = c.choose_action(gs, ctx)
+            out = unwrap(c.choose_action(gs, ctx))
             worst = max(worst, time.perf_counter() - t)
             obs = raw.get("observation") or {}
             if raw.get("phase") == "moving" and isinstance(obs, dict) and obs.get("is_doubles"):

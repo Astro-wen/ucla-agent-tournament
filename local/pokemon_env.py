@@ -17,7 +17,8 @@ import random
 import re
 from dataclasses import dataclass, field
 
-from altruagent import DecisionContext, GameState, LegalAction
+from altruagent import DecisionContext, GameState, LegalAction, WithReasoning
+from altruagent.runner import _validate_decision
 
 from .pool import POOL, to_showdown_set
 from .showdown import Showdown
@@ -52,7 +53,16 @@ class ContestantPlayer(Player):
     def choose(self, raw: dict):
         gs = GameState.from_mcp_state(raw)
         ctx = DecisionContext(session_id=raw["session_id"], tournament_id=None, game_type=GAME, agent_id="ours")
-        return self.agent.choose_action(gs, ctx)
+        return runner_view(self.agent.choose_action(gs, ctx), gs)
+
+
+def runner_view(out, gs: GameState):
+    """A move wrapped in altruagent.WithReasoning (public reasoning) is first checked the way the real runner checks
+    it (a rejection raises, and the match counts it as invalid), then played as the move inside."""
+    if isinstance(out, WithReasoning):
+        _validate_decision(out, gs.legal_actions)
+        out = out.action
+    return out
 
 
 class OfficialBaseline(Player):
