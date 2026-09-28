@@ -1,0 +1,2 @@
+# Keep LF line endings in the repo and working tree, even when files are edited from Windows.
+* text=auto eol=lf

@@ -58,7 +58,7 @@ WantedBy=multi-user.target
 
 ```bash
 python -c "
-from altruagent import AltruAgentClient; c = AltruAgentClient.from_env(); print(c.join_tournament('<tournament_id>'))"
+from altruagent import AltruAgentClient; c = AltruAgentClient(); print(c.join_tournament('<tournament_id>'))"
 ```
 
 （确切的 SDK 调用以 `altruagent/client.py` 的 `join_tournament` 为准。）之后 `python -m agent` 会看到子对局并自动开打。
