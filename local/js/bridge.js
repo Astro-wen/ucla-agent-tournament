@@ -3,10 +3,11 @@
 //   {"cmd":"start","format":"gen9vgc2025regi@@@Terastal Clause","p1":[sets],"p2":[sets],"seed":[1,2,3,4]}
 //   {"cmd":"choose","p1":"team 1234","p2":"move 1 1, move 2 2"}   (omit a side that has no request)
 //   {"cmd":"validate","sets":[sets]}
+//   {"cmd":"gen_team","format":"gen9randombattle","seed":[1,2,3,4]}   -> {"team":[sets]}  (singles harness)
 // and gets back one JSON object per line: {"requests":{"p1":..,"p2":..},"state":{..},"ended":bool,"winner":..,"log":[..]}
 'use strict';
 const readline = require('readline');
-const {Battle, TeamValidator} = require('pokemon-showdown');
+const {Battle, TeamValidator, Teams} = require('pokemon-showdown');
 
 let battle = null;
 let logOffset = 0;
@@ -17,7 +18,7 @@ function pokeView(p, omniscient) {
     species: p.species.name, id: p.species.id, types: p.getTypes().map(t => t.toUpperCase()),
     current_hp: p.hp, max_hp: p.maxhp, current_hp_fraction: p.maxhp ? p.hp / p.maxhp : 0,
     status: p.status || null, fainted: p.fainted, active: p.isActive, boosts: p.boosts,
-    base_stats: p.species.baseStats, position: p.position,
+    base_stats: p.species.baseStats, position: p.position, level: p.level, name: p.name,
   };
   if (omniscient) { v.item = p.item; v.ability = p.ability; v.moves = p.moves; v.stats = p.storedStats; }
   return v;
@@ -28,6 +29,7 @@ function sideView(side, omniscient) {
     active: side.active.map(p => pokeView(p, omniscient)),
     team: side.pokemon.map(p => pokeView(p, omniscient)),
     side_conditions: Object.keys(side.sideConditions),
+    side_layers: Object.fromEntries(Object.entries(side.sideConditions).map(([k, c]) => [k, c.layers || 1])),
   };
 }
 
@@ -70,6 +72,9 @@ rl.on('line', line => {
     if (msg.cmd === 'validate') {
       const v = TeamValidator.get(msg.format || 'gen9vgc2025regi');
       return out({problems: msg.sets.map(s => v.validateSet(s, {}) || null)});
+    }
+    if (msg.cmd === 'gen_team') {
+      return out({team: Teams.generate(msg.format || 'gen9randombattle', {seed: msg.seed || undefined})});
     }
     if (msg.cmd === 'quit') process.exit(0);
     out({error: 'unknown cmd'});

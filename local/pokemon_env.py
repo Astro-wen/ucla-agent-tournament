@@ -8,6 +8,12 @@ so the deployed `agent.agent.Contestant` runs here unchanged.
 
 Anything the platform rejects (bad lineup, illegal doubles choice) is what the
 platform's 300 s timer would do: a random legal choice, counted as `invalid`.
+
+Players that model the platform's clocks (local/field_opps.py) have two more answers: TIMER_DEFAULT = this
+decision was left to Showdown's battle timer (team preview: the first four in roster order, leading with the
+first two; a battle request: Showdown's own `default` choice), and altruagent.RESIGN = the seat forfeits and the
+other seat wins at once. Both are counted in MatchResult (`timer_defaults`, `forfeit`), never as `invalid`; no
+other player ever returns them, so they change nothing for the ladder or the benchmark.
 """
 from __future__ import annotations
 
@@ -17,7 +23,7 @@ import random
 import re
 from dataclasses import dataclass, field
 
-from altruagent import DecisionContext, GameState, LegalAction, WithReasoning
+from altruagent import RESIGN, DecisionContext, GameState, LegalAction, WithReasoning
 from altruagent.runner import _validate_decision
 
 from .pool import POOL, to_showdown_set
@@ -31,9 +37,28 @@ NO_TARGET = {"self", "allySide", "foeSide", "all", "allAdjacent", "allAdjacentFo
              "randomNormal", "scripted"}
 
 
+class _Sentinel:
+    __slots__ = ("label",)
+
+    def __init__(self, label: str):
+        self.label = label
+
+    def __repr__(self) -> str:
+        return self.label
+
+
+TIMER_DEFAULT = _Sentinel("TIMER_DEFAULT")   # Showdown's timer chose for this seat (see the module docstring)
+
+
+class _Forfeit(Exception):
+    def __init__(self, seat: int):
+        super().__init__(f"seat {seat} forfeited")
+        self.seat = seat
+
+
 # ---------------------------------------------------------------- players
 class Player:
-    """Anything with choose(raw_state) -> LegalAction | dict | action_id str."""
+    """Anything with choose(raw_state) -> LegalAction | dict | action_id str (| TIMER_DEFAULT | RESIGN)."""
     name = "player"
 
     def choose(self, raw: dict):
@@ -124,10 +149,22 @@ class MatchResult:
     invalid: list[int] = field(default_factory=lambda: [0, 0])
     rosters: list[list[str]] = field(default_factory=list)
     brought: list[list[str]] = field(default_factory=list)
+    timer_defaults: list[int] = field(default_factory=lambda: [0, 0])   # decisions left to Showdown's timer
+    forfeit: int | None = None            # the seat that forfeited (answered RESIGN), if any
 
 
 def _sid(x: str) -> str:
     return "".join(ch for ch in x.lower() if ch.isalnum())
+
+
+def lineup_ok(out, ids: list[str]) -> bool:
+    """The team-preview check: `out` is a select_lineup whose 4 brought species (and 2 distinct leads among them)
+    are in `ids`. May raise on a malformed payload (non-string species), like it always did inside preview()."""
+    return (isinstance(out, dict) and out.get("type") == "select_lineup"
+            and len(set(map(_sid, out.get("bring", [])))) == 4
+            and all(_sid(b) in ids for b in out["bring"])
+            and len(out.get("leads", [])) == 2 and all(_sid(l) in map(_sid, out["bring"]) for l in out["leads"])
+            and _sid(out["leads"][0]) != _sid(out["leads"][1]))
 
 
 class Match:
@@ -137,6 +174,9 @@ class Match:
         self.ids = ["agent-a", "agent-b"]
         self.version = 0
         self.invalid = [0, 0]
+        self.timer_defaults = [0, 0]
+        self.turns = 0
+        self.orders: list[str] = []
         self.picks: list[dict] = []
         self.rosters: list[list[dict]] = [[], []]
         for p in players:
@@ -183,6 +223,8 @@ class Match:
             actions = [self._act(f"draft_pick:{c['card_id']}", {"type": "draft_pick", "card_id": c["card_id"]},
                                  f"Draft {c['species']}") for c in offered]
             out = self._choose(seat, self._state(seat, "draft", obs, actions))
+            if out is RESIGN:
+                raise _Forfeit(seat)
             cid = (out or {}).get("card_id") if isinstance(out, dict) else None
             card = next((c for c in offered if c["card_id"] == cid), None)
             if card is None:
@@ -205,18 +247,19 @@ class Match:
                     "instructions": "bring 4 of your 6, leads = 2 of those 4"}
             out = self._choose(seat, self._state(seat, "team_preview", obs, [self._act("select_lineup", tmpl)]))
             ids = [p["species"] for p in mine]
-            ok = (isinstance(out, dict) and out.get("type") == "select_lineup"
-                  and len(set(map(_sid, out.get("bring", [])))) == 4
-                  and all(_sid(b) in ids for b in out["bring"])
-                  and len(out.get("leads", [])) == 2 and all(_sid(l) in map(_sid, out["bring"]) for l in out["leads"])
-                  and _sid(out["leads"][0]) != _sid(out["leads"][1]))
-            if not ok:
+            if out is RESIGN:
+                raise _Forfeit(seat)
+            if out is TIMER_DEFAULT:             # Showdown's timer: `team 1234` (first four, first two lead)
+                self.timer_defaults[seat] += 1
+                out = {"type": "select_lineup", "bring": ids[:4], "leads": ids[:2]}
+            if not lineup_ok(out, ids):
                 self.invalid[seat] += 1
                 out = random_action({"phase": "team_preview", "observation": obs, "legal_actions": {"actions": []}})
             leads = [_sid(x) for x in out["leads"]]
             rest = [_sid(x) for x in out["bring"] if _sid(x) not in leads]
             orders.append("team " + "".join(str(ids.index(s) + 1) for s in leads + rest))
             self.version += 1
+        self.orders = orders
         return orders
 
     # ---- battle ----------------------------------------------------------
@@ -235,7 +278,13 @@ class Match:
                 req = snap["requests"][sid]
                 raw, tmpl = self._battle_state(seat, sid, req, snap["state"], versions[seat])
                 out = self._choose(seat, raw)
-                choice = _to_choice(out, req, tmpl)
+                if out is RESIGN:
+                    raise _Forfeit(seat)
+                if out is TIMER_DEFAULT:           # Showdown's timer: its own `default` choice for this request
+                    self.timer_defaults[seat] += 1
+                    choice = "default"
+                else:
+                    choice = _to_choice(out, req, tmpl)
                 if choice is None:
                     self.invalid[seat] += 1
                     choice = _to_choice(random_action(raw), req, tmpl)
@@ -251,7 +300,7 @@ class Match:
                     snap = self.sd.choose(**{sid: "default"})
                 if snap["ended"]:
                     break
-            turns = snap["state"]["turn"]
+            turns = self.turns = snap["state"]["turn"]
             stuck = stuck + 1 if (turns, len(snap["log"])) == before and snap["log"] == [] else 0
             if turns > 200 or stuck > 20 or not pending:
                 raise RuntimeError(f"battle stalled at turn {turns}: requests={list(snap['requests'])} "
@@ -259,7 +308,15 @@ class Match:
         w = snap.get("winner")
         winner = 0 if w == "p1" else 1 if w == "p2" else None
         return MatchResult(winner, turns, list(self.invalid),
-                           rosters=[[c["species"] for c in r] for r in self.rosters], brought=orders)
+                           rosters=[[c["species"] for c in r] for r in self.rosters], brought=orders,
+                           timer_defaults=list(self.timer_defaults))
+
+    def forfeited(self, seat: int) -> MatchResult:
+        """`seat` answered RESIGN: the other seat wins now (like the platform's `resign`, or Showdown's
+        'lost due to inactivity' once a seat's timer bank is empty)."""
+        return MatchResult(1 - seat, self.turns, list(self.invalid),
+                           rosters=[[c["species"] for c in r] for r in self.rosters], brought=list(self.orders),
+                           timer_defaults=list(self.timer_defaults), forfeit=seat)
 
     def _battle_state(self, seat: int, sid: str, req: dict, st: dict, version: int):
         me, opp = st[sid], st["p2" if sid == "p1" else "p1"]
@@ -415,6 +472,9 @@ def play_match(sd: Showdown, a: Player, b: Player, seed: int) -> MatchResult:
     rng = random.Random(seed)
     random.seed(seed)
     m = Match(sd, [a, b], rng)
-    m.draft()
-    orders = m.preview()
-    return m.battle(orders)
+    try:
+        m.draft()
+        orders = m.preview()
+        return m.battle(orders)
+    except _Forfeit as f:
+        return m.forfeited(f.seat)

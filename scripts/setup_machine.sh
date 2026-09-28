@@ -23,6 +23,13 @@ echo "== node packages (damage calculator + local simulator)"
 (cd agent/js && npm install --no-audit --no-fund --silent)
 (cd local/js && npm install --no-audit --no-fund --silent)
 
+echo "== frozen copies run their OWN calc.js with the shared node_modules (ladder / benchmark / panel)"
+for d in champion/agent/js versions/*/agent/js local/sparring/*/agent/js; do
+  [ -f "$d/calc.js" ] || continue
+  up=$(echo "$d" | sed 's#[^/][^/]*#..#g')        # relative, so the checkout can move: champion/agent/js -> ../../..
+  [ -e "$d/node_modules" ] || ln -sfn "$up/agent/js/node_modules" "$d/node_modules"
+done
+
 echo "== scratch logs go to /dev/null"
 mkdir -p logs
 for n in local replay x sid; do ln -sf /dev/null "logs/$n.jsonl"; done

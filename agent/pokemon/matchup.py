@@ -2,7 +2,8 @@
 
 `agent.pokemon.drafter.threat_table()` is the process-wide instance. `ThreatTable.ensure(cards)` adds any card
 not seen yet and runs ONE DamageCalc.batch() for all new ordered pairs (every damaging move of the attacker
-against the defender, doubles field, full HP). When the calculator is unavailable a plain Gen 9 damage formula
+against the defender, doubles field -- a singles field for the OU draft's own instance, `ThreatTable("Singles")`,
+`drafter.singles_threat_table()` --, full HP). When the calculator is unavailable a plain Gen 9 damage formula
 is used instead, so the draft never depends on node being present. Each pair keeps the attacker's best expected
 damage (fraction of the defender's max HP, accuracy and charge/recharge included), the best priority-move
 damage, and each card's speed; `beats(a, b)` turns that into a 1v1 duel estimate in [0, 1]
@@ -113,7 +114,11 @@ def _hits(card: dict, mid: str) -> int | None:
 
 
 class ThreatTable:
-    def __init__(self):
+    def __init__(self, game_type: str = "Doubles"):
+        # "Doubles" (VGC draft, the default) or "Singles" (OU draft: no 0.75 spread penalty, no spread bonus when
+        # picking the best move, the formula fallback at the cards' own level instead of VGC's 50)
+        self.game_type = game_type
+        self.doubles = game_type == "Doubles"
         self.cards: dict[str, dict] = {}
         self.sig: dict[str, str] = {}
         self.dmg: dict[tuple[str, str], float] = {}        # best expected damage fraction of max HP per turn
@@ -174,7 +179,7 @@ class ThreatTable:
                 for mv in _moves(ca):
                     if _is_damaging(mv):
                         q = {"attacker": inp(a), "defender": inp(b), "move": move_name(mv),
-                             "field": {"gameType": "Doubles"}}
+                             "field": {"gameType": self.game_type}}
                         h = _hits(ca, mv)
                         if h:
                             q["hits"] = h
@@ -207,7 +212,7 @@ class ThreatTable:
         best, best_v, pbest, best_eff = "", 0.0, 0.0, 0.0
         for mv, d in per.items():
             m = dex.move(mv)
-            eff = d * (SPREAD_VALUE if m.get("target") in SPREAD_TARGETS else 1.0)
+            eff = d * (SPREAD_VALUE if self.doubles and m.get("target") in SPREAD_TARGETS else 1.0)
             if eff > best_eff:
                 best, best_v, best_eff = mv, d, eff
             if m.get("priority", 0) > 0 and d > pbest:
@@ -216,7 +221,7 @@ class ThreatTable:
                 pbest = d                  # Gale Wings: priority at full HP
         self.dmg[(a, b)] = best_v
         self.prio[(a, b)] = pbest
-        self.spread[(a, b)] = bool(best) and dex.move(best).get("target") in SPREAD_TARGETS
+        self.spread[(a, b)] = self.doubles and bool(best) and dex.move(best).get("target") in SPREAD_TARGETS
         self.best[(a, b)] = best
 
     def _formula(self, att: dict, deff: dict) -> dict[str, float]:
@@ -234,6 +239,12 @@ class ThreatTable:
                                                   "target": "normal"}
             moves = list(generic)
         item, ability = to_id(att.get("item") or ""), to_id(att.get("ability") or "")
+        level = LEVEL
+        if not self.doubles and _is_known(att):  # singles cards (OU: level 100): the level stats_for / the calc use
+            try:
+                level = int(att.get("level", 50))
+            except (TypeError, ValueError):
+                level = LEVEL
         out = {}
         for mv in moves:
             m = generic.get(mv) or dex.move(mv)
@@ -248,10 +259,10 @@ class ThreatTable:
             if not bp:
                 continue
             D = st_d.get("def" if cat == "Physical" else "spd", 100)
-            base = math.floor(math.floor(math.floor(2 * LEVEL / 5 + 2) * bp * A / max(1, D)) / 50) + 2
+            base = math.floor(math.floor(math.floor(2 * level / 5 + 2) * bp * A / max(1, D)) / 50) + 2
             mtype = str(m.get("type") or "").upper()
             mult = 0.925                        # mean random roll
-            if m.get("target") in SPREAD_TARGETS:
+            if self.doubles and m.get("target") in SPREAD_TARGETS:
                 mult *= 0.75
             if mtype in dex.types_of(sa):
                 mult *= 2.0 if ability == "adaptability" else 1.5

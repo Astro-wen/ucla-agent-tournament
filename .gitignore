@@ -41,6 +41,7 @@ logs/*
 # agent worktrees
 .claude/
 
-# per-version calculator links (see docs/HANDOFF.md)
+# per-version calculator links (see docs/HANDOFF.md, scripts/setup_machine.sh)
 champion/agent/js/node_modules
 versions/*/agent/js/node_modules
+local/sparring/*/agent/js/node_modules

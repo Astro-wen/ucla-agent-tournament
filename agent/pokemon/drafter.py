@@ -262,11 +262,25 @@ def threat_table():
     return _TT
 
 
+_TT_SINGLES = None
+
+
+def singles_threat_table():
+    """Process-wide threat table of the OU (singles) draft: the same duels on a singles field (a spread move is not
+    cut to 0.75x there). Kept apart from the VGC instance above, which it never touches."""
+    global _TT_SINGLES
+    if _TT_SINGLES is None:
+        from .matchup import ThreatTable
+        _TT_SINGLES = ThreatTable("Singles")
+    return _TT_SINGLES
+
+
 class Drafter:
     def __init__(self, model: DraftModel | None = None, prior_score=None, node_budget: int | None = None,
                  top_k: int | None = None, max_depth: int | None = None, use_matchups: bool = True,
-                 tie_eps: float | None = None, wall_cap: float | None = None):
+                 tie_eps: float | None = None, wall_cap: float | None = None, singles: bool = False):
         self.model = model or DraftModel.load()
+        self.singles = singles               # OU singles draft: counters from singles_threat_table()
         self.prior_score = prior_score
         self.node_budget = int(node_budget if node_budget is not None else _knob("NODES", NODE_BUDGET))
         self.top_k = int(top_k if top_k is not None else _knob("TOPK", TOP_K))
@@ -286,7 +300,7 @@ class Drafter:
         beta = self.model.beta
         tt = None
         if self.use_matchups and beta:
-            tt = threat_table()
+            tt = singles_threat_table() if self.singles else threat_table()
             tt.ensure(cards)
         from .matchup import card_key
         tkeys = [card_key(c) for c in cards]

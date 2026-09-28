@@ -33,6 +33,10 @@ class Showdown:
     def validate(self, sets: list[dict], fmt: str = "gen9vgc2025regi") -> list:
         return self._rpc({"cmd": "validate", "sets": sets, "format": fmt})["problems"]
 
+    def gen_team(self, fmt: str = "gen9randombattle", seed: list[int] | None = None) -> list[dict]:
+        """A Showdown-generated team (random-battle sets: species, item, ability, moves, level, EVs...)."""
+        return self._rpc({"cmd": "gen_team", "format": fmt, "seed": seed})["team"]
+
     def close(self):
         try:
             self._rpc({"cmd": "quit"})

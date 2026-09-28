@@ -1,6 +1,8 @@
 """Measure our Pokémon agent against reference players on the local Showdown env.
 
     python -m local.eval_pokemon --games 200 --opponent official_baseline
+    python -m local.eval_pokemon --games 200 --opponent smoke          # an organizers' example agent (local/field_opps.py)
+    OPENAI_API_KEY=... python -m local.eval_pokemon --games 20 --opponent llm_live   # examples/llm_agent.py, real model
 """
 from __future__ import annotations
 
@@ -10,10 +12,12 @@ import time
 
 from agent.agent import create_agent
 
+from . import field_opps
 from .pokemon_env import ContestantPlayer, OfficialBaseline, RandomPlayer, play_match
 from .showdown import Showdown
 
-OPPONENTS = {"official_baseline": OfficialBaseline, "random": RandomPlayer}
+OPPONENTS = {"official_baseline": OfficialBaseline, "random": RandomPlayer,
+             **{name: (lambda name=name: field_opps.make(name)) for name in (*field_opps.FIELD, *field_opps.LIVE)}}
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -38,6 +42,9 @@ def main() -> None:
     opp = OPPONENTS[a.opponent]()
     wins = ties = 0
     inv_ours = inv_opp = 0
+    timer = [0, 0]
+    forfeits = [0, 0]
+    pf = {}
     turns = []
     t0 = time.time()
     with Showdown() as sd:
@@ -51,16 +58,26 @@ def main() -> None:
                 wins += 1
             inv_ours += r.invalid[seat]
             inv_opp += r.invalid[1 - seat]
+            timer[0] += r.timer_defaults[seat]
+            timer[1] += r.timer_defaults[1 - seat]
+            if r.forfeit is not None:
+                forfeits[r.forfeit != seat] += 1
+            for k, v in getattr(opp, "stats", {}).items():
+                pf[k] = pf.get(k, 0) + v
             turns.append(r.turns)
             if a.verbose:
                 print(f"game {g:3d} seat {seat} -> {'WIN' if r.winner == seat else 'tie' if r.winner is None else 'loss'}"
-                      f" in {r.turns} turns | ours {r.rosters[seat]} bring {r.brought[seat]} | inv {r.invalid}")
+                      f" in {r.turns} turns | ours {r.rosters[seat]} bring {r.brought[seat]} | inv {r.invalid}"
+                      + (f" | forfeit seat {r.forfeit}" if r.forfeit is not None else ""))
     n = a.games
     lo, hi = wilson(wins, n)
     print(f"\nours vs {a.opponent}: {wins}/{n} wins ({100 * wins / n:.1f}%), {ties} ties, "
           f"95% CI [{100 * lo:.1f}%, {100 * hi:.1f}%]")
     print(f"invalid/rejected decisions: ours {inv_ours}, {a.opponent} {inv_opp} | avg turns {sum(turns) / n:.1f} | "
           f"{time.time() - t0:.0f}s")
+    if pf or any(timer) or any(forfeits):
+        print(f"platform model: timer-played decisions ours {timer[0]}, {a.opponent} {timer[1]} | forfeits ours "
+              f"{forfeits[0]}, {a.opponent} {forfeits[1]} | {a.opponent} counters {pf}")
 
 
 if __name__ == "__main__":
