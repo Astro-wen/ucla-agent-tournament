@@ -14,10 +14,12 @@ Tailwind, spread moves), exactly as v0 played. See docs/strategy.md for the upgr
 from __future__ import annotations
 
 import logging
+import time
 
 from . import dex
 from .calc import DamageCalc, calc_field, calc_pokemon, move_name
 from .dex import to_id
+from .lookahead import PROTECT_MOVES, joint_lookahead
 from .typechart import effectiveness
 
 log = logging.getLogger("agent.policy")
@@ -202,6 +204,22 @@ class PokemonPolicy:
         self.prev_active: list[str | None] = [None, None]
         self.me: str | None = None
         self.last_exact: bool = False           # did the last battle decision use the exact calculator?
+        self.opp_prev_active: list[str | None] = [None, None]   # foes on the field at our previous decision
+        self.last_protect: dict[str, int] = {}  # our species -> turn it last chose Protect (no Protect chains)
+        self.last_lookahead: dict | None = None  # diagnostics of the last joint lookahead (None = not used)
+        self.last_timing: dict | None = None     # last doubles decision: exact table / lookahead / total ms
+        self.warmed = False                      # did this policy already warm the damage calculator?
+
+    def _warm_calc(self) -> None:
+        """Pay the node + @smogon/calc start-up before the first battle decision (the draft, teambuild and team
+        preview phases have time to spare), once per policy. Never raises."""
+        if self.warmed:
+            return
+        self.warmed = True
+        try:
+            DamageCalc.get().warm()
+        except Exception:
+            log.warning("damage calc warm-up failed", exc_info=True)
 
     def _track_draft(self, obs: dict, me: str | None) -> None:
         """Full sets are only visible while a card is still in `available_cards`; rosters/picks carry just
@@ -217,6 +235,13 @@ class PokemonPolicy:
     def opponent_set(self, species: str) -> dict | None:
         return self.opp_cards.get(to_id(species))
 
+    def foe_moves(self, o: dict | None) -> list[str]:
+        """A foe's moves: its drafted set, else what it revealed, else one guessed STAB attack per type."""
+        o = o or {}
+        card = self.opponent_set(o.get("species", "")) or {}
+        moves = [to_id(m) for m in (card.get("moves") or o.get("moves") or [])[:4] if m]
+        return moves or _guess_moves(to_id(o.get("species", "")))
+
     @staticmethod
     def _card(store: dict, mon: dict | None) -> dict:
         """The drafted set of a Pokémon for the calculator, or a generic 252/252 spread when unknown."""
@@ -229,6 +254,8 @@ class PokemonPolicy:
     def act(self, st: dict) -> dict:
         obs = st.get("observation") or {}
         phase = st.get("phase")
+        if phase in ("draft", "teambuild", "team_preview"):
+            self._warm_calc()
         if phase == "draft":
             return self._draft(st, obs)
         if phase == "teambuild":
@@ -354,10 +381,13 @@ class PokemonPolicy:
                     else:
                         for j in foes:
                             add(("me", i, mid, "opp", j), my_in[i], foe_in[j], mid, f_me)
+                        if (1 - i) in mine and any(isinstance(t, int) and t < 0 for t in opt.get("targets") or []):
+                            # aimed at our own partner (the lookahead scores that row with its real damage);
+                            # our side's screens are the defender's
+                            add(("me", i, mid, "me", 1 - i), my_in[i], my_in[1 - i], mid,
+                                {**f_me, "defenderSide": f_me["attackerSide"]})
             for j, o in foes.items():
-                card = self.opponent_set(o.get("species", "")) or {}
-                for mv in (card.get("moves") or o.get("moves") or [])[:4]:
-                    mid = to_id(mv)
+                for mid in self.foe_moves(o):
                     m = dex.move(mid)
                     if not _damaging(m):
                         continue
@@ -366,6 +396,8 @@ class PokemonPolicy:
                     field = f_opp if tgt in SPREAD_TARGETS and hits > 1 else {**f_opp, "gameType": "Singles"}
                     for i in mine:
                         add(("opp", j, mid, "me", i), foe_in[j], my_in[i], mid, field)
+                    if tgt == "allAdjacent" and (1 - j) in foes:            # Earthquake & co. hit their partner too
+                        add(("opp", j, mid, "opp", 1 - j), foe_in[j], foe_in[1 - j], mid, field)
             res = dc.batch(calcs)
             if res is None:
                 return None
@@ -385,7 +417,7 @@ class PokemonPolicy:
             curs[j] = _cur_hp(o, r) if r else 1
             d = None
             for k, r in table.items():
-                if k[0] == "opp" and k[1] == j and r:
+                if k[0] == "opp" and k[1] == j and k[3] == "me" and r:
                     i = k[4]
                     me = actives[i] if i < len(actives) else None
                     useful, _ = _hit_stats(r["rolls"], _cur_hp(me, r))
@@ -456,38 +488,74 @@ class PokemonPolicy:
             return None
 
     def _doubles(self, st: dict, obs: dict) -> dict:
+        t0 = time.monotonic()
         tmpl = st["legal_actions"]["actions"][0]["input"]["action"]
         actives = obs.get("active_pokemon") or [None, None]
         opps = obs.get("opponent_active_pokemon") or [None, None]
         turn = obs.get("turn", 0)
         slots = tmpl.get("slots", [])
         table = self._exact_table(obs, tmpl, actives, opps)
+        t_table = time.monotonic()
         self.last_exact = table is not None
-        pick = None
+        self.last_lookahead = None
+        pick = ctx = None
+        la_ms = None
         if table is not None:
             try:
-                pick = self._doubles_exact(obs, slots, actives, opps, turn, table)
+                ctx = self._exact_context(obs, slots, actives, opps, turn, table)
+                pick = self._doubles_exact(ctx)
             except Exception:
                 log.warning("exact doubles scoring failed; using the heuristic", exc_info=True)
-                pick = None
+                pick = ctx = None
+        if pick is not None and ctx is not None:
+            # One-step joint lookahead; None = keep the exact pair pick. Its TIME_CAP clock starts here: it bounds
+            # the lookahead's own work, never the calculator start-up or round trip spent above.
+            la_t0 = time.monotonic()
+            try:
+                better = joint_lookahead(self, obs, tmpl, actives, opps, turn, table, ctx, pick, la_t0,
+                                         seed_key=(st.get("session_id"), st.get("state_version"), turn))
+                if better is not None:
+                    pick = better
+            except Exception:
+                log.warning("joint lookahead failed; keeping the exact pair pick", exc_info=True)
+                self.last_lookahead = None
+            la_ms = round(1000 * (time.monotonic() - la_t0), 1)
         if pick is None:
             pick = self._doubles_heuristic(obs, slots, actives, opps, turn)
+        self.last_timing = {"table_ms": round(1000 * (t_table - t0), 1), "lookahead_ms": la_ms,
+                            "total_ms": round(1000 * (time.monotonic() - t0), 1)}
+        self._remember_protect(pick, slots, actives, turn)
         self.prev_active = [to_id((a or {}).get("species", "")) or None for a in (list(actives) + [None, None])[:2]]
+        self.opp_prev_active = [to_id((o or {}).get("species", "")) or None
+                                if o and not o.get("fainted") else None for o in (list(opps) + [None, None])[:2]]
         return {"action": {"type": "doubles_turn", **pick}}
+
+    def _remember_protect(self, pick: dict, slots: list, actives: list, turn) -> None:
+        try:
+            for slot in slots:
+                i = slot.get("slot")
+                c = pick.get(f"slot_{i}") or {}
+                sp = to_id((self._slot_mon(slot, actives) or {}).get("species", ""))
+                if sp and c.get("type") == "move" and to_id(c.get("move_id", "")) in PROTECT_MOVES:
+                    self.last_protect[sp] = turn
+        except Exception:
+            log.debug("protect bookkeeping failed", exc_info=True)
 
     def _slot_mon(self, slot: dict, actives: list) -> dict | None:
         i = slot.get("slot", 0)
         me = actives[i] if isinstance(i, int) and i < len(actives) else None
         return me or slot.get("active") or ({"species": slot["species"]} if slot.get("species") else None)
 
-    def _doubles_exact(self, obs, slots, actives, opps, turn, table) -> dict | None:
+    def _exact_context(self, obs, slots, actives, opps, turn, table) -> dict:
+        """Per-slot candidates with exact damage distributions, shared by the pair scorer and the lookahead."""
         curs, danger, weights = self._foe_weights(table, actives, opps)
-        per_slot = []
+        per_slot, fresh_of = [], {}
         for slot in slots:
             i = slot["slot"]
             me = self._slot_mon(slot, actives)
             my_sp = to_id((me or {}).get("species", ""))
             fresh = self.prev_active[i] != my_sp if i < 2 else True
+            fresh_of[i] = fresh
             cands = []
             for opt in slot.get("options", []):
                 if opt.get("type") == "switch":
@@ -506,36 +574,49 @@ class PokemonPolicy:
             return c["base"] + sum(weights.get(j, 1.0) * acc * _points(rolls, curs.get(j, 1))
                                    for j, (rolls, acc) in c["foe"].items())
 
+        for _, cands in per_slot:
+            for c in cands:
+                c["solo"] = solo(c)
+        return {"per_slot": per_slot, "curs": curs, "danger": danger, "weights": weights, "fresh": fresh_of,
+                "cache": {}}
+
+    def _pair_value(self, ctx: dict, c0: dict, c1: dict) -> float | None:
+        """The exact pair score of two slot choices (None = illegal together)."""
+        if c0["cand"].get("type") == "switch" and c1["cand"].get("type") == "switch" \
+                and to_id(c0["cand"].get("species")) == to_id(c1["cand"].get("species")):
+            return None
+        curs, weights, cache = ctx["curs"], ctx["weights"], ctx["cache"]
+        v = c0["solo"] + c1["solo"]
+        if c0["flinch"] is not None and c0["flinch"] == c1["flinch"]:
+            v -= FAKE_OUT_BONUS
+        for j in c0["foe"].keys() & c1["foe"].keys():      # both hit foe j: joint value replaces the sum
+            da, db = c0["foe"][j], c1["foe"][j]
+            key = (id(da), id(db), j)
+            if key not in cache:
+                cache[key] = _pair_points(da, db, curs.get(j, 1))
+            v += weights.get(j, 1.0) * (cache[key] - da[1] * _points(da[0], curs.get(j, 1))
+                                        - db[1] * _points(db[0], curs.get(j, 1)))
+        return v
+
+    def _doubles_exact(self, ctx: dict) -> dict | None:
+        per_slot = ctx["per_slot"]
         pick = {}
         if len(per_slot) == 2:
             (i0, c0s), (i1, c1s) = per_slot
-            solo0, solo1 = [solo(c) for c in c0s], [solo(c) for c in c1s]
-            cache: dict = {}
             best, best_v = None, -1e18
-            for a, c0 in enumerate(c0s):
-                for b, c1 in enumerate(c1s):
-                    if c0["cand"].get("type") == "switch" and c1["cand"].get("type") == "switch" \
-                            and to_id(c0["cand"].get("species")) == to_id(c1["cand"].get("species")):
-                        continue
-                    v = solo0[a] + solo1[b]
-                    if c0["flinch"] is not None and c0["flinch"] == c1["flinch"]:
-                        v -= FAKE_OUT_BONUS
-                    for j in c0["foe"].keys() & c1["foe"].keys():      # both hit foe j: joint value replaces the sum
-                        da, db = c0["foe"][j], c1["foe"][j]
-                        key = (id(da), id(db), j)
-                        if key not in cache:
-                            cache[key] = _pair_points(da, db, curs.get(j, 1))
-                        v += weights.get(j, 1.0) * (cache[key] - da[1] * _points(da[0], curs.get(j, 1))
-                                                    - db[1] * _points(db[0], curs.get(j, 1)))
-                    if v > best_v:
+            for c0 in c0s:
+                for c1 in c1s:
+                    v = self._pair_value(ctx, c0, c1)
+                    if v is not None and v > best_v:
                         best, best_v = (c0, c1), v
             if best is None:
                 return None
             pick[f"slot_{i0}"], pick[f"slot_{i1}"] = best[0]["cand"], best[1]["cand"]
+            ctx["best_pair"] = best
         else:
             used = set()
             for i, cands in per_slot:
-                ranked = sorted(cands, key=solo, reverse=True)
+                ranked = sorted(cands, key=lambda c: c["solo"], reverse=True)
                 choice = next((c for c in ranked if not (c["cand"].get("type") == "switch"
                                                           and to_id(c["cand"].get("species")) in used)), ranked[0])
                 if choice["cand"].get("type") == "switch":
@@ -698,6 +779,27 @@ def _threat(o: dict) -> float:
     sp = o.get("species", "")
     bs = o.get("base_stats") or dex.base_stats(sp)
     return max(bs.get("atk", 90), bs.get("spa", 90)) + bs.get("spe", 80) / 2
+
+
+PHYSICAL_STAB = {"FIRE": "flareblitz", "WATER": "liquidation", "GRASS": "woodhammer", "ELECTRIC": "wildcharge",
+                 "GROUND": "highhorsepower", "FLYING": "bravebird", "ROCK": "rockslide", "STEEL": "ironhead",
+                 "FIGHTING": "closecombat", "DARK": "knockoff", "GHOST": "shadowclaw", "DRAGON": "dragonclaw",
+                 "FAIRY": "playrough", "ICE": "iciclecrash", "BUG": "uturn", "POISON": "gunkshot",
+                 "PSYCHIC": "zenheadbutt", "NORMAL": "bodyslam"}
+SPECIAL_STAB = {"FIRE": "heatwave", "WATER": "hydropump", "GRASS": "energyball", "ELECTRIC": "thunderbolt",
+                "GROUND": "earthpower", "FLYING": "hurricane", "ROCK": "powergem", "STEEL": "flashcannon",
+                "FIGHTING": "focusblast", "DARK": "darkpulse", "GHOST": "shadowball", "DRAGON": "dracometeor",
+                "FAIRY": "moonblast", "ICE": "icebeam", "BUG": "bugbuzz", "POISON": "sludgebomb",
+                "PSYCHIC": "psychic", "NORMAL": "hypervoice"}
+
+
+def _guess_moves(species: str) -> list[str]:
+    """Plausible attacks of a Pokémon whose set we never saw: one STAB per type on its better attacking stat."""
+    if not species:
+        return []
+    bs = dex.base_stats(species)
+    table = PHYSICAL_STAB if bs.get("atk", 0) >= bs.get("spa", 0) else SPECIAL_STAB
+    return [table[t] for t in dex.types_of(species) if t in table] + ["protect"]
 
 
 def _forced(obs: dict, i: int) -> bool:

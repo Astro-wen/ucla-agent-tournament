@@ -2,6 +2,11 @@
 
 `DamageCalc.batch()` returns None when node or node_modules are missing, so callers fall back to the
 base-stat heuristic instead of crashing (a crash = the platform random-plays our seat).
+
+The node process starts lazily and its first answer pays for node + @smogon/calc start-up (0.3 s here, seconds on
+a cold machine). `DamageCalc.warm()` pays that once with a tiny dummy calc; the policy calls it in the phases before
+the first battle decision (draft / teambuild / team preview), so a fresh match process does not spend its first
+turn's lookahead budget on it.
 """
 from __future__ import annotations
 
@@ -10,12 +15,17 @@ import logging
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from . import dex
 from .dex import to_id
 
 log = logging.getLogger("agent.calc")
+
+# One cheap calc that makes node load @smogon/calc and the gen-9 data; its answer is never cached or used.
+WARM_CALC = {"attacker": {"species": "Pikachu", "level": 50}, "defender": {"species": "Pikachu", "level": 50},
+             "move": "Thunderbolt", "field": {"gameType": "Doubles"}}
 
 
 def _js_dir() -> Path | None:
@@ -35,6 +45,9 @@ class DamageCalc:
         self.enabled = shutil.which("node") is not None and _js_dir() is not None
         self._id = 0
         self.cache: dict[str, dict] = {}
+        self.ready = False          # the running node process has answered at least once (start-up paid)
+        self.starts = 0             # node processes spawned
+        self.startup_s = None       # seconds the last spawn took until its first answer (None: never measured)
 
     @classmethod
     def get(cls) -> "DamageCalc":
@@ -48,13 +61,45 @@ class DamageCalc:
         if not self.enabled:
             return False
         try:
+            self.ready = False
             self.proc = subprocess.Popen(["node", str(_js_dir() / "calc.js")], stdin=subprocess.PIPE,
                                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
+            self.starts += 1
             return True
         except Exception:
             log.warning("could not start damage calc", exc_info=True)
             self.enabled = False
             return False
+
+    def _roundtrip(self, calcs: list[dict]) -> list | None:
+        """One request / response with the node process (started if needed); None on any failure."""
+        t = time.monotonic()
+        if not self._start():
+            return None
+        cold = not self.ready
+        self._id += 1
+        try:
+            self.proc.stdin.write(json.dumps({"id": self._id, "calcs": calcs}) + "\n")
+            self.proc.stdin.flush()
+            line = self.proc.stdout.readline()
+            res = json.loads(line)["results"]
+        except Exception:
+            log.warning("damage calc round trip failed", exc_info=True)
+            self.enabled = False
+            return None
+        if cold:
+            self.ready = True
+            self.startup_s = time.monotonic() - t
+        return res
+
+    def warm(self) -> bool:
+        """Start node and load the calculator now with one dummy calc, so the next real batch is a plain round trip.
+        Idempotent (a no-op while the process is up and has answered); False when the calculator is unavailable."""
+        if not self.enabled:
+            return False
+        if self.ready and self.proc is not None and self.proc.poll() is None:
+            return True
+        return self._roundtrip([WARM_CALC]) is not None
 
     def batch(self, calcs: list[dict]) -> list[dict | None] | None:
         """Each calc: {attacker, defender, move, field?}. Returns per-calc dicts (or None on per-calc error)."""
@@ -63,17 +108,8 @@ class DamageCalc:
         keys = [json.dumps(c, sort_keys=True) for c in calcs]
         todo = [(i, k) for i, k in enumerate(keys) if k not in self.cache]
         if todo:
-            if not self._start():
-                return None
-            self._id += 1
-            try:
-                self.proc.stdin.write(json.dumps({"id": self._id, "calcs": [calcs[i] for i, _ in todo]}) + "\n")
-                self.proc.stdin.flush()
-                line = self.proc.stdout.readline()
-                res = json.loads(line)["results"]
-            except Exception:
-                log.warning("damage calc round trip failed", exc_info=True)
-                self.enabled = False
+            res = self._roundtrip([calcs[i] for i, _ in todo])
+            if res is None:
                 return None
             for (i, k), r in zip(todo, res):
                 self.cache[k] = r
