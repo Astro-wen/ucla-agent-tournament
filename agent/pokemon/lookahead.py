@@ -29,7 +29,7 @@ out one turn and scores the resulting position.
   SPEED_BONUS per surviving Pokémon of ours that outspeeds every surviving foe + static value of
   support moves (the exact scorer's points / 100, e.g. ally-targeted Decorate / Coaching keep theirs)
   - PROTECT_TEMPO per Protect.
-* Decision rule: score(row) = ALPHA x min over columns + (1 - ALPHA) x mean over columns (0.6 / 0.4):
+* Decision rule: score(row) = ALPHA x min over columns + (1 - ALPHA) x mean over columns (0.4 / 0.6):
   robust against the reply that hurts most without assuming the opponent always finds it. Ties ->
   the exact pair score, then enumeration order (deterministic, no randomness anywhere).
 * Unmodelled picks: when the exact pick holds an action the lookahead does not build (a voluntary
@@ -40,11 +40,10 @@ out one turn and scores the resulting position.
   that slot stays and the Protect slot is re-picked by the exact pair score without the Protect chain
   (LOOKAHEAD_SWITCH_FIX=0 restores the old override for A/B runs).
 * Knobs (env, read per decision; unset / invalid = the defaults above): LOOKAHEAD_ALPHA (weight of the
-  min, 0..1, default 0.4), LOOKAHEAD_FOE_WEIGHT = softmax (default) | equal: softmax = the mean over
-  replies weighted by softmax(threat / LOOKAHEAD_FOE_TEMP) (default 1.0), where a reply's threat is the
+  min, 0..1, default 0.4; v2 used 0.6), LOOKAHEAD_FOE_WEIGHT = equal (default) | softmax: the mean over replies
+  weighted by softmax(threat / LOOKAHEAD_FOE_TEMP) (default 1.0), where a reply's threat is the
   column-ranking score (damage + KO odds into our board, summed over both foes); LOOKAHEAD_K_OURS
-  (default 5) / LOOKAHEAD_K_THEIRS (default 6): candidates per slot before the MAX_CELLS shrink.
-  These defaults ("sm-k6") won the 8-opponent panel sweep of 2026-09-28 (see docs/progress.md).
+  (default 5) / LOOKAHEAD_K_THEIRS (default 4): candidates per slot before the MAX_CELLS shrink.
 * Optional Nash mixing (env LOOKAHEAD_MIX = off | sample | argmax, default off = the rule above): the
   same payoff matrix, cut to the MIX_K best rows (the exact pick always kept) and the MIX_K replies
   that hurt them most, is solved as a zero-sum game by regret matching+ (pure Python, deterministic).
@@ -70,7 +69,7 @@ import zlib
 from operator import mul
 
 from . import dex
-from .calc import calc_field
+from .calc import calc_field, view_item
 from .dex import to_id
 from .stats import effective_speed, move_priority
 
@@ -79,12 +78,14 @@ log = logging.getLogger("agent.lookahead")
 TIME_CAP = 2.5            # seconds of lookahead work, from the t0 the caller passes (after the calc round trip)
 MAX_CELLS = 3000          # rows x columns before K shrinks
 K_OURS = 5                # defaults of LOOKAHEAD_K_OURS / LOOKAHEAD_K_THEIRS
-K_THEIRS = 6
+K_THEIRS = 4
 KO_VALUE = 0.5            # = policy.KO_BONUS / 100: a KO on top of the HP it removes
 SPEED_BONUS = 0.05
 PROTECT_TEMPO = 0.05      # a Protect gives up a turn of offence; depth 1 cannot see what it buys later
 STATUS_SCALE = 0.01       # exact-scorer points -> HP fractions (100 points = a foe's whole HP)
-W_WORST, W_MEAN = 0.4, 0.6   # default of LOOKAHEAD_ALPHA (= W_WORST; W_MEAN = 1 - W_WORST)
+# Default of LOOKAHEAD_ALPHA (= W_WORST; W_MEAN = 1 - W_WORST). 0.4 since v3-harden: on the 8-opponent panel (250
+# paired games each) alpha 0.4 scored 70.0% vs 67.65% for v2's 0.6 (+2.35 pp, permutation p = 0.0006).
+W_WORST, W_MEAN = 0.4, 0.6
 FOE_WEIGHT_MODES = ("equal", "softmax")
 FOE_TEMP = 1.0            # default of LOOKAHEAD_FOE_TEMP
 ALLY_HEAL = {"pollenpuff": 0.5}   # attack -> fraction of max HP it heals when aimed at our own ally
@@ -152,9 +153,9 @@ def alpha() -> float:
 
 
 def foe_weight_mode() -> str:
-    """LOOKAHEAD_FOE_WEIGHT: softmax (default) | equal; anything else reads as softmax."""
-    m = str(os.environ.get("LOOKAHEAD_FOE_WEIGHT") or "softmax").strip().lower()
-    return m if m in FOE_WEIGHT_MODES else "softmax"
+    """LOOKAHEAD_FOE_WEIGHT: equal (default) | softmax; anything else reads as equal."""
+    m = str(os.environ.get("LOOKAHEAD_FOE_WEIGHT") or "equal").strip().lower()
+    return m if m in FOE_WEIGHT_MODES else "equal"
 
 
 def foe_temp() -> float:
@@ -164,7 +165,7 @@ def foe_temp() -> float:
 
 
 def k_limits() -> tuple[int, int]:
-    """(LOOKAHEAD_K_OURS, LOOKAHEAD_K_THEIRS), each >= 1 (defaults K_OURS = 5, K_THEIRS = 6): our candidates per slot
+    """(LOOKAHEAD_K_OURS, LOOKAHEAD_K_THEIRS), each >= 1 (defaults K_OURS = 5, K_THEIRS = 4): our candidates per slot
     and each foe's replies before the MAX_CELLS shrink."""
     return (_env_num("LOOKAHEAD_K_OURS", K_OURS, int, 1, 1000), _env_num("LOOKAHEAD_K_THEIRS", K_THEIRS, int, 1, 1000))
 
@@ -285,8 +286,9 @@ def _is_damaging(m: dict) -> bool:
 def _norm_view(mon: dict | None, card: dict | None) -> dict:
     v = dict(mon or {})
     v["status"] = to_id(v.get("status") or "") or None
-    if not v.get("item") or v.get("item") == "unknown_item":
-        v["item"] = (card or {}).get("item")
+    # Hidden item -> the drafted card's; an item the view shows as gone (used Sash, knocked-off Scarf) stays gone,
+    # exactly as in the calculator's input (calc.view_item), so the Sash rule here matches the calc's rolls.
+    v["item"] = view_item(mon, card)
     if not v.get("ability"):
         v["ability"] = (card or {}).get("ability")
     return v

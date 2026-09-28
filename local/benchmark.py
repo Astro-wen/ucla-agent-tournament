@@ -28,11 +28,35 @@ def opponents() -> list:
     return out
 
 
+def _which_calc() -> None:
+    """Warn when an archived version runs the CANDIDATE's calc.js (same bug as local/ladder.py `_which_calc`): an old
+    versions/<name>/agent/pokemon/calc.py falls back to the repo's agent/js/calc.js when its own agent/js has no
+    node_modules, so after a calculator change that row silently measures the candidate's calculator."""
+    try:
+        import agent.pokemon.calc as cand_calc
+        d = cand_calc._js_dir()
+        cand = (d / "calc.js").resolve() if d else None
+        for v in sorted((ROOT / "versions").glob("*/agent")):
+            try:
+                mod = importlib.import_module(f"versions.{v.parent.name}.agent.pokemon.calc")
+                vd = mod._js_dir()
+                runs = (vd / "calc.js").resolve() if vd else None
+                own = v / "js" / "calc.js"
+                if runs and runs == cand and own.exists() and own.read_bytes() != runs.read_bytes():
+                    print(f"WARNING: {v.parent.name} runs the candidate's calc.js, not its own {own} "
+                          f"(link {v / 'js' / 'node_modules'} to agent/js/node_modules)")
+            except Exception as e:                                  # noqa: BLE001 - diagnostics only
+                print(f"({v.parent.name}: could not resolve its calc.js: {e!r})")
+    except Exception as e:                                          # noqa: BLE001 - diagnostics only
+        print(f"(could not resolve calc.js paths: {e!r})")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--games", type=int, default=200)
     ap.add_argument("--seed", type=int, default=31)
     a = ap.parse_args()
+    _which_calc()
     from agent.agent import create_agent
     ours = ContestantPlayer(create_agent, "candidate")
     print(f"{'opponent':22s} {'win%':>6s}  95% CI          invalid(ours/opp)")

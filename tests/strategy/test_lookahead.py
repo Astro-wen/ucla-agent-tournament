@@ -231,24 +231,27 @@ KNOBS = ("LOOKAHEAD_ALPHA", "LOOKAHEAD_FOE_WEIGHT", "LOOKAHEAD_FOE_TEMP", "LOOKA
 def test_knob_defaults_and_bad_values_fall_back_to_the_current_behaviour(monkeypatch):
     for k in KNOBS:
         monkeypatch.delenv(k, raising=False)
-    assert L.alpha() == L.W_WORST == 0.4 and 1.0 - L.alpha() == L.W_MEAN
-    assert L.foe_weight_mode() == "softmax" and L.foe_temp() == 1.0 and L.k_limits() == (L.K_OURS, L.K_THEIRS) == (5, 6)
+    # built-in default alpha 0.4 (the panel winner; v2 / v2.1 shipped 0.6)
+    assert L.alpha() == L.W_WORST == 0.4 and 1.0 - L.alpha() == L.W_MEAN == 0.6
+    assert L.foe_weight_mode() == "equal" and L.foe_temp() == 1.0 and L.k_limits() == (L.K_OURS, L.K_THEIRS) == (5, 4)
     for bad in ("", "abc", "nan", "inf", "-0.1", "1.5"):
         monkeypatch.setenv("LOOKAHEAD_ALPHA", bad)
         assert L.alpha() == 0.4
+    monkeypatch.setenv("LOOKAHEAD_ALPHA", "0.6")                   # the env var still overrides the default
+    assert L.alpha() == 0.6
     for bad in ("", "0", "-3", "x", "nan", "inf"):
         monkeypatch.setenv("LOOKAHEAD_K_OURS", bad)
         monkeypatch.setenv("LOOKAHEAD_K_THEIRS", bad)
         monkeypatch.setenv("LOOKAHEAD_FOE_TEMP", bad)
-        assert L.k_limits() == (5, 6) and L.foe_temp() == 1.0
+        assert L.k_limits() == (5, 4) and L.foe_temp() == 1.0
     monkeypatch.setenv("LOOKAHEAD_FOE_WEIGHT", "bogus")
-    assert L.foe_weight_mode() == "softmax"
+    assert L.foe_weight_mode() == "equal"
     monkeypatch.setenv("LOOKAHEAD_ALPHA", " 1 ")
-    monkeypatch.setenv("LOOKAHEAD_FOE_WEIGHT", "Equal")
+    monkeypatch.setenv("LOOKAHEAD_FOE_WEIGHT", "SoftMax")
     monkeypatch.setenv("LOOKAHEAD_FOE_TEMP", "0.25")
     monkeypatch.setenv("LOOKAHEAD_K_OURS", "3")
     monkeypatch.setenv("LOOKAHEAD_K_THEIRS", "2")
-    assert L.alpha() == 1.0 and L.foe_weight_mode() == "equal" and L.foe_temp() == 0.25 and L.k_limits() == (3, 2)
+    assert L.alpha() == 1.0 and L.foe_weight_mode() == "softmax" and L.foe_temp() == 0.25 and L.k_limits() == (3, 2)
 
 
 def test_row_score_alpha_and_softmax_weights():
@@ -495,8 +498,8 @@ def test_knobs_reach_the_lookahead_and_explicit_defaults_change_nothing(monkeypa
     pol = policy()
     want = pol.act(st)["action"]
     la = dict(pol.last_lookahead)
-    assert la["k"] == (5, 6) and la["alpha"] == 0.4 and la["foe_weight"] == "softmax"
-    for k, v in zip(KNOBS, ("0.4", "softmax", "1.0", "5", "6")):
+    assert la["k"] == (5, 4) and la["alpha"] == 0.4 and la["foe_weight"] == "equal"
+    for k, v in zip(KNOBS, ("0.4", "equal", "1.0", "5", "4")):
         monkeypatch.setenv(k, v)
     pol = policy()
     assert pol.act(st)["action"] == want and pol.last_lookahead["score"] == la["score"]
@@ -509,11 +512,11 @@ def test_knobs_reach_the_lookahead_and_explicit_defaults_change_nothing(monkeypa
     monkeypatch.delenv("LOOKAHEAD_K_OURS")
     monkeypatch.delenv("LOOKAHEAD_K_THEIRS")
     monkeypatch.setenv("LOOKAHEAD_ALPHA", "1")
-    monkeypatch.setenv("LOOKAHEAD_FOE_WEIGHT", "equal")
+    monkeypatch.setenv("LOOKAHEAD_FOE_WEIGHT", "softmax")
     monkeypatch.setenv("LOOKAHEAD_FOE_TEMP", "0.5")
     pol = policy()
     out = pol.act(st)["action"]
-    assert doubles_ok(st, out) and pol.last_lookahead["alpha"] == 1.0 and pol.last_lookahead["foe_weight"] == "equal"
+    assert doubles_ok(st, out) and pol.last_lookahead["alpha"] == 1.0 and pol.last_lookahead["foe_weight"] == "softmax"
     assert out == policy().act(st)["action"]
 
 

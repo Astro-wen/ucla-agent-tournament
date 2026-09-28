@@ -12,10 +12,32 @@ import argparse
 import json
 import sys
 import time
+from pathlib import Path
 
 from .eval_pokemon import wilson
 from .pokemon_env import ContestantPlayer, play_match
 from .showdown import Showdown
+
+
+def _which_calc() -> None:
+    """Print which calc.js each side runs. An old champion/agent/pokemon/calc.py falls back to the repo's
+    agent/js/calc.js when champion/agent/js has no node_modules: then the champion plays with the CANDIDATE's
+    calculator and a calculator change is invisible to the ladder."""
+    try:
+        import agent.pokemon.calc as cand_calc
+        import champion.agent.pokemon.calc as champ_calc
+        paths = {}
+        for name, mod in (("candidate", cand_calc), ("champion", champ_calc)):
+            d = mod._js_dir()
+            paths[name] = (d / "calc.js").resolve() if d else None
+            print(f"{name} calc.js: {paths[name]}")
+        c, h = paths["candidate"], paths["champion"]
+        own = (Path(champ_calc.__file__).resolve().parent.parent / "js" / "calc.js").resolve()
+        if c and h and c == h and own.exists() and own != h and own.read_bytes() != h.read_bytes():
+            print(f"WARNING: champion runs the candidate's calc.js, not its own {own} "
+                  f"(link champion/agent/js/node_modules to agent/js/node_modules)")
+    except Exception as e:                                          # noqa: BLE001 - diagnostics only
+        print(f"(could not resolve calc.js paths: {e!r})")
 
 
 def main() -> None:
@@ -29,6 +51,7 @@ def main() -> None:
         from champion.agent.agent import create_agent as champ_factory
     except ImportError:
         sys.exit("no champion/ snapshot — run scripts/freeze_champion.sh first")
+    _which_calc()
     cand, champ = ContestantPlayer(cand_factory, "candidate"), ContestantPlayer(champ_factory, "champion")
     wins = ties = 0
     inv = [0, 0]

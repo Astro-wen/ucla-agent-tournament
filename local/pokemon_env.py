@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import os
 import random
+import re
 from dataclasses import dataclass, field
 
 from altruagent import DecisionContext, GameState, LegalAction
@@ -187,14 +188,9 @@ class Match:
     def preview(self) -> list[str]:
         orders = []
         for seat in range(2):
-            def view(c):
-                from agent.pokemon import dex
-                return {"species": _sid(c["species"]), "name": c["species"], "types": dex.types_of(c["species"]),
-                        "base_stats": dex.base_stats(c["species"]), "item": c["item"], "ability": c["ability"],
-                        "moves": c["moves"]}
-            mine = [view(c) for c in self.rosters[seat]]
+            mine = [preview_view(c, hidden=False) for c in self.rosters[seat]]
             obs = {"phase": "team_preview", "battle_format": "gen9vgc2025regi", "waiting_for_action": True,
-                   "your_roster": mine, "opponent_roster": [view(c) for c in self.rosters[1 - seat]]}
+                   "your_roster": mine, "opponent_roster": [preview_view(c, hidden=True) for c in self.rosters[1 - seat]]}
             tmpl = {"type": "select_lineup", "roster": [p["species"] for p in mine],
                     "instructions": "bring 4 of your 6, leads = 2 of those 4"}
             out = self._choose(seat, self._state(seat, "team_preview", obs, [self._act("select_lineup", tmpl)]))
@@ -313,6 +309,31 @@ class Match:
         raw["legal_actions"]["state_version"] = version
         raw["legal_actions"]["actions"][0]["input"]["state_version"] = version
         return raw, tmpl
+
+
+MASKED_FORMES = re.compile(r"^(Arceus|Gourgeist|Pumpkaboo|Xerneas|Silvally|Urshifu|Dudunsparce)(-.*)?$")
+ZERO_BOOSTS = {"accuracy": 0, "atk": 0, "def": 0, "evasion": 0, "spa": 0, "spd": 0, "spe": 0}
+
+
+def preview_view(c: dict, hidden: bool) -> dict:
+    """A roster entry as the real platform shows it at team preview (docs/real_payloads.md, logs/*/): our own
+    Pokemon in full (ids, not display names); the opponent's with item "unknown_item", ability None, no moves,
+    no HP, and Showdown's masked formes ("Urshifu-*" -> species "urshifu" with the BASE forme's types/stats)."""
+    from agent.pokemon import dex
+    shown = c["species"]
+    if hidden:
+        m = MASKED_FORMES.match(shown)
+        shown = m.group(1) if m else shown
+    v = {"species": _sid(shown), "name": shown, "types": dex.types_of(shown), "base_stats": dex.base_stats(shown),
+         "boosts": dict(ZERO_BOOSTS), "status": None, "fainted": False, "active": False, "revealed": False,
+         "is_terastallized": False}
+    if hidden:
+        v.update({"item": "unknown_item", "ability": None, "moves": [], "current_hp": 0, "max_hp": 0,
+                  "current_hp_fraction": 0})
+    else:
+        v.update({"item": _sid(c["item"]), "ability": _sid(c["ability"]), "moves": [_sid(m) for m in c["moves"]],
+                  "current_hp_fraction": 1.0})
+    return v
 
 
 def _pv(p: dict | None) -> dict | None:
