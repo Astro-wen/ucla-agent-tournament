@@ -17,8 +17,14 @@
 
 结论：**对战阶段可以 100% 复现**（同引擎、同 format、Tera 关、6 带 4）。**选秀阶段是平台自定义的**，我按 `docs/platform/pokemon.md` 重写了一份（18 卡蛇形、道具条款）。
 
-卡池：`local/pool.py` 优先读 `data/vgc_cards.json`——**从真实对局记录里采集的平台卡**（2026-09-26 第一局 VGC 后为 18 张，全部通过 Showdown TeamValidator）；没有时退回手写的 26 套。
+卡池：`local/pool.py` 优先读 `data/vgc_cards.json`——**从真实对局记录里采集的平台卡**（2026-09-26 第一局 VGC 后为 18 张，09-28 为 48 张，全部通过 Showdown TeamValidator）；没有时退回手写的 26 套。
 与真实平台对照（`docs/real_payloads.md`）：同 29 组（槽位, 招式）的可选目标集合 **0 处不一致**。
+
+**每局抽哪 18 张（09-28 起）**：平台**不是**均匀抽卡。39 局真实选秀（`data/vgc_pools.json`，`python -m local.pool --harvest` 自动记录）里 Rillaboom 出现 35 次、Wo-Chien 33 次，而 Sneasler、Toxapex、Ursaluna 各只出现 3 次（各卡出现次数的方差约是均匀抽样的 7 倍）。分布还在变：09-28 实战 A/B 的 20 局里新卡明显更多（Tyranitar 7/20，之前 19 局只有 1 次）。所以本地每张卡的「入池概率」= 真实出现频率（每张卡加 0.5 次平滑、上限 0.97），再按这些概率精确抽 18 张（`sample_pool`，`python -m local.pool --freq` 可看每张卡的真实次数与本地概率）。
+**道具冲突的卡照样列出**：平台的 `available_cards` / `available_card_ids` / `unused_card_ids` 列出所有还没被选的卡，包括和你已有道具重复、你不能选的卡（39 局里出现 624 次，没有一次是合法动作）；只有 legal actions 把它们排除。本地环境现在也这样。
+`ARENA_POOL=legacy` 恢复旧环境（只从 09-28 之前目录里的 43 张卡均匀抽、同样的随机数序列、隐藏道具冲突卡；擂台 7 / 11、基准 31 的 1000 个对局种子抽到的卡池与 aa48e95 逐个相同），用来复现 09-28 之前的数字；`ARENA_POOL=uniform` 只把抽卡改回均匀（从全部 48 张里抽）。`--harvest`（以及读真实记录的测试）只读 VGC 双打选秀的记录（按平台的 `game_type` = `pokemon_vgc_doubles_draft` 过滤；记录里没有 `game_type` 时看 `battle_format` 是否 gen9vgc 开头），单打 OU 选秀（`pokemon_gen9ou_draft`，同样是 draft 阶段、`ou-` 卡）不会混进 VGC 目录和卡池。换了卡池分布后，擂台 / 基准 / 面板的绝对胜率和旧记录不能直接比，要在同一环境下对比（下文 v3 / v2 的面板数字都是旧环境测的）。新环境（48 张卡、39 个真实卡池）下 v3.2 的基准线：擂台（冠军自己打自己）种子 7 / 11 = 191 / 211（旧环境 195 / 204，`ARENA_POOL=legacy` 下原样复现）；基准 official_baseline / random / v0 / v1 / v2 / v3 = 100 / 100 / 96.0 / 92.0 / 88.5 / 51.5；种子 43 面板均值 92.4%，最低 v3 镜像 48.5%。
+**选秀死局**：真实卡池道具重复很多（39 个真实卡池里每个有 6–9 张「道具和池里别的卡重复」的卡），偶尔一方剩下的卡全部撞道具、一张都不能选。平台上没见过，不知道平台怎么处理；本地以前直接崩溃（约万分之一局），现在这一手放宽道具条款（所有没被选的卡都合法）并记在 `Match.clause_waived` / `MatchResult.clause_waived`；擂台、基准、面板（`local.panel`）和 `scripts/draft_panel.py` 的输出里都有「draft dead ends」一项（出现了多少局）。
+**选秀模型没见过的卡**：目录里有、但 `agent/pokemon/draft_model.json` 没拟合过的卡，明确列在 `local/pool.py` 的 `NOT_IN_DRAFT_MODEL`（现在是 09-28 采集到的 5 张：pelipper、scream-tail、ursaluna、tyranitar、toxapex），选秀时用模型对「未见过的卡」的先验打分（平台上遇到新卡本来就是这样）。测试要求「目录 − 模型 = 这个列表」：以后 `--harvest` 采到新卡，要么加进这个列表，要么用**含这些卡的对局**重拟合（`scripts/fit_draft_model.py` 只把训练对局里出现过的卡写进模型，没有对局的卡不会以 0 分冒充「已拟合」）后再从列表里删掉。
 
 狼人杀：平台引擎不公开，`local/werewolf_env.py` 严格按 `docs/platform/werewolf.md` 实现（2 狼 1 预 4 民、第一夜平安、分票取低座位、死亡亮身份、每天一次公开讨论窗口 5 条 × 50 词、顺序暗投相对多数、平票无人、三天僵局狼胜、±1）。**状态 payload 按平台文档的形状构造**，所以 `agent/agent.py` 里部署用的 `Contestant` 在这里一行不改地跑。
 

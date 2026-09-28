@@ -116,7 +116,8 @@ def test_shipped_model_covers_the_catalog():
         pytest.skip("no fitted draft model")
     d = json.loads(p.read_text())
     cat = dex.card_catalog()
-    assert set(cat) <= set(d["main"])
+    from local.pool import NOT_IN_DRAFT_MODEL          # documented catalog cards the model was not fitted on
+    assert set(cat) - set(d["main"]) == set(NOT_IN_DRAFT_MODEL)
     assert all(abs(v) < 5 for v in d["main"].values()) and abs(d["beta"]) < 5
     for k in d["cross"]:
         a, b = k.split("|")

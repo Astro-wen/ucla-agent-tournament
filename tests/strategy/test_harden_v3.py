@@ -106,15 +106,17 @@ def test_fingerprint_normalises_presentation_but_not_the_set():
 def test_local_sim_cards_and_the_shipped_model_match_the_catalog_fingerprints():
     """The local sim fills 31 IVs, the platform sends {}: both must hash like the catalog, or every local ladder
     would treat every card as unseen."""
-    from local.pool import POOL
+    from local.pool import NOT_IN_DRAFT_MODEL, POOL
     cat_fp = {cid: card_fingerprint(c) for cid, c in CAT.items()}
     assert all(card_fingerprint(c) == cat_fp[c["card_id"]] for c in POOL if c["card_id"] in cat_fp)
     d = json.loads(drafter.MODEL_PATH.read_text())
-    assert d["fingerprints"] == cat_fp
+    # every catalog card is fitted except the documented new ones (local/pool.py NOT_IN_DRAFT_MODEL)
+    assert d["fingerprints"] == {k: v for k, v in cat_fp.items() if k not in NOT_IN_DRAFT_MODEL}
     assert set(d["prior"]) >= {"a", "b", "c", "z_mean"}
     m = DraftModel.load()
-    assert all(m.key(c) == c["card_id"] for c in POOL)
-    assert all(m.key(dict(c, ivs={})) == c["card_id"] for c in CAT.values())
+    assert all(m.key(c) == (None if c["card_id"] in NOT_IN_DRAFT_MODEL else c["card_id"]) for c in POOL)
+    assert all(m.key(dict(c, ivs={})) == (None if c["card_id"] in NOT_IN_DRAFT_MODEL else c["card_id"])
+               for c in CAT.values())
 
 
 def test_a_changed_set_is_unseen_and_an_identical_set_under_a_new_id_is_known():

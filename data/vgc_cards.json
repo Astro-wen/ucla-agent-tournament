@@ -580,6 +580,26 @@
   ]
  },
  {
+  "card_id": "vgc-pelipper",
+  "species": "Pelipper",
+  "item": "Damp Rock",
+  "ability": "Drizzle",
+  "nature": "Modest",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "spa": 252,
+   "spd": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Hurricane",
+   "Weather Ball",
+   "Tailwind",
+   "Protect"
+  ]
+ },
+ {
   "card_id": "vgc-porygon2",
   "species": "Porygon2",
   "item": "Eviolite",
@@ -658,6 +678,26 @@
    "Draco Meteor",
    "Hurricane",
    "Tailwind",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-scream-tail",
+  "species": "Scream Tail",
+  "item": "Covert Cloak",
+  "ability": "Protosynthesis",
+  "nature": "Bold",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "def": 252,
+   "spd": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Dazzling Gleam",
+   "Encore",
+   "Wish",
    "Protect"
   ]
  },
@@ -798,6 +838,66 @@
    "Bleakwind Storm",
    "Taunt",
    "Tailwind",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-toxapex",
+  "species": "Toxapex",
+  "item": "Black Sludge",
+  "ability": "Regenerator",
+  "nature": "Careful",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "def": 4,
+   "spd": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Liquidation",
+   "Haze",
+   "Toxic",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-tyranitar",
+  "species": "Tyranitar",
+  "item": "Chople Berry",
+  "ability": "Sand Stream",
+  "nature": "Careful",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 4,
+   "spd": 252
+  },
+  "ivs": {},
+  "moves": [
+   "Rock Slide",
+   "Knock Off",
+   "Low Kick",
+   "Protect"
+  ]
+ },
+ {
+  "card_id": "vgc-ursaluna",
+  "species": "Ursaluna",
+  "item": "Flame Orb",
+  "ability": "Guts",
+  "nature": "Adamant",
+  "level": 50,
+  "evs": {
+   "hp": 252,
+   "atk": 252,
+   "spd": 4
+  },
+  "ivs": {},
+  "moves": [
+   "Facade",
+   "Headlong Rush",
+   "Earthquake",
    "Protect"
   ]
  },

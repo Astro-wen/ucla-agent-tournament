@@ -53,7 +53,7 @@ def main() -> None:
         sys.exit("no champion/ snapshot — run scripts/freeze_champion.sh first")
     _which_calc()
     cand, champ = ContestantPlayer(cand_factory, "candidate"), ContestantPlayer(champ_factory, "champion")
-    wins = ties = 0
+    wins = ties = dead_ends = 0
     inv = [0, 0]
     turns = []
     t0 = time.time()
@@ -69,15 +69,18 @@ def main() -> None:
             inv[0] += r.invalid[seat]
             inv[1] += r.invalid[1 - seat]
             turns.append(r.turns)
+            dead_ends += any(getattr(r, "clause_waived", None) or [])
     n = a.games
     lo, hi = wilson(wins, n)
     print(f"candidate vs champion: {wins}/{n} = {100 * wins / n:.1f}% (ties {ties}), 95% CI [{100 * lo:.1f}%, {100 * hi:.1f}%]"
-          f" | invalid: candidate {inv[0]}, champion {inv[1]} | avg turns {sum(turns) / n:.1f} | {time.time() - t0:.0f}s")
+          f" | invalid: candidate {inv[0]}, champion {inv[1]} | avg turns {sum(turns) / n:.1f}"
+          f" | draft dead ends (Item Clause waived) {dead_ends} games | {time.time() - t0:.0f}s")
     verdict = "PROMOTE" if lo > 0.5 else ("HOLD" if wins / n >= 0.5 else "REJECT")
     print("verdict:", verdict)
     if a.json:
         print(json.dumps({"wins": wins, "games": n, "ties": ties, "win_rate": wins / n, "ci": [lo, hi],
-                          "invalid_candidate": inv[0], "invalid_champion": inv[1], "verdict": verdict}))
+                          "invalid_candidate": inv[0], "invalid_champion": inv[1],
+                          "draft_dead_end_games": dead_ends, "verdict": verdict}))
     sys.exit(0 if verdict != "REJECT" else 1)
 
 

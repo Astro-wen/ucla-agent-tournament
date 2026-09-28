@@ -172,6 +172,8 @@ def summarize(rows: list[dict], order: list[str] | None = None) -> dict:
                     "timer_opp": sum(r.get("timer_opp", 0) for r in ok),
                     "forfeit_cand": sum(r.get("forfeit") == "cand" for r in ok),
                     "forfeit_opp": sum(r.get("forfeit") == "opp" for r in ok),
+                    # draft dead ends: games where a pick had no Item-Clause-legal card (local/pokemon_env.py Match.draft)
+                    "dead_ends": sum(bool(r.get("waive_cand") or r.get("waive_opp")) for r in ok),
                     # the candidate's slowest team-preview / battle decision (real seconds on the VGC timer), and
                     # games without that measurement (rows from before the candidate ran on the timer)
                     "tmax_cand": max((r["tmax_cand"] for r in ok if "tmax_cand" in r), default=0.0),
@@ -201,6 +203,7 @@ def summarize(rows: list[dict], order: list[str] | None = None) -> dict:
                    forfeit_cand=sum(per[o]["forfeit_cand"] for o in live),
                    tmax_cand=max(per[o]["tmax_cand"] for o in live),
                    untimed_cand=sum(per[o]["untimed_cand"] for o in live),
+                   dead_ends=sum(per[o]["dead_ends"] for o in live),
                    errors=sum(per[o]["errors"] for o in per))
     return out
 
@@ -292,6 +295,8 @@ def print_summary(s: dict, title: str = "") -> None:
         print(f"{'candidate clock':18s} slowest preview/battle decision {s.get('tmax_cand', 0.0):.2f} s on the VGC "
               f"timer (limits 90 s / 55 s) in {timed} timed games; timer-played {s['timer_cand']}, forfeits "
               f"{s['forfeit_cand']}" + (f"; {s['untimed_cand']} games UNTIMED" if s.get("untimed_cand") else ""))
+        print(f"{'draft dead ends':18s} {s.get('dead_ends', 0)} games with a pick where no card was Item-Clause legal "
+              f"(the local env waived the clause for that pick; platform behaviour unknown)")
 
 
 def print_compare(c: dict, base_name: str) -> None:
@@ -723,6 +728,7 @@ def _play(task: tuple[str, int]) -> dict:
         row.update(winner=r.winner, win=r.winner == seat, tie=r.winner is None, turns=r.turns,
                    inv_cand=r.invalid[seat], inv_opp=r.invalid[1 - seat],
                    timer_cand=r.timer_defaults[seat], timer_opp=r.timer_defaults[1 - seat],
+                   waive_cand=r.clause_waived[seat], waive_opp=r.clause_waived[1 - seat],
                    pvfb_cand=WARNS.preview["cand"], pvfb_opp=WARNS.preview["opp"],
                    pvwall_cand=WARNS.preview_wall["cand"], pvwall_opp=WARNS.preview_wall["opp"],
                    warn_cand=WARNS.warn["cand"], warn_opp=WARNS.warn["opp"])

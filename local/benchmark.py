@@ -60,9 +60,10 @@ def main() -> None:
     from agent.agent import create_agent
     ours = ContestantPlayer(create_agent, "candidate")
     print(f"{'opponent':22s} {'win%':>6s}  95% CI          invalid(ours/opp)")
+    total_dead = total_games = 0
     with Showdown() as sd:
         for opp in opponents():
-            wins = 0
+            wins = dead_ends = 0
             inv = [0, 0]
             t0 = time.time()
             for g in range(a.games):
@@ -72,9 +73,14 @@ def main() -> None:
                 wins += r.winner == seat
                 inv[0] += r.invalid[seat]
                 inv[1] += r.invalid[1 - seat]
+                dead_ends += any(getattr(r, "clause_waived", None) or [])
             lo, hi = wilson(wins, a.games)
+            total_dead, total_games = total_dead + dead_ends, total_games + a.games
+            waived = f"   draft dead ends (Item Clause waived) {dead_ends} games" if dead_ends else ""
             print(f"{opp.name:22s} {100 * wins / a.games:5.1f}%  [{100 * lo:4.1f}, {100 * hi:4.1f}]   {inv[0]}/{inv[1]}"
-                  f"   ({time.time() - t0:.0f}s)")
+                  f"   ({time.time() - t0:.0f}s){waived}")
+    # local/pokemon_env.py Match.draft: a pick where no undrafted card was Item-Clause legal (clause waived for it)
+    print(f"draft dead ends (Item Clause waived): {total_dead} of {total_games} games")
 
 
 if __name__ == "__main__":

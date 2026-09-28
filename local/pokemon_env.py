@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from altruagent import RESIGN, DecisionContext, GameState, LegalAction, WithReasoning
 from altruagent.runner import _validate_decision
 
-from .pool import POOL, to_showdown_set
+from .pool import POOL, pool_mode, sample_pool, to_showdown_set
 from .showdown import Showdown
 
 os.environ["ARENA_RECORD"] = "0"      # never record simulated games (agent/agent.py record())
@@ -151,6 +151,7 @@ class MatchResult:
     brought: list[list[str]] = field(default_factory=list)
     timer_defaults: list[int] = field(default_factory=lambda: [0, 0])   # decisions left to Showdown's timer
     forfeit: int | None = None            # the seat that forfeited (answered RESIGN), if any
+    clause_waived: list[int] = field(default_factory=lambda: [0, 0])    # draft dead ends per seat (Match.draft)
 
 
 def _sid(x: str) -> str:
@@ -170,11 +171,13 @@ def lineup_ok(out, ids: list[str]) -> bool:
 class Match:
     def __init__(self, sd: Showdown, players: list[Player], rng: random.Random, pool: list[dict] | None = None):
         self.sd, self.players, self.rng = sd, players, rng
-        self.pool = pool or rng.sample(POOL, min(18, len(POOL)))
+        # platform card frequencies (local/pool.py sample_pool; ARENA_POOL=legacy: the old uniform rng.sample)
+        self.pool = pool or sample_pool(rng, POOL, 18)
         self.ids = ["agent-a", "agent-b"]
         self.version = 0
         self.invalid = [0, 0]
         self.timer_defaults = [0, 0]
+        self.clause_waived = [0, 0]          # draft picks where no card was Item-Clause legal (see draft())
         self.turns = 0
         self.orders: list[str] = []
         self.picks: list[dict] = []
@@ -209,17 +212,33 @@ class Match:
     def draft(self) -> None:
         first = self.rng.randrange(2)
         taken: set[str] = set()
+        # The real platform lists every undrafted card in available_cards / available_card_ids / unused_card_ids,
+        # item-blocked ones included (624 such listings in the 39 recorded drafts, none of them a legal action);
+        # only the legal actions leave them out. ARENA_POOL=legacy hides them, as this env used to.
+        list_blocked = pool_mode() != "legacy"
         for n, letter in enumerate(SNAKE, 1):
             seat = first if letter == "A" else 1 - first
             my_items = {c["item"] for c in self.rosters[seat]}
-            offered = [c for c in self.pool if c["card_id"] not in taken and c["item"] not in my_items]
+            undrafted = [c for c in self.pool if c["card_id"] not in taken]
+            offered = [c for c in undrafted if c["item"] not in my_items]
+            if not offered:
+                # Dead end: every undrafted card clashes with this seat's items (real pools repeat items a lot:
+                # 6-9 duplicate items per recorded pool). Never seen on the platform, so its behaviour is unknown;
+                # here the Item Clause is waived for this one pick (a team with a repeated item still battles in
+                # the sim), instead of crashing the match. Counted in clause_waived (-> MatchResult; local.ladder,
+                # local.benchmark and local.panel report it).
+                offered = undrafted
+                self.clause_waived[seat] += 1
+            listed = undrafted if list_blocked else offered
             obs = {"phase": "draft", "draft_complete": False, "battle_format": "gen9vgc2025regi",
                    "current_seat": self.ids[seat], "pick_number": n, "picks_remaining": 13 - n,
                    "first_drafter": self.ids[first],
-                   "available_card_ids": [c["card_id"] for c in offered], "available_cards": offered,
+                   "available_card_ids": [c["card_id"] for c in listed], "available_cards": listed,
                    "rosters": {self.ids[i]: [{"card_id": c["card_id"], "species": c["species"]} for c in self.rosters[i]]
                                for i in range(2)},
                    "picks": list(self.picks)}
+            if list_blocked:
+                obs["unused_card_ids"] = [c["card_id"] for c in listed]     # the platform sends it (== available)
             actions = [self._act(f"draft_pick:{c['card_id']}", {"type": "draft_pick", "card_id": c["card_id"]},
                                  f"Draft {c['species']}") for c in offered]
             out = self._choose(seat, self._state(seat, "draft", obs, actions))
@@ -309,14 +328,15 @@ class Match:
         winner = 0 if w == "p1" else 1 if w == "p2" else None
         return MatchResult(winner, turns, list(self.invalid),
                            rosters=[[c["species"] for c in r] for r in self.rosters], brought=orders,
-                           timer_defaults=list(self.timer_defaults))
+                           timer_defaults=list(self.timer_defaults), clause_waived=list(self.clause_waived))
 
     def forfeited(self, seat: int) -> MatchResult:
         """`seat` answered RESIGN: the other seat wins now (like the platform's `resign`, or Showdown's
         'lost due to inactivity' once a seat's timer bank is empty)."""
         return MatchResult(1 - seat, self.turns, list(self.invalid),
                            rosters=[[c["species"] for c in r] for r in self.rosters], brought=list(self.orders),
-                           timer_defaults=list(self.timer_defaults), forfeit=seat)
+                           timer_defaults=list(self.timer_defaults), forfeit=seat,
+                           clause_waived=list(self.clause_waived))
 
     def _battle_state(self, seat: int, sid: str, req: dict, st: dict, version: int):
         me, opp = st[sid], st["p2" if sid == "p1" else "p1"]
