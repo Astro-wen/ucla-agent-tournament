@@ -14,7 +14,7 @@
 1. **真实平台 A/B：v3 vs v2**（`ARENA_DIR_APOCALYPSE=~/ab/v2 python scripts/sparring.py play <id>`；房间在 Human dashboard 创建，需要人登录；同一账号同时只能有一个进行中的房间）。至少 20 局，15 胜以上算明显领先，10 胜以下就停下来对比真实卡池和本地卡池。
 2. ~~控时与防崩溃~~、~~公开理由~~：v3.1 已完成（见 `docs/progress.md`）。剩下：首次真实对局确认观战页显示公开理由、平台如何扣总时间；传输层断线重连在官方 `altruagent/`（上游），不要改。
 3. **多场并发压力测试**：`scripts/stress_concurrency.py`，在比赛用的机器上跑 N=8。
-4. **宝可梦其他格式冒烟测试**：官方演示是 Gen 9 OU 公开选秀单打；单打 / teambuild 路径、无 Node 时的实力都要测。和官方示例 agent（basic / smoke / llm_agent）以及开源强 bot 做基准。
+4. ~~宝可梦其他格式~~、~~官方示例 agent 基准~~：v3.2 已完成（单打策略 + `local/panel.py`）。剩下：无 Node 时的实力、和开源强 bot（foul-play、VGC-Bench 等）对比。晋级时除了擂台，再跑一遍 `python -m local.panel`（见 `docs/local_sim.md`）。
 5. **选秀模型换成混合对手群体重新拟合**，并把 4 张新卡加进目录（`python -m local.pool --harvest`）。
 6. **狼人杀**：合并 `candidates/r2-ww-seer-and-villager` 并按模拟结论调整；注意狼人杀可能不计分（技能文档写「Standalone competitions only」），单个座位对投票影响有限，投入要看回报。发言说服需要大模型（Nebius 已不是赞助商，额度来源要重新核对）。
 7. **自托管方案**：美西云主机（平台在 AWS us-west-2）、自动重启、装 Node、无人值守演练数小时；同时保证代码可打包、不依赖 LLM 也满实力。

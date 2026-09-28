@@ -21,6 +21,7 @@ Tailwind, spread moves), exactly as v0 played. See docs/strategy.md for the upgr
 from __future__ import annotations
 
 import logging
+import os
 import time
 
 from .. import timecontrol
@@ -54,6 +55,8 @@ ABILITIES = {"intimidate": 2.0, "prankster": 0.8, "drought": 1.0, "drizzle": 1.0
              "asonespectrier": 0.5, "innerfocus": 0.3}
 SPREAD_TARGETS = {"allAdjacentFoes", "allAdjacent"}
 USE_DRAFTER = True               # draft with agent/pokemon/drafter.py (search over the rest of the draft)
+USE_SINGLES = True               # singles battles / preview with agent/pokemon/singles.py (False = the v3 scorer)
+SINGLES_DRAFTER = os.environ.get("ARENA_SINGLES_DRAFTER", "1") != "0"   # OU draft: singles prior (A/B knob, local only)
 # ---- time control (agent/timecontrol.py): below these the bounded step is skipped, not started
 MIN_LOOKAHEAD_S = 0.05           # joint lookahead (normally ~30 ms, TIME_CAP 2.5 s)
 MIN_DRAFTER_S = 0.02             # drafter search wall (normally < 0.3 s, SAFETY_WALL_S 2 s)
@@ -399,6 +402,11 @@ class PokemonPolicy:
         self.drafter_kwargs: dict = {}          # Drafter(...) overrides (node budget / max_depth / top_k), experiments only
         self.last_timing: dict | None = None     # last doubles decision: exact table / lookahead / total ms
         self.warmed = False                      # did this policy already warm the damage calculator?
+        # Singles (agent/pokemon/singles.py): game type of the current state, per-battle memory, last scores / reason.
+        self.game_type: str | None = None
+        self.singles_prev: dict = {}
+        self.singles_last: list | None = None
+        self.singles_why: str | None = None
         self.lookahead_skipped = 0               # doubles decisions whose deadline left no time for the lookahead
         self.degraded: list[str] = []            # time-control degradations of the current match (diagnostics)
         self._reported: set = set()              # unknown phases already reported on stderr
@@ -477,14 +485,14 @@ class PokemonPolicy:
         if not isinstance(obs, dict):
             raise TypeError(f"observation is a {type(obs).__name__}, not a dict")
         phase = st.get("phase")
+        if st.get("game_type"):
+            self.game_type = str(st.get("game_type"))
         if phase in ("draft", "teambuild", "team_preview"):
             self._warm_calc()
         if phase == "draft":
             return self._draft(st, obs)
         if phase == "teambuild":
-            for s in DEFAULT_OU_TEAM:
-                self.cards.setdefault(to_id(s["species"]), s)
-            return {"action": {"type": "submit_team", "team": DEFAULT_OU_TEAM}}
+            return self._teambuild(obs)
         if phase == "team_preview":
             return self._preview(obs, str(st.get("session_id") or ""))
         if phase not in BATTLE_PHASES:
@@ -526,6 +534,20 @@ class PokemonPolicy:
             roster = [to_id(p.get("species", "")) for p in obs.get("your_roster", [])]
             return {"action": {"type": "select_lineup", "bring": roster[:4], "leads": roster[:2]}}
         return {k: v for k, v in la[0]["input"].items() if k not in ("session_id", "state_version")}
+
+    # ---- teambuild (pokemon_gen9ou_teambuild) ---------------------------
+    def _teambuild(self, obs: dict) -> dict:
+        """DEFAULT_OU_TEAM first; after a rejected team (the runner dies on INVALID_ACTION, the next worker sees
+        `submit_attempts_failed` > 0) the next of OU_TEAMS, so a ban or catalog quirk costs one attempt, not all eight
+        (after 8 the platform assigns its fallback team). Every set is remembered at level 100 for the calculator."""
+        try:
+            failed = max(0, int(obs.get("submit_attempts_failed") or 0))
+        except (TypeError, ValueError):
+            failed = 0
+        team = OU_TEAMS[failed % len(OU_TEAMS)]
+        for s in team:
+            self.cards.setdefault(to_id(s["species"]), {**s, "level": 100})
+        return {"action": {"type": "submit_team", "team": team}}
 
     # ---- draft ---------------------------------------------------------
     def _draft(self, st: dict, obs: dict) -> dict:
@@ -587,7 +609,15 @@ class PokemonPolicy:
         pick_no = obs.get("pick_number")
         if isinstance(pick_no, int) and 1 <= pick_no <= 12:
             n_taken = pick_no - 1                             # the platform's own count decides whose turn it is
-        d = Drafter(prior_score=lambda c: card_score(c, []), **self.drafter_kwargs)
+        if USE_SINGLES and SINGLES_DRAFTER and self._singles_format(obs):
+            # OU singles draft: the fitted model knows VGC cards only; drive the search by the calc duels (counters)
+            # and a singles prior instead of the VGC card_score.
+            from . import singles
+            from .drafter import DraftModel
+            d = Drafter(model=DraftModel(singles.SINGLES_DRAFT_MODEL), prior_score=singles.card_value, singles=True,
+                        **self.drafter_kwargs)
+        else:
+            d = Drafter(prior_score=lambda c: card_score(c, []), **self.drafter_kwargs)
         cid = d.pick(pool, mine, opp, legal_ids, n_taken=n_taken)
         self.draft_info = d.info
         return cid
@@ -618,7 +648,24 @@ class PokemonPolicy:
         except Exception as e:
             log.warning("preview matrix failed; using the heuristic preview", exc_info=True)
             self.degraded.append(f"preview:{type(e).__name__}")
+        if USE_SINGLES and self._singles_format(obs):
+            try:
+                from . import singles
+                out = singles.preview(self, {"game_type": self.game_type}, obs)
+                if out is not None:
+                    return out
+            except Exception:
+                log.warning("singles preview failed; using the heuristic preview", exc_info=True)
         return self._preview_heuristic(obs)
+
+    def _singles_format(self, obs: dict) -> bool:
+        """A singles game type (every Pokémon type but the VGC doubles draft): the game type if known, else the
+        preview's battle format (the same test `_preview_matrix` uses to skip singles)."""
+        game = to_id(self.game_type or "")
+        if game:
+            return "vgc" not in game and "doubles" not in game
+        fmt = to_id(obs.get("battle_format") or "")
+        return bool(fmt) and "vgc" not in fmt and "doubles" not in fmt
 
     def _new_battle(self) -> None:
         """Forget per-battle memory at team preview. calc-fixes' Supreme Overlord entry counts used to be cleared at
@@ -638,8 +685,9 @@ class PokemonPolicy:
 
     def _preview_matrix(self, obs: dict, session_id: str) -> dict | None:
         fmt = to_id(obs.get("battle_format") or "")
-        if fmt and "vgc" not in fmt and "doubles" not in fmt:
-            return None                     # the race models VGC doubles; singles 6-bring-4 keeps the heuristic
+        if (fmt and "vgc" not in fmt and "doubles" not in fmt) or self._singles_format(obs):
+            return None                     # the race models VGC doubles; a singles game type never uses it, even
+                                            # when its preview state carries no battle_format
         mine = [p for p in (obs.get("your_roster") or []) if isinstance(p, dict) and p.get("species")]
         opp = [p for p in (obs.get("opponent_roster") or []) if isinstance(p, dict) and p.get("species")]
         if not (4 <= len(mine) <= 6 and 4 <= len(opp) <= 6):
@@ -1001,6 +1049,20 @@ class PokemonPolicy:
 
     # ---- battle --------------------------------------------------------
     def _singles(self, st: dict, obs: dict) -> dict:
+        """Singles: agent/pokemon/singles.py (sets per format, one-turn payoff table with the foe's replies, switching,
+        KO races); the v3 stand-alone scorer below when it is off, fails or the calculator is unavailable."""
+        if USE_SINGLES:
+            try:
+                from . import singles
+                out = singles.decide(self, st, obs)
+                if out is not None:
+                    self.last_exact = True
+                    return out
+            except Exception:
+                log.warning("singles lookahead failed; using the stand-alone scorer", exc_info=True)
+        return self._singles_v3(st, obs)
+
+    def _singles_v3(self, st: dict, obs: dict) -> dict:
         la = (st.get("legal_actions") or {}).get("actions") or []
         me_mon = obs.get("active_pokemon") or {}
         me = me_mon.get("species", "")
@@ -1034,7 +1096,8 @@ class PokemonPolicy:
                 else:
                     v = move_value(mid, me, opp_types, extra) * HEURISTIC_TO_POINTS
             else:
-                v = 5.0 if obs.get("force_switch") else 0.0
+                # v3 took the FIRST switch on a forced switch; now the one that resists the foe / hits it hardest
+                v = 5.0 + _singles_switch_score(act, obs) if obs.get("force_switch") else 0.0
             if v > best_v:
                 best, best_v = a, v
         best = best or la[0]
@@ -1490,6 +1553,25 @@ class PokemonPolicy:
         return v + 10 * (opt.get("current_hp_fraction") or opt.get("hp_fraction") or 1.0)
 
 
+def _singles_switch_score(act: dict, obs: dict) -> float:
+    """0..1 for a singles switch-in without the calculator: HP left, resisting the foe's types, hitting it super
+    effectively with our own types."""
+    try:
+        sp = to_id(act.get("species", ""))
+        view = next((v for v in obs.get("available_switches") or [] if isinstance(v, dict)
+                     and to_id(v.get("species", "")) == sp), {"species": sp})
+        opp = obs.get("opponent_active_pokemon") or {}
+        mine = _types(view)
+        s = float(view.get("current_hp_fraction", 1.0) or 0.0)
+        if isinstance(opp, dict) and opp.get("species") and not opp.get("fainted"):
+            theirs = _types(opp)
+            s -= 0.25 * sum(effectiveness(t, mine) - 1 for t in theirs)
+            s += 0.2 * (max((effectiveness(t, theirs) for t in mine), default=1.0) - 1)
+        return max(0.0, min(0.99, 0.5 + 0.25 * s))
+    except Exception:
+        return 0.0
+
+
 def _threat(o: dict) -> float:
     sp = o.get("species", "")
     bs = o.get("base_stats") or dex.base_stats(sp)
@@ -1598,3 +1680,20 @@ DEFAULT_OU_TEAM = [
     {"species": "Iron Valiant", "item": "Booster Energy", "ability": "Quark Drive", "nature": "Naive",
      "evs": {"atk": 4, "spa": 252, "spe": 252}, "moves": ["Moonblast", "Close Combat", "Knock Off", "Encore"]},
 ]
+# Backups after a rejected team (a ban or catalog difference on the platform's Showdown), none of DEFAULT's species:
+# long-standing OU staples. All pass the local gen9ou validator (tests/strategy/test_singles.py).
+ALT_OU_TEAM = [
+    {"species": "Garchomp", "item": "Rocky Helmet", "ability": "Rough Skin", "nature": "Jolly",
+     "evs": {"hp": 252, "def": 4, "spe": 252}, "moves": ["Earthquake", "Dragon Tail", "Stealth Rock", "Spikes"]},
+    {"species": "Corviknight", "item": "Leftovers", "ability": "Pressure", "nature": "Impish",
+     "evs": {"hp": 252, "def": 168, "spd": 88}, "moves": ["Brave Bird", "Roost", "Defog", "U-turn"]},
+    {"species": "Toxapex", "item": "Black Sludge", "ability": "Regenerator", "nature": "Bold",
+     "evs": {"hp": 252, "def": 252, "spd": 4}, "moves": ["Surf", "Toxic", "Recover", "Haze"]},
+    {"species": "Heatran", "item": "Air Balloon", "ability": "Flash Fire", "nature": "Modest",
+     "evs": {"hp": 252, "spa": 252, "spe": 4}, "moves": ["Magma Storm", "Earth Power", "Flash Cannon", "Taunt"]},
+    {"species": "Clefable", "item": "Life Orb", "ability": "Magic Guard", "nature": "Modest",
+     "evs": {"hp": 252, "spa": 252, "spd": 4}, "moves": ["Moonblast", "Calm Mind", "Moonlight", "Flamethrower"]},
+    {"species": "Rotom-Wash", "item": "Choice Scarf", "ability": "Levitate", "nature": "Timid",
+     "evs": {"hp": 4, "spa": 252, "spe": 252}, "moves": ["Hydro Pump", "Volt Switch", "Trick", "Will-O-Wisp"]},
+]
+OU_TEAMS = [DEFAULT_OU_TEAM, ALT_OU_TEAM]
