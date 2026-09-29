@@ -387,6 +387,124 @@ def test_engine_timeout_kills_and_restarts(eng):
     e._kill()
 
 
+# ---------------------------------------------------------------- the real platform's six-entry `team`
+# Three recorded real forced switches (Yoriko_Red, v4, 09-29): the platform's `team` lists all six of our roster, and
+# the old reconstruction put a Pokemon left at team preview on the engine's bench instead of one we brought. Exactly
+# what the policy handed battlestate.build there (observation, template, the draft's cards, the preview prior, seen
+# foes) plus our team-preview `bring` and the answer played live.
+#   slot1_single_bench (39a033d9 #15): slot 1 fainted, template [switch rillaboom]; the engine had Amoonguss
+#     -> "no engine option for slot 1", classic fallback
+#   double_faint_two_bench (2a30f417 #8): both fainted, template [ironhands, arcanine] twice; the engine had Milotic
+#     instead of Arcanine -> only "switch 3, switch 3" rows -> "empty matrix", classic fallback
+#   double_faint_one_bench (f525d6ac #10): both fainted, template [irontreads, pass] twice; the engine had Chi-Yu
+#     instead of Iron Treads -> the only row left was "pass, pass", played live: INVALID_ACTION
+with open(os.path.join(os.path.dirname(__file__), "data", "real_six_roster_team.json")) as _fh:
+    SIX = json.load(_fh)
+SIX_CLASSIC = {"slot1_single_bench": SIX["slot1_single_bench"]["played"],       # (the classic fallback played live)
+               "double_faint_two_bench": SIX["double_faint_two_bench"]["played"], "double_faint_one_bench": None}
+
+
+def six_state(name, **kw):
+    f = SIX[name]
+    st = battlestate.build(f["observation"], f["template"], f["my_cards"], f["opp_cards"], opp_roster=f["opp_roster"],
+                           lineup_prior=f["lineup_prior"], seen_foes=f["seen_foes"], **kw)
+    return f, st
+
+
+@pytest.mark.parametrize("name", sorted(SIX))
+def test_only_the_four_we_brought_are_rebuilt(name):
+    f, st = six_state(name)
+    team = [to_id(v["species"]) for v in f["observation"]["team"].values()]
+    bring = sorted(to_id(s) for s in f["bring"])
+    assert len(team) == 6 and len(bring) == 4                      # the platform lists the whole roster
+    mine = [to_id(m["set"]["species"]) for m in st["sides"][st["me"]]["mons"]]
+    assert sorted(mine) == bring and sorted(st["meta"]["benched"]) == sorted(set(team) - set(bring))
+    for o in (x for opts in st["options"] for x in opts):
+        assert o["type"] != "switch" or to_id(o["species"]) in mine[2:]     # every template switch has its Pokemon
+
+
+def test_the_battle_team_comes_from_the_observation_alone():
+    obs = real_obs()                                                # four entries (the local simulator's shape)
+    assert battlestate._in_battle(obs, real_tmpl(), {to_id(v["species"]): v for v in obs["team"].values()},
+                                  battlelog.parse(obs["protocol_log"]), "p2") == \
+        {"incineroar", "tornadus", "fluttermane", "rillaboom"}
+    obs["team"]["p2: Garchomp"] = _view("garchomp", 183, 183, revealed=False)      # left at team preview, listed
+    obs["team"] = dict(reversed(list(obs["team"].items())))                        # ... ahead of the others
+    st = battlestate.build(obs, real_tmpl(), cards(*MINE), cards(*THEIRS), opp_roster=[to_id(x) for x in THEIRS])
+    assert [to_id(m["set"]["species"]) for m in st["sides"]["p2"]["mons"]][2:] in (["tornadus", "incineroar"],
+                                                                                    ["incineroar", "tornadus"])
+    assert st["meta"]["benched"] == ["garchomp"]
+
+
+def test_a_battle_team_it_cannot_name_is_never_guessed():
+    """Six listed but not exactly four known: build raises (the classic pick plays) instead of filling the gap in
+    `team` order with a Pokemon left at team preview."""
+    def six(obs):
+        obs["team"]["p2: Garchomp"] = _view("garchomp", 183, 183, revealed=False, active=True)   # roster[0]/[1]
+        obs["team"]["p2: Tyranitar"] = _view("tyranitar", 207, 207, revealed=False)
+        obs["team"] = dict(reversed(list(obs["team"].items())))                            # ... listed first
+        return obs
+
+    def build(obs, tmpl):
+        return battlestate.build(obs, tmpl, cards(*MINE), cards(*THEIRS), opp_roster=[to_id(x) for x in THEIRS])
+
+    def no_switch():                   # both actives trapped / locked into a move: Showdown offers no switch
+        tmpl = real_tmpl()
+        for s in tmpl["slots"]:
+            s["options"] = [o for o in s["options"] if o["type"] != "switch"]
+        return tmpl
+
+    assert sorted(build(six(real_obs()), real_tmpl())["meta"]["benched"]) == ["garchomp", "tyranitar"]
+    # Tornadus (brought, never on the field) is named nowhere: the old fill put Tyranitar in its place
+    with pytest.raises(ValueError, match="our four are not known"):
+        build(six(real_obs()), no_switch())
+    # one too many flagged: never drop one of the four silently
+    obs = six(real_obs())
+    obs["team"]["p2: Garchomp"]["revealed"] = True
+    with pytest.raises(ValueError, match="our four are not known"):
+        build(obs, real_tmpl())
+    # four listed (the local simulator's shape): those are the four, nothing to guess
+    st = build(real_obs(), no_switch())
+    assert sorted(to_id(m["set"]["species"]) for m in st["sides"]["p2"]["mons"]) == \
+        ["fluttermane", "incineroar", "rillaboom", "tornadus"]
+
+
+@needs_engine
+@pytest.mark.parametrize("name", sorted(SIX))
+def test_a_real_forced_switch_is_searched(eng, name):
+    f, st = six_state(name, classic=SIX_CLASSIC[name])
+    ans = eng.search(st, dict(FAST, rng=3), 20.0)
+    assert ans is not None, eng.last_error
+    assert pol._template_ok(f["template"], ans["action"])
+    parts = [ans["action"][f"slot_{i}"] for i in (0, 1)]
+    if all(p["type"] == "switch" for p in parts):
+        assert parts[0]["species"] != parts[1]["species"]
+    if name == "slot1_single_bench":                                # one legal answer: the search returns it
+        assert ans["action"] == f["played"] and ans["info"]["n_my"] == 1
+    elif name == "double_faint_two_bench":
+        assert ans["info"]["n_my"] == 2 and ans["info"]["forced"] and ans["info"]["errors"] == 0
+    else:                                                           # one bench Pokemon: it comes in, the other passes
+        assert sorted(p["type"] for p in parts) == ["pass", "switch"]
+        assert next(p for p in parts if p["type"] == "switch")["species"] == "irontreads"
+
+
+@needs_engine
+def test_a_template_switch_the_engine_cannot_make_is_never_searched(eng):
+    _, st = six_state("slot1_single_bench")
+    st["options"][1] = [{"type": "switch", "species": "amoonguss"}]           # left at team preview: not in battle
+    assert eng.search(st, dict(FAST), 20.0) is None
+    assert eng.last_error == "no engine Pokemon for slot 1's switch to amoonguss"
+    # the live INVALID_ACTION's shape: the one bench switch unmappable, so only "pass, pass" was left
+    _, st = six_state("double_faint_one_bench")
+    st["options"] = [[{"type": "switch", "species": "chiyu"}, {"type": "pass"}]] * 2
+    assert eng.search(st, dict(FAST), 20.0) is None
+    assert eng.last_error == "no engine Pokemon for slot 0's switch to chiyu"
+    _, st = six_state("double_faint_two_bench")
+    st["options"] = [[{"type": "switch", "species": "ironhands"}]] * 2         # both slots into the same Pokemon
+    assert eng.search(st, dict(FAST), 20.0) is None
+    assert eng.last_error.startswith("no legal joint engine option")
+
+
 # ---------------------------------------------------------------- policy integration
 class FakeEngine:
     enabled = True

@@ -477,23 +477,51 @@ function rootSlots(b, sd, req, tmplSlots) {
         if (!want.length) want = [targets[0]];
         for (const t of want) add({type: 'move', move_id: opt.move_id, target: t});
       } else if (opt.type === 'switch') {
+        // A switch the platform offers but the rebuilt battle cannot make: our four Pokemon are wrong there, so
+        // do not search that battle at all (the classic pick plays). Dropping the option instead left, e.g., only
+        // "pass, pass" after a double faint (the platform refuses it) or searched without that switch.
+        if (!mapChoice(b, sd, req, i, {type: 'switch', species: opt.species})) {
+          throw new Error(`no engine Pokemon for slot ${i}'s switch to ${toID(opt.species)}`);
+        }
         add({type: 'switch', species: opt.species});
       } else {
         add({type: 'pass'});
       }
     }
-    if (!out.length) throw new Error(`no engine option for slot ${i}`);
+    if (!out.length) {
+      const names = opts.map(o => (o.type === 'move' ? o.move_id : o.type));
+      throw new Error(`no engine option for slot ${i} (${names.join(', ') || 'empty'})`);
+    }
     res.push(out);
   }
   return res;
 }
 
-function jointOptions(slots) {
+// Showdown's pair rule for OUR joint rows (the platform rejects anything else): never the same switch-in on both
+// slots, and a slot passes only when no switch-in its platform template offers is left after the other slot's choice.
+// The template decides, not the rebuilt request: a bench Pokemon the reconstruction lacks is still on the platform
+// (09-29 f525d6ac: both actives fainted, the last Pokemon missing from the rebuilt team -> "pass, pass", rejected).
+function jointOk(parts, tmplSlots) {
+  if (parts.length < 2) return true;
+  const [a, c] = parts;
+  if (a.kind === 'switch' && c.kind === 'switch' && (a.j === c.j || a.species === c.species)) return false;
+  for (let i = 0; i < 2; i++) {
+    if (parts[i].kind !== 'pass') continue;
+    const other = parts[1 - i];
+    const taken = other.kind === 'switch' ? other.species : null;
+    if (((tmplSlots || [])[i] || []).some(o => o.type === 'switch' && toID(o.species) !== taken)) return false;
+  }
+  return true;
+}
+
+// tmplSlots (our root rows only): drop the pairs jointOk rejects.
+function jointOptions(slots, tmplSlots) {
   if (slots.length === 1) return slots[0].map(a => ({str: a.str, parts: [a]}));
   const out = [];
   for (const a of slots[0]) {
     for (const c of slots[1]) {
       if (a.kind === 'switch' && c.kind === 'switch' && a.j === c.j) continue;
+      if (tmplSlots && !jointOk([a, c], tmplSlots)) continue;
       out.push({str: `${a.str}, ${c.str}`, parts: [a, c]});
     }
   }
@@ -796,12 +824,15 @@ function prune(ctx, root, sd, req, slots, probesOther, ours, seed, g) {
     for (const a of kept[0]) {
       for (const c of kept[1]) {
         if (a.o.kind === 'switch' && c.o.kind === 'switch' && a.o.j === c.o.j) continue;
+        if (ours && !jointOk([a.o, c.o], ctx.tmplSlots)) continue;
         joint.push({str: `${a.o.str}, ${c.o.str}`, parts: [a.o, c.o], score: a.score + c.score});
       }
     }
   }
   joint.sort((p, q) => q.score - p.score);
-  if (!joint.some(j => j.str === g.str)) joint.push(Object.assign({score: -Infinity}, g));
+  if (!joint.some(j => j.str === g.str) && (!ours || jointOk(g.parts, ctx.tmplSlots))) {
+    joint.push(Object.assign({score: -Infinity}, g));
+  }
   return joint.slice(0, Math.max(ctx.p.keep, 1)).concat(joint.slice(ctx.p.keep).filter(j => j.str === g.str));
 }
 
@@ -814,7 +845,14 @@ function search(battle, sideIdx, st, params, t0) {
   if (!req || req.wait) throw new Error('no request for our side after reconstruction');
   const oppReq = op.activeRequest && !op.activeRequest.wait ? op.activeRequest : null;
   const mySlots = rootSlots(root, me, req, st.options || []);
-  const myAll = jointOptions(mySlots);
+  ctx.tmplSlots = st.options || [];
+  const myAll = jointOptions(mySlots, ctx.tmplSlots);
+  // no pair passes the joint check against the platform template (e.g. both slots only into the same Pokemon,
+  // "switch 3, switch 3"): say so instead of searching an empty matrix; the classic pick plays
+  if (!myAll.length) {
+    throw new Error('no legal joint engine option: no jointly legal row for our side ('
+      + mySlots.map(s => s.map(o => o.str).join('/')).join(' | ') + ')');
+  }
   let classic = null;
   if (st.classic) {
     const parts = [];

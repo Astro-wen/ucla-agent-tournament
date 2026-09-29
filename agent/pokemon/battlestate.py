@@ -1,7 +1,8 @@
 """Platform observation -> the battle description the engine search rebuilds (agent/js/search.js `build`).
 
 Platform-legal information only (docs/real_payloads.md):
-  * our four Pokemon: exact HP, status, boosts, item as shown in `team` / `active_pokemon`, full sets from our draft;
+  * our four Pokemon: exact HP, status, boosts, item as shown in `team` / `active_pokemon`, full sets from our draft
+    (the platform's `team` lists all six of our roster: only the four we brought are used, see `_in_battle`);
   * the foe: HP out of 100, status and boosts from `opponent_active_pokemon` / `opponent_team`, full sets from the
     draft cache (`PokemonPolicy.opp_cards`); which four they brought only as far as they have appeared (the protocol
     log's switch-ins, plus every foe we saw on the field); the rest is filled in from the team-preview prior
@@ -35,6 +36,7 @@ SIMPLE_VOLATILES = {"substitute", "saltcure", "focusenergy", "torment", "aquarin
                     "tarshot", "healblock", "throatchop", "magnetrise", "charge", "embargo"}
 STATUSES = {"brn", "par", "slp", "frz", "psn", "tox"}
 CHOICE_ITEMS = {"choicescarf", "choiceband", "choicespecs"}
+BATTLE_SIZE = 4                       # VGC: bring four of six
 
 
 def _status(x) -> str:
@@ -312,6 +314,43 @@ def _field(ctx: _Ctx, obs: dict, items: dict, cond_left: dict | None) -> dict:
     return out
 
 
+def _in_battle(obs: dict, tmpl: dict, ours: dict, log: battlelog.Log | None, me: str) -> set[str]:
+    """Our Pokemon known to be among the four we brought.
+
+    The real platform's `team` lists the whole roster of six, the two left out at team preview included (full HP,
+    never fainted, never `revealed`; their dict position varies), while the engine plays only the first four it is
+    given (search.js build). Taking `team` in dict order put a Pokemon we did not bring on the engine's bench in 413 of
+    936 recorded real doubles decisions: the search then could not map the template's switch to the one we did bring
+    ("no engine option for slot N" on forced switches, "switch 3, switch 3" rows, a lone "pass, pass" row after a
+    double faint), silently lost that switch in normal turns, and counted a phantom full-HP Pokemon in the evaluation
+    and the win check.
+
+    In battle for sure: the actives, anything fainted or `revealed`, our protocol-log switch-ins, and every switch
+    option of the template / `available_switches` (the unfainted bench). On every recorded real doubles state this
+    finds all four and nothing else (936 / 936). It can find fewer: with both actives trapped or locked into a move
+    (Showdown then offers no switch) a bench Pokemon that never came in is named nowhere; `build` then raises rather
+    than guess. The local simulator lists only the four brought (ARENA_SIX_TEAM=1 lists six like the platform)."""
+    out: set[str] = set()
+    for a in obs.get("active_pokemon") or []:
+        if isinstance(a, dict) and a.get("species"):
+            out.add(to_id(a["species"]))
+    for sid, v in ours.items():
+        if _fainted(v) or v.get("revealed") is True:
+            out.add(sid)
+    if log is not None:
+        out.update(log.revealed.get(me, []))
+    for s in (tmpl or {}).get("slots") or []:
+        opts = s.get("options") if isinstance(s, dict) else None
+        for o in opts or []:
+            if isinstance(o, dict) and o.get("type") == "switch" and o.get("species"):
+                out.add(to_id(o["species"]))
+    for row in obs.get("available_switches") or []:
+        for p in (row if isinstance(row, list) else [row]):
+            if isinstance(p, dict) and p.get("species"):
+                out.add(to_id(p["species"]))
+    return out & set(ours)
+
+
 def build(obs: dict, tmpl: dict, my_cards: dict, opp_cards: dict, *, opp_roster: list | None = None,
           lineup_prior: list | None = None, seen_foes=(), classic: dict | None = None, seed: list | None = None,
           cond_left: dict | None = None, prev_mine=None, prev_foe=None) -> dict:
@@ -352,7 +391,18 @@ def build(obs: dict, tmpl: dict, my_cards: dict, opp_cards: dict, *, opp_roster:
         if not sid:
             raise ValueError(f"our position {i} is unknown")
         order.append(sid)
-    order += [s for s in ours if s not in order]
+    # the platform's `team` is the whole roster of six: only the four we brought go to the engine (see _in_battle)
+    in_battle = _in_battle(obs, tmpl, ours, log, me)
+    if len(ours) > BATTLE_SIZE and (len(in_battle) != BATTLE_SIZE or not set(order) <= in_battle):
+        # More listed than brought and the observation does not name exactly our four: e.g. both actives trapped or
+        # locked into a move (no switch options) before a bench Pokemon ever came in, or one flagged too many. Filling
+        # the gap in `team` order would search with a Pokemon left at team preview: the classic pick plays instead.
+        raise ValueError(f"our four are not known ({len(in_battle)} of the {len(ours)} listed)")
+    rest = [s for s in ours if s not in order]
+    order += [s for s in rest if s in in_battle]
+    order += [s for s in rest if s not in in_battle][:max(0, BATTLE_SIZE - len(order))]
+    order = order[:BATTLE_SIZE]           # (search.js plays the first four it is given, like Showdown's team order)
+    benched = [s for s in ours if s not in order]
     my_mons = []
     for n, sid in enumerate(order):
         card = _card_for(my_cards, sid)
@@ -464,4 +514,4 @@ def build(obs: dict, tmpl: dict, my_cards: dict, opp_cards: dict, *, opp_roster:
             "field": _field(ctx, obs, items, cond_left), "options": options, "classic": classic,
             "seed": seed or [11, 22, 33, 44],
             "meta": {"log_lines": log.lines if log is not None else 0, "revealed": len(revealed),
-                     "filled": [s for s in f_order if s not in known]}}
+                     "filled": [s for s in f_order if s not in known], "benched": benched}}

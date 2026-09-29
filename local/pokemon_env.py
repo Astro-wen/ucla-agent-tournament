@@ -202,6 +202,9 @@ class Match:
         # its side, x/100 on the other), as the platform sends it (docs/real_payloads.md). Off by default so every
         # earlier result replays exactly; the engine search (ARENA_BATTLE=search) reads volatile state from it.
         self.plog_on = os.environ.get("ARENA_PLOG", "0") == "1"
+        # ARENA_SIX_TEAM=1: `team` lists the whole roster of six in roster order, like the real platform (the two
+        # left at team preview as full-HP, unrevealed views; see _six_team). Off by default (earlier results replay).
+        self.six_team = os.environ.get("ARENA_SIX_TEAM", "0") == "1"
         self.plog: dict[str, list[str]] = {"p1": [], "p2": []}
         self._split: list | None = None
         for p in players:
@@ -491,7 +494,8 @@ class Match:
         obs = {"phase": "moving", "is_doubles": True, "turn": st["turn"], "format": "gen9vgc2025regi",
                "weather": st["weather"], "fields": st["pseudo_weather"] + ([st["terrain"]] if st["terrain"] else []),
                "active_pokemon": active_views, "opponent_active_pokemon": opp_views,
-               "team": {f"{sid}: {p['species']}": p for p in map(_pv, me["team"]) if p},
+               "team": _six_team(sid, me["team"], self.rosters[seat]) if self.six_team
+               else {f"{sid}: {p['species']}": p for p in map(_pv, me["team"]) if p},
                "opponent_team": {f"opp: {p['species']}": p for p in map(_foe_view, opp["team"]) if p and p.get("revealed", True)},
                "available_moves": moves_out, "available_switches": switches_out,
                "force_switch": force if not req.get("active") else [False] * n_slots,
@@ -541,6 +545,27 @@ def _pv(p: dict | None) -> dict | None:
     return {"species": p["id"], "name": p["species"], "types": p["types"], "current_hp": p["current_hp"],
             "max_hp": p["max_hp"], "current_hp_fraction": p["current_hp_fraction"], "status": p["status"],
             "fainted": p["fainted"], "active": p["active"], "boosts": p["boosts"], "base_stats": p["base_stats"]}
+
+
+def _six_team(sid: str, live: list, roster: list[dict]) -> dict:
+    """`team` as the real platform sends it (ARENA_SIX_TEAM=1): the whole roster of six in team-preview roster order
+    (every recorded real doubles state), the four brought as their live views and the two left out at full HP, never
+    fainted, never revealed. The platform marks the roster's first two `active` at team preview and never clears the
+    flag on one left out (192 / 192 such views in the real recordings), so neither does this."""
+    from agent.pokemon.stats import stats_for
+    views = {v["species"]: v for v in map(_pv, live) if v}
+    out = {}
+    for n, c in enumerate(roster):
+        s = _sid(c["species"])
+        v = views.pop(s, None)
+        if v is None:
+            v = preview_view(c, hidden=False)
+            hp = int(stats_for(c, c["species"])["hp"])
+            v.update({"current_hp": hp, "max_hp": hp, "current_hp_fraction": 1.0, "active": n < 2})
+        out[f"{sid}: {v['name']}"] = v
+    for v in views.values():                   # (a brought Pokemon the roster does not name: keep it anyway)
+        out[f"{sid}: {v['name']}"] = v
+    return out
 
 
 def _foe_view(p: dict | None) -> dict | None:

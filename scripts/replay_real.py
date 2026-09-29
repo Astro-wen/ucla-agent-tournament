@@ -7,7 +7,9 @@
 
 Each move is first put through the official runner's own `_validate_decision` (the shapes it accepts, including
 the WithReasoning wrapper), and each public reasoning line is checked (length cap, ASCII whitelist, leak guard);
-the time to build the line is reported on its own.
+the time to build the line is reported on its own. Doubles turns are checked as a pair too (agent.doubles_ok: the
+server rejects the same switch-in twice and a `pass` while a switch-in is still free); answers agent.py had to
+repair before sending are counted (`joint repairs`: the policy itself answered an illegal pair).
 """
 from __future__ import annotations
 
@@ -36,7 +38,7 @@ def main() -> int:
         DamageCalc.get().enabled = False
     show = "--show-reasoning" in sys.argv
     files = sorted(glob.glob("logs/*/*.jsonl"))
-    n = fails = with_reason = 0
+    n = fails = with_reason = repairs = 0
     times: list[float] = []
     reason_times: list[float] = []
     search = {"decisions": 0, "used": 0, "fallback": 0, "same_as_classic": 0, "reasons": {}, "ms": []}
@@ -47,6 +49,7 @@ def main() -> int:
         n += counts["n"]
         fails += counts["fails"]
         with_reason += counts["with_reason"]
+        repairs += getattr(c, "joint_repairs", 0)
         if getattr(c.pk, "battle_mode", "classic") == "search":   # ARENA_BATTLE=search: the engine search's record
             ss = c.pk.search_stats
             for k in ("decisions", "used", "fallback", "same_as_classic"):
@@ -56,7 +59,7 @@ def main() -> int:
             search["ms"] += c.pk.search_ms
     times.sort()
     reason_times.sort()
-    print(f"replayed {n} real decisions from {len(files)} files: {fails} failures | "
+    print(f"replayed {n} real decisions from {len(files)} files: {fails} failures, {repairs} joint repairs | "
           f"decision time avg {1000 * sum(times) / max(1, len(times)):.1f} ms, p99 {1000 * _p99(times):.1f} ms, "
           f"max {1000 * (times[-1] if times else 0):.0f} ms")
     print(f"public reasoning (mode {reasoning.mode_from_env()}) on {with_reason} decisions: build avg "

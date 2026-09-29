@@ -65,6 +65,33 @@ def test_random_action_never_double_switches_and_survives_empty_options():
         assert a["slot_0"] == {"type": "switch", "species": "x"} and a["slot_1"] == {"type": "pass"}
 
 
+def test_six_team_lists_the_whole_roster_like_the_platform():
+    """ARENA_SIX_TEAM=1: `team` as the real platform sends it (roster order, the two left out at full HP)."""
+    from agent.pokemon.dex import card_catalog, to_id
+    roster, seen = [], set()
+    for c in card_catalog().values():
+        if to_id(c["species"]) not in seen and len(roster) < 6:
+            seen.add(to_id(c["species"]))
+            roster.append(c)
+    live = [{"id": to_id(c["species"]), "species": c["species"], "types": [], "current_hp": 10, "max_hp": 150,
+             "current_hp_fraction": 10 / 150, "status": None, "fainted": False, "active": i < 2, "boosts": {},
+             "base_stats": {}} for i, c in enumerate(reversed(roster[2:]))]           # brought: the last four
+    team = pe._six_team("p1", live, roster)
+    assert [v["species"] for v in team.values()] == [to_id(c["species"]) for c in roster]
+    assert all(k.startswith("p1: ") for k in team)
+    for n, v in enumerate(team.values()):
+        if n < 2:                                   # left at team preview
+            assert v["current_hp"] == v["max_hp"] > 0 and v["current_hp_fraction"] == 1.0
+            assert not v["fainted"] and not v["revealed"] and v["moves"]
+            assert v["active"] is True              # the platform's stale team-preview flag (roster[0] and [1])
+        else:
+            assert v["current_hp"] == 10
+    # the same two left out, third and fourth in the roster: not flagged
+    team = pe._six_team("p1", live, roster[2:4] + roster[:2] + roster[4:])
+    assert [v["species"] for v in team.values()][2:4] == [to_id(c["species"]) for c in roster[:2]]
+    assert [v["active"] for v in team.values()][2:4] == [False, False]
+
+
 @pytest.mark.skipif(not (JS_DIR / "node_modules").exists(), reason="npm install not run in local/js")
 def test_showdown_match_ours_vs_baseline_completes():
     from agent.agent import create_agent

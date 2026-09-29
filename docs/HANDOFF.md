@@ -3,7 +3,8 @@
 ## 现在到哪了
 
 - **2026-09-27 起在新机器上开发**：Windows 11 Pro + WSL2 Ubuntu 24.04，仓库在 `~/ucla-agent-tournament`。从 Windows 侧改 WSL 里的文件会变成 root 所有，改完要 chown 回来。
-- **冠军 v4_engine_search（main / `champion/`，09-29）**：v3.2 的选秀和首发不变，对战改成在 Showdown 引擎克隆上的搜索（blend）。对 v3.2 擂台 57.5% / 63.5%（种子 7 / 11），对开源学习型 bot VGC-Bench +8.5 / +15.5 个百分点，对引擎搜索 bot simbot −9（不显著）。需要 pokemon-showdown 模拟器（压缩包自带；checkout 里 `(cd local/js && npm ci)`），`ARENA_BATTLE=classic` 退回 v3.2 打法。备选 `~/exp13/patches/battlefix-final.patch`（和 v4 直接对打持平）。详见 `docs/progress.md`。
+- **冠军 v4.1（main / `champion/`，09-29）**：v4 + 两个真实平台 bug 的修复（平台的 `team` 列出全部 6 只 → 局面重建只用带上场的 4 只；两格回答合起来必须合法），见 `docs/progress.md` 的 v4.1 节。以后的 v5 按 `docs/v5_standard.md`。以下是 v4 本身：
+- **v4_engine_search（09-29）**：v3.2 的选秀和首发不变，对战改成在 Showdown 引擎克隆上的搜索（blend）。对 v3.2 擂台 57.5% / 63.5%（种子 7 / 11），对开源学习型 bot VGC-Bench +8.5 / +15.5 个百分点，对引擎搜索 bot simbot −9（不显著）。需要 pokemon-showdown 模拟器（压缩包自带；checkout 里 `(cd local/js && npm ci)`），`ARENA_BATTLE=classic` 退回 v3.2 打法。备选 `~/exp13/patches/battlefix-final.patch`（和 v4 直接对打持平）。详见 `docs/progress.md`。
 - 真实平台：v2 对 v1 10 局 8 胜 2 负；v3.2 对 v2 20 局 18 胜 2 负。v4 对 v3.2 的真实 A/B：`~/exp7/scripts/ab4-play.sh <session_id>`（v3.2 冻结副本在 `~/ab/v3`）。
 - 外部对手（本地评测）：`simbot`（引擎搜索）和 `vgcbench_sp` / `vgcbench_bc`（VGC-Bench，装在 D 盘 `/mnt/d/altruagent`，所有者要求大文件不放 C 盘）。LLM 花费看 `~/exp7/scripts/llm-spend.sh`（到 09-29 真实 1.04 美元），不要直接加账本的 cost_usd 列。
 - **两个 agent 已注册并认领**：Yoriko_Red（主力）、Apocalypse_Red（陪练）。密钥不在 git 里（本机备份在 `~/.config/altruagent/`）。

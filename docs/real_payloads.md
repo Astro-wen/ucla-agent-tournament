@@ -66,6 +66,8 @@ observation 新增 `target_legend`；`active_pokemon` / `opponent_active_pokemon
 唯一 legal action `doubles_turn`，模板 `{type, slots, target_legend, instructions}`；每个 slot：`slot, board_position(-1/-2), active(完整宝可梦视图，含 boosts), force_switch, options`。
 option：招式 `{type:"move", move_id, base_power, category, move_type, current_pp, accuracy, targets}`；换人 `{type:"switch", species}`；`{type:"pass"}`。
 
+**`team` 是整份 6 只名单，不只是带上场的 4 只**（09-29 核对：936/936 个真实双打状态都是 6 只，顺序 = Team Preview 名单顺序）。没带的 2 只一直满血、`fainted: false`、`revealed: false`。哪 4 只在场上打：在场的、倒下的、`revealed: true` 的、协议日志里换上场过的、模板 / `available_switches` 里能换上的——这几条合起来在全部真实状态上正好找到 4 只（`agent/pokemon/battlestate.py` `_in_battle`）。v4_engine_search（a64bcd4）按字典顺序取前 4 只，在 44% 的真实双打决策里把没带的宝可梦放进了引擎。本地模拟器默认只给 4 只；`ARENA_SIX_TEAM=1` 按平台的样子给 6 只。注意：名单前两位如果没带，它的 `active` 一直是 `true`（Team Preview 时的标记没清掉，真实记录 192/192），所以不能用 `team[...].active` 判断谁在场。找不齐正好 4 只时（例如我方两只都被困住或锁招、替补还没上过场，模板里没有换人选项）不猜，`build` 报错、打经典策略。
+
 实测目标集合：
 - 单体招式：slot 0 → `[-2, 1, 2]`，slot 1 → `[-1, 1, 2]`（**`-1/-2` 是固定站位，不是"自己/队友"**；单体招式可以打队友）
 - 群攻 / 自身 / 场地：`[0]`（Earthquake、Heat Wave、Rock Slide、Snarl、Protect、Rage Powder）

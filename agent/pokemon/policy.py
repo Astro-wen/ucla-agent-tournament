@@ -26,6 +26,7 @@ import time
 import zlib
 
 from .. import timecontrol
+from ..fallback import joint_problems, repair_doubles
 from . import dex
 from . import drafter as drafter_mod
 from . import lookahead as lookahead_mod
@@ -132,8 +133,10 @@ def search_params() -> dict:
     return out
 
 
-def _template_ok(tmpl: dict, action: dict) -> bool:
-    """Is a doubles_turn `action` one of the template's options (agent.doubles_ok's rules; never raises)?"""
+def _template_ok(tmpl: dict, action: dict, joint: bool = True) -> bool:
+    """Is a doubles_turn `action` one of the template's options (agent.doubles_ok's rules; never raises)? `joint`: also
+    as a pair -- no `pass` while a switch-in is still free for that slot (fallback.joint_problems; the duplicate
+    switch-in is checked either way)."""
     try:
         used = set()
         for slot in tmpl.get("slots", []):
@@ -155,7 +158,7 @@ def _template_ok(tmpl: dict, action: dict) -> bool:
                     return False
             else:
                 return False
-        return True
+        return not (joint and joint_problems(tmpl, action))
     except Exception:
         return False
 
@@ -164,6 +167,9 @@ KO_BONUS = 50.0
 FAKE_OUT_BONUS = 1000.0          # Fake Out on a fresh mon stays dominant (v0 behaviour)
 ALLY_HIT_WEIGHT = 0.9            # allAdjacent moves: our partner's damage counts against the move
 SELF_KO_PENALTY = 150.0          # Explosion & co.
+# "pass" in a forced-switch slot scores below any switch-in: Showdown accepts it only when no switch-in is left for
+# that slot, so with both actives fainted and one Pokemon left "pass, pass" is rejected (platform 09-29, f525d6ac).
+FORCED_PASS = -1000.0
 HEURISTIC_TO_POINTS = 1 / 3.5    # move_value() (~400 for a STAB super-effective 120 BP hit) -> points, when one calc fails
 GENERIC_CARD = {"evs": {"hp": 4, "atk": 252, "spa": 252, "spe": 252}, "nature": "Hardy", "level": 50}
 FIRST_TURN_ONLY = {"fakeout", "firstimpression"}
@@ -656,7 +662,8 @@ class PokemonPolicy:
                     if opt.get("type") == "switch":
                         used.add(to_id(opt.get("species")))
                     break
-            return {"action": {"type": "doubles_turn", **pick}}
+            # a first-listed `pass` next to a free switch-in is rejected as a pair: take the switch-in instead
+            return {"action": repair_doubles({"type": "doubles_turn", **pick}, tmpl)[0]}
         if st.get("phase") == "team_preview":
             roster = [to_id(p.get("species", "")) for p in obs.get("your_roster", [])]
             return {"action": {"type": "select_lineup", "bring": roster[:4], "leads": roster[:2]}}
@@ -1399,8 +1406,15 @@ class PokemonPolicy:
             self.last_search = info
             self.search_trace.append({k: info.get(k) for k in TRACE_KEYS if k in info})
             del self.search_trace[:-400]
-            if not _template_ok(tmpl, action):
+            if not _template_ok(tmpl, action, joint=False):
                 self._search_reason("answer not in the template")
+                self.search_stats["fallback"] += 1
+                return None
+            bad = joint_problems(tmpl, action)
+            if bad:          # e.g. "pass, pass" when the rebuilt battle misses the one Pokemon left (f525d6ac)
+                log.warning("engine search answered an illegal pair (%s): %s; playing the classic pick",
+                            "; ".join(bad), info.get("choice"))
+                self._search_reason("answer jointly illegal")
                 self.search_stats["fallback"] += 1
                 return None
             out = {f"slot_{s['slot']}": action[f"slot_{s['slot']}"] for s in tmpl.get("slots", [])}
@@ -1520,7 +1534,8 @@ class PokemonPolicy:
                     cands.extend(self._move_choices(opt, i, me, actives, opps, turn, fresh, obs, table, danger,
                                                     terrain, sm))
                 else:
-                    cands.append({"cand": {"type": "pass"}, "base": -100.0, "foe": {}, "flinch": None})
+                    cands.append({"cand": {"type": "pass"}, "base": FORCED_PASS if _forced(obs, i) else -100.0,
+                                  "foe": {}, "flinch": None})
             if not cands:
                 cands.append({"cand": _concrete(slot["options"][0]) if slot.get("options") else {"type": "pass"},
                               "base": -100.0, "foe": {}, "flinch": None})
@@ -1727,7 +1742,7 @@ class PokemonPolicy:
                 elif opt.get("type") == "move":
                     cand, v = self._best_target(opt, my_sp, me, actives, opps, i, turn, fresh, obs)
                 else:
-                    cand, v = {"type": "pass"}, -100
+                    cand, v = {"type": "pass"}, FORCED_PASS if _forced(obs, i) else -100
                 if v > best_v:
                     best, best_v = cand, v
             if best is None:
@@ -1779,14 +1794,38 @@ class PokemonPolicy:
         return best, best_v
 
     def _switch_value(self, opt, opps) -> float:
-        sp = to_id(opt.get("species", ""))
-        mine = dex.types_of(sp)
-        v = 10.0
-        for o in opps:
-            if o and not o.get("fainted"):
-                for t in (o.get("types") or dex.types_of(o.get("species", ""))):
-                    v -= 3 * (effectiveness(t, mine) - 1)          # resist their STABs
-        return v + 10 * (opt.get("current_hp_fraction") or opt.get("hp_fraction") or 1.0)
+        return _switch_score(opt, opps)
+
+
+def _switch_score(opt: dict, opps) -> float:
+    """A switch-in's value without the calculator: resisting the foes' types, HP left."""
+    sp = to_id(opt.get("species", ""))
+    mine = dex.types_of(sp)
+    v = 10.0
+    for o in opps:
+        if o and not o.get("fainted"):
+            for t in (o.get("types") or dex.types_of(o.get("species", ""))):
+                v -= 3 * (effectiveness(t, mine) - 1)          # resist their STABs
+    return v + 10 * (opt.get("current_hp_fraction") or opt.get("hp_fraction") or 1.0)
+
+
+def switch_ranking(st: dict) -> list[str]:
+    """The switch-ins a doubles state offers, best first by the classic forced-switch score (`_switch_score`): which
+    Pokemon agent.py's last-line repair brings in when it must replace an illegal `pass`. Stateless (safe from the
+    watchdog's thread while an overrun policy call still runs); raises on a malformed state."""
+    obs = st.get("observation") or {}
+    tmpl = st["legal_actions"]["actions"][0]["input"]["action"]
+    opps = [o for o in (obs.get("opponent_active_pokemon") or []) if isinstance(o, dict)] \
+        if isinstance(obs.get("opponent_active_pokemon"), list) else []
+    seen, scored = set(), []
+    for slot in tmpl.get("slots") or []:
+        for opt in (slot or {}).get("options") or []:
+            if isinstance(opt, dict) and opt.get("type") == "switch" and opt.get("species") is not None:
+                sp = to_id(opt["species"])
+                if sp not in seen:
+                    seen.add(sp)
+                    scored.append((-_switch_score(opt, opps), len(scored), opt["species"]))
+    return [sp for _, _, sp in sorted(scored)]
 
 
 def _singles_switch_score(act: dict, obs: dict) -> float:

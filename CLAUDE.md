@@ -17,6 +17,7 @@ The owner is new to this domain: explain in plain Chinese, define terms.
 3. `python -m local.ladder --games 400 --seed 7`: promote only if the 95% CI lower bound > 50%. Re-check with another seed.
 4. `python -m local.benchmark --games 200`: no regression vs official baseline, random, or any `versions/*`.
 5. `./scripts/freeze_champion.sh`, archive under `versions/<name>` for real milestones, commit, update `docs/progress.md`.
+6. From v5 on, the full bar (external opponents, dev-proxy funnel, seed registry, live A/B, what was already tried) is `docs/v5_standard.md`. Fixes that do not aim at strength ship as v4.x.
 
 ## Facts that are easy to get wrong
 - Real payload shapes are in `docs/real_payloads.md` (authoritative over `docs/platform/`): foe HP is out of 100, foe item/ability/moves hidden in battle, the opponent's full sets are only visible during the draft (the policy caches them), doubles targets: slot 0 single-target moves `[-2, 1, 2]`, slot 1 `[-1, 1, 2]`, spread/self `[0]`.
