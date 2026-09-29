@@ -50,6 +50,12 @@
   - 按事先定的规则（留出更准 + 擂台不差 + 对非自己的对手更强）**不上位**，模型留作实验（`~/exp5/patches/drafter-refit-model-on-infra.patch`，套在本改动 `drafter-infra-final.patch` 之上）。在新卡多的卡池下，擂台种子 7 单独过了 CI 下限 > 50%，但换种子 11 复查没过（下限 47.6%），所以也不满足 CLAUDE.md 的晋级规则。对外来对手的提升若有也只有约 +0.5~1 个百分点，而且这是在训练见过的对手类型上估的；真正没见过（样本外）的只有面板里的 greedy、protect_spam、basic、smoke 和两个 llm 替身，要在它们身上用更多局数才能确认。
 - 目录里 5 张新卡暂由旧模型的「未见过的卡」先验打分（平台上本来就是这样）：`local/pool.py` 的 `NOT_IN_DRAFT_MODEL` 明确列出，测试要求「目录 − 模型 = 这个列表」，以后再采集到新卡不会悄悄漏掉；拟合脚本只写进有训练对局的卡（以前目录里没有对局的卡也会以 0 分 + 指纹写进模型，冒充「已拟合」），所以只有真正用含新卡的数据重拟合后，才能把卡从这个列表删掉。
 
+### 部署就绪（09-28，对局不变）
+- `scripts/run_agent.sh`（start / stop / restart / status / health / tmux / install-systemd；崩溃自动重启、日志轮转、机器级锁保证一个 agent 密钥只跑一个进程）、`deploy/arena-agent@.service`、`requirements.lock`、`scripts/bundle.sh`（打包时自带校验过的官方 Node v22.23.3）、`deploy/Dockerfile`、`scripts/selfcheck.py`。用法见 `docs/deploy.md`。
+- **没有计算器（Node）时宝可梦只剩 11–13% 胜率（对有计算器的自己）**，所以 selfcheck 和 run_agent.sh 默认在计算器跑不起来时拒绝启动（`ARENA_ALLOW_NO_CALC=1` 才放行）。
+- 演练（本地假平台 + 各种故障注入）：130 分钟 systemd、两次 12 分钟全故障演练，0 非法 / 0 超时 / 0 判负 / 停止后 0 残留进程；内存约 400–450 MB。
+- 检查：pytest 926 通过；1341 个真实决策重放 0 失败；擂台种子 7 = 191/400（与之前完全相同）。
+
 ### 真实大模型对手（09-28，Nebius，只用于本地评测）
 - `local/llm_client.py`（OpenAI 兼容，只从 `.env` / 环境变量读 `NEBIUS_*`；每次请求先按最坏情况记账，超过 `NEBIUS_BUDGET_USD`（默认 5 美元）就拒绝，调用方退回规则；账本在 `~/.cache/altruagent/llm_usage.jsonl`）和 `local/llm_seats.py`：宝可梦的 `llm_real` 对手（官方 `examples/llm_agent.py` 接 Nebius）、狼人杀的 `--llm-real N`（同一副牌同时跑替身作配对对照）。默认模型 Qwen/Qwen3-30B-A3B-Instruct-2507。
 - 宝可梦：当前冠军对 `llm_real` 20 局 19 胜（95%，CI 76–99%），对方 7% 的回答不合法、0 次超时。

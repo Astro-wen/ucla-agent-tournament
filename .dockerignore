@@ -1,0 +1,18 @@
+# deploy/Dockerfile copies only what the agent needs; this keeps keys and bulk out of the build context.
+.env
+.env.*
+!.env.example
+**/node_modules
+**/__pycache__
+**/*.pyc
+.venv
+.git
+.pytest_cache
+logs
+dist
+node
+local
+champion
+versions
+tests
+examples

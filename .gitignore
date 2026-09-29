@@ -41,6 +41,9 @@ logs/*
 # agent worktrees
 .claude/
 
+# a bundled Node build (scripts/bundle.sh puts one in bundles; never commit the binary)
+/node/
+
 # per-version calculator links (see docs/HANDOFF.md, scripts/setup_machine.sh)
 champion/agent/js/node_modules
 versions/*/agent/js/node_modules

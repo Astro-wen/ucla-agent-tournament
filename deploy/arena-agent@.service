@@ -1,0 +1,31 @@
+# systemd USER unit template: one instance per agent key. Install with `scripts/run_agent.sh install-systemd`
+# (fills in __ROOT__ = this checkout and __PATH__ = where node was found), then:
+#   systemctl --user enable --now arena-agent@main          # main -> .env, arena-agent@NAME -> .env.NAME
+#   sudo loginctl enable-linger $USER                       # run without a login session, start after a reboot
+# scripts/run_agent.sh does the restarts, logs (logs/agent-NAME.out) and health lines; systemd restarts the loop
+# itself if it ever dies. Stop = SIGTERM to the loop only (KillMode=mixed): it stops the agent tree cleanly and
+# systemd SIGKILLs whatever is left after TimeoutStopSec.
+[Unit]
+Description=AltruAgent tournament agent (%i)
+# (a user manager has no network-online.target; without network the agent just retries with backoff)
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=__ROOT__
+ExecStart=/bin/bash __ROOT__/scripts/run_agent.sh run --name %i
+Environment=PATH=__PATH__
+Environment=PYTHONUNBUFFERED=1
+Environment=HEALTH_EVERY=300
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=45
+Restart=always
+RestartSec=5
+# 3 = this key already runs here (another instance holds the lock): retrying cannot help.
+# 2 = the start refused (no key, or the damage calculator cannot run; see the ERROR banner in the journal and in
+# logs/agent-%i.out): retried every RestartSec, so it comes up by itself once node is fixed.
+RestartPreventExitStatus=3
+
+[Install]
+WantedBy=default.target
