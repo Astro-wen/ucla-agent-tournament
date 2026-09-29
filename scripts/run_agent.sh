@@ -20,12 +20,15 @@
 # one key on two machines.
 # The damage calculator is required: the start refuses (exit 2, loudly) when it cannot answer a real calc, unless
 # ARENA_ALLOW_NO_CALC=1 (emergency only: without it the agent wins ~12% against itself with the calculator).
+# So is the engine search's simulator while ARENA_BATTLE=search (the default battle policy): without it every battle
+# decision would quietly play the classic policy, so the start refuses (exit 2, loudly) unless ARENA_BATTLE=classic.
 #
 # Files under LOG_DIR (default logs/, ignored by git): agent-NAME.out (+ .1 ... .LOG_KEEP, rotated at LOG_MAX_MB),
 # agent-NAME.pid (the run loop), agent-NAME.state (the agent process and the loop's helpers), agent-NAME.lock.
 # Knobs (environment): PYTHON, LOG_DIR, LOG_MAX_MB=20, LOG_KEEP=10, HEALTH_EVERY=300, RESTART_DELAY=3,
 # RESTART_MAX_DELAY=60, STOP_TIMEOUT=20, ARENA_LOCK_DIR=/tmp, ARENA_ALLOW_NO_CALC, ARENA_DISCOVERY_S=10,
-# ARENA_WORKER_COOLDOWN_S=10 (agent/__main__.py), ARENA_NODE, ARENA_CALC (agent/pokemon/calc.py).
+# ARENA_WORKER_COOLDOWN_S=10 (agent/__main__.py), ARENA_NODE, ARENA_CALC (agent/pokemon/calc.py), ARENA_BATTLE,
+# ARENA_SHOWDOWN (agent/pokemon/policy.py, engine.py).
 # Needs bash >= 4.2 and ps; setsid and flock are used when present.
 set -uo pipefail
 
@@ -84,7 +87,7 @@ PIDFILE="$LOG_DIR/agent-$NAME.pid"
 STATE="$LOG_DIR/agent-$NAME.state"
 LOCK="$LOG_DIR/agent-$NAME.lock"
 RUN_ID="$NAME@$(cd "$LOG_DIR" && pwd)"              # ARENA_RUN_ID of the loop, its helpers and the agent
-CALC_KNOBS='^(ARENA_CALC|ARENA_NODE|ARENA_ALLOW_NO_CALC)$'
+START_KNOBS='^(ARENA_CALC|ARENA_NODE|ARENA_ALLOW_NO_CALC|ARENA_BATTLE|ARENA_SHOWDOWN)$'   # what the start checks read
 
 now() { printf '%(%s)T' -1; }
 say() { printf '[run_agent] %s\n' "$*"; }
@@ -109,10 +112,10 @@ load_env_file() {   # $1 file of KEY=VALUE lines (the dotenv subset .env.example
   done < "$f"
 }
 
-load_envs() {     # what the agent will see: the key file, then the calculator knobs of the checkout's .env, which the
-  [ -f "$ENV_FILE" ] && load_env_file "$ENV_FILE"   # SDK's load_dotenv() reads for every NAME (never overriding)
+load_envs() {     # what the agent will see: the key file, then the calculator / battle knobs of the checkout's .env,
+  [ -f "$ENV_FILE" ] && load_env_file "$ENV_FILE"   # which the SDK's load_dotenv() reads for every NAME (never overriding)
   if [ -f "$ROOT/.env" ] && [ "$(cd "$(dirname "$ENV_FILE")" 2>/dev/null && pwd)/$(basename "$ENV_FILE")" != "$ROOT/.env" ]; then
-    load_env_file "$ROOT/.env" "$CALC_KNOBS"
+    load_env_file "$ROOT/.env" "$START_KNOBS"
   fi
 }
 
@@ -132,6 +135,17 @@ node_status() {   # cheap mirror of agent/pokemon/calc.py _node_bin() for the he
   [ -n "$bin" ] || { echo "MISSING"; return; }
   [ -d "$ROOT/agent/js/node_modules/@smogon/calc" ] || { echo "NO-NODE_MODULES"; return; }
   echo "ok($("$bin" --version 2>/dev/null || echo '?'))"
+}
+
+battle_mode() {   # agent/pokemon/policy.py battle_mode(): the engine search unless ARENA_BATTLE names another policy
+  case "$(printf '%s' "${ARENA_BATTLE:-search}" | tr -d '[:space:]' | tr 'A-Z' 'a-z')" in search) echo search ;; *) echo classic ;; esac
+}
+
+engine_status() {  # cheap mirror of agent/pokemon/engine.py available() for the health line (the start loads it)
+  [ "$(battle_mode)" = search ] || { echo "classic(ARENA_BATTLE)"; return; }
+  [ -f "$ROOT/agent/js/search.js" ] || { echo "MISSING"; return; }
+  if [ -d "$ROOT/agent/js/node_modules/pokemon-showdown" ] || [ -d "$ROOT/local/js/node_modules/pokemon-showdown" ] \
+     || [ -n "${ARENA_SHOWDOWN:-}" ]; then echo ok; else echo "NO-SIMULATOR"; fi
 }
 
 cmdline_of() {    # $1 pid: its arguments, one per line ('' when gone)
@@ -209,9 +223,9 @@ health_line() {
   disk="$(df -Pk "$LOG_DIR" 2>/dev/null | awk 'NR==2 { printf "%.1fG", $4 / 1048576 }')"
   logs_mb="$(du -sk "$LOG_DIR" 2>/dev/null | awk '{ printf "%dM", $1 / 1024 }')"
   restarts="$(state_get restarts)"
-  printf '[health] name=%s agent=%s pid=%s run_up=%s agent_up=%s restarts=%s workers=%d node=%d calc_procs=%d rss=%dMB fds=%d last_output=%s records=%s last_record=%s disk_free=%s logs=%s calc=%s key=#%s\n' \
+  printf '[health] name=%s agent=%s pid=%s run_up=%s agent_up=%s restarts=%s workers=%d node=%d calc_procs=%d rss=%dMB fds=%d last_output=%s records=%s last_record=%s disk_free=%s logs=%s calc=%s search=%s key=#%s\n' \
     "$NAME" "$st" "${child:--}" "$up" "$aup" "${restarts:-0}" "$npy" "$nnode" "$ncalc" \
-    $((rss / 1024)) "$nfd" "$age" "$rec" "$last_rec" "${disk:-?}" "${logs_mb:-?}" "$(node_status)" "$(key_hash)"
+    $((rss / 1024)) "$nfd" "$age" "$rec" "$last_rec" "${disk:-?}" "${logs_mb:-?}" "$(node_status)" "$(engine_status)" "$(key_hash)"
 }
 
 log_writer() {    # stdin -> timestamped lines in $LOG, rotated at LOG_MAX_MB; echoed to fd 3 if a tty or LOG_ECHO=1
@@ -271,6 +285,28 @@ sys.exit(0 if good else 1)' 2>&1)"; rc=$?
   is_yes "${ARENA_ALLOW_NO_CALC:-}"
 }
 
+check_engine() {  # 0 = ARENA_BATTLE=classic, or the engine search's simulator loads (agent/pokemon/engine.py probe())
+  local out rc line
+  if [ "$(battle_mode)" != search ]; then say "battle policy: classic (ARENA_BATTLE=${ARENA_BATTLE:-}), no engine search"; return 0; fi
+  out="$("$PYTHON" -c 'import sys
+from agent.pokemon import engine
+good, why = engine.probe()
+print("ENGINE " + why)
+sys.exit(0 if good else 1)' 2>&1)"; rc=$?
+  while IFS= read -r line; do case "$line" in "ENGINE "*|"") ;; *) say "engine probe: $line" ;; esac; done <<< "$out"
+  line="$(printf '%s\n' "$out" | sed -n 's/^ENGINE //p' | tail -n 1)"
+  if [ "$rc" = 0 ]; then say "battle policy: engine search (ARENA_BATTLE=search), ${line:-ok}"; return 0; fi
+  [ -n "$line" ] || line="the probe failed (exit $rc)"
+  loud "******************************************************************************************"
+  loud "ERROR: ARENA_BATTLE=search BUT THE ENGINE SEARCH CANNOT RUN ($line): NOT STARTING."
+  loud "  Without its simulator every battle decision would quietly play the classic policy (champion v3.2)."
+  loud "  Fix: deploy a bundle (scripts/bundle.sh vendors the simulator into agent/js/node_modules) or, in a"
+  loud "  git checkout, run (cd local/js && npm ci). python scripts/selfcheck.py shows the details."
+  loud "  To run the classic policy on purpose: ARENA_BATTLE=classic."
+  loud "******************************************************************************************"
+  return 1
+}
+
 preflight() {     # 0 = go; everything it prints lands in the log
   local ok=0 perm free_k
   if [ -f "$ENV_FILE" ]; then
@@ -285,6 +321,8 @@ preflight() {     # 0 = go; everything it prints lands in the log
   if ! "$PYTHON" -c 'import agent.agent, altruagent' >/dev/null 2>&1; then
     loud "ERROR: $PYTHON cannot import agent.agent / altruagent (venv? pip install -r requirements.lock)"; ok=1
   elif ! check_calc; then
+    ok=1
+  elif ! check_engine; then
     ok=1
   fi
   free_k="$(df -Pk "$LOG_DIR" 2>/dev/null | awk 'NR==2 { print $4 }')"
@@ -478,7 +516,7 @@ case "$CMD" in
     tmux has-session -t "arena-$NAME" 2>/dev/null && { echo "tmux session arena-$NAME exists: tmux attach -t arena-$NAME"; exit 0; }
     envs=()                   # an already running tmux server would not see this shell's knobs: pass them on
     for v in PYTHON PYTHONPATH PATH LOG_DIR LOG_MAX_MB LOG_KEEP HEALTH_EVERY RESTART_DELAY RESTART_MAX_DELAY STOP_TIMEOUT \
-             ARENA_NODE ARENA_CALC ARENA_ALLOW_NO_CALC ARENA_LOCK_DIR ARENA_REASONING ARENA_RECORD ARENA_RECORD_DIR \
+             ARENA_NODE ARENA_CALC ARENA_ALLOW_NO_CALC ARENA_BATTLE ARENA_SHOWDOWN ARENA_LOCK_DIR ARENA_REASONING ARENA_RECORD ARENA_RECORD_DIR \
              ARENA_DISCOVERY_S ARENA_WORKER_COOLDOWN_S ARENA_DISCOVERY_MAX_FAILURES; do
       [ -n "${!v+x}" ] && envs+=(-e "$v=${!v}")
     done

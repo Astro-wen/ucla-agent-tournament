@@ -1,6 +1,7 @@
 """Deployment readiness: supervisor knobs and steady discovery (agent/__main__.py), the calculator's deployment
-knobs and probe (agent/pokemon/calc.py), scripts/selfcheck.py (refuses a machine whose calculator cannot run),
-scripts/run_agent.sh (restart, rotation, locks, clean stop, no orphans, calculator refusal, no key in logs),
+knobs and probe (agent/pokemon/calc.py), scripts/selfcheck.py (refuses a machine whose calculator, or with
+ARENA_BATTLE=search whose engine search, cannot run), scripts/run_agent.sh (restart, rotation, locks, clean stop, no
+orphans, calculator and engine search refusal, no key in logs),
 local/fake_platform.py against the real SDK client, scripts/bundle.sh (allowlist, pinned node, secret scan) and the
 packaging files (requirements.lock, deploy/Dockerfile, deploy/arena-agent@.service, .gitignore, docs)."""
 from __future__ import annotations
@@ -23,7 +24,7 @@ from altruagent.errors import AuthenticationError, PlatformError
 from altruagent.models import AgentSessions
 
 import agent.__main__ as agent_main
-from agent.pokemon import calc
+from agent.pokemon import calc, engine
 
 ROOT = Path(__file__).resolve().parents[1]
 RUN_AGENT = ROOT / "scripts" / "run_agent.sh"
@@ -209,15 +210,65 @@ def test_selfcheck_is_ready_when_the_calculator_answers():
     assert r.returncode == 0 and "OK    damage calculator answers: node v" in r.stdout, r.stdout
 
 
+# ---- the engine search's simulator is required while ARENA_BATTLE=search (the default battle policy) -----------------
+def _load_selfcheck(monkeypatch):
+    import importlib.util
+    monkeypatch.setenv("ARENA_RECORD", os.environ.get("ARENA_RECORD", "0"))    # (selfcheck sets it on import)
+    spec = importlib.util.spec_from_file_location("selfcheck_under_test", ROOT / "scripts" / "selfcheck.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_selfcheck_fails_when_the_engine_search_cannot_run(monkeypatch, capsys):
+    # without its simulator every battle decision would quietly play the classic policy (a git checkout set up with
+    # agent/js's npm ci only, a Docker build from the repository root): FAIL unless ARENA_BATTLE=classic
+    sc = _load_selfcheck(monkeypatch)
+    monkeypatch.setattr(engine, "probe", lambda timeout=60.0: (False, "pokemon-showdown missing (test)"))
+    monkeypatch.setenv("ARENA_BATTLE", "search")
+    sc.check_search()
+    assert len(sc.FAILS) == 1 and "engine search cannot run (pokemon-showdown missing (test))" in sc.FAILS[0]
+    assert "ARENA_BATTLE=classic" in sc.FAILS[0] and "cd local/js && npm ci" in sc.FAILS[0]
+    monkeypatch.delenv("ARENA_BATTLE")                                         # unset = the default = search
+    sc.check_search()
+    assert len(sc.FAILS) == 2
+    monkeypatch.setenv("ARENA_BATTLE", "classic")                              # the classic policy on purpose
+    capsys.readouterr()
+    sc.check_search()
+    assert len(sc.FAILS) == 2 and "OK    battle policy: classic" in capsys.readouterr().out
+    monkeypatch.setenv("ARENA_BATTLE", "search")
+    monkeypatch.setattr(engine, "probe", lambda timeout=60.0: (True, "simulator loads in 0.9s (test)"))
+    sc.check_search()
+    assert len(sc.FAILS) == 2 and "OK    battle policy: engine search" in capsys.readouterr().out
+
+
+def test_engine_probe_names_what_is_missing(monkeypatch):
+    monkeypatch.setattr(engine, "_paths", lambda: None)
+    monkeypatch.delenv("ARENA_SHOWDOWN", raising=False)
+    good, why = engine.probe(5)
+    assert not good and ("cd local/js && npm ci" in why or why == "no node"), why
+
+
+@pytest.mark.skipif(shutil.which("node") is None or engine._paths() is None or calc._js_dir() is None,
+                    reason="needs node, agent/js/node_modules and pokemon-showdown")
+def test_selfcheck_loads_the_engine_search_for_real():
+    r = _selfcheck({"ARENA_BATTLE": "search"})
+    assert r.returncode == 0 and "OK    battle policy: engine search" in r.stdout, r.stdout
+    assert "simulator loads in" in r.stdout
+
+
 # ---- scripts/run_agent.sh --------------------------------------------------------------------------------------------
 FAKE_PY = r"""#!/usr/bin/env bash
 # stands in for python in run_agent.sh tests: `-c ...` (preflight) succeeds, except the calculator probe when
-# $FAKE_CALC holds "broken"; `-u -m agent` behaves per $FAKE_MODE
+# $FAKE_CALC holds "broken" and the engine search probe when $FAKE_ENGINE does; `-u -m agent` behaves per $FAKE_MODE
 if [ "$1" = "-c" ]; then
   case "$2" in
     *calc.probe*)
       if [ "$(cat "$FAKE_CALC" 2>/dev/null)" = broken ]; then echo "PROBE no node found (fake)"; exit 1; fi
       echo "PROBE node v22.23.3 (fake), 0.01s incl. start-up" ;;
+    *engine.probe*)
+      if [ "$(cat "$FAKE_ENGINE" 2>/dev/null)" = broken ]; then echo "ENGINE pokemon-showdown missing (fake)"; exit 1; fi
+      echo "ENGINE simulator loads in 0.9s (fake)" ;;
   esac
   exit 0
 fi
@@ -297,14 +348,16 @@ def run_env(tmp_path):
     mode.write_text("run")
     calcf = tmp_path / "calc"
     calcf.write_text("ok")
+    enginef = tmp_path / "engine"
+    enginef.write_text("ok")
     (tmp_path / "locks").mkdir()
     env = dict(os.environ, PYTHON=str(fake), LOG_DIR=str(tmp_path / "logs"), HEALTH_EVERY="1", RESTART_DELAY="1",
-               STOP_TIMEOUT="3", FAKE_MODE=str(mode), FAKE_CALC=str(calcf), LOG_MAX_BYTES="4000", LOG_KEEP="2",
-               ARENA_LOCK_DIR=str(tmp_path / "locks"))
+               STOP_TIMEOUT="3", FAKE_MODE=str(mode), FAKE_CALC=str(calcf), FAKE_ENGINE=str(enginef),
+               LOG_MAX_BYTES="4000", LOG_KEEP="2", ARENA_LOCK_DIR=str(tmp_path / "locks"))
     for k in ("ALTRUAGENT_API_KEY", "ARENA_ALLOW_NO_CALC", "INVOCATION_ID", "ARENA_RUN_ID"):
         env.pop(k, None)
-    yield {"env": env, "envf": envf, "mode": mode, "calc": calcf, "logs": tmp_path / "logs", "key": key,
-           "tmp": tmp_path}
+    yield {"env": env, "envf": envf, "mode": mode, "calc": calcf, "engine": enginef, "logs": tmp_path / "logs",
+           "key": key, "tmp": tmp_path}
     subprocess.run(["bash", str(RUN_AGENT), "stop", "--env", str(envf)], env=env, capture_output=True, timeout=60)
     for pid in _procs_with_env(f"FAKE_MODE={mode}"):                       # never leave a test process behind
         os.kill(pid, signal.SIGKILL)
@@ -386,6 +439,49 @@ def test_run_agent_refuses_to_start_when_the_calculator_cannot_run(run_env):
     assert r.returncode == 0 and "agent=up" in r.stdout, r.stdout
     log = (run_env["logs"] / "agent-unit.out").read_text()
     assert "WARNING: THE DAMAGE CALCULATOR CANNOT RUN" in log and "Starting anyway because ARENA_ALLOW_NO_CALC=1" in log
+
+
+@needs_linux
+def test_run_agent_refuses_to_start_when_the_engine_search_cannot_run(run_env):
+    # ARENA_BATTLE=search (the default) without its simulator would quietly play the classic policy: refused, loudly
+    run_env["engine"].write_text("broken")
+    search = dict(run_env["env"], ARENA_BATTLE="search")
+    r = _ra(run_env, "start", env=search)
+    assert r.returncode == 1 and "did not come up" in r.stdout
+    log = (run_env["logs"] / "agent-unit.out").read_text()
+    assert "ARENA_BATTLE=search BUT THE ENGINE SEARCH CANNOT RUN (pokemon-showdown missing (fake)): NOT STARTING" in log
+    assert "preflight failed; exiting (code 2)" in log and "agent started" not in log
+    unset = dict(search)
+    unset.pop("ARENA_BATTLE")                                      # unset = the default = search: refused too
+    r = _ra(run_env, "run", env=unset)
+    assert r.returncode == 2 and "ENGINE SEARCH CANNOT RUN" in r.stdout
+    r = _ra(run_env, "start", env=dict(run_env["env"], ARENA_BATTLE="classic"))   # the classic policy on purpose
+    assert r.returncode == 0 and "agent=up" in r.stdout and "search=classic(ARENA_BATTLE)" in r.stdout, r.stdout
+    assert "battle policy: classic (ARENA_BATTLE=classic)" in "".join(
+        p.read_text() for p in sorted(run_env["logs"].glob("agent-unit.out*")))
+    assert _ra(run_env, "stop").returncode == 0
+    run_env["engine"].write_text("ok")                             # a simulator that loads: starts with the search
+    r = _ra(run_env, "start", env=search)
+    assert r.returncode == 0 and "agent=up" in r.stdout, r.stdout
+    every = "".join(p.read_text() for p in sorted(run_env["logs"].glob("agent-unit.out*")))   # (LOG_MAX_BYTES rotates)
+    assert "battle policy: engine search (ARENA_BATTLE=search), simulator loads in 0.9s (fake)" in every
+
+
+@needs_linux
+def test_run_agent_reads_arena_battle_from_the_checkouts_env_like_the_agent(tmp_path):
+    # the SDK's load_dotenv() gives the agent the checkout's .env too: ARENA_BATTLE there counts for the start check
+    root = tmp_path / "co"
+    (root / "scripts").mkdir(parents=True)
+    shutil.copy2(RUN_AGENT, root / "scripts" / "run_agent.sh")
+    (root / ".env").write_text("ARENA_BATTLE=classic\n")
+    envf = tmp_path / "other.env"
+    envf.write_text("ALTRUAGENT_API_KEY=test-key-root-env-1\n")
+    env = dict(os.environ, LOG_DIR=str(tmp_path / "logs"))
+    for k in ("ARENA_BATTLE", "ALTRUAGENT_API_KEY"):
+        env.pop(k, None)
+    r = subprocess.run(["bash", str(root / "scripts" / "run_agent.sh"), "health", "--env", str(envf)], env=env,
+                       capture_output=True, text=True, timeout=60)
+    assert "search=classic(ARENA_BATTLE)" in r.stdout, r.stdout + r.stderr
 
 
 @needs_linux
@@ -674,6 +770,15 @@ def test_dockerfile_unit_and_ignores_keep_keys_and_logs_out():
         assert needle in unit
     gitignore = (ROOT / ".gitignore").read_text().split()
     assert "logs/*" in gitignore and ".env" in gitignore and "dist/" in gitignore and "/node/" in gitignore
+
+
+def test_the_runbook_installs_the_engine_search_and_docker_builds_from_a_bundle():
+    doc = (ROOT / "docs" / "deploy.md").read_text()
+    assert "(cd local/js && npm ci)" in doc and "OK    battle policy: engine search" in doc
+    assert "ARENA_BATTLE=classic" in doc and "search=ok" in doc
+    docker = (ROOT / "deploy" / "Dockerfile").read_text()
+    assert "extracted bundle directory" in docker and "selfcheck.py --no-replay" in docker
+    assert "ARENA_BATTLE=search" in (ROOT / "scripts" / "run_agent.sh").read_text()
 
 
 def test_the_runbook_has_no_placeholders_and_requires_the_calculator():

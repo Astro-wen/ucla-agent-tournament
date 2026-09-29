@@ -108,7 +108,8 @@ FIELD_ALL = ("basic", "messaging", "smoke", "llm_fallback", "llm_timeout")     #
 PANEL = STRENGTH + FIELD_PANEL
 GROUPS = {"all": PANEL, "panel": PANEL, "": PANEL, "strength": STRENGTH, "field": FIELD_ALL}
 PACKAGES = {"v0": "versions.v0_heuristic", "v1": "versions.v1_exact_damage", "v2": "versions.v2_joint_lookahead",
-            "v3": "versions.v3_draft_preview", "cautious": "local.sparring.v2_cautious"}
+            "v3": "versions.v3_draft_preview", "cautious": "local.sparring.v2_cautious",
+            "champion": "champion"}            # by name only: the frozen champion (= local.ladder's seeds and seats)
 BOTS = ("greedy", "protect_spam")
 LIVE = ("llm_live", "llm_real")                                                  # = local.field_opps.LIVE
 EXT = ("simbot", "simbot_v1")                                                    # = local.ext_opp.NAMES (opt-in)
@@ -525,6 +526,35 @@ class Scoped:
             bind(match, seat)
 
 
+class OracleBind:
+    """Local ablation of the engine search (candidate --env ARENA_SEARCH_ORACLE=1): the candidate's search is handed
+    the simulator's TRUE battle (local/js/bridge.js `dump`) instead of the battle it rebuilds from platform-legal
+    information, everything else unchanged. Measures the information gap; never a candidate for the platform."""
+
+    def __init__(self, player):
+        self.player = player
+
+    def __getattr__(self, k):
+        return getattr(self.player, k)
+
+    def reset(self):
+        self.player.reset()
+
+    def choose(self, raw):
+        return self.player.choose(raw)
+
+    def bind(self, match, seat):
+        p = self.player
+        for _ in range(8):                           # Tap -> Scoped -> WallClockSeat -> ContestantPlayer
+            pk = getattr(getattr(p, "agent", None), "pk", None)
+            if pk is not None:
+                pk.oracle = lambda: match.sd.dump()
+                return
+            p = getattr(p, "player", None)
+            if p is None:
+                return
+
+
 class Tap:
     """Records a player's team-preview and battle answers of one game (--save-logs: `cand_trace` in the game file);
     everything else is passed through unchanged."""
@@ -833,6 +863,8 @@ def _play(task: tuple[str, int]) -> dict:
         before = {s: _lookahead_stats(p) for s, p in sides.items()}
         same, logs_dir = bool(cfg.get("same_team")), cfg.get("logs_dir")
         cand = Tap(_W["cand"]) if logs_dir else _W["cand"]      # --save-logs: keep the candidate's answers too
+        if (cfg.get("cand_env") or {}).get("ARENA_SEARCH_ORACLE") == "1":
+            cand = OracleBind(cand)                  # local ablation: the engine search reads the true battle
         players = [cand, Scoped(o, {}, "opp")]
         if seat == 1:
             players.reverse()
@@ -850,6 +882,16 @@ def _play(task: tuple[str, int]) -> dict:
         clock = _W["cand"].player.stats                 # WallClockSeat: the candidate's real decision times
         row.update(tmax_cand=round(clock["max_s"], 3), tdraft_cand=round(clock["draft_max_s"], 3),
                    bank_cand=clock["bank_left"])
+        pk = getattr(getattr(_W["cand"], "agent", None), "pk", None)
+        if getattr(pk, "battle_mode", None) == "search":     # the engine search's own counters (ARENA_BATTLE=search)
+            ss, ms = pk.search_stats, list(pk.search_ms)
+            row.update(srch_dec=ss["decisions"], srch_used=ss["used"], srch_same=ss["same_as_classic"],
+                       srch_fb=ss["fallback"], srch_skip=ss["skipped_time"],
+                       srch_ms_max=max(ms) if ms else 0, srch_ms_sum=round(sum(ms), 1), srch_n=len(ms))
+            if ss["reasons"]:
+                row["srch_reasons"] = dict(ss["reasons"])
+            if getattr(pk, "oracle", None) is not None:
+                row["srch_oracle"] = True                 # ARENA_SEARCH_ORACLE=1: searched the true battle
         if WARNS.warn["env"]:
             row["warn_env"] = WARNS.warn["env"]
         for side, text in WARNS.first.items():

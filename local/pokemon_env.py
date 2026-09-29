@@ -15,6 +15,9 @@ first two; a battle request: Showdown's own `default` choice), and altruagent.RE
 other seat wins at once. Both are counted in MatchResult (`timer_defaults`, `forfeit`), never as `invalid`; no
 other player ever returns them, so they change nothing for the ladder or the benchmark.
 
+ARENA_PLOG=1 (off by default): battle states also carry `protocol_log`, the seat's own view of the Showdown protocol
+as the platform sends it (the engine search reads volatile state and condition turns from it).
+
 Opt-in extras (all off by default, so every existing caller plays exactly the same games): play_match(same_team=True)
 replaces the snake draft by Match.draft_same (both seats get the same six cards; isolates battle skill from
 drafting), play_match(keep_log=True) returns the Showdown protocol log in MatchResult.log, and a player with a
@@ -195,6 +198,12 @@ class Match:
         self.same_team = False
         self.keep_log = keep_log
         self.log_lines: list[str] = []
+        # ARENA_PLOG=1: battle states carry `protocol_log`, each seat's own view of the Showdown protocol (exact HP on
+        # its side, x/100 on the other), as the platform sends it (docs/real_payloads.md). Off by default so every
+        # earlier result replays exactly; the engine search (ARENA_BATTLE=search) reads volatile state from it.
+        self.plog_on = os.environ.get("ARENA_PLOG", "0") == "1"
+        self.plog: dict[str, list[str]] = {"p1": [], "p2": []}
+        self._split: list | None = None
         for p in players:
             p.reset()
         # Players that search the engine themselves (local/ext_opp.py) get the match and their seat; nobody else
@@ -357,9 +366,28 @@ class Match:
 
     # ---- battle ----------------------------------------------------------
     def _take(self, snap: dict) -> dict:
-        """Every bridge snapshot passes here: its new protocol lines are kept when keep_log is on."""
+        """Every bridge snapshot passes here: its new protocol lines are kept when keep_log is on, and split into the
+        two players' views when ARENA_PLOG=1 (`|split|pN` + the exact line for pN + the public line for the other)."""
         if self.keep_log:
             self.log_lines.extend(snap.get("log") or [])
+        if self.plog_on:
+            for ln in snap.get("log") or []:
+                if not isinstance(ln, str):
+                    continue
+                if ln.startswith("|split|"):
+                    self._split = [ln.split("|")[2], None]
+                    continue
+                if self._split is not None:
+                    if self._split[1] is None:
+                        self._split[1] = ln
+                        continue
+                    owner, secret = self._split
+                    self._split = None
+                    for s in ("p1", "p2"):
+                        self.plog[s].append(secret if s == owner else ln)
+                    continue
+                for s in ("p1", "p2"):
+                    self.plog[s].append(ln)
         return snap
 
     def battle(self, orders: list[str]) -> MatchResult:
@@ -469,6 +497,8 @@ class Match:
                "force_switch": force if not req.get("active") else [False] * n_slots,
                "side_conditions": {c: 1 for c in me["side_conditions"]},
                "opponent_side_conditions": {c: 1 for c in opp["side_conditions"]}}
+        if self.plog_on:
+            obs["protocol_log"] = list(self.plog[sid])
         public_tmpl = {"type": "doubles_turn", "target_legend": tmpl["target_legend"],
                        "slots": [{"slot": s["slot"], "species": s["species"],
                                   "options": [{k: v for k, v in o.items() if not k.startswith("_")} for o in s["options"]]}

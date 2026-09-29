@@ -1,15 +1,20 @@
-# The agent as a container: Python 3.12 + Node.js 22.23.3 (the damage calculator; the same pinned version that
-# scripts/bundle.sh ships). Build from a bundle directory (scripts/bundle.sh) or from the repository root; the key
-# comes from the environment at run time, never the image.
+# The agent as a container: Python 3.12 + Node.js 22.23.3 (the damage calculator and the engine search; the same
+# pinned version that scripts/bundle.sh ships). Build from an extracted bundle directory (scripts/bundle.sh): the
+# bundle's agent/js/node_modules carries the engine search's simulator (a trimmed pokemon-showdown), which the
+# repository root does not (.dockerignore drops node_modules and local/), so a build from the repository root stops at
+# the selfcheck step (ARENA_BATTLE=search, the default battle policy, needs the simulator). The key comes from the
+# environment at run time, never the image.
 #
+#   bash scripts/bundle.sh && tar xzf dist/arena-agent-*.tar.gz -C /tmp && cd /tmp/arena-agent-*
 #   docker build -f deploy/Dockerfile -t arena-agent .
 #   docker run -d --name arena-main --restart unless-stopped \
 #       -e ALTRUAGENT_API_KEY=... -v arena-logs:/data arena-agent
 #   docker logs -f arena-main          # same lines as /data/logs/agent-main.out
 #   docker stop arena-main             # clean stop (SIGTERM -> scripts/run_agent.sh stops the agent tree)
 #
-# (No --init: the entrypoint already runs under tini.) The build fails when the calculator cannot answer a calc
-# (selfcheck), and the container refuses to start without it unless -e ARENA_ALLOW_NO_CALC=1 (emergency only).
+# (No --init: the entrypoint already runs under tini.) The build fails when the calculator cannot answer a calc or the
+# engine search cannot load its simulator (selfcheck), and the container refuses to start without them unless
+# -e ARENA_ALLOW_NO_CALC=1 (emergency only) / -e ARENA_BATTLE=classic (the classic policy on purpose).
 # Optional env: ALTRUAGENT_CONTROL_URL (default: the platform), ARENA_REASONING, HEALTH_EVERY, ARENA_RECORD=0.
 
 # Node.js (official build, pinned by version) + the calculator's node_modules, installed exactly from
@@ -36,6 +41,7 @@ COPY altruagent ./altruagent
 COPY agent ./agent
 COPY data ./data
 COPY scripts/run_agent.sh scripts/selfcheck.py scripts/check_connection.py ./scripts/
+# (merged over the bundle's agent/js/node_modules, which keeps its vendored pokemon-showdown for the engine search)
 COPY --from=calc /calc/node_modules ./agent/js/node_modules
 RUN python scripts/selfcheck.py --no-replay \
  && useradd --create-home --uid 10001 arena \

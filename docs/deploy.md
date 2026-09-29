@@ -15,9 +15,10 @@
 
 - Linux x86-64（推荐美西云主机，平台在 AWS us-west-2），Python ≥ 3.11（实测 3.12），bash ≥ 4.2
 - **计算器必须能跑**：Node ≥ 18 加 `agent/js/node_modules`。没有计算器时 agent 只能用启发式，对有计算器的自己只赢约 12%（见「没有 Node 会怎样」）。所以 `selfcheck.py` 会判失败，`run_agent.sh` 会**拒绝启动**（退出码 2，日志和终端 / journal 里都有醒目的 ERROR 横幅），除非显式设 `ARENA_ALLOW_NO_CALC=1`（仅限紧急情况：启发式总比 agent 不在线、被随机代打强）。
+- **引擎搜索的模拟器也必须能跑**（默认对战策略 `ARENA_BATTLE=search`，见 `docs/local_sim.md`「引擎搜索对战策略」）：它在 agent 自己的 Node 进程里跑 Showdown 引擎（`agent/js/search.js` + `pokemon-showdown`）。**`pokemon-showdown` 不在 `agent/js/package.json` 里**，`cd agent/js && npm ci` 不会装它：压缩包把裁剪过的一份（8 MB）放在 `agent/js/node_modules`；git checkout 要另外 `(cd local/js && npm ci)`（本地模拟器用的同一份）。缺了它 agent 不会出错，但**每一步都悄悄退回冠军 v3.2 的打法**，所以 `selfcheck.py` 判失败、`run_agent.sh` 拒绝启动（退出码 2，ERROR 横幅），除非显式设 `ARENA_BATTLE=classic`（有意用冠军打法）。
 - 压缩包自带固定版本的官方 Node（`node/bin/node`，v22.23.3），Docker 镜像里也是同一版本；自托管的 git checkout 用系统的 node（≥ 18）。
 - 稳定网络；不要用会睡眠 / 合盖的笔记本
-- 内存：每场并发对局约 150 MB（worker）+ 50 MB（计算器），主进程约 55 MB；2 场并发时整棵进程树峰值实测 418–447 MB（130 / 125 分钟演练），按 **500 MB** 预留
+- 内存：每场并发对局约 150 MB（worker）+ 50–120 MB（计算器）+ **230–320 MB（引擎搜索的 Node 进程，每场一个）**，主进程约 55 MB。冠军版 2 场并发时整棵进程树峰值实测 418–447 MB（130 / 125 分钟演练）；加上搜索进程（门槛对局中实测每个 232–320 MB），2 场并发约 **1.1 GB**，按 **1.2 GB** 预留（旧的 500 MB 只够冠军版）
 
 ## 一次性准备（A. 自托管）
 
@@ -26,12 +27,16 @@ git clone https://github.com/Astro-wen/ucla-agent-tournament.git && cd ucla-agen
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.lock      # 锁定版本的 29 个运行依赖；开发机再 pip install -e ".[dev]"
 (cd agent/js && npm ci --omit=dev)              # 计算器的 node_modules，按 package-lock.json 精确安装
+(cd local/js && npm ci)                         # 引擎搜索用的 pokemon-showdown（按 local/js/package-lock.json，约 200 MB）
 cp .env.example .env && chmod 600 .env          # 填 ALTRUAGENT_API_KEY（主 agent Yoriko_Red）
 .venv/bin/python scripts/selfcheck.py           # 必须以 "selfcheck: ready" 结尾，并有 "OK    damage calculator answers: node v…"
+                                                # 和 "OK    battle policy: engine search (…), simulator loads in …"
 .venv/bin/python scripts/check_connection.py    # 必须显示 status=claimed（这一步会连平台）
 ```
 
-`selfcheck.py` 不连平台、不需要密钥：检查 Python 和锁定的包版本、数据文件和选秀模型、计算器能否在一个新的 node 进程里真的算出一次伤害（**算不出来就 FAIL，退出码 1**；`--allow-no-calc` 或 `ARENA_ALLOW_NO_CALC=1` 才降为警告；旧参数 `--require-calc` 仍可用，现在就是默认行为），并用仓库里录下的真实对局状态分别以「有计算器 / 无计算器」跑决策，按官方 runner 的规则校验每个答案。
+（云主机上也可以不 clone，直接用 B 的压缩包自托管：它自带 node、计算器和裁剪过的模拟器，步骤见 B。）
+
+`selfcheck.py` 不连平台、不需要密钥：检查 Python 和锁定的包版本、数据文件和选秀模型、计算器能否在一个新的 node 进程里真的算出一次伤害（**算不出来就 FAIL，退出码 1**；`--allow-no-calc` 或 `ARENA_ALLOW_NO_CALC=1` 才降为警告；旧参数 `--require-calc` 仍可用，现在就是默认行为）、引擎搜索能否在一个新的 node 进程里加载模拟器（`ARENA_BATTLE=search` 时**加载不了就 FAIL**；`ARENA_BATTLE=classic` 时只提示），并用仓库里录下的真实对局状态分别以「有计算器 / 无计算器」跑决策，按官方 runner 的规则校验每个答案。
 
 ## 运行（A. 自托管）
 
@@ -60,6 +65,7 @@ bash scripts/run_agent.sh stop   # 停止
 
 ### 看门脚本做了什么
 
+- **引擎搜索的模拟器也是启动条件**（`ARENA_BATTLE=search`，默认）：计算器通过后，再用 `agent/pokemon/engine.py` 的 `probe()` 起一个新的搜索进程加载模拟器（约 1 秒）。加载不了就不启动（退出码 2，横幅 "ARENA_BATTLE=search BUT THE ENGINE SEARCH CANNOT RUN … NOT STARTING"，systemd 下每 5 s 重试）；设 `ARENA_BATTLE=classic` 才会以冠军打法启动。仓库根目录 `.env` 里的 `ARENA_BATTLE` 也算（agent 进程也会读到它）。运行中搜索进程坏了不会停 agent：那一步退回冠军的走法，每场最多重启搜索进程 6 次。
 - **计算器是启动条件**：启动前用 agent 自己的代码（`agent/pokemon/calc.py` 的 `probe()`）起一个新的 node 进程真算一次伤害。算不出来（没有 node、node 太旧或跑不起来、缺 node_modules、`ARENA_CALC=off`）就不启动：退出码 2，横幅写进日志，也写到终端 / journal；systemd 下每 5 s 重试一次，node 修好后自动起来。`ARENA_ALLOW_NO_CALC=1` 时照样启动，但每次启动都打 WARNING 横幅、健康行显示 `calc=MISSING` 之类。运行中 node 坏了不会停 agent（该局退回启发式，每场最多自动重启计算器 6 次），健康行会显示。
 - **崩溃重启**：`python -m agent` 退出就重启，间隔 3 s；1 分钟内连续退出则翻倍退避（3→6→12…最多 60 s），避免密钥错误时狂刷登录。重启前把上一轮残留的 worker 和 Node 进程整组杀掉，不会有两个进程抢同一个座位。退避期间的 sleep 不持有任何锁，退避中 `restart` 也能马上起来。
 - **单场恢复更快**：设置 `ARENA_DISCOVERY_S=10`、`ARENA_WORKER_COOLDOWN_S=10`。官方 SDK 默认 15 s 发现一次、某场 worker 崩溃后冷却 60 s，合计 60–75 s，会丢掉一个 55 s 的对战回合；现在约 20 s。
@@ -68,16 +74,16 @@ bash scripts/run_agent.sh stop   # 停止
 - **健康行**：每 5 分钟（`HEALTH_EVERY`）写一行 `[health]`，也可随时 `bash scripts/run_agent.sh health`：
 
   ```
-  [health] name=main agent=up pid=… run_up=2h05m agent_up=1h47m restarts=1 workers=2 node=2 calc_procs=2 rss=418MB fds=87
-           last_output=3s records=41 last_record=12s disk_free=38.2G logs=12M calc=ok(v18.19.1) key=#762c809cde
+  [health] name=main agent=up pid=… run_up=2h05m agent_up=1h47m restarts=1 workers=2 node=4 calc_procs=2 rss=1010MB fds=87
+           last_output=3s records=41 last_record=12s disk_free=38.2G logs=12M calc=ok(v18.19.1) search=ok key=#762c809cde
   ```
 
-  `workers` = 正在打的对局数；`calc_procs` 应 ≤ `workers`；`restarts` 比赛中应不变；`calc` 必须是 `ok(...)`，出现 `MISSING` / `NO-NODE_MODULES` / `OFF(ARENA_CALC)` 立刻处理；`key=#…` 是密钥哈希的前 10 位（不是密钥），用来核对两台机器没跑同一个密钥。
+  `workers` = 正在打的对局数；`calc_procs` 应 ≤ `workers`；`node` = 计算器 + 搜索进程（每场各一个）；`restarts` 比赛中应不变；`calc` 必须是 `ok(...)`，出现 `MISSING` / `NO-NODE_MODULES` / `OFF(ARENA_CALC)` 立刻处理；`search` 应是 `ok`（`NO-SIMULATOR` / `MISSING` = 模拟器不见了，每步都在用冠军打法；`classic(ARENA_BATTLE)` = 有意关掉了搜索）；`key=#…` 是密钥哈希的前 10 位（不是密钥），用来核对两台机器没跑同一个密钥。
 - **干净停止**：`stop`（或 systemd stop、tmux 里 Ctrl-C）向 agent 整个进程组发 SIGTERM，20 s 内不退就 SIGKILL；不认输、不再调用平台。实测 0.6 s 停完。看门脚本自己被 SIGKILL / OOM 杀掉时，它的健康循环 5 s 内自行退出，日志写入进程在最后一个写端关闭后退出，下一次 `start` / `stop` 会清理残留的 agent 和这两个辅助进程（测试覆盖：`kill -9` 看门脚本后 `stop`，本测试的进程一个不剩）。
 - **pid 文件不盲信**：`start` / `stop` 只认命令行是 `run_agent.sh run` 且环境里 `ARENA_RUN_ID=<NAME>@<LOG_DIR>` 对得上的进程；pid 文件过期、pid 被别的进程复用时，既不会误报「已在运行」，也不会去杀别人的进程。
 - 启动自检写进日志：密钥是否设置（不打印密钥）、`.env` 权限、计算器（真算一次）、磁盘空间。
 
-可调环境变量：`PYTHON`、`LOG_DIR`、`LOG_MAX_MB`、`LOG_KEEP`、`HEALTH_EVERY`、`RESTART_DELAY`、`RESTART_MAX_DELAY`、`STOP_TIMEOUT`、`ARENA_LOCK_DIR`（密钥锁目录，默认 `/tmp`）、`ARENA_DISCOVERY_S`、`ARENA_WORKER_COOLDOWN_S`、`ARENA_DISCOVERY_MAX_FAILURES`、`ARENA_NODE`（node 可执行文件路径，systemd / nvm 下 PATH 里没有 node 时用；路径失效时只记一条警告、改用包里的 `node/bin/node` 或 PATH 里的 node，不会因此关掉计算器）、`ARENA_CALC=off`（**只用于诊断**：强制关计算器，看门脚本和 selfcheck 会拒绝，除非同时设 `ARENA_ALLOW_NO_CALC=1`）、`ARENA_ALLOW_NO_CALC=1`（计算器跑不起来也照样启动；仅紧急情况，用完删掉）。
+可调环境变量：`PYTHON`、`LOG_DIR`、`LOG_MAX_MB`、`LOG_KEEP`、`HEALTH_EVERY`、`RESTART_DELAY`、`RESTART_MAX_DELAY`、`STOP_TIMEOUT`、`ARENA_LOCK_DIR`（密钥锁目录，默认 `/tmp`）、`ARENA_DISCOVERY_S`、`ARENA_WORKER_COOLDOWN_S`、`ARENA_DISCOVERY_MAX_FAILURES`、`ARENA_NODE`（node 可执行文件路径，systemd / nvm 下 PATH 里没有 node 时用；路径失效时只记一条警告、改用包里的 `node/bin/node` 或 PATH 里的 node，不会因此关掉计算器）、`ARENA_CALC=off`（**只用于诊断**：强制关计算器，看门脚本和 selfcheck 会拒绝，除非同时设 `ARENA_ALLOW_NO_CALC=1`）、`ARENA_ALLOW_NO_CALC=1`（计算器跑不起来也照样启动；仅紧急情况，用完删掉）、`ARENA_BATTLE`（对战策略：不设或 `search` = 引擎搜索，默认；`classic` = 冠军 v3.2 的打法，回退开关）。
 
 ## B. 交给主办方：压缩包 / Docker
 
@@ -85,7 +91,7 @@ bash scripts/run_agent.sh stop   # 停止
 bash scripts/bundle.sh     # -> dist/arena-agent-<版本>.tar.gz（44 MB，解开 127 MB，其中 node 119 MB）+ .sha256
 ```
 
-包里有：`agent/`（含选秀模型 `draft_model.json`）、`altruagent/`、`data/`、计算器的 `node_modules`（纯 JS，随包带上）、**官方 Node v22.23.3 Linux x64（`node/bin/node` + LICENSE + VERSION.txt）**、`requirements.lock`、`scripts/run_agent.sh`、`selfcheck.py`、`check_connection.py`、`replay_real.py`、`deploy/`（Dockerfile、systemd 单元）、本文件、一场真实对局录像（给 selfcheck 用）、`SHA256SUMS`、`BUNDLE_README.txt`。
+包里有：`agent/`（含选秀模型 `draft_model.json`）、`altruagent/`、`data/`、计算器的 `node_modules`（纯 JS，随包带上）、引擎搜索用的裁剪版 `pokemon-showdown`（MIT，8 MB，放在 `agent/js/node_modules`；出包前用包里的 node 真加载一次）、**官方 Node v22.23.3 Linux x64（`node/bin/node` + LICENSE + VERSION.txt）**、`requirements.lock`、`scripts/run_agent.sh`、`selfcheck.py`、`check_connection.py`、`replay_real.py`、`deploy/`（Dockerfile、systemd 单元）、本文件、一场真实对局录像（给 selfcheck 用）、`SHA256SUMS`、`BUNDLE_README.txt`。
 
 - Node 从 `https://nodejs.org/dist/v22.23.3/` 下载（缓存在 `~/.cache/arena-agent/`），SHA-256 必须等于 `bundle.sh` 里写死的值（取自该版本的 SHASUMS256.txt），不符就不出包；出包前还用包里的 node 和包里的 node_modules 真算一次伤害。对方机器上默认用包里的 node（`ARENA_NODE` 可指定别的）。
 - **没有任何密钥**：只按白名单拷文件，`.env*` 一律不进包，打包后再扫描一遍（`sk_agent_…`、`seatclaim_…`、`sk-…`、私钥、`ALTRUAGENT_API_KEY=` 后跟真实值），有就拒绝出包。
@@ -101,15 +107,17 @@ bash scripts/bundle.sh     # -> dist/arena-agent-<版本>.tar.gz（44 MB，解�
 tar xzf arena-agent-*.tar.gz && cd arena-agent-*
 python3 -m venv .venv && .venv/bin/pip install -r requirements.lock
 .venv/bin/python scripts/selfcheck.py           # 必须 "selfcheck: ready"，且有 "OK    damage calculator answers: node v22.23.3 (…/node/bin/node)"
+                                                # 和 "OK    battle policy: engine search (…), simulator loads in …"
 export ALTRUAGENT_API_KEY=...                   # 或写进 .env（chmod 600）
 bash scripts/run_agent.sh start
 ```
 
 一定要通过 `run_agent.sh`（或 Docker / systemd）启动：直接 `python -m agent` 不检查计算器。
 
-Docker（Python 3.12 + 官方 Node 22.23.3，与压缩包同一版本；密钥只从环境变量进，不进镜像；构建时跑 `selfcheck`，计算器不可用就构建失败；容器启动时 `run_agent.sh` 再检查一次）：
+Docker（Python 3.12 + 官方 Node 22.23.3，与压缩包同一版本；密钥只从环境变量进，不进镜像；构建时跑 `selfcheck`，计算器或引擎搜索的模拟器不可用就构建失败；容器启动时 `run_agent.sh` 再检查一次）。**要在解开的压缩包目录里构建**：模拟器在包的 `agent/js/node_modules` 里；仓库根目录的构建上下文没有它（`.dockerignore` 排除了 `node_modules` 和 `local/`），在根目录构建会停在 selfcheck 这一步（以前会悄悄构建出一个只会冠军打法的镜像）：
 
 ```bash
+bash scripts/bundle.sh && tar xzf dist/arena-agent-*.tar.gz -C /tmp && cd /tmp/arena-agent-*
 docker build -f deploy/Dockerfile -t arena-agent .
 docker run -d --name arena-main --restart unless-stopped -e ALTRUAGENT_API_KEY=... -v arena-logs:/data arena-agent
 docker logs -f arena-main            # 与 /data/logs/agent-main.out 内容相同
@@ -202,11 +210,11 @@ from altruagent import AltruAgentClient; c = AltruAgentClient(); print(c.join_to
 ## 上线前检查清单
 
 - [ ] `git pull` 到冻结的 tag；`python -m pytest -q` 全绿；`python scripts/replay_real.py` 和 `--no-calc` 0 失败
-- [ ] `.venv/bin/python scripts/selfcheck.py` → `selfcheck: ready`，且有 `OK    damage calculator answers`
+- [ ] `.venv/bin/python scripts/selfcheck.py` → `selfcheck: ready`，且有 `OK    damage calculator answers` 和 `OK    battle policy: engine search`
 - [ ] `python scripts/check_connection.py` → claimed；`.env` 权限 600；`.env` 里没有 `ARENA_CALC` / `ARENA_ALLOW_NO_CALC`
 - [ ] 本机只跑这一个密钥；其他机器（笔记本、旧云主机）上的同一密钥已停掉
-- [ ] systemd 已 `enable --now` 且 `enable-linger`（或 tmux 会话已开）；`bash scripts/run_agent.sh status` 显示 `agent=up`、`calc=ok(...)`、`restarts=0`
-- [ ] 磁盘剩余 > 1 GB；`logs/` 可写；内存至少 500 MB 空闲
+- [ ] systemd 已 `enable --now` 且 `enable-linger`（或 tmux 会话已开）；`bash scripts/run_agent.sh status` 显示 `agent=up`、`calc=ok(...)`、`search=ok`、`restarts=0`；`.env` 里没有 `ARENA_BATTLE=classic`（除非有意用冠军打法）
+- [ ] 磁盘剩余 > 1 GB；`logs/` 可写；内存至少 1.2 GB 空闲（2 场并发；搜索进程每场约 300 MB）
 - [ ] 提前至少 1 小时启动并看到健康行；比赛中每小时看一次 `status`（`restarts` 不涨、`calc` 仍是 ok、`workers` 与在打的对局数一致）
 - [ ] 主办方回复：需要自己 join 锦标赛吗？几点开始？交代码还是交运行中的 agent？
 - [ ] 交给主办方时：`bash scripts/bundle.sh` 出包（自带 node），在一台干净机器上按 `BUNDLE_README.txt` 走一遍 selfcheck，确认计算器用的是包里的 node
@@ -218,6 +226,7 @@ from altruagent import AltruAgentClient; c = AltruAgentClient(); print(c.join_to
 | `status` 显示 `agent=down` 且不恢复 | `tail -50 logs/agent-main.out` 看原因；密钥 / 未认领类错误修好后 `systemctl --user restart arena-agent@main` |
 | 日志有 "THE DAMAGE CALCULATOR CANNOT RUN … NOT STARTING" | 按横幅里的原因修（装 node / 设 `ARENA_NODE` / `cd agent/js && npm ci --omit=dev` / 删掉 `ARENA_CALC=off`），systemd 会自己重试；实在修不好又必须上场：临时设 `ARENA_ALLOW_NO_CALC=1`（启发式也比被随机代打强），修好后删掉并重启 |
 | 运行中 `calc=MISSING` / `NO-NODE_MODULES` | 同上修好后重启；在此之前 agent 仍在用启发式打 |
+| 日志有 "ARENA_BATTLE=search BUT THE ENGINE SEARCH CANNOT RUN … NOT STARTING"，或健康行 `search=NO-SIMULATOR` | 模拟器没装或坏了：git checkout 里 `(cd local/js && npm ci)`，或换成压缩包；systemd 会自己重试。实在修不好又必须上场：临时设 `ARENA_BATTLE=classic`（冠军 v3.2 的打法，照样能打），修好后删掉并重启 |
 | `restarts` 一直涨 | 看日志里 `exited with code` 前的报错；网络问题先 `curl -sI https://api.altruagent-game.com` |
 | 磁盘满 | 删旧的 `logs/agent-*.out.N` 和不需要的 `logs/rehearsal/` |
 | 日志报 "another instance on this machine already runs key" | 本机已有同密钥实例在跑（可能在另一个目录 / 另一个 LOG_DIR），先 `status` / `stop` 旧的；`ls /tmp/arena-agent-key-*.lock` 看锁文件，`fuser` 看谁持有 |

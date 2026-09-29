@@ -55,6 +55,11 @@ class Showdown:
         "showteam" (the Open Team Sheets lines)}. The live battle is not touched."""
         return self._rpc({"cmd": "preview_view", "side": side, "p1": p1, "p2": p2, "seed": seed})
 
+    def dump(self) -> str:
+        """The live battle serialized (Battle.toJSON text, logs emptied): the local oracle ablation of the agent's
+        engine search (ARENA_SEARCH_ORACLE=1, local.panel). Never used by an agent on the platform."""
+        return self._rpc({"cmd": "dump"})["battle"]
+
     def close(self):
         try:
             self._rpc({"cmd": "quit"})

@@ -15,6 +15,8 @@
 //       -> {"lines":[..],"request":..,"showteam":[..]}  (the same side view of a throwaway battle's team-preview
 //       phase, plus the Open Team Sheets lines a server shows once both players accept them; the live battle is
 //       not touched)
+//   {"cmd":"dump"}   -> {"battle": the live battle as Battle.toJSON() text}  (local ablation of the agent's engine
+//       search only: ARENA_SEARCH_ORACLE=1 in local.panel lets the candidate search the true state)
 // and gets back one JSON object per line: {"requests":{"p1":..,"p2":..},"state":{..},"ended":bool,"winner":..,"log":[..]}
 'use strict';
 const readline = require('readline');
@@ -126,6 +128,13 @@ rl.on('line', line => {
       const showteam = sideLines(b.log.slice(n), msg.side);
       b.destroy();
       return out({lines, request, showteam});
+    }
+    if (msg.cmd === 'dump') {        // the live battle serialized (local ablation of the agent's engine search only)
+      if (!battle) return out({error: 'no_battle'});
+      const st = battle.toJSON();
+      st.log = [];
+      st.inputLog = [];
+      return out({battle: JSON.stringify(st)});
     }
     if (msg.cmd === 'quit') process.exit(0);
     out({error: 'unknown cmd'});

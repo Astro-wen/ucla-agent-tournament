@@ -13,7 +13,15 @@
 #   bash scripts/bundle.sh --node-dist DIR      # another extracted official Node >= 18 build (DIR/bin/node)
 #   bash scripts/bundle.sh --no-node            # no node binary (the target must provide Node >= 18)
 #   bash scripts/bundle.sh --no-node-modules    # leave agent/js/node_modules out (then: cd agent/js && npm ci)
+#   bash scripts/bundle.sh --no-showdown        # leave the engine search's simulator out (then the bundle runs only
+#                                               # with ARENA_BATTLE=classic: selfcheck fails, run_agent.sh refuses)
 #   bash scripts/bundle.sh --no-sample-logs     # leave the recorded match out (selfcheck then skips its replay)
+#
+# The engine-search battle policy (ARENA_BATTLE=search, agent/js/search.js) runs the Pokemon Showdown simulator: a
+# trimmed copy of the pokemon-showdown package the local simulator already pins (local/js/package-lock.json, MIT
+# license, shipped with it) goes to agent/js/node_modules/pokemon-showdown: dist/sim, dist/lib, dist/config, the
+# top-level dist/data files (no mods' data, no random-battle sets: empty mod directories only, formats.js names
+# them) and its two runtime dependencies (ts-chacha20, sql-template-strings), about 8 MB instead of 145 MB.
 #
 # The Node tarball comes from https://nodejs.org/dist/ (cached in ~/.cache/arena-agent) and must match the SHA-256
 # pinned below (from the release's SHASUMS256.txt); anything else aborts the build. On the target, the agent uses
@@ -29,7 +37,7 @@ NODE_SHA256_XZ=df450af89261115ef9f9e3830c3eeb2cc9213b63c720b1af623cb5dcbe2e02de 
 NODE_SHA256_GZ=1084aa36196bba4c3a5e69a1ee388a6e4ff729dad09445fbcd434b28fe3c24af   # node-v22.23.3-linux-x64.tar.gz
 NODE_CACHE="${ARENA_NODE_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/arena-agent}"
 
-OUT="$ROOT/dist"; NODE_MODULES=1; SAMPLE_LOGS=1; NODE_MODE=pinned; NODE_SRC=""
+OUT="$ROOT/dist"; NODE_MODULES=1; SAMPLE_LOGS=1; NODE_MODE=pinned; NODE_SRC=""; SHOWDOWN=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT="$2"; shift 2 ;;
@@ -37,6 +45,7 @@ while [ $# -gt 0 ]; do
     --node-tarball) NODE_MODE=tarball; NODE_SRC="$2"; shift 2 ;;
     --no-node) NODE_MODE=none; shift ;;
     --no-node-modules) NODE_MODULES=0; shift ;;
+    --no-showdown) SHOWDOWN=0; shift ;;
     --no-sample-logs) SAMPLE_LOGS=0; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -100,6 +109,30 @@ rm -rf "$DEST/agent/js/node_modules"
 if [ "$NODE_MODULES" = 1 ]; then
   [ -d agent/js/node_modules/@smogon/calc ] || { echo "agent/js/node_modules missing: run (cd agent/js && npm ci) first" >&2; exit 1; }
   cp -RL agent/js/node_modules "$DEST/agent/js/node_modules"
+  rm -rf "$DEST/agent/js/node_modules/pokemon-showdown"          # (re)vendored trimmed below
+fi
+# the engine search's simulator: a trimmed pokemon-showdown (see the header) next to the calculator
+SHOWDOWN_NOTE="NOT included (built with --no-showdown or --no-node-modules): selfcheck fails and run_agent.sh refuses to start unless ARENA_BATTLE=classic"
+if [ "$NODE_MODULES" = 1 ] && [ "$SHOWDOWN" = 1 ]; then
+  PS_SRC=""
+  for d in agent/js/node_modules/pokemon-showdown local/js/node_modules/pokemon-showdown; do
+    [ -f "$d/package.json" ] && [ -d "$d/dist/sim" ] && { PS_SRC="$d"; break; }
+  done
+  [ -n "$PS_SRC" ] || { echo "pokemon-showdown missing: run (cd local/js && npm ci) first, or pass --no-showdown" >&2; exit 1; }
+  PSD="$DEST/agent/js/node_modules/pokemon-showdown"
+  mkdir -p "$PSD/dist/data/mods"
+  cp -L "$PS_SRC/package.json" "$PS_SRC/LICENSE" "$PSD/"
+  cp -RL "$PS_SRC/dist/sim" "$PS_SRC/dist/lib" "$PS_SRC/dist/config" "$PSD/dist/"
+  cp -RL "$PS_SRC/dist/data/text" "$PSD/dist/data/"
+  cp -L "$PS_SRC"/dist/data/*.js "$PSD/dist/data/"
+  for m in "$PS_SRC"/dist/data/mods/*/; do mkdir -p "$PSD/dist/data/mods/$(basename "$m")"; done
+  find "$PSD" \( -name '*.map' -o -name '*.d.ts' \) -delete
+  for dep in ts-chacha20 sql-template-strings; do
+    [ -d "$(dirname "$PS_SRC")/$dep" ] || { echo "pokemon-showdown dependency $dep missing next to $PS_SRC" >&2; exit 1; }
+    rm -rf "$DEST/agent/js/node_modules/$dep"
+    cp -RL "$(dirname "$PS_SRC")/$dep" "$DEST/agent/js/node_modules/$dep"
+  done
+  SHOWDOWN_NOTE="included (pokemon-showdown $(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$PSD/package.json" | head -1), MIT, trimmed)"
 fi
 NODE_NOTE=""
 case "$NODE_MODE" in
@@ -144,6 +177,13 @@ if [ -f "$DEST/node/bin/node" ] && [ "$NODE_MODULES" = 1 ] && [ "$(uname -sm)" =
     '{"id":1,"results":[{"min":'*) echo "bundled node $("$DEST/node/bin/node" --version) answers a calc with the bundled node_modules" ;;
     *) echo "the bundled node did not answer a calc: ${ans:0:200}" >&2; echo "bundle NOT written" >&2; exit 1 ;;
   esac
+  if [ "$SHOWDOWN" = 1 ]; then           # the engine search loads the vendored simulator (and nothing outside the bundle)
+    ans="$(printf '%s\n' '{"id":1,"cmd":"warm"}' | (cd "$DEST/agent/js" && env -u ARENA_SHOWDOWN NODE_PATH="$DEST/agent/js/node_modules" timeout 120 "$DEST/node/bin/node" search.js) 2>&1 | head -n 1 || true)"
+    case "$ans" in
+      '{"id":1,"ok":true'*) echo "bundled node runs the engine search with the vendored pokemon-showdown" ;;
+      *) echo "the bundled node did not start the engine search: ${ans:0:200}" >&2; echo "bundle NOT written" >&2; exit 1 ;;
+    esac
+  fi
 fi
 
 cat > "$DEST/BUNDLE_README.txt" <<EOF
@@ -153,13 +193,15 @@ Contains no API key. Runbook: docs/deploy.md.
 Needs: Linux x86-64, Python 3.11+ (tested 3.12). The damage calculator needs Node.js >= 18:
 $NODE_NOTE
 agent/js/node_modules is $([ "$NODE_MODULES" = 1 ] && echo "included" || echo "NOT included: run (cd agent/js && npm ci --omit=dev)").
+The engine search's simulator (the default battle policy, ARENA_BATTLE=search; ARENA_BATTLE=classic = the rollback): $SHOWDOWN_NOTE.
 WITHOUT THE CALCULATOR THE AGENT WINS ONLY ~12% AGAINST ITSELF WITH IT: selfcheck fails and run_agent.sh
 refuses to start when it cannot run (ARENA_ALLOW_NO_CALC=1 overrides; emergency only).
 
 Install and check (no network access to the platform needed):
   python3 -m venv .venv && .venv/bin/pip install -r requirements.lock
   .venv/bin/python scripts/selfcheck.py            # must end with "selfcheck: ready" and show
-                                                   # "OK    damage calculator answers: node ..."
+                                                   # "OK    damage calculator answers: node ..." and
+                                                   # "OK    battle policy: engine search ..."
 
 Run one agent key (restarts, logs/agent-main.out, a health line every 5 minutes; it must show calc=ok(...)):
   export ALTRUAGENT_API_KEY=...   (or put it in .env, mode 600; see .env.example)

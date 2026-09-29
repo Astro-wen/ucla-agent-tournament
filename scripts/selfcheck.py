@@ -8,6 +8,9 @@ Checks: Python >= 3.11 and the pinned packages import; the agent's data files (d
 the damage calculator (node + agent/js/node_modules) answers a real calc in a fresh node process: when it cannot,
 selfcheck FAILS (exit 1) unless --allow-no-calc or ARENA_ALLOW_NO_CALC=1 (without it the agent wins only ~12%
 against itself with the calculator; --require-calc is the default and still accepted);
+with ARENA_BATTLE=search (the default battle policy) the engine search's simulator loads in a fresh node process:
+when it cannot, selfcheck FAILS (every battle decision would quietly play the classic policy; ARENA_BATTLE=classic
+runs that policy on purpose);
 recorded real platform states (logs/*/*.jsonl) replay through the agent with and without the calculator,
 every answer passing the official runner's own validation; the agent key is configured (only its presence and a
 short hash are printed, never the key).
@@ -199,6 +202,29 @@ def check_key() -> None:
         ok(f"agent key configured (#{hashlib.sha256(key.encode()).hexdigest()[:10]}), control plane {url}")
 
 
+def check_search() -> None:
+    """ARENA_BATTLE=search (the default): the engine search's node process must start and load the simulator
+    (agent/pokemon/engine.py probe()). When it cannot, every battle decision would quietly play the classic policy, so
+    this FAILS, like run_agent.sh's refusal to start. Classic (the rollback, ARENA_BATTLE=classic): info only."""
+    try:
+        from agent.pokemon import engine
+        from agent.pokemon.policy import battle_mode, search_params
+        if battle_mode() != "search":
+            good, why = engine.available()
+            ok(f"battle policy: classic (ARENA_BATTLE); engine search {'available' if good else 'unavailable'}: {why}")
+            return
+        good, why = engine.probe(60)
+        params = search_params()
+    except Exception as ex:  # noqa: BLE001 - diagnostics only
+        good, why, params = False, f"check raised {ex!r}", {}
+    if good:
+        ok(f"battle policy: engine search (ARENA_BATTLE=search, {params}), {why}")
+    else:
+        fail(f"ARENA_BATTLE=search but the engine search cannot run ({why}): every battle decision would play the "
+             "classic policy. Fix: deploy a bundle (scripts/bundle.sh vendors the simulator) or, in a git checkout, "
+             "run (cd local/js && npm ci); ARENA_BATTLE=classic runs the classic policy on purpose")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--require-calc", action="store_true",
@@ -213,6 +239,7 @@ def main(argv=None) -> int:
     if not FAILS:
         check_data()
         calc_ok = check_calc(a.allow_no_calc or no_calc_allowed())
+        check_search()
         if not a.no_replay:
             replay(a.replay_limit, with_calc=calc_ok)
             if calc_ok:
