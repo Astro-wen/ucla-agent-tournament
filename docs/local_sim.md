@@ -301,6 +301,62 @@ python scripts/extopp_analyze.py logs/panel/runs/v32-vs-simbot-s71.jsonl --speci
 
 对照：冠军对面板里其他所有对手都在 88% 以上（v3 镜像除外）。simbot 是目前唯一能和冠军打平的非自家对手。它一换成 v1 的选秀和首发，冠军就赢 84%，所以冠军的领先主要来自选秀和首发，对战本身并不比这个一回合搜索强。输局分析在 `~/exp8/extopp/NOTES.md`。主要问题：从不主动换人（simbot 每局约 2 次，靠抗性换入吃伤害、反复威吓）；被更快的对手在出手前击倒（输局里最亏的那一回合 44–60% 是这种情况）；几张卡的招式估值有错（Ting-Lu 的 Ruination 被计算器算成 0 伤害，改去连用撒菱）；控速（冰冻之风）和击掌奇袭用得少；另外还有群攻和集火造成的击倒。
 
+## 开源学习型对手 VGC-Bench（09-28，`local/vgcbench_opp.py` + `local/vgcbench_worker.py`）
+
+为什么：simbot 是我们自己写的搜索。VGC-Bench（Angliss 等，AAMAS，MIT 许可）是公开的**学习型** VGC 双打 bot：用 Showdown 天梯的公开队伍表（OTS）对局记录做行为克隆（BC，模仿人类），再用自我对弈（self-play）微调。别的参赛者最可能直接下载它来用，所以拿它当对手最接近"外面的人会带什么来"。
+
+- **两个对手**：`vgcbench_bc`（只做行为克隆，`saves_bc/seed1/100.zip`）和 `vgcbench_sp`（行为克隆 + 自我对弈，`saves_bc_sp/reg_all/seed1/98304000.zip`）。
+- **怎么接的**：他们的代码跑在他们自己的虚拟环境里（torch、poke-env），由 `local/vgcbench_worker.py` 这个子进程负责，每个面板 worker 进程一个，模型只加载一次，局与局之间复用。我们这边（`local/vgcbench_opp.py`）只做翻译：
+  - **选秀**：用冠军的代码（和 simbot 一样），所以正常选秀下比的是首发和对战。
+  - **首发（team preview）**：用他们的策略网络。我们的环境在真正的 Showdown 对局开始之前就要首发，所以 bridge 用同样的两队和同一个随机种子临时建一个对局，只取这一方在首发阶段能看到的消息、请求（request）和公开队伍表（OTS），喂给 poke-env；它答的 `/team 3142` 换成平台的 `select_lineup`。
+  - **对战**：每一步把真实对局里**这一方能看到的**协议消息（bridge 的 `sideview` 命令，用 Showdown 自己的 `extractChannelMessages` 拆分，看不到对方的精确 HP、看不到对方的 request）和这一方的 request 发给 worker；worker 走 poke-env 自己的消息处理和 VGC-Bench 的 `PolicyPlayer`（embed_battle + 动作掩码 + 策略网络 + action_to_order），返回 Showdown 指令串（如 `/choose move closecombat 1, switch Incineroar`），我们再换成平台的 `doubles_turn`（招式 id、目标编号本来就一样、换人名字换成 species），用 `template_ok` 检查。
+  - **出错时**：worker 启动失败或崩溃先重启一次，再不行就随机出一个合法动作；答案不在模板里也随机出。**全部计数**（面板里 `vgcbench:` 那一栏：fallbacks、worker errors、restarts）。VGC-Bench 词表里没有的招式 / 道具 / 特性映射到它的 null（编号 0）并计数（`unknown-vocab`）；Showdown 本来就会自动改的目标（打向已倒下的对手位置 → 打剩下那只；锁招不看目标）照样改掉并计数（`retargeted`）。
+  - **随机性**：策略按概率抽样（和他们的 `play.py` 一样；`VGCBENCH_DETERMINISTIC=1` 改成取最大概率），每步用由本局种子导出的种子，所以同种子重跑结果相同。
+- **可选安装**：没有安装时面板拒绝这两个名字并说明原因，pytest 跳过需要它的那一个测试（Mac / CI 上照常全绿）。默认不在任何组里，已有面板逐局不变（同种子 A/B 相同）。
+- **忠实度检查**：`scripts/vgcbench_check.py` 边打边核对：worker 看到的 request 与环境完全一致；它的 DoubleBattle（回合、自己每只的 HP/状态/道具/特性/招式/能力变化、双方场上、对方 HP（百分比 ±1）/状态/能力变化/道具/特性、天气/场地/双方场地状态）与引擎真值一致；动作掩码与平台模板允许的动作一致；动作 → 指令串 → 平台字典 → 环境的 Showdown 指令与直接解读指令串一致。
+
+```bash
+python -m local.panel --opps vgcbench_sp --games 200 --seed 71 --jobs 3 --name champ-vs-vgcb-sp --save-logs
+python -m local.panel --opps vgcbench_bc --games 200 --seed 71 --jobs 3 --name champ-vs-vgcb-bc --save-logs
+python -m local.panel --opps vgcbench_sp --games 100 --seed 71 --jobs 3 --name champ-vs-vgcb-sp-same --same-team --save-logs
+python scripts/vgcbench_check.py --opp random --games 30           # 忠实度检查 + 对随机（也可 --opp v0 / simbot）
+python scripts/extopp_analyze.py logs/panel/runs/champ-vs-vgcb-sp-s71.jsonl
+```
+
+- 速度：每个面板 worker 第一次用时启动 VGC-Bench worker 约 1–1.5 分钟（从 D: 冷读 torch），之后每步约 0.06 s（p95 约 0.1 s）。
+- 环境变量：`VGCBENCH_HOME`（默认 `/mnt/d/altruagent`，下面有 `vgc-bench-sv/`、`venv/`、`models-sv/`），或分别设 `VGCBENCH_CODE` / `VGCBENCH_PYTHON` / `VGCBENCH_MODELS`；`VGCBENCH_THREADS`（每个 worker 的 torch 线程数，默认 1）；`VGCBENCH_DEBUG=1`（trace 里带上 worker 的完整视图）；`VGCBENCH_WORKER_STDERR=<文件>`（worker 的 stderr，默认丢弃）。这些会写进 meta 文件。
+
+**安装方法**（全部放 D:，不占 C:；只需要一次）：
+
+```bash
+D=/mnt/d/altruagent; mkdir -p $D/{pip-cache,tmp,hf-home}
+export PIP_CACHE_DIR=$D/pip-cache TMPDIR=$D/tmp HF_HOME=$D/hf-home
+git clone https://github.com/cameronangliss/vgc-bench $D/vgc-bench-sv
+git -C $D/vgc-bench-sv checkout Scarlet/Violet          # = 72057ce，朱紫时代的版本，对应我们的 gen9 Reg I
+python3.12 -m venv $D/venv
+$D/venv/bin/pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cpu      # 只要 CPU 版
+$D/venv/bin/pip install "poke-env @ git+https://github.com/cameronangliss/poke-env.git@sv" stable_baselines3==2.8.0 huggingface_hub==0.36.2
+$D/venv/bin/pip install --no-deps -e $D/vgc-bench-sv    # 不装 open-spiel（只有他们的 eval 模块要用）
+$D/venv/bin/python -c "from huggingface_hub import hf_hub_download as d
+for f in ('results/saves_bc/seed1/100.zip', 'results/saves_bc_sp/reg_all/seed1/98304000.zip'):
+    print(d('cameronangliss/vgc-bench-models', f, revision='c15e5bc', local_dir='$D/models-sv'))"
+```
+
+本机实际装的是 poke-env sv 分支的 379a046、torch 2.12.0+cpu、stable_baselines3 2.8.0、numpy 2.5.3，Python 3.12.3。不要用 VGC-Bench 的 main 分支（现在只支持 Pokémon Champions）。
+
+**忠实度**（`scripts/vgcbench_check.py`，对 random / v0 / simbot 共 160 局、1527 个对战决策）：request 0 处不一致；6108 次己方宝可梦核对、2728 次对方在场宝可梦核对、1527 次天气/场地/场地状态核对全部一致；动作掩码和模板只有一种差别：poke-env 允许打向**已经倒下的对方位置**（Showdown 会自动改打剩下那只，适配层照此换算并计入 `retargeted`），其他 0 处；解码往返 1527/1527 一致。对随机 30/30、20/20（SP / BC），对 v0 29/30、15/20；SP 对 simbot（双方都用冠军的选秀）34/60 = 56.7% [44.1, 68.4]。
+
+**冠军（main 的 agent/）对 VGC-Bench**（冠军用真实 VGC 计时，双方都 0 非法动作、0 回退、0 次 worker 出错；每步平均 45–64 ms，p95 ≤ 108 ms）：
+
+| 条件 | 冠军胜率 | 95% CI | 平均回合 |
+|---|---|---|---|
+| vgcbench_sp，正常选秀，种子 71 + 72 | 216/400 = 54.0% | [49.1, 58.8] | 8.4 |
+| vgcbench_sp，同队，种子 71 + 72 | 98/200 = 49.0% | [42.2, 55.9] | 10.5 |
+| vgcbench_bc，正常选秀，种子 71 | 155/200 = 77.5% | [71.2, 82.7] | 8.8 |
+| vgcbench_sp 取最大概率（`VGCBENCH_DETERMINISTIC=1`），种子 71 前 100 局 | 48/100 = 48.0% | [38.5, 57.7] | 8.9 |
+
+VGC-Bench 的自我对弈版和 simbot 一样，是能在对战上和冠军打平的外部对手。输局里和 simbot 研究相同的问题全部重现（不主动换人、在更快对手的击杀线上被先手击倒、Ruination 估值错误、被群攻 / 集火击倒），另外它还靠长局消耗（寄生种子、吸取拳、祈愿、再来一次）和 Parting Shot / 威吓循环赢冠军。明细在 `~/exp11/NOTES.md`。
+
 ## 已知缺口（下一步）
 
 1. 预言家夜里查验时会查"最可疑"= 平票取最小座位 = 明天就要被投出去的人，查验浪费。应排除最可能被处决的席位。

@@ -29,6 +29,11 @@ Panel (--opps, default all 13; groups: all, strength, field; or a comma list):
             each battle turn a joint-action matrix game played out on clones of the real Showdown battle; drafts and
             previews with the champion's code (`simbot_v1`: v1's card_score draft + preview). ~1 s per decision, so
             about 15 s per game; knobs SIMBOT_* from the shell (recorded in the meta file).
+  vgcbench_bc / vgcbench_sp   opt-in only, by name, and only where the VGC-Bench install exists (docs/local_sim.md;
+            VGCBENCH_HOME, default /mnt/d/altruagent): the open-source learned VGC bots (behaviour cloning on ladder
+            logs / + self-play), run in their own venv by local/vgcbench_worker.py (local/vgcbench_opp.py); draft
+            with the champion's code, team preview and battle by the policy. ~0.1 s per decision after a ~1 min
+            worker start per panel worker; knobs VGCBENCH_* from the shell (recorded in the meta file).
 Any versions/<dir> name, or a dotted package that holds agent/agent.py, works as an extra opponent. Every opponent
 package must run its own calc.js (versions/*/agent/js/node_modules and local/sparring/*/agent/js/node_modules linked
 to agent/js/node_modules, see scripts/setup_machine.sh); the panel checks that before the first game.
@@ -107,7 +112,11 @@ PACKAGES = {"v0": "versions.v0_heuristic", "v1": "versions.v1_exact_damage", "v2
 BOTS = ("greedy", "protect_spam")
 LIVE = ("llm_live", "llm_real")                                                  # = local.field_opps.LIVE
 EXT = ("simbot", "simbot_v1")                                                    # = local.ext_opp.NAMES (opt-in)
-BUILTIN = ("official_baseline", "random") + BOTS + FIELD_ALL + LIVE + EXT
+VGCB = ("vgcbench_bc", "vgcbench_sp")             # = local.vgcbench_opp.NAMES (opt-in, needs the VGC-Bench install)
+# per-game counters of the VGC-Bench players (local.vgcbench_opp.EXTRA_KEYS) -> row fields vgb_<key>
+VGCB_KEYS = ("preview_fallbacks", "restarts", "vocab_lookups", "vocab_unknown", "unknown_decisions", "retargeted",
+             "gimmicks", "header_mismatch", "policy_ms")
+BUILTIN = ("official_baseline", "random") + BOTS + FIELD_ALL + LIVE + EXT + VGCB
 KNOB_PREFIXES = ("LOOKAHEAD_", "ARENA_DRAFT_", "PREVIEW_MATRIX_")
 # Time-dependent lookahead counters (agent/pokemon/lookahead.py STATS) -> per-game row fields <name>_cand / <name>_opp:
 # a decision that hit the 2.5 s cap, or a Nash mix that fell back (mostly its 0.25 s budget), depends on machine load.
@@ -203,6 +212,9 @@ def summarize(rows: list[dict], order: list[str] | None = None) -> dict:
                 per[opp][key] = sum(r.get(key, 0) for r in ok)
             per[opp]["ext_ms_max"] = max((r.get("ext_ms_max", 0) for r in ok), default=0)
             per[opp]["same_team"] = sum(bool(r.get("same_team")) for r in ok)
+        if any("vgb_restarts" in r for r in ok):             # VGC-Bench (local/vgcbench_opp.py)
+            for key in VGCB_KEYS:
+                per[opp][f"vgb_{key}"] = sum(r.get(f"vgb_{key}", 0) for r in ok)
         if any("pf_requests" in r for r in ok):
             for key in PF_KEYS:
                 per[opp][f"pf_{key}"] = sum(r.get(f"pf_{key}", 0) for r in ok)
@@ -295,7 +307,15 @@ def print_summary(s: dict, title: str = "") -> None:
         if "bot_fallbacks" in p:
             extra += (f"  bot: fallbacks {p['bot_fallbacks']}, no-calc turns {p.get('bot_no_calc', 0)}, "
                      f"protects {p.get('bot_protects', 0)}/{p.get('bot_slots', 0)} slot-moves")
-        if "ext_decisions" in p:
+        if "vgb_restarts" in p:
+            extra += (f"  vgcbench: {p['ext_decisions']} decisions, fallbacks {p['ext_fallbacks']} (team preview "
+                      f"{p['vgb_preview_fallbacks']}), worker errors {p['ext_errors']}, restarts {p['vgb_restarts']}, "
+                      f"{p['ext_ms_total'] / max(1, p['ext_decisions']):.0f} ms mean / {p['ext_ms_max']:.0f} ms max "
+                      f"per decision, unknown-vocab decisions {p['vgb_unknown_decisions']} ({p['vgb_vocab_unknown']}/"
+                      f"{p['vgb_vocab_lookups']} lookups), retargeted {p['vgb_retargeted']}, gimmicks stripped "
+                      f"{p['vgb_gimmicks']}, header mismatches {p['vgb_header_mismatch']}"
+                      + (f", same-team games {p['same_team']}" if p.get("same_team") else ""))
+        elif "ext_decisions" in p:
             extra += (f"  simbot: {p['ext_decisions']} decisions, fallbacks {p['ext_fallbacks']}, sim errors "
                       f"{p['ext_errors']}, {p['ext_ms_total'] / max(1, p['ext_decisions']):.0f} ms mean / "
                       f"{p['ext_ms_max']:.0f} ms max per decision"
@@ -365,8 +385,13 @@ def resolve_opps(spec: str) -> list[str]:
     bad = [n for n in names if n not in BUILTIN and opponent_package(n) is None]
     if bad:
         raise SystemExit(f"unknown opponent(s) {bad}; groups: {', '.join(k for k in GROUPS if k)}; "
-                         f"panel: {', '.join(PANEL)}; also messaging, llm_live, llm_real, {', '.join(EXT)}, any "
-                         f"versions/<dir> or a dotted package")
+                         f"panel: {', '.join(PANEL)}; also messaging, llm_live, llm_real, {', '.join(EXT + VGCB)}, "
+                         f"any versions/<dir> or a dotted package")
+    if any(n in VGCB for n in names):
+        from .vgcbench_opp import available
+        ok, why = available()
+        if not ok:
+            raise SystemExit(f"{', '.join(n for n in names if n in VGCB)}: {why}")
     if "llm_live" in names and not os.environ.get("OPENAI_API_KEY"):
         raise SystemExit("llm_live plays examples/llm_agent.py with a real model: set OPENAI_API_KEY (and optionally "
                          "OPENAI_MODEL / OPENAI_BASE_URL for any OpenAI-compatible endpoint) in the environment")
@@ -678,6 +703,16 @@ def _opponent(name: str):
         p = ext_opp.make(name)                  # p.calc_pkg = the package it drafts / previews with
         p.calc_info = _warm(p.calc_pkg)
         instrument_preview(p.calc_pkg)
+    elif name in VGCB:
+        from . import vgcbench_opp
+        p = vgcbench_opp.make(name)             # p.calc_pkg = the package it drafts with (the champion)
+        p.calc_info = _warm(p.calc_pkg)
+        instrument_preview(p.calc_pkg)
+        try:                                    # worker start-up + checkpoint load now, outside any game
+            p.load_info = p.start()
+        except Exception as e:  # noqa: BLE001 - the games then count fallbacks / restarts; never kill the worker
+            p.load_info = {"error": f"{type(e).__name__}: {e}"}
+            logging.getLogger("local.vgcbench").warning("VGC-Bench worker failed to start: %s", e)
     else:
         pkg = opponent_package(name)
         mod = importlib.import_module(f"{pkg}.agent.agent")
@@ -831,10 +866,13 @@ def _play(task: tuple[str, int]) -> dict:
             for k, field in DIAG.items():
                 if k in after:
                     row[f"{field}_{s}"] = after[k] - before[s].get(k, 0)
-        if opp in EXT:                                   # simbot's own counters (local/ext_opp.py)
+        if opp in EXT or opp in VGCB:                    # simbot's / VGC-Bench's own counters
             st = o.stats
             row.update(ext_decisions=st["decisions"], ext_fallbacks=st["fallbacks"], ext_errors=st["errors"],
                        ext_sims=st["sims"], ext_ms_total=round(st["ms_total"], 1), ext_ms_max=round(st["ms_max"], 1))
+            if opp in VGCB:
+                row.update({f"vgb_{k}": round(st.get(k, 0), 1) if k == "policy_ms" else st.get(k, 0)
+                            for k in VGCB_KEYS})
         if logs_dir:
             Path(logs_dir).mkdir(parents=True, exist_ok=True)
             game = {k: row[k] for k in ("cand", "opp", "seed", "g", "match_seed", "seat", "winner", "win", "turns")}
@@ -986,6 +1024,8 @@ def run(a) -> int:
             "nice": a.nice, "warmup": cfg["warmup"], "pythonhashseed": os.environ.get("PYTHONHASHSEED"),
             "same_team": bool(a.same_team), "logs_dir": logs_dir,
             "simbot_knobs": {k: v for k, v in os.environ.items() if k.startswith("SIMBOT_")},
+            **({"vgcbench_knobs": {k: v for k, v in os.environ.items() if k.startswith("VGCBENCH_")}}
+               if any(o in VGCB for o in opps) else {}),
             "panel_root": str(ROOT), "python": sys.executable, "started": time.strftime("%Y-%m-%d %H:%M:%S")}
     print(f"panel: candidate {name} = {cand} (code {code}, git {meta['git']}), env {env or '{}'}\n"
           f"       opponents {', '.join(opps)}; {a.games} games each, seed {a.seed}; {len(tasks)} to play "
@@ -1135,7 +1175,7 @@ def main(argv=None) -> None:
         rc = 0
         for path in a.summary:
             rows = latest(load_rows(path))
-            s = summarize(rows, list(PANEL) + [o for o in FIELD_ALL + EXT if o not in PANEL])
+            s = summarize(rows, list(PANEL) + [o for o in FIELD_ALL + EXT + VGCB if o not in PANEL])
             names = sorted({(r.get("cand"), r.get("seed")) for r in rows}, key=str)
             print_summary(s, f"== {path}  ({', '.join(f'{n} seed {sd}' for n, sd in names)})")
             rc = max(rc, finish(s, rows, a, None))

@@ -673,8 +673,12 @@ def decisions(g: dict) -> dict:
         if t.get("phase") == "moving" and isinstance(t.get("out"), dict) and t.get("turn") not in out[g["cand"]]:
             out[g["cand"]][t["turn"]] = [t["out"].get("slot_0"), t["out"].get("slot_1")]
     for t in g.get("trace") or []:
-        if t.get("slots") and not t.get("forced") and t.get("turn") not in out[g["oppside"]]:
+        if t.get("turn") in out[g["oppside"]]:
+            continue
+        if t.get("slots") and not t.get("forced"):                               # simbot
             out[g["oppside"]][t["turn"]] = list(t["slots"]) + [None]
+        elif t.get("phase") == "moving" and isinstance(t.get("out"), dict):     # VGC-Bench (local/vgcbench_opp.py)
+            out[g["oppside"]][t["turn"]] = [t["out"].get("slot_0"), t["out"].get("slot_1")]
     return out
 
 

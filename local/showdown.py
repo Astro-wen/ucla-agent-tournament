@@ -43,6 +43,18 @@ class Showdown:
         The live battle is not touched."""
         return self._rpc({"cmd": "search", "side": side, "seed": seed, "params": params or {}})
 
+    def sideview(self, side: str, frm: int | None = None) -> dict:
+        """What one player ('p1'/'p2') would receive from a Showdown server (the VGC-Bench opponent,
+        local/vgcbench_opp.py): the live battle's protocol lines from log index `frm` (default 0) resolved for that
+        side's channel, and that side's current request. {"lines", "request", "pos" (log length now; pass it back as
+        `frm` next time), "header_end" (log length after the team-preview header), "turn", "ended"}. Read-only."""
+        return self._rpc({"cmd": "sideview", "side": side, "from": frm})
+
+    def preview_view(self, side: str, p1: list[dict], p2: list[dict], seed: list[int] | None = None) -> dict:
+        """The same side view of a throwaway battle's team-preview phase with these teams: {"lines", "request",
+        "showteam" (the Open Team Sheets lines)}. The live battle is not touched."""
+        return self._rpc({"cmd": "preview_view", "side": side, "p1": p1, "p2": p2, "seed": seed})
+
     def close(self):
         try:
             self._rpc({"cmd": "quit"})
