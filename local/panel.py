@@ -25,6 +25,10 @@ Panel (--opps, default all 13; groups: all, strength, field; or a comma list):
   llm_real  opt-in only, by name: the same agent on Nebius Token Factory (NEBIUS_API_KEY from the environment or the
             .env; local/llm_client.py caps and ledgers the spend, all workers share one NEBIUS_RUN_ID). Without a key
             it plays the agent's rule fallback (= llm_fallback) and says so before the first game
+  simbot    opt-in only, by name: the outside-style engine-search opponent (local/ext_opp.py, local/js/simbot.js):
+            each battle turn a joint-action matrix game played out on clones of the real Showdown battle; drafts and
+            previews with the champion's code (`simbot_v1`: v1's card_score draft + preview). ~1 s per decision, so
+            about 15 s per game; knobs SIMBOT_* from the shell (recorded in the meta file).
 Any versions/<dir> name, or a dotted package that holds agent/agent.py, works as an extra opponent. Every opponent
 package must run its own calc.js (versions/*/agent/js/node_modules and local/sparring/*/agent/js/node_modules linked
 to agent/js/node_modules, see scripts/setup_machine.sh); the panel checks that before the first game.
@@ -40,6 +44,12 @@ PYTHONHASHSEED is fixed (--hashseed). Re-running a candidate gives the same game
 time budget can differ, and those are counted per game: lookahead cap hits and Nash-mix fallbacks (from the
 lookahead's STATS), team-preview searches cut at their wall-clock cap (v3's preview `info["wall_hit"]`, still an
 answer) and team-preview fallbacks (v3's preview game logging "preview matrix failed", mostly the same cap).
+--same-team replaces the snake draft by Match.draft_same: both seats get the same six cards (random from the match's
+18-card pool; the draft protocol still shows every set), so only team preview and battle skill differ. Its games are
+different games from a normal run with the same --seed: give it its own --name and never --compare the two.
+--save-logs writes every game's Showdown protocol log (plus rosters, leads, the candidate's team-preview and battle
+answers and simbot's per-decision trace) to <out>.logs/<opp>-g<g>.json for the loss analysis
+(scripts/extopp_analyze.py); --only 12,18,30-33 replays just those game indices (same seeds and seats).
 
 Output (default logs/panel/runs/<name>-s<seed>.jsonl, never directly in logs/<dir>/ where scripts/replay_real.py looks
 for real recordings): one JSON line per game (cand, opp, seed, g, match_seed, seat, winner, win, tie, turns,
@@ -96,7 +106,8 @@ PACKAGES = {"v0": "versions.v0_heuristic", "v1": "versions.v1_exact_damage", "v2
             "v3": "versions.v3_draft_preview", "cautious": "local.sparring.v2_cautious"}
 BOTS = ("greedy", "protect_spam")
 LIVE = ("llm_live", "llm_real")                                                  # = local.field_opps.LIVE
-BUILTIN = ("official_baseline", "random") + BOTS + FIELD_ALL + LIVE
+EXT = ("simbot", "simbot_v1")                                                    # = local.ext_opp.NAMES (opt-in)
+BUILTIN = ("official_baseline", "random") + BOTS + FIELD_ALL + LIVE + EXT
 KNOB_PREFIXES = ("LOOKAHEAD_", "ARENA_DRAFT_", "PREVIEW_MATRIX_")
 # Time-dependent lookahead counters (agent/pokemon/lookahead.py STATS) -> per-game row fields <name>_cand / <name>_opp:
 # a decision that hit the 2.5 s cap, or a Nash mix that fell back (mostly its 0.25 s budget), depends on machine load.
@@ -187,6 +198,11 @@ def summarize(rows: list[dict], order: list[str] | None = None) -> dict:
         for key in ("bot_fallbacks", "bot_protects", "bot_slots", "bot_no_calc"):
             if any(key in r for r in ok):
                 per[opp][key] = sum(r.get(key, 0) for r in ok)
+        if any("ext_decisions" in r for r in ok):            # simbot (local/ext_opp.py)
+            for key in ("ext_decisions", "ext_fallbacks", "ext_errors", "ext_sims", "ext_ms_total"):
+                per[opp][key] = sum(r.get(key, 0) for r in ok)
+            per[opp]["ext_ms_max"] = max((r.get("ext_ms_max", 0) for r in ok), default=0)
+            per[opp]["same_team"] = sum(bool(r.get("same_team")) for r in ok)
         if any("pf_requests" in r for r in ok):
             for key in PF_KEYS:
                 per[opp][f"pf_{key}"] = sum(r.get(f"pf_{key}", 0) for r in ok)
@@ -279,6 +295,11 @@ def print_summary(s: dict, title: str = "") -> None:
         if "bot_fallbacks" in p:
             extra += (f"  bot: fallbacks {p['bot_fallbacks']}, no-calc turns {p.get('bot_no_calc', 0)}, "
                      f"protects {p.get('bot_protects', 0)}/{p.get('bot_slots', 0)} slot-moves")
+        if "ext_decisions" in p:
+            extra += (f"  simbot: {p['ext_decisions']} decisions, fallbacks {p['ext_fallbacks']}, sim errors "
+                      f"{p['ext_errors']}, {p['ext_ms_total'] / max(1, p['ext_decisions']):.0f} ms mean / "
+                      f"{p['ext_ms_max']:.0f} ms max per decision"
+                      + (f", same-team games {p['same_team']}" if p.get("same_team") else ""))
         if "pf_requests" in p:
             extra += (f"  platform: crashed games {p['pf_crashed_games']}, rejected {p['pf_rejected']}, "
                       f"timer-played {p['timer_opp']} of {p['pf_requests']} requests (draft incl.), forfeits "
@@ -344,7 +365,8 @@ def resolve_opps(spec: str) -> list[str]:
     bad = [n for n in names if n not in BUILTIN and opponent_package(n) is None]
     if bad:
         raise SystemExit(f"unknown opponent(s) {bad}; groups: {', '.join(k for k in GROUPS if k)}; "
-                         f"panel: {', '.join(PANEL)}; also messaging, llm_live, any versions/<dir> or a dotted package")
+                         f"panel: {', '.join(PANEL)}; also messaging, llm_live, llm_real, {', '.join(EXT)}, any "
+                         f"versions/<dir> or a dotted package")
     if "llm_live" in names and not os.environ.get("OPENAI_API_KEY"):
         raise SystemExit("llm_live plays examples/llm_agent.py with a real model: set OPENAI_API_KEY (and optionally "
                          "OPENAI_MODEL / OPENAI_BASE_URL for any OpenAI-compatible endpoint) in the environment")
@@ -470,6 +492,43 @@ class Scoped:
     def choose(self, raw):
         with scoped_env(self.env), WARNS.acting(self.side):
             return self.player.choose(raw)
+
+    def bind(self, match, seat):
+        """Forward Match.bind to players that search the engine themselves (simbot); a no-op for everyone else."""
+        bind = getattr(self.player, "bind", None)
+        if callable(bind):
+            bind(match, seat)
+
+
+class Tap:
+    """Records a player's team-preview and battle answers of one game (--save-logs: `cand_trace` in the game file);
+    everything else is passed through unchanged."""
+
+    def __init__(self, player):
+        self.player, self.trace = player, []
+
+    @property
+    def name(self):
+        return self.player.name
+
+    def reset(self):
+        self.trace = []
+        self.player.reset()
+
+    def bind(self, match, seat):
+        bind = getattr(self.player, "bind", None)
+        if callable(bind):
+            bind(match, seat)
+
+    def choose(self, raw):
+        out = self.player.choose(raw)
+        if raw.get("phase") in ("team_preview", "moving"):
+            shown = out.input.get("action") if hasattr(out, "input") else out
+            if not isinstance(shown, (dict, list, str, int, float, type(None))):
+                shown = repr(shown)
+            self.trace.append({"phase": raw["phase"], "turn": (raw.get("observation") or {}).get("turn"),
+                               "out": shown})
+        return out
 
 
 def shell_knobs(environ=None) -> dict:
@@ -614,6 +673,11 @@ def _opponent(name: str):
         p = ContestantPlayer(lambda kind=name: panel_bots.create_agent(kind), name)
         p.calc_info = _warm("versions.v1_exact_damage.agent")
         p.calc_pkg = "versions.v1_exact_damage.agent"
+    elif name in EXT:
+        from . import ext_opp
+        p = ext_opp.make(name)                  # p.calc_pkg = the package it drafts / previews with
+        p.calc_info = _warm(p.calc_pkg)
+        instrument_preview(p.calc_pkg)
     else:
         pkg = opponent_package(name)
         mod = importlib.import_module(f"{pkg}.agent.agent")
@@ -732,11 +796,15 @@ def _play(task: tuple[str, int]) -> dict:
             _fresh_calc_cache(p)
         pids = _calc_pids()
         before = {s: _lookahead_stats(p) for s, p in sides.items()}
-        players = [_W["cand"], Scoped(o, {}, "opp")]
+        same, logs_dir = bool(cfg.get("same_team")), cfg.get("logs_dir")
+        cand = Tap(_W["cand"]) if logs_dir else _W["cand"]      # --save-logs: keep the candidate's answers too
+        players = [cand, Scoped(o, {}, "opp")]
         if seat == 1:
             players.reverse()
         WARNS.reset()
-        r = play_match(_showdown(), players[0], players[1], seed=seed)
+        r = play_match(_showdown(), players[0], players[1], seed=seed, same_team=same, keep_log=bool(logs_dir))
+        if same:
+            row["same_team"] = True
         row.update(winner=r.winner, win=r.winner == seat, tie=r.winner is None, turns=r.turns,
                    inv_cand=r.invalid[seat], inv_opp=r.invalid[1 - seat],
                    timer_cand=r.timer_defaults[seat], timer_opp=r.timer_defaults[1 - seat],
@@ -763,6 +831,16 @@ def _play(task: tuple[str, int]) -> dict:
             for k, field in DIAG.items():
                 if k in after:
                     row[f"{field}_{s}"] = after[k] - before[s].get(k, 0)
+        if opp in EXT:                                   # simbot's own counters (local/ext_opp.py)
+            st = o.stats
+            row.update(ext_decisions=st["decisions"], ext_fallbacks=st["fallbacks"], ext_errors=st["errors"],
+                       ext_sims=st["sims"], ext_ms_total=round(st["ms_total"], 1), ext_ms_max=round(st["ms_max"], 1))
+        if logs_dir:
+            Path(logs_dir).mkdir(parents=True, exist_ok=True)
+            game = {k: row[k] for k in ("cand", "opp", "seed", "g", "match_seed", "seat", "winner", "win", "turns")}
+            game.update(same_team=same, rosters=r.rosters, brought=r.brought, log=r.log or [],
+                        trace=list(getattr(o, "trace", None) or []), cand_trace=cand.trace)
+            (Path(logs_dir) / f"{opp}-g{g}.json").write_text(json.dumps(game))
         if isinstance(o, PlatformSeat):
             row.update({f"pf_{k}": o.stats.get(k, 0) for k in PF_KEYS})
             if o.crash_reason:
@@ -829,6 +907,21 @@ def default_out(name: str, seed: int) -> Path:
     return ROOT / "logs" / "panel" / "runs" / f"{name}-s{seed}.jsonl"
 
 
+def parse_only(spec: str) -> list[int]:
+    """'12,18,30-33' -> [12, 18, 30, 31, 32, 33]: replay just these game indices (same seeds and seats)."""
+    out = []
+    for part in str(spec).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            out.extend(range(int(lo), int(hi) + 1))
+        else:
+            out.append(int(part))
+    return sorted(set(out))
+
+
 def parse_env(pairs) -> dict:
     env = {}
     for kv in pairs or []:
@@ -874,7 +967,8 @@ def run(a) -> int:
                     done.add((r["opp"], r["g"]))
         elif not a.force:
             raise SystemExit(f"{out} exists: --resume to add the missing games, --force to overwrite")
-    tasks = [(o, g) for g in range(a.games) for o in opps if (o, g) not in done]
+    games = parse_only(a.only) if a.only else range(a.games)
+    tasks = [(o, g) for g in games for o in opps if (o, g) not in done]
     code = tree_hash(cand)
     meta_path = Path(str(out) + ".meta.json")
     if a.resume and meta_path.exists():
@@ -882,11 +976,16 @@ def run(a) -> int:
         if old.get("code_hash") != code or old.get("env") != env:
             print(f"WARNING: resuming {out} with different code/env (was {old.get('code_hash')} {old.get('env')}, "
                   f"now {code} {env})", flush=True)
+        if bool(old.get("same_team")) != bool(a.same_team):
+            raise SystemExit(f"{out} was run with same_team={bool(old.get('same_team'))}: resume it the same way")
+    logs_dir = str(out) + ".logs" if a.save_logs else None
     cfg = {"root": str(ROOT), "candidate_dir": str(cand), "name": name, "seed": a.seed, "nice": a.nice,
-           "warmup": not a.no_warmup, "cand_env": env}
+           "warmup": not a.no_warmup, "cand_env": env, "same_team": bool(a.same_team), "logs_dir": logs_dir}
     meta = {"name": name, "candidate_dir": str(cand), "git": git_rev(cand), "code_hash": code, "env": env,
             "shell_knobs_dropped": dropped, "opps": opps, "games": a.games, "seed": a.seed, "jobs": a.jobs,
             "nice": a.nice, "warmup": cfg["warmup"], "pythonhashseed": os.environ.get("PYTHONHASHSEED"),
+            "same_team": bool(a.same_team), "logs_dir": logs_dir,
+            "simbot_knobs": {k: v for k, v in os.environ.items() if k.startswith("SIMBOT_")},
             "panel_root": str(ROOT), "python": sys.executable, "started": time.strftime("%Y-%m-%d %H:%M:%S")}
     print(f"panel: candidate {name} = {cand} (code {code}, git {meta['git']}), env {env or '{}'}\n"
           f"       opponents {', '.join(opps)}; {a.games} games each, seed {a.seed}; {len(tasks)} to play "
@@ -1025,12 +1124,18 @@ def main(argv=None) -> None:
     ap.add_argument("--hashseed", default="0", help="PYTHONHASHSEED of the workers (default 0; 'random' = unset)")
     ap.add_argument("--progress", type=float, default=30.0, help="seconds between progress lines")
     ap.add_argument("--json", action="store_true", help="print the summary (and comparison) as one JSON line")
+    ap.add_argument("--same-team", action="store_true",
+                    help="both seats battle with the same six cards (random from the pool) instead of the snake draft")
+    ap.add_argument("--save-logs", action="store_true",
+                    help="write each game's Showdown protocol log (+ both sides' answers) to <out>.logs/<opp>-g<g>.json")
+    ap.add_argument("--only", metavar="G,G-G",
+                    help="play only these game indices (e.g. 12,18,30-33: replay example games with the same seeds)")
     a = ap.parse_args(argv)
     if a.summary:
         rc = 0
         for path in a.summary:
             rows = latest(load_rows(path))
-            s = summarize(rows, list(PANEL) + [o for o in FIELD_ALL if o not in PANEL])
+            s = summarize(rows, list(PANEL) + [o for o in FIELD_ALL + EXT if o not in PANEL])
             names = sorted({(r.get("cand"), r.get("seed")) for r in rows}, key=str)
             print_summary(s, f"== {path}  ({', '.join(f'{n} seed {sd}' for n, sd in names)})")
             rc = max(rc, finish(s, rows, a, None))

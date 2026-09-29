@@ -4,10 +4,14 @@
 //   {"cmd":"choose","p1":"team 1234","p2":"move 1 1, move 2 2"}   (omit a side that has no request)
 //   {"cmd":"validate","sets":[sets]}
 //   {"cmd":"gen_team","format":"gen9randombattle","seed":[1,2,3,4]}   -> {"team":[sets]}  (singles harness)
+//   {"cmd":"search","side":"p2","seed":[1,2,3,4],"params":{..}}   -> {"choice":..,"slots":[..],"info":{..}}
+//       (the `simbot` opponent's engine search on clones of the current battle, local/js/simbot.js; the live
+//        battle is not touched)
 // and gets back one JSON object per line: {"requests":{"p1":..,"p2":..},"state":{..},"ended":bool,"winner":..,"log":[..]}
 'use strict';
 const readline = require('readline');
 const {Battle, TeamValidator, Teams} = require('pokemon-showdown');
+const simbot = require('./simbot');
 
 let battle = null;
 let logOffset = 0;
@@ -75,6 +79,10 @@ rl.on('line', line => {
     }
     if (msg.cmd === 'gen_team') {
       return out({team: Teams.generate(msg.format || 'gen9randombattle', {seed: msg.seed || undefined})});
+    }
+    if (msg.cmd === 'search') {
+      if (!battle) return out({error: 'no_battle'});
+      return out(simbot.search(battle, msg));
     }
     if (msg.cmd === 'quit') process.exit(0);
     out({error: 'unknown cmd'});

@@ -14,6 +14,12 @@ decision was left to Showdown's battle timer (team preview: the first four in ro
 first two; a battle request: Showdown's own `default` choice), and altruagent.RESIGN = the seat forfeits and the
 other seat wins at once. Both are counted in MatchResult (`timer_defaults`, `forfeit`), never as `invalid`; no
 other player ever returns them, so they change nothing for the ladder or the benchmark.
+
+Opt-in extras (all off by default, so every existing caller plays exactly the same games): play_match(same_team=True)
+replaces the snake draft by Match.draft_same (both seats get the same six cards; isolates battle skill from
+drafting), play_match(keep_log=True) returns the Showdown protocol log in MatchResult.log, and a player with a
+`bind(match, seat)` method is handed the match and its seat at the start (local/ext_opp.py's engine-search `simbot`
+uses it to reach the live bridge).
 """
 from __future__ import annotations
 
@@ -33,6 +39,7 @@ os.environ["ARENA_RECORD"] = "0"      # never record simulated games (agent/agen
 log = logging.getLogger("local.pokemon")
 GAME = "pokemon_vgc_doubles_draft"
 SNAKE = "ABBAABBAABBA"
+TWIN = "#2"                           # card-id suffix of seat B's copies in same-team mode (Match.draft_same)
 NO_TARGET = {"self", "allySide", "foeSide", "all", "allAdjacent", "allAdjacentFoes", "allyTeam",
              "randomNormal", "scripted"}
 
@@ -152,6 +159,8 @@ class MatchResult:
     timer_defaults: list[int] = field(default_factory=lambda: [0, 0])   # decisions left to Showdown's timer
     forfeit: int | None = None            # the seat that forfeited (answered RESIGN), if any
     clause_waived: list[int] = field(default_factory=lambda: [0, 0])    # draft dead ends per seat (Match.draft)
+    same_team: bool = False               # both seats battled with the same six cards (Match.draft_same)
+    log: list[str] | None = field(default=None, repr=False)   # the Showdown protocol log (play_match keep_log=True)
 
 
 def _sid(x: str) -> str:
@@ -169,7 +178,8 @@ def lineup_ok(out, ids: list[str]) -> bool:
 
 
 class Match:
-    def __init__(self, sd: Showdown, players: list[Player], rng: random.Random, pool: list[dict] | None = None):
+    def __init__(self, sd: Showdown, players: list[Player], rng: random.Random, pool: list[dict] | None = None,
+                 keep_log: bool = False):
         self.sd, self.players, self.rng = sd, players, rng
         # platform card frequencies (local/pool.py sample_pool; ARENA_POOL=legacy: the old uniform rng.sample)
         self.pool = pool or sample_pool(rng, POOL, 18)
@@ -182,8 +192,17 @@ class Match:
         self.orders: list[str] = []
         self.picks: list[dict] = []
         self.rosters: list[list[dict]] = [[], []]
+        self.same_team = False
+        self.keep_log = keep_log
+        self.log_lines: list[str] = []
         for p in players:
             p.reset()
+        # Players that search the engine themselves (local/ext_opp.py) get the match and their seat; nobody else
+        # has `bind`, so every other player is unaffected.
+        for seat, p in enumerate(players):
+            bind = getattr(p, "bind", None)
+            if callable(bind):
+                bind(self, seat)
 
     # ---- envelope helpers -------------------------------------------
     def _state(self, seat: int, phase: str, obs: dict, actions: list[dict]) -> dict:
@@ -255,6 +274,61 @@ class Match:
                                "species": card["species"]})
             self.version += 1
 
+    def draft_same(self) -> None:
+        """Same-team mode (isolates battle skill from drafting): both seats get the SAME six cards, drawn at random
+        from this match's 18-card pool (distinct species and, where the pool allows, distinct items). The draft
+        protocol is still played, so every agent sees all 12 sets in `available_cards` exactly as on the platform
+        and caches them as usual, but each pick offers one legal card only: the next of that seat's six. Seat A
+        (the first drafter) holds the original card ids, seat B twins with the id suffix TWIN (same set), so both
+        can resolve every roster entry. Any other answer counts as invalid and the card is given anyway."""
+        self.same_team = True
+        first = self.rng.randrange(2)
+        order = list(self.pool)
+        self.rng.shuffle(order)
+        six: list[dict] = []
+        for strict in (True, False):
+            for c in order:
+                if len(six) == 6:
+                    break
+                if c in six or any(_sid(c["species"]) == _sid(d["species"]) for d in six):
+                    continue
+                if strict and any(c["item"] == d["item"] for d in six):
+                    continue
+                six.append(c)
+        copies = {first: [dict(c) for c in six], 1 - first: [{**c, "card_id": c["card_id"] + TWIN} for c in six]}
+        for s in (first, 1 - first):
+            self.rng.shuffle(copies[s])              # the order each seat receives its six
+        listing = copies[0] + copies[1]
+        self.rng.shuffle(listing)                    # available_cards order (random on the platform too)
+        taken: set[str] = set()
+        nxt = {0: 0, 1: 0}
+        for n, letter in enumerate(SNAKE, 1):
+            seat = first if letter == "A" else 1 - first
+            card = copies[seat][nxt[seat]]
+            nxt[seat] += 1
+            listed = [c for c in listing if c["card_id"] not in taken]
+            obs = {"phase": "draft", "draft_complete": False, "battle_format": "gen9vgc2025regi",
+                   "current_seat": self.ids[seat], "pick_number": n, "picks_remaining": 13 - n,
+                   "first_drafter": self.ids[first],
+                   "available_card_ids": [c["card_id"] for c in listed], "available_cards": listed,
+                   "unused_card_ids": [c["card_id"] for c in listed],
+                   "rosters": {self.ids[i]: [{"card_id": c["card_id"], "species": c["species"]} for c in self.rosters[i]]
+                               for i in range(2)},
+                   "picks": list(self.picks)}
+            actions = [self._act(f"draft_pick:{card['card_id']}", {"type": "draft_pick", "card_id": card["card_id"]},
+                                 f"Draft {card['species']}")]
+            out = self._choose(seat, self._state(seat, "draft", obs, actions))
+            if out is RESIGN:
+                raise _Forfeit(seat)
+            cid = (out or {}).get("card_id") if isinstance(out, dict) else None
+            if cid != card["card_id"]:
+                self.invalid[seat] += 1
+            taken.add(card["card_id"])
+            self.rosters[seat].append(card)
+            self.picks.append({"pick_number": n, "seat_id": self.ids[seat], "card_id": card["card_id"],
+                               "species": card["species"]})
+            self.version += 1
+
     # ---- team preview ----------------------------------------------------
     def preview(self) -> list[str]:
         orders = []
@@ -282,10 +356,16 @@ class Match:
         return orders
 
     # ---- battle ----------------------------------------------------------
+    def _take(self, snap: dict) -> dict:
+        """Every bridge snapshot passes here: its new protocol lines are kept when keep_log is on."""
+        if self.keep_log:
+            self.log_lines.extend(snap.get("log") or [])
+        return snap
+
     def battle(self, orders: list[str]) -> MatchResult:
         teams = [[to_showdown_set(c) for c in r] for r in self.rosters]
-        snap = self.sd.start(teams[0], teams[1], seed=[self.rng.randrange(1, 65535) for _ in range(4)])
-        snap = self.sd.choose(orders[0], orders[1])
+        snap = self._take(self.sd.start(teams[0], teams[1], seed=[self.rng.randrange(1, 65535) for _ in range(4)]))
+        snap = self._take(self.sd.choose(orders[0], orders[1]))
         versions = [0, 0]
         turns = 0
         stuck = 0
@@ -308,15 +388,15 @@ class Match:
                     self.invalid[seat] += 1
                     choice = _to_choice(random_action(raw), req, tmpl)
                 versions[seat] += 1
-                snap = self.sd.choose(**{sid: choice})
+                snap = self._take(self.sd.choose(**{sid: choice}))
                 for _retry in range(4):            # engine refused it: random, like the platform's 300 s timer
                     if "error" not in snap:
                         break
                     self.invalid[seat] += 1
-                    snap = self.sd.choose(**{sid: _to_choice(random_action(raw), req, tmpl)})
+                    snap = self._take(self.sd.choose(**{sid: _to_choice(random_action(raw), req, tmpl)}))
                 if "error" in snap:                # template bug on our side: let Showdown pick, but make it loud
                     log.warning("engine refused every choice for %s: %s", sid, snap.get("detail"))
-                    snap = self.sd.choose(**{sid: "default"})
+                    snap = self._take(self.sd.choose(**{sid: "default"}))
                 if snap["ended"]:
                     break
             turns = self.turns = snap["state"]["turn"]
@@ -328,7 +408,8 @@ class Match:
         winner = 0 if w == "p1" else 1 if w == "p2" else None
         return MatchResult(winner, turns, list(self.invalid),
                            rosters=[[c["species"] for c in r] for r in self.rosters], brought=orders,
-                           timer_defaults=list(self.timer_defaults), clause_waived=list(self.clause_waived))
+                           timer_defaults=list(self.timer_defaults), clause_waived=list(self.clause_waived),
+                           same_team=self.same_team, log=self.log_lines if self.keep_log else None)
 
     def forfeited(self, seat: int) -> MatchResult:
         """`seat` answered RESIGN: the other seat wins now (like the platform's `resign`, or Showdown's
@@ -336,7 +417,8 @@ class Match:
         return MatchResult(1 - seat, self.turns, list(self.invalid),
                            rosters=[[c["species"] for c in r] for r in self.rosters], brought=list(self.orders),
                            timer_defaults=list(self.timer_defaults), forfeit=seat,
-                           clause_waived=list(self.clause_waived))
+                           clause_waived=list(self.clause_waived), same_team=self.same_team,
+                           log=self.log_lines if self.keep_log else None)
 
     def _battle_state(self, seat: int, sid: str, req: dict, st: dict, version: int):
         me, opp = st[sid], st["p2" if sid == "p1" else "p1"]
@@ -488,12 +570,18 @@ def _to_choice(out, req: dict, tmpl: dict) -> str | None:
     return ", ".join(parts)
 
 
-def play_match(sd: Showdown, a: Player, b: Player, seed: int) -> MatchResult:
+def play_match(sd: Showdown, a: Player, b: Player, seed: int, same_team: bool = False,
+               keep_log: bool = False) -> MatchResult:
+    """One match. same_team: both seats get the same six cards (Match.draft_same) instead of the snake draft;
+    keep_log: the result carries the Showdown protocol log (MatchResult.log)."""
     rng = random.Random(seed)
     random.seed(seed)
-    m = Match(sd, [a, b], rng)
+    m = Match(sd, [a, b], rng, keep_log=keep_log)
     try:
-        m.draft()
+        if same_team:
+            m.draft_same()
+        else:
+            m.draft()
         orders = m.preview()
         return m.battle(orders)
     except _Forfeit as f:

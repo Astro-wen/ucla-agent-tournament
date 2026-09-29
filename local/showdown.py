@@ -37,6 +37,12 @@ class Showdown:
         """A Showdown-generated team (random-battle sets: species, item, ability, moves, level, EVs...)."""
         return self._rpc({"cmd": "gen_team", "format": fmt, "seed": seed})["team"]
 
+    def search(self, side: str, seed: list[int], params: dict | None = None) -> dict:
+        """The `simbot` engine search (local/js/simbot.js) for `side` ('p1'/'p2') on clones of the current battle:
+        {"choice": Showdown choice string, "slots": [per-slot doubles_turn entries], "info": {...}} or {"error"}.
+        The live battle is not touched."""
+        return self._rpc({"cmd": "search", "side": side, "seed": seed, "params": params or {}})
+
     def close(self):
         try:
             self._rpc({"cmd": "quit"})

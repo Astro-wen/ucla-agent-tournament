@@ -270,6 +270,37 @@ python -m local.eval_werewolf --llm-real 2 --bg mixed:first+heuristic --ks 1,5 -
 - VGC：新环境下仍是 19/20，第一次输给 `llm_real` 一局（种子 45 第 18 局）；这次模型没有卡住（最慢 1.8 s）。
 - **平台替身和示例 agent 的一处不一致**：`local/werewolf_platform.py` 每条聊天和每次 terminate 都让 `state_version` +1，而 `examples/llm_agent.py` 按「state_version 只在走子时变」来数每轮 2 次发言；在替身上，一个一直想说话的模型每条消息后都拿到新的 2 次，第 6 条被平台拒掉（MESSAGES_QUOTA_EXCEEDED）→ runner 报错、进程退出（假模型复现）。本地引擎 `werewolf_env` 讨论期间版本号不变，所以 `eval_werewolf` 里不会发生。平台到底怎样文档没写（`wait_for_update` 单独有 `since_message_seq`，示例作者的注释也说只在走子时变），测试里只用不说话的模型跑替身。
 
+## 外部风格对手 simbot（09-28，`local/ext_opp.py` + `local/js/simbot.js`）
+
+为什么：面板里的对手要么是我们自己的历史版本，要么是脚本机器人。公开的强 VGC bot（VGC-Bench 等）要下载 torch 和模型权重，没有获批，所以没下载。simbot 是自己写的、**原理和我们完全不同**的对手：不用伤害计算器，也没有手写战术。每回合它在**真 Showdown 引擎的克隆**上把双方的双槽组合都打一遍（打 1 回合，再让双方按最大伤害贪心多打 1 回合），按存活数、HP、异常、能力变化、顺风、墙、戏法空间估值，把结果排成零和矩阵博弈，用 regret matching 求均衡，再按均衡的混合策略抽一个动作。守住、击掌奇袭、看我嘛、帮助、控速、换人，只要引擎算出来划算，它就会用。
+
+- **信息**：克隆的是真实对局，所以它知道对手的精确 HP 和带了哪 4 只（配置本来就公开，这是一点小优势）。它看不到对手本回合的指令；随机数种子也换掉了，不会预知伤害浮动或会心一击。回合中途的换人请求（U-turn 等）会用已经排队的招式模拟本回合剩下的部分，这是一点小泄漏，很少见。
+- **选秀 / 带人**：simbot 没有自己的选秀。`simbot` 用**冠军自己的**选秀和 90×90 首发（champion/agent），所以正常选秀下比的就是对战；`simbot_v1` 用 v1 的固定规则（card_score 选秀 + v1 带人）。
+- **速度**：每步约 1 s（p95 约 2 s，最慢 3.2 s），每局约 15 s；2 个 worker 打 200 局约 25 分钟。唯一受机器负载影响的地方是预算：前半段搜索超过 1.5 s 时后半段只用 1 个样本，超过 3 s 就提前停。
+- **协议**：答案走正常模板检查，不合法算 invalid（实测 0 次）；搜索出错时随机出一个合法动作并计数（实测 0 次）。对随机对手 19/20。
+
+```bash
+python -m local.panel --opps simbot --games 200 --seed 71 --jobs 2 --name v32-vs-simbot --save-logs
+python -m local.panel --opps simbot --games 200 --seed 71 --jobs 2 --name v32-vs-simbot-same --same-team --save-logs
+python -m local.panel --opps simbot --seed 71 --only 12,18 --name replay --save-logs     # 只重放指定的局
+python scripts/extopp_analyze.py logs/panel/runs/v32-vs-simbot-s71.jsonl --species Ting-Lu,Incineroar
+```
+
+- `--same-team`：双方拿**同一套 6 张**卡（从本局 18 张里随机抽，物种不同，尽量道具也不同）。选秀流程照走，每一手只有一个合法选项，所有配置照常展示给双方，所以只比首发和对战。它和普通运行不是同一批局：要用不同的 `--name`，不能拿来 `--compare`。
+- `--save-logs`：每局写一个 `<out>.logs/<对手>-g<g>.json`，里面有 Showdown 全日志、双方阵容、我方每一步的答案，以及 simbot 每一步的矩阵值和混合策略。`scripts/extopp_analyze.py` 读这些文件，列出双方行为对比、按局面特征拆开的胜率、每局输掉的那一回合发生了什么、按卡的胜率；同队运行还会列出同一只宝可梦在两边的招式使用率。
+- `SIMBOT_*` 环境变量用来调 simbot（样本数、剪枝宽度、预算等，见 `local/ext_opp.py`），会写进 meta 文件。
+- simbot 默认不在任何组里（`all` / `strength` / `field` 都不含它）。已有的面板、擂台和基准局一局都不变（同种子 A/B 逐局相同）。
+
+**v3.2（main 的 agent/）对 simbot**，种子 71（simbot 只在种子 70 上调过）；0 非法动作，0 计时器代打，simbot 0 回退：
+
+| 条件 | 冠军胜率 | 95% CI | 平均回合 |
+|---|---|---|---|
+| 正常选秀（simbot 用冠军的选秀和首发） | 95/200 = 47.5% | [40.7, 54.4] | 9.1 |
+| 同队（双方同 6 张） | 95/200 = 47.5% | [40.7, 54.4] | 11.8 |
+| 正常选秀，simbot_v1（v1 的固定选秀规则 + v1 首发） | 84/100 = 84.0% | [75.6, 89.9] | 8.9 |
+
+对照：冠军对面板里其他所有对手都在 88% 以上（v3 镜像除外）。simbot 是目前唯一能和冠军打平的非自家对手。它一换成 v1 的选秀和首发，冠军就赢 84%，所以冠军的领先主要来自选秀和首发，对战本身并不比这个一回合搜索强。输局分析在 `~/exp8/extopp/NOTES.md`。主要问题：从不主动换人（simbot 每局约 2 次，靠抗性换入吃伤害、反复威吓）；被更快的对手在出手前击倒（输局里最亏的那一回合 44–60% 是这种情况）；几张卡的招式估值有错（Ting-Lu 的 Ruination 被计算器算成 0 伤害，改去连用撒菱）；控速（冰冻之风）和击掌奇袭用得少；另外还有群攻和集火造成的击倒。
+
 ## 已知缺口（下一步）
 
 1. 预言家夜里查验时会查"最可疑"= 平票取最小座位 = 明天就要被投出去的人，查验浪费。应排除最可能被处决的席位。
