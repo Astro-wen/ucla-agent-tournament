@@ -21,6 +21,7 @@ then is the calculator off for good (heuristic play, exactly as without node).
 """
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import os
@@ -73,6 +74,87 @@ def _js_dir() -> Path | None:
     return p[0] if p else None
 
 
+MIN_NODE_MAJOR = 18
+_warned_node: set = set()
+
+
+def calc_disabled() -> bool:
+    """ARENA_CALC=off: force the heuristic. Diagnostics only: scripts/run_agent.sh and scripts/selfcheck.py refuse
+    to start with it unless ARENA_ALLOW_NO_CALC=1 (without the calculator the agent wins ~12% against itself)."""
+    return str(os.environ.get("ARENA_CALC") or "on").strip().lower() in ("0", "off", "false", "no")
+
+
+@functools.lru_cache(maxsize=8)
+def _node_version(path: str) -> str | None:
+    """`path --version` (e.g. 'v22.23.3'), or None when that binary does not run here (wrong architecture, too old
+    a C library ...). Cached per process."""
+    try:
+        out = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=15)
+    except Exception:
+        return None
+    v = out.stdout.strip()
+    return v if out.returncode == 0 and v.startswith("v") else None
+
+
+def _node_bin() -> str | None:
+    """The node executable to run, or None (calculator off: heuristic play, exactly as on a machine without node).
+
+    Order: ARENA_NODE (a node binary, for a service manager whose PATH lacks node: systemd, nvm installs), then
+    node/bin/node in the checkout when it runs here (scripts/bundle.sh ships a pinned official Node build there),
+    then `node` from PATH. A development checkout has no node/, so without ARENA_NODE this is `node` from PATH, as
+    always. A stale ARENA_NODE (not an executable) is logged and skipped rather than turning the calculator off.
+    ARENA_CALC=off forces the heuristic (see calc_disabled)."""
+    if calc_disabled():
+        return None
+    explicit = str(os.environ.get("ARENA_NODE") or "").strip()
+    if explicit:
+        if (os.path.isfile(explicit) and os.access(explicit, os.X_OK)) or shutil.which(explicit):
+            return explicit
+        if explicit not in _warned_node:
+            _warned_node.add(explicit)
+            log.warning("ARENA_NODE=%r is not an executable: ignored, looking for node/bin/node and PATH", explicit)
+    bundled = dex.repo_root() / "node" / "bin" / "node"
+    if bundled.is_file() and os.access(bundled, os.X_OK) and _node_version(str(bundled)):
+        return str(bundled)
+    return "node" if shutil.which("node") is not None else None
+
+
+def probe(attempts: int = 2) -> tuple[bool, str]:
+    """Can this machine run the calculator? For scripts/selfcheck.py and scripts/run_agent.sh, never used in play:
+    a fresh node process answers one real calc and is stopped. (True, 'node v22.23.3 (/usr/bin/node), 0.31s incl.
+    start-up') or (False, the reason)."""
+    if calc_disabled():
+        return False, "ARENA_CALC=off"
+    node = _node_bin()
+    if node is None:
+        return False, "no node found (ARENA_NODE, node/bin/node, PATH)"
+    if _js_paths() is None:
+        return False, "agent/js/node_modules missing (run: cd agent/js && npm ci --omit=dev)"
+    where = shutil.which(node) or node
+    version = _node_version(node)
+    if version is None:
+        return False, f"{where} does not run on this machine"
+    try:
+        major = int(version.lstrip("v").split(".")[0])
+    except ValueError:
+        major = 0
+    if major < MIN_NODE_MAJOR:
+        return False, f"node {version} ({where}) is older than {MIN_NODE_MAJOR}"
+    why = "no answer"
+    for _ in range(max(1, attempts)):
+        dc = DamageCalc()
+        t = time.monotonic()
+        try:
+            dc.warm()
+            res = dc.batch([WARM_CALC])
+        finally:
+            dc._kill()
+        if res and res[0]:
+            return True, f"node {version} ({where}), {time.monotonic() - t:.2f}s incl. start-up"
+        why = f"node {version} ({where}) did not answer a calc: {dc.last_error or 'no answer'}"
+    return False, why
+
+
 CACHE_MAX = 20000                 # calc results kept across decisions (cleared, never partially evicted)
 
 
@@ -81,7 +163,7 @@ class DamageCalc:
 
     def __init__(self):
         self.proc = None
-        self.enabled = shutil.which("node") is not None and _js_dir() is not None
+        self.enabled = _node_bin() is not None and _js_dir() is not None
         self._id = 0
         self.cache: dict[str, dict] = {}
         self.ready = False          # the running node process has answered at least once (start-up paid)
@@ -111,7 +193,7 @@ class DamageCalc:
     # ---- process lifecycle ---------------------------------------------------------------------------------------
     @staticmethod
     def _command(script: Path) -> list[str]:
-        return ["node", str(script / "calc.js")]
+        return [_node_bin() or "node", str(script / "calc.js")]
 
     def _start(self) -> bool:
         """True while a node process is running (a new one is started when needed, its warm-up calc sent at once so

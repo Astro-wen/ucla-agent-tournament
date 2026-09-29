@@ -41,7 +41,7 @@ from altruagent.auth import SeatClaimError, SeatGrantAuth
 from altruagent.client import AltruAgentClient
 from altruagent.errors import AltruAgentError, ConfigurationError
 from altruagent.mcp_game import MCPGameSession
-from altruagent.models import DecisionContext, GameState, SeatGrant
+from altruagent.models import AgentSessions, DecisionContext, GameState, SeatGrant
 from altruagent.runner import RunnerError, _resolve_decision_fn, run_game
 from altruagent.supervisor import run_forever_concurrent
 
@@ -63,6 +63,73 @@ def _resolve_create_agent(module: object) -> Callable:
             "exposing choose_action(state, context))."
         )
     return create_agent
+
+
+_SUPERVISOR_ENV = (
+    # (environment variable, run_forever_concurrent keyword, smallest accepted value)
+    ("ARENA_DISCOVERY_S", "discovery_interval", 2.0),
+    ("ARENA_WORKER_COOLDOWN_S", "cooldown_seconds", 1.0),
+)
+
+
+def _env_number(env, name: str, low: float) -> float | None:
+    raw = str(env.get(name) or "").strip()
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        value = float("nan")
+    if not value >= low:                          # also rejects nan
+        print(f"Ignoring {name}={raw!r}: expected a number >= {low:g}.")
+        return None
+    return value
+
+
+def _supervisor_options(env=None) -> dict:
+    """Optional supervisor tuning from the environment. Unset = the SDK defaults (a sessions() poll every 15 s, and
+    a 60 s cooldown before a match whose worker crashed gets a new worker: a lost 55 s battle turn). The deployment
+    wrapper scripts/run_agent.sh sets both to 10 s. Bad values are ignored with a message, never fatal."""
+    env = os.environ if env is None else env
+    out: dict = {}
+    for name, key, low in _SUPERVISOR_ENV:
+        value = _env_number(env, name, low)
+        if value is not None:
+            out[key] = value
+    return out
+
+
+class _SteadyDiscovery:
+    """The client as the supervisor sees it, except that a failed sessions() poll (network blip, 5xx, rate limit,
+    a transient 401) no longer ends `python -m agent` — the SDK's supervisor would then terminate EVERY running
+    match worker, although each worker handles its own errors. The failed poll answers "no active matches" instead:
+    the supervisor keeps the workers it has (it never stops one because of a poll) and starts new ones at the next
+    good poll. After ARENA_DISCOVERY_MAX_FAILURES failures in a row (default 30) the error is raised as before, and
+    the wrapper (scripts/run_agent.sh / systemd) restarts the whole agent."""
+
+    def __init__(self, client, max_failures: int | None = None) -> None:
+        self._client = client
+        if max_failures is None:
+            max_failures = int(_env_number(os.environ, "ARENA_DISCOVERY_MAX_FAILURES", 1) or 30)
+        self.max_failures = max_failures
+        self.failures = 0
+
+    def sessions(self) -> AgentSessions:
+        try:
+            found = self._client.sessions()
+        except AltruAgentError as exc:
+            self.failures += 1
+            if self.failures >= self.max_failures:
+                raise
+            print(f"[agent] discovery failed ({self.failures} in a row; running workers continue): {exc}", flush=True)
+            return AgentSessions()
+        if self.failures:
+            print(f"[agent] discovery recovered after {self.failures} failed poll(s)", flush=True)
+        self.failures = 0
+        return found
+
+    def __getattr__(self, name: str):
+        return getattr(self._client, name)
 
 
 def _run_discovery() -> int:
@@ -104,7 +171,7 @@ def _run_discovery() -> int:
     )
 
     try:
-        run_forever_concurrent(client, agent_id=me.id)
+        run_forever_concurrent(_SteadyDiscovery(client), agent_id=me.id, **_supervisor_options())
         return 0
     except KeyboardInterrupt:
         print("\nStopped.")
