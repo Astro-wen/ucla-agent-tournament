@@ -8,7 +8,9 @@ scripts/fit_draft_model.py and stored in agent/pokemon/draft_model.json:
   + sum_{pairs in A} S[c,c'] - sum_{pairs in B} S[d,d']             synergy
 
 `beats` is the 1v1 duel estimate of agent/pokemon/matchup.py (exact damage calc over the pool; a plain formula
-without node), so counters exist for cards the model never saw.
+without node), so counters exist for cards the model never saw. A model fitted with the `full_asym` config also has
+`main_opp`: a card's strength when the opponent holds it (m + d, fitted on games against other pilots); the search
+then uses it for the opponent's side (`sum_{d in B} main_opp[d]`). Without it both sides use `main`.
 
 Which cards the model "knows" (v3-harden). The model file stores a fingerprint of every fitted card's full set
 (`fingerprints`: card_id -> hash of species / item / ability / nature / level / moves / EVs / non-31 IVs, see
@@ -167,6 +169,9 @@ class DraftModel:
     def __init__(self, d: dict | None = None):
         d = d or {}
         self.main = {str(k): float(v) for k, v in (d.get("main") or {}).items()}
+        # Optional (config full_asym): a card's strength when the OPPONENT holds it (fitted on games against other
+        # pilots). Absent -> the same as `main`, i.e. the symmetric model.
+        self.main_opp = {str(k): float(v) for k, v in (d.get("main_opp") or {}).items() if str(k) in self.main}
         self.cross: dict[tuple[str, str], float] = {}
         for k, v in (d.get("cross") or {}).items():
             a, b = k.split("|")
@@ -290,6 +295,7 @@ class Drafter:
         self.use_matchups = use_matchups
         self.info: dict = {}
         self.unseen: list[str] = []          # card_ids of this draft the model did not know (not in `info`)
+        self.m_opp: list[float] = []         # per-card strength in the opponent's hands (set by _tables)
 
     # ---- tables over the cards of this draft ---------------------------------------------------------------
     def _tables(self, cards: list[dict]):
@@ -320,6 +326,9 @@ class Drafter:
             # unseen: the two-feature prior; its mean duel against the other cards of this draft
             duel = sum(B[i][j] - 0.5 for j in range(n) if j != i) / (n - 1) if B is not None and n > 1 else None
             m.append(self.model.prior_strength(c, self.prior_score, duel))
+        # the opponent's strengths: main_opp where the model has it, else the same as ours (symmetric model)
+        self.m_opp = [self.model.main_opp[k] if k is not None and k in self.model.main_opp else m[i]
+                      for i, k in enumerate(keys)]
         for i in range(n):
             for j in range(i + 1, n):
                 v = self.model.x(keys[i], keys[j])
@@ -360,6 +369,7 @@ class Drafter:
         me_letter = seq[0] if seq else "A"
         seq_me = [ch == me_letter for ch in seq]           # True = our pick
         m, P, S = self._tables(cards)
+        mo = self.m_opp                                     # == m unless the model has main_opp
         budget = self.node_budget                           # the calc tables (first pick only) are not search work
         # the wall also never runs past DEADLINE_SHARE of the pick's time left (agent/timecontrol.py); unchanged
         # outside a decision and whenever the deadline is far (always, unless the machine is badly overloaded)
@@ -369,8 +379,8 @@ class Drafter:
 
         # gains: gm[c] = what adding c is worth to us, go[c] = to them (both from the picker's own view)
         gm = [m[c] + sum(P[c][j] for j in opp_idx) + sum(S[c][e] for e in my_idx) for c in range(n)]
-        go = [m[c] + sum(P[c][j] for j in my_idx) + sum(S[c][e] for e in opp_idx) for c in range(n)]
-        L0 = sum(m[i] for i in my_idx) - sum(m[j] for j in opp_idx) \
+        go = [mo[c] + sum(P[c][j] for j in my_idx) + sum(S[c][e] for e in opp_idx) for c in range(n)]
+        L0 = sum(m[i] for i in my_idx) - sum(mo[j] for j in opp_idx) \
             + sum(P[i][j] for i in my_idx for j in opp_idx) \
             + sum(S[a][b] for x, a in enumerate(my_idx) for b in my_idx[x + 1:]) \
             - sum(S[a][b] for x, a in enumerate(opp_idx) for b in opp_idx[x + 1:])
