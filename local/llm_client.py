@@ -8,9 +8,10 @@
 Agent-independent: only httpx, python-dotenv and the standard library, no `local.*` / `agent.*` imports, so the
 deployed agent can reuse this file as agent/llm.py later. It never raises for a missing / unusable key or an
 exhausted budget at construction: `client.available` is False with a reason, and `chat` / `complete_json` raise
-`LLMUnavailable` (a subclass of `LLMError`), which callers turn into their rule-based fallback. Every failure of a
-request (HTTP status, timeout, transport, malformed body, a reply off the schema) surfaces as `LLMError`; a cache
-that fails is a miss, a ledger that fails refuses.
+`LLMUnavailable` (a subclass of `LLMError`), which callers turn into their rule-based fallback; a spend cap that
+would be exceeded is the documented "budget exhausted" signal `BudgetExhausted` (a subclass of `LLMUnavailable`, so
+the same `except` covers it). Every failure of a request (HTTP status, timeout, transport, malformed body, a reply off
+the schema) surfaces as `LLMError`; a cache that fails is a miss, a ledger that fails refuses.
 
 Configuration: the environment first, then NEBIUS_* keys (and only those) from a .env file -- $NEBIUS_DOTENV, else
 the .env of the checkout this file lives in. The key only ever goes into the Authorization header: never into repr,
@@ -20,28 +21,50 @@ request, so only HTTP status codes and exception type names are reported, and no
                      not a valid header value -> unavailable too, without saying why in terms of its content)
   NEBIUS_BASE_URL    default https://api.tokenfactory.nebius.com/v1/ (any OpenAI-compatible /chat/completions)
   NEBIUS_MODEL       default Qwen/Qwen3-30B-A3B-Instruct-2507 (see DEFAULT_MODEL)
-  NEBIUS_BUDGET_USD  global budget over the whole ledger, default 5.0 (not a finite number -> the default; < 0 -> 0):
-                     estimated spend + the next request's worst case above it -> refused
+  NEBIUS_BUDGET_USD  GLOBAL budget over the whole ledger (every process, every run), default 5.0, never above
+                     HARD_CEILING_USD = 20 whatever is asked (set but not a finite number, e.g. '$1.84' / '1,84' /
+                     'nan' -> 0, everything refused, never the default; < 0 -> 0): ledger total + the next request's
+                     worst case above it -> refused
+  NEBIUS_RUN_BUDGET_USD  optional per-run sub-cap in USD (the run's own spend in the ledger, open reservations
+                     included), enforced on top of the global one; unset -> none; not a finite number or < 0 -> 0
+                     (everything refused: a sub-cap that cannot be read is not silently dropped)
   NEBIUS_MAX_CALLS   per-run cap on real (uncached) request attempts, retries included, default 2000
-  NEBIUS_MAX_TOKENS  per-run cap on prompt + completion tokens, default 3,000,000
+  NEBIUS_MAX_TOKENS  per-run cap on prompt + completion tokens, default 3,000,000 ('1e6', '100.0' read as numbers;
+                     junk -> 0, everything refused)
+                     These four are ceilings: a client built in code, or overrides passed to from_env / shared_client,
+                     can lower them but never raise them (see LLMClient).
   NEBIUS_RUN_ID      the run the per-run caps count (shared by a run's worker processes); default: one per process
   NEBIUS_LEDGER      spend ledger, default ~/.cache/altruagent/llm_usage.jsonl (outside the repo; JSON lines with
                      time, run, model, tag, request id, tokens, estimated cost, latency, status -- no key, no prompt,
-                     no answer). A ledger that cannot be read or written refuses every request (fail closed).
+                     no answer). A ledger that cannot be read, written or locked, is not a regular file, does not read
+                     back a reservation, or lost history this process had read (deleted, truncated, swapped) refuses
+                     every request (fail closed); ledger_path=None (this process only) never sends. The global cap is
+                     only as global as the ledger: every real run must use the same file (and the same HOME).
   NEBIUS_CACHE       sqlite response cache for identical requests, default ~/.cache/altruagent/llm_cache.sqlite;
                      0 / off disables it. A hit costs nothing and replays the stored answer (local evaluation only:
                      the same prompt always gets the same answer, even when the model samples)
   NEBIUS_TIMEOUT     seconds per request, default 60 (examples/llm/providers.py REQUEST_TIMEOUT_SECONDS)
 
-Costs are ESTIMATES from PRICES (USD per 1M tokens) times the token counts the server reports; an unknown model is
-charged the conservative UNKNOWN_PRICE. Each request attempt (retries included) first RESERVES its worst case
-(estimated prompt + max_tokens) in the shared ledger: the caps are checked against everything already there and the
-reservation appended under one exclusive lock, so parallel workers cannot all pass the same check. The final line
-replaces the reservation with the reported usage. An attempt whose outcome is unknown -- a timeout or a connection
-dropped after sending, a 502 / 504, a 200 with an unreadable body -- stays charged at the worst case, since the
-provider may still bill it; a 200 without usage is charged the estimated prompt plus its text; an attempt that never
-left (connection refused) or was rejected (4xx, 429, 500, 503) is charged nothing. Streaming is never requested and
-max_tokens is always sent, so no reply can cost more than its reservation's completion part.
+Costs are ESTIMATES from PRICES (USD per 1M tokens) times the token counts the server reports; a model not in the
+table is charged UNKNOWN_PRICE, the most expensive listed input and output rates. Each request attempt (retries
+included) first RESERVES its worst case (prompt bounded at one token per UTF-8 byte of the messages and the
+response_format, + max_tokens) in the shared ledger: the caps are checked against everything already there and the
+reservation appended under one exclusive fcntl.flock, so parallel processes cannot all pass the same check (no flock
+on this platform -> refused). The final line replaces the reservation with the reported usage. An attempt whose
+outcome is unknown -- a timeout or a connection dropped after sending, a 502 / 504, a 200 with an unreadable body or
+WITHOUT usage, any other exception once the request was handed to the transport (e.g. httpx.DecodingError while the
+reply is read) -- stays charged at the worst case, since the provider may still bill it; an attempt that never left
+(connection refused, a body that cannot be encoded: checked before reserving) or was rejected (4xx, 429, 500, 503) is
+charged nothing; a process that dies between the two lines leaves its reservation counted. Streaming is never
+requested and max_tokens is always sent, so an honest server's reply cannot cost more than its reservation; one that
+bills past max_tokens is recorded as reported (the next request sees it). A cache hit is not a request: it costs 0,
+is not in the ledger, and comes back `cached=True`.
+
+Reading the ledger: a 'reserved' line is a placeholder, not spend. Its worst case is in `reserve_usd` /
+`reserve_tokens` and its `cost_usd` / token fields are 0, so a plain column sum of `cost_usd` is the settled spend
+(open reservations excluded). Lines written before 2026-09-29 kept the worst case in the reservation's `cost_usd`:
+summing that column over them counts every request twice (reservation + final line; the 09-28 ledger's $3.25 "total"
+was really $1.04). `python -m local.llm_client ledger` prints the total the caps use.
 """
 from __future__ import annotations
 
@@ -52,6 +75,7 @@ import math
 import os
 import re
 import sqlite3
+import stat
 import sys
 import threading
 import time
@@ -72,14 +96,15 @@ DEFAULT_BASE_URL = "https://api.tokenfactory.nebius.com/v1/"
 # defaults to, so it stands in for "the organizers' generic LLM agent". $0.10 / $0.30 per 1M tokens.
 DEFAULT_MODEL = "Qwen/Qwen3-30B-A3B-Instruct-2507"
 DEFAULT_BUDGET_USD = 5.0
+HARD_CEILING_USD = 20.0        # the owner's hard limit: no setting or argument raises the global budget above it
 DEFAULT_MAX_CALLS = 2000
 DEFAULT_MAX_TOKENS = 3_000_000
 DEFAULT_TIMEOUT = 60.0
 CACHE_DIR = Path.home() / ".cache" / "altruagent"
 DEFAULT_LEDGER = CACHE_DIR / "llm_usage.jsonl"
 DEFAULT_CACHE = CACHE_DIR / "llm_cache.sqlite"
-ENV_KEYS = ("NEBIUS_API_KEY", "NEBIUS_BASE_URL", "NEBIUS_MODEL", "NEBIUS_BUDGET_USD", "NEBIUS_MAX_CALLS",
-            "NEBIUS_MAX_TOKENS", "NEBIUS_RUN_ID", "NEBIUS_LEDGER", "NEBIUS_CACHE", "NEBIUS_TIMEOUT")
+ENV_KEYS = ("NEBIUS_API_KEY", "NEBIUS_BASE_URL", "NEBIUS_MODEL", "NEBIUS_BUDGET_USD", "NEBIUS_RUN_BUDGET_USD",
+            "NEBIUS_MAX_CALLS", "NEBIUS_MAX_TOKENS", "NEBIUS_RUN_ID", "NEBIUS_LEDGER", "NEBIUS_CACHE", "NEBIUS_TIMEOUT")
 
 # USD per 1M tokens (input, output), Nebius Token Factory list prices as of 2026-09-28. Nebius's own price page
 # (tokenfactory.nebius.com/organization/prices) renders client-side only, so these are from the copy in the Mastra
@@ -106,10 +131,16 @@ PRICES = {
     "zai-org/GLM-5.3": (1.0, 4.0),
     "zai-org/GLM-5.3-Flash": (0.15, 0.50),
 }
-# Models without a known price (e.g. Kimi-K2.6, GLM-5.1, Qwen3.8-27B) are charged the most expensive listed rate.
-UNKNOWN_PRICE = (3.0, 15.0)
-BYTES_PER_TOKEN = 3.0          # pre-call prompt estimate from UTF-8 bytes: English / JSON is ~3.5-4 bytes a token,
-MSG_OVERHEAD_TOKENS = 8        # CJK ~3 bytes for 1+ token; plus the chat template's tokens per message
+# Models without a known price (e.g. Kimi-K2.6, GLM-5.1, Qwen3.8-27B) are charged the most expensive listed rates
+# (input and output separately), so an unlisted model can only be over-reserved, never under.
+UNKNOWN_PRICE = (max(p[0] for p in PRICES.values()), max(p[1] for p in PRICES.values()))
+# Pre-call prompt bound from the UTF-8 bytes of the JSON-encoded messages: a byte-level BPE token (Qwen, Llama-3,
+# DeepSeek, GPT) or a SentencePiece token with byte fallback (Gemma) covers at least one byte, so a prompt never has
+# more tokens than bytes. English / JSON is ~3.5-4 bytes a token, but numbers are split into single digits (1 token a
+# byte), so 3 bytes a token was NOT a worst case for game-state prompts. The JSON syntax around each message (> 20
+# bytes) covers the chat template's per-message tokens; MSG_OVERHEAD_TOKENS and the +16 are extra margin.
+BYTES_PER_TOKEN = 1.0
+MSG_OVERHEAD_TOKENS = 8
 RETRY_STATUS = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
 MAYBE_BILLED_STATUS = frozenset({502, 504})     # a gateway gave up waiting: the model may still have run (and billed)
 MAX_RETRY_AFTER_S = 10.0
@@ -126,6 +157,18 @@ class LLMError(RuntimeError):
 class LLMUnavailable(LLMError):
     """No usable key, or a spend cap would be exceeded, or the spend ledger cannot be used: the client refuses
     without calling; fall back to rules."""
+
+
+class BudgetExhausted(LLMUnavailable):
+    """The "budget exhausted" signal: this request's worst case would take the global ledger total past
+    NEBIUS_BUDGET_USD, or its run past NEBIUS_RUN_BUDGET_USD / NEBIUS_MAX_CALLS / NEBIUS_MAX_TOKENS (or the budget
+    setting could not be read). Nothing was sent (and nothing reserved); fall back to rules."""
+
+
+class LedgerError(OSError):
+    """The spend ledger cannot be trusted: it lost history this process had read (deleted, truncated or replaced
+    while in use), it is not a regular file, or a reservation did not reach it. The message is ours (no file content)
+    and safe to show; the client refuses."""
 
 
 def known_price(model: str) -> tuple[float, float] | None:
@@ -165,15 +208,25 @@ class Ledger:
     """JSONL of request attempts, shared by processes (path None: kept in this process only).
 
     Each attempt is a 'reserved' line written before it is sent -- by `reserve`, which checks the caps against the
-    whole file and appends under one exclusive lock -- then a final line with the same `rid` and the actual usage,
-    which replaces the reservation. A reservation without its final line (the process died mid-request) stays
-    counted at its worst case. `refresh()` reads what others appended since the last read; `totals` is the whole
-    ledger, `runs[run_id]` = {'calls', 'tokens', 'usd'}, open reservations included; `pending` = open reservations."""
+    whole file and appends under one exclusive fcntl.flock -- then a final line with the same `rid` and the actual
+    usage, which replaces the reservation. A reservation without its final line (the process died mid-request) stays
+    counted at its worst case. The reservation's worst case is in `reserve_usd` / `reserve_tokens` (its `cost_usd`
+    and token fields are 0, so summing `cost_usd` over the file gives the settled spend); older reservation lines kept
+    it in `cost_usd` / the token fields and are read that way. `refresh()` reads what others appended since the last
+    read; `totals` is the whole ledger, `runs[run_id]` = {'calls', 'tokens', 'usd'}, open reservations included;
+    `pending` = open reservations, rid -> (run, tokens, usd).
+
+    The file only ever grows: once this object has read spend from it, a ledger that vanishes, shrinks or is swapped
+    for another file (a new inode) raises LedgerError from then on instead of starting over at $0 (that was a fresh
+    budget). A last line without its newline (a writer killed mid-line, a full disk) is closed before the next line is
+    appended, so it can never swallow a reservation. Only a regular file is a ledger (/dev/null reads back empty)."""
 
     def __init__(self, path: str | Path | None):
         self.path = Path(path).expanduser() if path else None
         self._lock = threading.RLock()
         self._offset = 0
+        self._ident = None                            # (st_dev, st_ino) of the file the offset belongs to
+        self._broken = None                           # why this ledger can no longer be trusted (sticky)
         self.totals, self.runs, self.pending = _zero(), {}, {}
 
     def _acc(self, run: str, tokens: int, usd: float, sign: int = 1) -> None:
@@ -187,6 +240,9 @@ class Ledger:
         tokens = _nonneg(rec.get("prompt_tokens") or 0, int) + _nonneg(rec.get("completion_tokens") or 0, int)
         usd = _nonneg(rec.get("cost_usd") or 0.0, float)
         if rec.get("status") == "reserved":
+            if "reserve_usd" in rec or "reserve_tokens" in rec:     # the worst case (older lines: the fields above)
+                tokens = _nonneg(rec.get("reserve_tokens") or 0, int)
+                usd = _nonneg(rec.get("reserve_usd") or 0.0, float)
             if isinstance(rid, str):
                 self.pending[rid] = (run, tokens, usd)
             self._acc(run, tokens, usd)
@@ -195,21 +251,39 @@ class Ledger:
             self._acc(*self.pending.pop(rid), sign=-1)
         self._acc(run, tokens, usd)
 
+    def _lost(self, what: str) -> LedgerError:
+        self._broken = (f"the spend ledger {what} after this process had read spend from it: that spend can no "
+                        f"longer be counted, so the budget cannot be enforced (lost history; restart the process)")
+        return LedgerError(self._broken)
+
     def refresh(self) -> None:
-        """Read new complete lines. Raises OSError when the ledger exists but cannot be read."""
+        """Read new complete lines. Raises OSError when the ledger exists but cannot be read, LedgerError when it is
+        not a regular file or lost history this object had read."""
         if self.path is None:
             return
         with self._lock:
+            if self._broken:
+                raise LedgerError(self._broken)
             try:
-                size = self.path.stat().st_size
+                st = os.stat(self.path)
             except FileNotFoundError:
-                size = 0
-            if size < self._offset:                  # truncated / replaced: start over
-                self._offset = 0
-                self.totals, self.runs, self.pending = _zero(), {}, {}
-            if size == self._offset:
+                st = None
+            if st is None:
+                if self._offset:
+                    raise self._lost("vanished")
                 return
+            if not stat.S_ISREG(st.st_mode):
+                raise LedgerError("the spend ledger is not a regular file")
             with open(self.path, "rb") as f:
+                st = os.fstat(f.fileno())
+                ident, size = (st.st_dev, st.st_ino), st.st_size
+                if self._offset and ident != self._ident:
+                    raise self._lost("was replaced by another file")
+                if size < self._offset:
+                    raise self._lost("shrank")
+                self._ident = ident
+                if size == self._offset:
+                    return
                 f.seek(self._offset)
                 chunk = f.read(size - self._offset)
             end = chunk.rfind(b"\n") + 1             # a half-written last line is read next time
@@ -224,41 +298,68 @@ class Ledger:
 
     def _write(self, rec: dict, check=None) -> str | None:
         """Append `rec` under the exclusive lock; with `check`, only if check(self) -- run on the refreshed ledger,
-        inside the lock -- returns None, else that refusal reason (and nothing is written). Raises OSError."""
+        inside the lock -- returns None, else that refusal reason (and nothing is written). Raises OSError, also when
+        this platform has no fcntl.flock (without it parallel processes could all pass the same check)."""
         with self._lock:
             if self.path is None:
                 why = check(self) if check is not None else None
                 if why is None:
                     self._add(rec)
                 return why
+            if fcntl is None:
+                raise OSError("no cross-process file lock (fcntl.flock) on this platform")
             self.path.parent.mkdir(parents=True, exist_ok=True)
+            if self.path.exists() and not self.path.is_file():
+                raise LedgerError("the spend ledger is not a regular file")
             line = (json.dumps(rec, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
-            with open(self.path, "ab") as f:
-                if fcntl is not None:
-                    fcntl.flock(f, fcntl.LOCK_EX)
+            with open(self.path, "a+b") as f:
+                fd = f.fileno()
+                mine = os.fstat(fd)
+                if not stat.S_ISREG(mine.st_mode):
+                    raise LedgerError("the spend ledger is not a regular file")
+                fcntl.flock(f, fcntl.LOCK_EX)
                 try:
+                    try:
+                        now = os.stat(self.path)
+                    except FileNotFoundError:
+                        now = None
+                    if now is None or (now.st_dev, now.st_ino) != (mine.st_dev, mine.st_ino):
+                        # deleted / swapped between open and lock: this lock no longer excludes the other writers
+                        raise LedgerError("the spend ledger was replaced while it was being locked")
                     why = None
                     if check is not None:
                         self.refresh()
                         why = check(self)
                     if why is None:
+                        size = os.fstat(fd).st_size
+                        if size and os.pread(fd, 1, size - 1) != b"\n":
+                            line = b"\n" + line      # close a torn last line: never glue a record onto it
                         f.write(line)
                         f.flush()
                 finally:
-                    if fcntl is not None:
-                        fcntl.flock(f, fcntl.LOCK_UN)
+                    fcntl.flock(f, fcntl.LOCK_UN)
             self.refresh()
             return why
 
     def reserve(self, rec: dict, check) -> str | None:
-        """Atomically check the caps and append a reservation (see the class docstring). Raises OSError."""
-        return self._write({**rec, "status": "reserved"}, check)
+        """Atomically check the caps and append a reservation (see the class docstring); `rec` carries the worst
+        case as reserve_usd / reserve_tokens and its `rid`. Raises OSError; LedgerError when the reservation cannot
+        be read back (a ledger that drops writes would let every check see $0)."""
+        why = self._write({**rec, "prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0,
+                           "status": "reserved"}, check)
+        if why is None and self.path is not None and rec.get("rid") not in self.pending:
+            raise LedgerError("a reservation did not reach the spend ledger (it cannot be read back)")
+        return why
 
     def append(self, rec: dict) -> None:
         self._write(rec)
 
     def run(self, run_id: str) -> dict:
         return dict(self.runs.get(run_id) or _zero())
+
+    def open_usd(self) -> float:
+        """The worst cases still reserved (requests in flight, or whose process died before settling)."""
+        return sum(p[2] for p in self.pending.values())
 
 
 # ------------------------------------------------------------------------------------------ cache
@@ -368,6 +469,23 @@ def _finite(v, default: float, *, low: float = 0.0, positive: bool = False) -> f
     return max(low, x)
 
 
+def _amount(v) -> float | None:
+    """A cap in USD: a finite number (below 0 -> 0), else None (junk, NaN, inf: the caller refuses everything)."""
+    x = _finite(v, float("nan"))
+    return None if math.isnan(x) else x
+
+
+def _whole(v) -> int:
+    """A count cap (calls, tokens): '100', '100.0', '1e6', '1_000_000' -> an int >= 0; junk / NaN / inf -> 0."""
+    x = _amount(v)
+    return 0 if x is None else int(x)
+
+
+# constructor argument -> the NEBIUS_* setting that bounds it (the operator's value: code may lower it, not raise it)
+CAP_SETTINGS = {"budget_usd": "NEBIUS_BUDGET_USD", "run_budget_usd": "NEBIUS_RUN_BUDGET_USD",
+                "max_calls": "NEBIUS_MAX_CALLS", "max_tokens": "NEBIUS_MAX_TOKENS"}
+
+
 def _count(v) -> int | None:
     """A token count as the server reported it (a non-negative int / integral float), else None."""
     if isinstance(v, bool):
@@ -398,20 +516,49 @@ def _parse_completion(resp) -> tuple[str, tuple[int, int] | None, str | None] | 
     return text, counts, finish if isinstance(finish, str) else None
 
 
+NO_LEDGER = ("no spend ledger file (ledger_path=None): the global budget cannot be enforced across processes, so "
+             "nothing is sent")
+
+
+def _ledger_problem(exc: OSError, what: str) -> str:
+    """The refusal reason for a ledger error: our own LedgerError message, else only the exception's type name."""
+    if isinstance(exc, LedgerError):
+        return f"spend ledger unusable: {exc}"
+    return f"spend ledger {what} ({type(exc).__name__}): the budget cannot be enforced"
+
+
 class LLMClient:
-    """One OpenAI-compatible endpoint + model, with retries, a response cache and hard spend caps."""
+    """One OpenAI-compatible endpoint + model, with retries, a response cache and hard spend caps.
+
+    The caps (budget_usd, run_budget_usd, max_calls, max_tokens) are bounded by the operator's NEBIUS_BUDGET_USD /
+    NEBIUS_RUN_BUDGET_USD / NEBIUS_MAX_CALLS / NEBIUS_MAX_TOKENS, read from `caps_env` (default os.environ; from_env
+    passes the environment + .env it read): code that builds its own client, or passes overrides to from_env /
+    shared_client, can lower them, never raise them. A cap that is not a finite number refuses everything (budget 0,
+    count 0) instead of reverting to a default, and the budget never exceeds HARD_CEILING_USD."""
 
     def __init__(self, api_key: str | None, *, model: str = DEFAULT_MODEL, base_url: str = DEFAULT_BASE_URL,
                  timeout: float = DEFAULT_TIMEOUT, retries: int = 2, backoff: float = 1.0, retry_timeouts: bool = False,
-                 budget_usd: float = DEFAULT_BUDGET_USD, max_calls: int = DEFAULT_MAX_CALLS,
-                 max_tokens: int = DEFAULT_MAX_TOKENS, run_id: str | None = None,
+                 budget_usd: float = DEFAULT_BUDGET_USD, run_budget_usd: float | None = None,
+                 max_calls: int = DEFAULT_MAX_CALLS, max_tokens: int = DEFAULT_MAX_TOKENS, run_id: str | None = None,
                  ledger_path: str | Path | None = DEFAULT_LEDGER, cache_path: str | Path | None = DEFAULT_CACHE,
-                 transport: httpx.BaseTransport | None = None, sleep=time.sleep):
+                 transport: httpx.BaseTransport | None = None, sleep=time.sleep, caps_env: dict | None = None):
         self.model, self.base_url = str(model), str(base_url).rstrip("/") + "/"
         self.timeout = _finite(timeout, DEFAULT_TIMEOUT, positive=True)
-        self.retries, self.backoff, self.retry_timeouts = max(0, int(retries)), backoff, retry_timeouts
-        self.budget_usd = _finite(budget_usd, DEFAULT_BUDGET_USD)
-        self.max_calls, self.max_tokens = max(0, int(max_calls)), max(0, int(max_tokens))
+        self.retries, self.backoff, self.retry_timeouts = max(0, _whole(retries)), backoff, retry_timeouts
+        src = os.environ if caps_env is None else caps_env
+        ceil = {arg: src.get(name) for arg, name in CAP_SETTINGS.items() if src.get(name) not in (None, "")}
+        budget = _amount(budget_usd)
+        env_budget = _amount(ceil["budget_usd"]) if "budget_usd" in ceil else HARD_CEILING_USD
+        self._budget_note = None
+        if budget is None or env_budget is None:       # a typo like '$1.84' or '1,84' must not become the $5 default
+            budget = env_budget = 0.0
+            self._budget_note = "NEBIUS_BUDGET_USD (or budget_usd) is not a finite number: nothing is sent"
+        self.budget_usd = min(HARD_CEILING_USD, budget, env_budget)
+        # None: no per-run sub-cap; anything else that is not a finite number >= 0 refuses everything (0)
+        runs = [x for x in (run_budget_usd, ceil.get("run_budget_usd")) if x is not None]
+        self.run_budget_usd = None if not runs else min([self.budget_usd] + [_amount(x) or 0.0 for x in runs])
+        self.max_calls = min([_whole(max_calls)] + ([_whole(ceil["max_calls"])] if "max_calls" in ceil else []))
+        self.max_tokens = min([_whole(max_tokens)] + ([_whole(ceil["max_tokens"])] if "max_tokens" in ceil else []))
         self.run_id = run_id or f"{os.uname().nodename if hasattr(os, 'uname') else 'host'}-{os.getpid()}-" \
                                 f"{time.strftime('%Y%m%dT%H%M%S')}-{uuid.uuid4().hex[:6]}"
         self.ledger = Ledger(ledger_path)
@@ -441,7 +588,8 @@ class LLMClient:
 
     @classmethod
     def from_env(cls, *, dotenv: str | Path | None | bool = True, environ: dict | None = None, **overrides):
-        """Build from NEBIUS_* (environment first, then the .env; see the module docstring). Never raises."""
+        """Build from NEBIUS_* (environment first, then the .env; see the module docstring). Never raises. Overrides
+        of the caps can only lower what the environment / .env set (see the class docstring)."""
         env = dict(_read_dotenv(default_dotenv() if dotenv is True else (dotenv or None)))
         src = os.environ if environ is None else environ
         env.update({k: v for k, v in src.items() if k in ENV_KEYS and v})
@@ -449,12 +597,14 @@ class LLMClient:
         kw = dict(model=env.get("NEBIUS_MODEL") or DEFAULT_MODEL,
                   base_url=env.get("NEBIUS_BASE_URL") or DEFAULT_BASE_URL,
                   timeout=_num(env.get("NEBIUS_TIMEOUT"), float, DEFAULT_TIMEOUT),
-                  budget_usd=_num(env.get("NEBIUS_BUDGET_USD"), float, DEFAULT_BUDGET_USD),
-                  max_calls=_num(env.get("NEBIUS_MAX_CALLS"), int, DEFAULT_MAX_CALLS),
-                  max_tokens=_num(env.get("NEBIUS_MAX_TOKENS"), int, DEFAULT_MAX_TOKENS),
+                  budget_usd=env.get("NEBIUS_BUDGET_USD") or DEFAULT_BUDGET_USD,      # parsed (fail closed) by
+                  run_budget_usd=env.get("NEBIUS_RUN_BUDGET_USD") or None,            # the constructor
+                  max_calls=env.get("NEBIUS_MAX_CALLS") or DEFAULT_MAX_CALLS,
+                  max_tokens=env.get("NEBIUS_MAX_TOKENS") or DEFAULT_MAX_TOKENS,
                   run_id=env.get("NEBIUS_RUN_ID") or None,
                   ledger_path=env.get("NEBIUS_LEDGER") or DEFAULT_LEDGER,
-                  cache_path=None if (cache or "").lower() in ("0", "off", "no", "false") else (cache or DEFAULT_CACHE))
+                  cache_path=None if (cache or "").lower() in ("0", "off", "no", "false") else (cache or DEFAULT_CACHE),
+                  caps_env=env)
         kw.update(overrides)
         return cls(env.get("NEBIUS_API_KEY"), **kw)
 
@@ -473,11 +623,18 @@ class LLMClient:
                 "run_usd": run["usd"]}
 
     def _why(self, led: Ledger, est_usd: float, est_tokens: int) -> str | None:
+        """Why a request of this worst case would break a cap, checked against the ledger `led` (the whole file:
+        every process and run, open reservations at their worst case), or None."""
+        if self._budget_note:
+            return f"budget exhausted: {self._budget_note}"
         total = led.totals["usd"]
         if total + est_usd > self.budget_usd:
-            return (f"budget: ${total:.4f} spent + ${est_usd:.4f} for this call > NEBIUS_BUDGET_USD "
+            return (f"budget exhausted: ledger total ${total:.4f} + ${est_usd:.4f} for this call > NEBIUS_BUDGET_USD "
                     f"${self.budget_usd:.2f}")
         run = led.run(self.run_id)
+        if self.run_budget_usd is not None and run["usd"] + est_usd > self.run_budget_usd:
+            return (f"budget exhausted: run ${run['usd']:.4f} + ${est_usd:.4f} for this call > NEBIUS_RUN_BUDGET_USD "
+                    f"${self.run_budget_usd:.2f}")
         if run["calls"] + 1 > self.max_calls:
             return f"run cap: {run['calls']} calls = NEBIUS_MAX_CALLS {self.max_calls}"
         if run["tokens"] + est_tokens > self.max_tokens:
@@ -488,10 +645,12 @@ class LLMClient:
         """Why the next request (of this estimated size) would be refused, or None."""
         if self._http is None:
             return self._no_http
+        if self.ledger.path is None:
+            return NO_LEDGER
         try:
             self.ledger.refresh()
         except OSError as exc:
-            return f"spend ledger unreadable ({type(exc).__name__}): the budget cannot be checked"
+            return _ledger_problem(exc, "unreadable")
         return self._why(self.ledger, est_usd, est_tokens)
 
     @property
@@ -502,9 +661,13 @@ class LLMClient:
     def unavailable_reason(self) -> str | None:
         return self.refusal()
 
-    def estimate(self, messages: list[dict], max_tokens: int) -> tuple[int, int, float]:
-        """Worst case of one request: (estimated prompt tokens, prompt + max_tokens, USD)."""
+    def estimate(self, messages: list[dict], max_tokens: int,
+                 response_format: dict | None = None) -> tuple[int, int, float]:
+        """Worst case of one request: (estimated prompt tokens, prompt + max_tokens, USD). A response_format counts
+        as prompt (some servers put the schema into the prompt)."""
         size = len(json.dumps(messages, ensure_ascii=False, default=str).encode("utf-8"))
+        if response_format is not None:
+            size += len(json.dumps(response_format, ensure_ascii=False, default=str).encode("utf-8"))
         prompt = int(size / BYTES_PER_TOKEN) + 16 + MSG_OVERHEAD_TOKENS * len(messages)
         return prompt, prompt + int(max_tokens), cost_usd(self.model, prompt, int(max_tokens))
 
@@ -513,24 +676,32 @@ class LLMClient:
         return hashlib.sha256(json.dumps({"base": self.base_url, **body}, sort_keys=True, ensure_ascii=False,
                                          default=str).encode()).hexdigest()
 
-    def _refuse(self, why: str):
+    def _refuse(self, why: str, cls=LLMUnavailable):
         with self._lock:
             self.stats.refused += 1
-        return LLMUnavailable(why)
+        return cls(why)
 
     def chat(self, messages: list[dict], *, max_tokens: int = 512, temperature: float | None = None,
              response_format: dict | None = None, tag: str = "", use_cache: bool = True) -> Completion:
-        """One chat completion. Raises LLMUnavailable (refused, nothing sent) or LLMError (failed after retries)."""
-        max_tokens = max(1, int(max_tokens))
+        """One chat completion. Raises BudgetExhausted (a cap: nothing sent), LLMUnavailable (no key / no usable
+        ledger: nothing sent) or LLMError (failed after retries). A cache hit costs 0 and has cached=True."""
+        try:
+            max_tokens = max(1, int(max_tokens))
+            temperature = None if temperature is None else float(temperature)
+            ok = temperature is None or math.isfinite(temperature)
+        except (TypeError, ValueError, OverflowError):
+            ok = False
+        if not ok:
+            raise LLMError("max_tokens / temperature must be finite numbers")
         body: dict = {"model": self.model, "messages": messages, "max_tokens": max_tokens}    # never "stream"
         if temperature is not None:
-            body["temperature"] = float(temperature)
+            body["temperature"] = temperature
         if response_format is not None:
             body["response_format"] = response_format
         est, key = None, None
         try:
             key = self._cache_key(body) if (self.cache is not None and use_cache and self._http is not None) else None
-            est = self.estimate(messages, max_tokens)
+            est = self.estimate(messages, max_tokens, response_format)
         except (TypeError, ValueError, RecursionError):
             est = None
         if est is None:
@@ -545,22 +716,33 @@ class LLMClient:
                                   cached=True)
         if self._http is None:
             raise self._refuse(self._no_http)
+        if self.ledger.path is None:
+            raise self._refuse(NO_LEDGER)
         attempt = 0
         while True:
+            request, bad = None, None
+            try:                                       # before reserving: a body that cannot be encoded never leaves
+                request = self._http.build_request("POST", "chat/completions", json=body)
+            except Exception as exc:                   # noqa: BLE001 - reported by type name only
+                bad = type(exc).__name__
+            if request is None:
+                raise LLMError(f"the request cannot be built ({bad})")
             base = {"t": round(time.time(), 3), "run": self.run_id, "model": self.model, "tag": tag,
                     "rid": uuid.uuid4().hex}
+            broken = None
             try:
-                why = self.ledger.reserve({**base, "prompt_tokens": est_prompt, "completion_tokens": max_tokens,
-                                           "cost_usd": round(est_usd, 8)},
+                why = self.ledger.reserve({**base, "reserve_tokens": est_tokens, "reserve_usd": round(est_usd, 8)},
                                           lambda led: self._why(led, est_usd, est_tokens))
             except OSError as exc:
-                why = f"spend ledger not writable ({type(exc).__name__}): the budget cannot be enforced"
+                why, broken = None, _ledger_problem(exc, "not writable or lockable")
+            if broken is not None:                     # raised outside the except: nothing chained
+                raise self._refuse(broken)
             if why is not None:
-                raise self._refuse(why)
+                raise self._refuse(why, BudgetExhausted)
             t0 = time.perf_counter()
             resp, status, err, maybe_billed, retryable = None, None, None, False, False
             try:
-                resp = self._http.post("chat/completions", json=body)
+                resp = self._http.send(request)
                 status = resp.status_code
             except httpx.TimeoutException as exc:
                 err, maybe_billed, retryable = f"timeout ({type(exc).__name__})", not isinstance(exc, _UNSENT), \
@@ -570,7 +752,9 @@ class LLMClient:
             except httpx.TransportError as exc:
                 err, maybe_billed, retryable = f"transport ({type(exc).__name__})", not isinstance(exc, _UNSENT), True
             except Exception as exc:                   # noqa: BLE001 - httpx's own errors may quote the request
-                err = f"client ({type(exc).__name__})"
+                # the request was built and handed to the transport: anything else (httpx.DecodingError while the
+                # reply is read -- not a TransportError --, a transport bug) may come after the model ran and billed
+                err, maybe_billed = f"client ({type(exc).__name__})", True
             latency = time.perf_counter() - t0
             if status == 200:
                 parsed = _parse_completion(resp)
@@ -580,8 +764,11 @@ class LLMClient:
                         self.stats.errors += 1
                     raise LLMError("the response had no message")
                 text, counts, finish = parsed
-                pt, ct = counts if counts is not None else (est_prompt, len(text.encode("utf-8")) // 3 + 1)
-                usd = cost_usd(self.model, pt, ct)
+                if counts is not None:
+                    pt, ct = counts
+                    usd = cost_usd(self.model, pt, ct)
+                else:                                  # no usage: what was billed is unknown, keep the worst case
+                    pt, ct, usd = est_prompt, max_tokens, est_usd
                 self._settle(base, pt, ct, latency, "ok", usd, estimated=counts is None)
                 with self._lock:
                     self.stats.calls += 1
@@ -811,9 +998,10 @@ def _cli(argv=None) -> int:
     if a.cmd == "status":
         s = c.spent()
         print(f"key: {c.key_state} | model {c.model} | base {c.base_url}")
-        print(f"ledger {c.ledger.path}: ${s['total_usd']:.4f} spent of ${c.budget_usd:.2f} budget "
-              f"({len(c.ledger.pending)} open reservations) | per-run caps {c.max_calls} calls, {c.max_tokens} "
-              f"tokens | cache {c.cache.path if c.cache else 'off'}")
+        run_cap = "none" if c.run_budget_usd is None else f"${c.run_budget_usd:.2f}"
+        print(f"ledger {c.ledger.path}: ${s['total_usd']:.4f} spent of ${c.budget_usd:.2f} budget (hard ceiling "
+              f"${HARD_CEILING_USD:.0f}; {len(c.ledger.pending)} open reservations) | per-run caps {run_cap}, "
+              f"{c.max_calls} calls, {c.max_tokens} tokens | cache {c.cache.path if c.cache else 'off'}")
         print("available" if c.available else f"unavailable: {c.unavailable_reason}")
         return 0
     if a.cmd == "ledger":
@@ -821,9 +1009,10 @@ def _cli(argv=None) -> int:
         runs = {a.run: c.ledger.run(a.run)} if a.run else c.ledger.runs
         for rid, r in runs.items():
             print(f"{rid}: {r['calls']} requests, {r['tokens']} tokens, ${r['usd']:.4f}")
-        t = c.ledger.totals
-        print(f"total: {t['calls']} requests, {t['tokens']} tokens, ${t['usd']:.4f} of ${c.budget_usd:.2f} "
-              f"({len(c.ledger.pending)} open reservations, counted at their worst case)")
+        t, held = c.ledger.totals, c.ledger.open_usd()
+        print(f"total: {t['calls']} requests, {t['tokens']} tokens, ${t['usd']:.4f} of ${c.budget_usd:.2f} = settled "
+              f"${t['usd'] - held:.4f} + {len(c.ledger.pending)} open reservations ${held:.4f} (their worst case). "
+              f"This is the total the caps use; do not sum cost_usd over old 'reserved' lines.")
         return 0
     try:
         if a.cmd == "models":

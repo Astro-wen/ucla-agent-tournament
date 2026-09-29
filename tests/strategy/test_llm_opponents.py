@@ -21,6 +21,10 @@ needs_showdown = pytest.mark.skipif(not (JS_DIR / "node_modules").exists(), reas
 FAKE_KEY = "test-key-not-real-0123456789"
 
 
+def no_network(self, request):
+    raise AssertionError("a test tried to reach the network")
+
+
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch, tmp_path):
     for k in lc.ENV_KEYS:
@@ -29,6 +33,7 @@ def _isolated(monkeypatch, tmp_path):
     monkeypatch.setenv("NEBIUS_LEDGER", str(tmp_path / "ledger.jsonl"))
     monkeypatch.setenv("NEBIUS_CACHE", "off")
     monkeypatch.setattr(lc, "_SHARED", {})
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", no_network)    # only MockTransport answers here
     yield
 
 
@@ -127,8 +132,9 @@ def test_a_call_is_ledgered_with_tokens_and_cost_and_never_the_key(tmp_path):
     assert comp.cost_usd == pytest.approx(want) and c.stats.cost_usd == pytest.approx(want)
     text = (tmp_path / "ledger.jsonl").read_text()
     res, rec = ledger_lines(tmp_path / "ledger.jsonl", final_only=False)   # the reservation, then the final line
-    assert res["status"] == "reserved" and res["rid"] == rec["rid"] and res["completion_tokens"] == 50
-    assert res["cost_usd"] == pytest.approx(c.estimate(msgs, 50)[2], abs=1e-8)
+    assert res["status"] == "reserved" and res["rid"] == rec["rid"] and res["reserve_tokens"] == c.estimate(msgs, 50)[1]
+    assert res["reserve_usd"] == pytest.approx(c.estimate(msgs, 50)[2], abs=1e-8)
+    assert res["cost_usd"] == 0 and res["prompt_tokens"] == res["completion_tokens"] == 0   # a placeholder, not spend
     assert rec["run"] == "r1" and rec["prompt_tokens"] == 1000 and rec["completion_tokens"] == 200
     assert rec["status"] == "ok" and rec["tag"] == "t" and rec["cost_usd"] == pytest.approx(want)
     assert FAKE_KEY not in text and "Bearer" not in text
@@ -312,11 +318,13 @@ def test_attempts_with_an_unknown_outcome_stay_charged_at_their_worst_case(tmp_p
     assert c.stats.errors == 1 and c.stats.timeouts == (status == "timeout")    # timeouts are counted on their own
 
 
-def test_a_reply_without_usage_is_charged_its_estimate(tmp_path):
+def test_a_reply_without_usage_stays_charged_at_its_worst_case(tmp_path):
     c = client(tmp_path, FakeNebius(usage=None, content='{"a": 1}'))
     comp = c.chat(MSGS, max_tokens=400)
-    assert comp.prompt_tokens == c.estimate(MSGS, 400)[0] and comp.completion_tokens >= 1 and comp.cost_usd > 0
+    prompt, _, worst = c.estimate(MSGS, 400)
+    assert (comp.prompt_tokens, comp.completion_tokens) == (prompt, 400) and comp.cost_usd == pytest.approx(worst)
     assert ledger_lines(tmp_path / "ledger.jsonl")[0]["estimated"] is True
+    assert c.spent()["total_usd"] == pytest.approx(worst, abs=1e-8)
 
 
 def test_a_reservation_without_its_final_line_stays_charged(tmp_path):
@@ -352,9 +360,11 @@ def test_damaged_ledger_lines_never_break_the_budget_check(tmp_path):
     assert c.spent()["total_usd"] == pytest.approx(1.0 + lc.cost_usd(lc.DEFAULT_MODEL, 10, 10))
 
 
-@pytest.mark.parametrize("raw, want", [("nan", 5.0), ("inf", 5.0), ("-inf", 5.0), ("junk", 5.0), ("-1", 0.0),
-                                       ("0.25", 0.25)])
+@pytest.mark.parametrize("raw, want", [("nan", 0.0), ("inf", 0.0), ("-inf", 0.0), ("junk", 0.0), ("-1", 0.0),
+                                       ("0.25", 0.25), ("20", 20.0), ("20.01", 20.0), ("1000", 20.0)])
 def test_the_budget_setting_cannot_switch_the_cap_off(monkeypatch, raw, want):
+    """Never above the hard ceiling, and a setting that is not a finite number refuses everything ($0) instead of
+    reverting to the $5 default (a typo like '1,84' must not raise the cap)."""
     monkeypatch.setenv("NEBIUS_BUDGET_USD", raw)
     assert lc.LLMClient.from_env().budget_usd == want
     assert lc.LLMClient(FAKE_KEY, budget_usd=float(raw) if raw != "junk" else raw, ledger_path=None,

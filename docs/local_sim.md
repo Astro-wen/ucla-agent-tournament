@@ -210,17 +210,32 @@ python -m local.panel --candidate-dir ../wt-foo --name foo --games 200 --jobs 3 
 | 变量 | 默认 | 作用 |
 |---|---|---|
 | `NEBIUS_MODEL` | `Qwen/Qwen3-30B-A3B-Instruct-2507` | 模型 |
-| `NEBIUS_BUDGET_USD` | 5.0 | **全局预算** = 账本里所有花费之和（含还没结束的预留）；下一次请求按最坏情况（估计的提示 token + max_tokens）会超就拒绝，不发请求。填 nan / inf / 乱写 → 回到 5.0，负数 → 0（全拒） |
-| `NEBIUS_MAX_CALLS` / `NEBIUS_MAX_TOKENS` | 2000 / 3,000,000 | **每个 run** 的请求数（**每次重试都算**）/ token 上限（面板的多个 worker 共用一个 `NEBIUS_RUN_ID`） |
-| `NEBIUS_LEDGER` / `NEBIUS_CACHE` | 见上 | 账本 / 缓存位置；`NEBIUS_CACHE=off` 关缓存 |
+| `NEBIUS_BUDGET_USD` | 5.0 | **全局预算** = 账本里所有花费之和（所有进程、所有 run，含还没结束的预留）；下一次请求按最坏情况（估计的提示 token + max_tokens）会超就拒绝（`BudgetExhausted`），不发请求。**最高 20**（`HARD_CEILING_USD`，填 1000 也只算 20）；填了但不是数字（`$1.84`、`1,84`、`1.84 USD`、nan、inf）→ 0（全拒，拒绝理由里写明），**不会悄悄变回 5**；负数 → 0 |
+| `NEBIUS_RUN_BUDGET_USD` | 不设 = 没有 | **每个 run 的美元小上限**（按 `NEBIUS_RUN_ID` 算这个 run 在账本里的花费，含预留），和全局预算同时生效；乱写 / nan / 负数 → 0（全拒，不会悄悄失效） |
+| `NEBIUS_MAX_CALLS` / `NEBIUS_MAX_TOKENS` | 2000 / 3,000,000 | **每个 run** 的请求数（**每次重试都算**）/ token 上限（面板的多个 worker 共用一个 `NEBIUS_RUN_ID`）；`100.0`、`1e6`、`1_000_000` 都能读，乱写 → 0（全拒） |
+| `NEBIUS_LEDGER` / `NEBIUS_CACHE` | 见上 | 账本 / 缓存位置；`NEBIUS_CACHE=off` 关缓存。**真跑时别改账本路径、别删账本**：全局预算只管同一个账本文件（`NEBIUS_LEDGER` 写错、或用 root 跑（HOME 不同）= 另一本空账 = 另一份预算）。账本必须是普通文件（`/dev/null` 之类直接拒绝） |
 | `NEBIUS_BASE_URL` / `NEBIUS_TIMEOUT` | Nebius / 60 | 任何 OpenAI 兼容服务都行 |
+
+上面四个上限（预算、run 小上限、请求数、token 数）以**环境变量 / `.env` 里的值为天花板**：代码自己 `LLMClient(...)`，或者给 `from_env` / `shared_client` 传参数，只能调低、不能调高。`ledger_path=None`（只在本进程里记账）的客户端不发真实请求（它的「全局」预算只管它自己）。
+
+**怎么读账本（09-29）**：`reserved`（预留）行只是占位，不是花费：最坏情况写在 `reserve_usd` / `reserve_tokens`，它的 `cost_usd` 和 token 字段是 0，所以直接把 `cost_usd` 一列加起来 = 已结算的花费（不含还在飞的预留）。09-29 之前的旧预留行把最坏情况写在 `cost_usd` 里，直接相加会把每个请求算两遍——09-28 的「$3.25」就是这么来的，真实账本总额是 $1.04（用 main 上旧代码 + 假服务器复现过：2 个 worker、上限按 0.1 倍缩放成 $0.184，真实总额 $0.104 时直接相加是 $0.258，看起来「超了上限」；一直跑到被拒，真实总额最高 $0.18399 ≤ $0.184）。要看预算检查用的数，跑 `python -m local.llm_client ledger`。
 
 **没 key、超预算、超上限、请求失败**：客户端立刻拒绝（不发请求），`LLMAgent` 走自己的规则兜底（第一个合法动作 / smoke 的带人和出招 / 结束发言）= 和 `llm_fallback` 下法相同，**不会崩**；面板和评测开跑前打印 WARNING。`eval_pokemon` / `eval_werewolf`（真实 LLM 座位）跑到一半被上限拒绝时会**提前停**并说明（不再把后面几百局兜底局混进「对 LLM」的胜率里；狼人杀被打断的那一局丢掉，对照也截到同样的局）。
 
 **审查加固（09-28）**，每条都有测试（`tests/strategy/test_llm_opponents.py`，全用假 HTTP，不联网、不读真 `.env`）：
 - **并发**：检查上限和写「预留」在同一把文件锁里完成，多个 worker 不会同时通过同一次检查（8 个并发、只够 3 次 → 恰好发 3 次）；进程中途被杀，它的预留按最坏情况一直计着。
-- **结果不明的请求照最坏情况计费**：超时、发出后断线、502 / 504、200 但读不出内容 —— 服务器可能已经算钱；连不上、4xx、429、500 / 503 记 0；200 但没报 usage 按估计的提示 + 回答长度计。
+- **结果不明的请求照最坏情况计费**：超时、发出后断线、502 / 504、200 但读不出内容、200 但没报 usage —— 服务器可能已经算钱；连不上、4xx、429、500 / 503 记 0。
+- **多进程预算（09-29，`tests/strategy/test_llm_budget.py`）**：12 个进程各自一个客户端、同时猛打一个只够 7 次的上限 → 恰好发 7 次，逐行重放账本，任何时刻都没超过上限；把文件锁换成空锁，同样的测试会发 12 次（超 60%）。没有 `fcntl.flock` 的平台直接拒绝。表里没有的模型按表里最贵的输入 / 输出价预留和计费；缓存命中不花钱、不进账本、`cached=True`。
 - **账本读不了 / 写不了就拒绝**（以前会退回进程内计数、而那份计数不参与预算检查 → 等于没上限）；账本里坏掉的行不会让检查崩。
+- **对抗测试（09-29，`tests/strategy/test_llm_budget_attacks.py`）**，每条先写成会失败的测试再修：
+  - **发出之后才出错的请求照最坏情况计费**：比如回答的 gzip 压缩坏了（httpx 抛 `DecodingError`，它不算 `TransportError`），以前记 0 美元 → 调用方一直重试就能无限花钱（测试里只够 3.5 次的上限发出了 20 次）。现在只有「确定没发出去」的错误（连不上、请求体编码失败）才记 0；请求体编码失败在预留之前就报错，不发也不记账。
+  - **最坏情况的提示 token 改成「1 字节 = 1 token」**：字节级分词器一个 token 至少占 1 字节，这才是真上限。旧的「3 字节 = 1 token」对数字多的提示不成立（Qwen 等把数字拆成单个数字，差不多 1 字节 1 token），实际花费会超过预留、账本能越过上限。代价：预留大约变成原来的 3 倍（只影响还在飞的请求占的额度，结算仍按服务器报的实际 token）。
+  - **账本最后一行没写完（进程写到一半被杀、磁盘满）**：以前下一条预留会粘到这半行后面，整行解析失败被丢掉 → 别的 worker 看不到这条预留（测试里只够 1.5 次的上限，2 个 worker 都发了；8 个进程抢只够 5 次的上限时发了 6 次）。现在写之前先补一个换行。
+  - **账本在运行中被删 / 截短 / 换成另一个文件**：以前这个进程会从 0 重新算（等于预算重置）。现在这个进程从此拒绝（要重启进程）。注意：删账本之后**新启动**的进程只能看到新文件——所以不要删账本。
+  - **预留写完必须能读回来**，否则拒绝（`/dev/null` 这类「账本」会吞掉写入，每次检查都看到 $0）；拿到文件锁之后再确认锁住的还是账本那个文件。
+  - **设置写错不再变回默认值**；代码传参不能调高环境变量里的上限（见上面表格下面那段）；`max_tokens` / `temperature` 不是有限数字 → `LLMError`，不发请求。
+  - **守住了、测试证明的**：同一个客户端被 10 个线程共用、只够 3 次 → 恰好 3 次；`max_tokens=10**12` 直接被预算拒；重试每次重新预留；在预留和结算之间抛出的非 `Exception` 异常（类似 KeyboardInterrupt）让预留一直计着；结算时账本变只读 → 预留保留、下一次拒绝；垃圾行、时间戳错乱（未来 / 负数 / 没有）不影响总额；VGC `llm_real` 和狼人杀 `LLMWerewolfSeat` 走共享客户端，预算用完后不再发请求、座位走规则兜底不崩。
+  - **残余风险（代码挡不住，只能记账）**：服务器无视 `max_tokens` 多算钱 → 按服务器报的数记上，下一次请求会看到并拒绝，超出量最多是当时还在飞的那几个请求；`llm_live`（`OPENAI_*` 环境变量，官方 `OpenAIProvider`）完全不走这个账本，别把 Nebius 的 key 填进 `OPENAI_API_KEY`；账本只是按价目表的估算，以 Nebius 控制台为准。
 - **绝不因为我们自己的代码让座位崩**：`NebiusProvider` 把任何异常都变成 `ProviderError`（只带异常类型名），`LLMAgent` 照常重试一次再兜底；usage 字段格式怪、正文不是 JSON、缓存出错、key 不是合法 HTTP 头（例如含非 ASCII 字符）都不再抛出别的异常。
 - **不合 schema 的回答算无效**：端点不支持严格 `json_schema` 时会退到 `json_object`，那时模型什么都能答（比如 `bring` 里放对象，官方 `pokemon.py` 的 `build()` 会抛 TypeError → runner 判座位掉线）；现在按 schema 检查类型 / 枚举 / 必填 / 多余字段，不合就是无效回答（OpenAI 严格模式本来就保证这一点）。JSON 模式按 schema 分别记忆，一个 schema 被拒不会让别的也降级。
 - **对局里的文字只是数据**：聊天里的恶意文本以转义字符串进请求；回答外面包着说明文字、代码块或 `<think>` 都能解析，没写完的 `<think>`、极深的嵌套也不会抛异常；照着注入内容选的非法动作会被官方 agent 自己的校验挡下 → 重试 → 兜底。
@@ -228,7 +243,7 @@ python -m local.panel --candidate-dir ../wt-foo --name foo --games 200 --jobs 3 
 ```bash
 python -m local.llm_client status          # key 在不在（只打印 present/absent）、模型、已花 / 预算
 python -m local.llm_client ping            # 一次很短的调用（约 40 token）
-python -m local.llm_client ledger          # 按 run 汇总账本（含未结束的预留）
+python -m local.llm_client ledger          # 按 run 汇总账本；总额 = 已结算 + 未结束的预留（预算检查用的就是这个数）
 python -m local.eval_pokemon --games 10 --opponent llm_real --seed 43 --verbose
 python -m local.panel --opps llm_real --games 20 --jobs 2 --name v3-llmreal   # 只能按名字点，不在任何组里
 python -m local.eval_werewolf --llm-real 2 --bg mixed:first+heuristic --ks 1,5 --games 40 --seeds 43 --jobs 2   # 对照 = llm 替身
