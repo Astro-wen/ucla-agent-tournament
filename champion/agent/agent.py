@@ -13,7 +13,16 @@ after 120 s in Werewolf). So everything here is defensive:
     logged to stderr and answered with a safe legal action (agent/fallback.py,
     deterministic);
   * structured actions are checked against the server's own template before we
-    send them, and chat is clipped to the platform limits.
+    send them, and chat is clipped to the platform limits;
+  * a doubles turn is also checked as a pair (Showdown's rule: never the same
+    switch-in twice, no `pass` while a switch-in is still free for that slot)
+    right before it goes to the runner, whatever path produced it (policy,
+    fallback, watchdog, crash): a pair the server would reject (or one with a
+    wrong or missing `type`) is repaired minimally (agent/fallback.repair_doubles),
+    logged and counted; when the doubles template is the state's one legal
+    action, an answer that is no pair at all (e.g. the template's own
+    LegalAction, which the runner would send unfilled) is replaced by the
+    template filled in.
 
 Moves carry a short public `reasoning_summary` (altruagent.WithReasoning) built
 by agent/reasoning.py from public information only, after the move is fixed;
@@ -33,9 +42,9 @@ from pathlib import Path
 from altruagent import TERMINATE_MESSAGING, DecisionContext, GameState, LegalAction, SendMessage
 
 from . import reasoning, timecontrol
-from .fallback import is_template, safe_action
+from .fallback import doubles_from_template, doubles_problems, is_template, joint_problems, repair_doubles, safe_action
 from .pokemon.dex import to_id
-from .pokemon.policy import PokemonPolicy
+from .pokemon.policy import PokemonPolicy, switch_ranking
 from .werewolf.policy import WerewolfPolicy
 
 log = logging.getLogger("agent")
@@ -91,6 +100,7 @@ class Contestant:
         self.last_decision: dict | None = None        # kind, budget, source, path, ms of the last decision
         self.overruns = 0                             # decisions the watchdog answered for
         self.fallbacks = 0                            # decisions answered by a fallback (crash, overrun, unknown)
+        self.joint_repairs = 0                        # doubles answers repaired as a pair before sending
         self._path = "policy"                         # how the current decision is being answered
         self.reasoning_mode = reasoning.mode_from_env()   # ARENA_REASONING: off | safe (default) | detail
         self.last_reasoning: str | None = None             # the public line sent with the last move, if any
@@ -112,6 +122,7 @@ class Contestant:
         except Exception:
             log.exception("choose_action failed; answering with a safe legal action")
             out = self._fallback(state, game, "crash")
+        out = self._joint_guard(state, out)              # every path: a doubles pair the server takes as a whole
         # The move is fixed above; the public line is attached afterwards and can only drop itself, never the move.
         sent, self.last_reasoning = out, None
         try:
@@ -216,6 +227,10 @@ class Contestant:
             return hit or self._fallback(state, "pokemon_", "singles action not legal")
         raw = _raw_with_legal(state)
         if action.get("type") == "doubles_turn" and not doubles_ok(raw, action):
+            fixed = self._repair(raw, action, "doubles action failed local validation")
+            if fixed is not None:
+                self._path = "repaired"
+                return fixed
             log.warning("doubles action failed local validation: %s", action)
             return self._fallback(state, "pokemon_", "doubles action not legal")
         if action.get("type") == "select_lineup" and not lineup_ok(raw, action):
@@ -260,6 +275,55 @@ class Contestant:
         if out.get("type") == "select_lineup":
             return lineup_ok(raw, out)
         return True
+
+    def _repair(self, raw: dict, action: dict, why: str) -> dict | None:
+        """`action` repaired minimally into a legal doubles_turn (fallback.repair_doubles; a slot that must change takes
+        the switch-in the policy's ranking prefers), or None when that is not possible. Logs and counts a repair."""
+        tmpl = _doubles_template(raw)
+        if tmpl is None:
+            return None
+        fixed, notes = repair_doubles(action, tmpl, prefer=_switch_prefs(raw))
+        if not doubles_ok(raw, fixed):
+            return None
+        if notes:
+            self.joint_repairs += 1
+            log.warning("%s (%s); repaired: %s -> %s", why, "; ".join(notes), action, fixed)
+        return fixed
+
+    def _joint_guard(self, state: GameState, out):
+        """The last line of defence, on every path (policy, repair, fallback, watchdog overrun, crash): in a doubles
+        state what goes to the runner is a legal doubles_turn. A pair (a doubles_turn, or any dict with slot_* keys)
+        the server would reject, also for a wrong or missing `type`, is repaired. When the doubles template is the
+        state's one legal action (every recorded platform doubles turn), an answer that is no pair at all (the
+        template's own LegalAction, which the runner would send unfilled, a stale select_lineup, junk) is replaced by
+        the template filled in (its first options: moves stay moves). Never raises (the answer then goes as is)."""
+        try:
+            raw = _raw_with_legal(state)
+            tmpl = _doubles_template(raw)
+            if tmpl is None or (tmpl.get("type") or "doubles_turn") != "doubles_turn":
+                return out
+            pair = isinstance(out, dict) and (out.get("type") == "doubles_turn"
+                                              or any(str(k).startswith("slot_") for k in out))
+            if not pair:
+                if not _doubles_only(raw, tmpl):
+                    return out                            # another legal action is listed: the answer may be that one
+                filled = doubles_from_template(tmpl)
+                log.error("doubles state answered with %r, not a doubles_turn; sending the template filled in: %s",
+                          out, filled)
+                self.joint_repairs += 1
+                self._path += "+filled"
+                out = filled
+            if not doubles_problems(tmpl, out):
+                return out
+            fixed = self._repair(raw, out, "doubles answer not legal right before sending")
+            if fixed is None:
+                log.error("doubles answer %s is not legal and could not be repaired; sending it", out)
+                return out
+            self._path += "+repaired"
+            return fixed
+        except Exception:
+            log.exception("doubles pair check failed; sending the answer as it is")
+            return out
 
     # ---- Werewolf discussion ----------------------------------------------
     def choose_message(self, state: GameState, context: DecisionContext):
@@ -353,8 +417,36 @@ def lineup_ok(raw: dict, action: dict) -> bool:
         return False
 
 
+def _doubles_template(raw: dict) -> dict | None:
+    """The doubles_turn template (per-slot options) of a state, or None."""
+    try:
+        tmpl = raw["legal_actions"]["actions"][0]["input"]["action"]
+        return tmpl if isinstance(tmpl, dict) and isinstance(tmpl.get("slots"), list) else None
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
+def _doubles_only(raw: dict, tmpl: dict) -> bool:
+    """The state's one legal action is a doubles_turn template (every recorded platform doubles turn is): then only a
+    doubles_turn answer can be legal."""
+    try:
+        return (tmpl.get("type") or "doubles_turn") == "doubles_turn" and len(raw["legal_actions"]["actions"]) == 1
+    except (KeyError, TypeError, AttributeError):
+        return False
+
+
+def _switch_prefs(raw: dict) -> list[str] | None:
+    """The policy's switch-in ranking for a repair (best first), or None. Never raises."""
+    try:
+        return switch_ranking(raw)
+    except Exception:
+        log.debug("switch ranking failed", exc_info=True)
+        return None
+
+
 def doubles_ok(raw: dict, action: dict) -> bool:
-    """Check a doubles_turn against the server's per-slot option template."""
+    """Check a doubles_turn against the server's per-slot option template, and the two slots as a pair (never the same
+    switch-in twice, no `pass` while a switch-in is still free for that slot: fallback.joint_problems)."""
     try:
         tmpl = raw["legal_actions"]["actions"][0]["input"]["action"]
         switched = []
@@ -364,17 +456,18 @@ def doubles_ok(raw: dict, action: dict) -> bool:
                 return False
             opts = slot.get("options", [])
             if choice["type"] == "move":
-                ok = any(o.get("type") == "move" and to_id(o.get("move_id")) == to_id(choice.get("move_id"))
+                ok = any(o.get("type") == "move" and o.get("move_id") is not None
+                         and to_id(o.get("move_id")) == to_id(choice.get("move_id"))
                          and choice.get("target") in (o.get("targets") or [0]) for o in opts)
             elif choice["type"] == "switch":
                 ok = any(o.get("type") == "switch" and to_id(o.get("species")) == to_id(choice.get("species"))
                          for o in opts)
                 switched.append(to_id(choice.get("species")))
-            else:
-                ok = any(o.get("type") == "pass" for o in opts)
+            else:                                  # a `pass`; any other type is never an option
+                ok = choice["type"] == "pass" and any(o.get("type") == "pass" for o in opts)
             if not ok:
                 return False
-        return len(switched) == len(set(switched))
+        return len(switched) == len(set(switched)) and not joint_problems(tmpl, action)
     except (KeyError, IndexError, TypeError):
         return False
 
