@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+import zlib
 
 from .. import timecontrol
 from . import dex
@@ -64,6 +65,99 @@ MIN_PREVIEW_S = 0.25             # preview matrix game (normally 0.5-2.7 s incl.
 DRAFTER_SHARE = 0.5              # the drafter's search may use this share of the draft pick's time left
 PREVIEW_SHARE = 0.8              # the preview matrix game (calc batch + search) may use this share
 BATTLE_PHASES = ("moving",)      # the platform's battle phase (docs/real_payloads.md)
+
+
+# ---- engine-search battle policy (ARENA_BATTLE=search; agent/pokemon/engine.py + agent/js/search.js) -------------
+def _env_num(name: str, default: float, cast=float):
+    try:
+        v = os.environ.get(name)
+        return default if v in (None, "") else cast(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def battle_mode() -> str:
+    """ARENA_BATTLE: `search` (default: the engine search, with the classic pick as its fallback and as one of its
+    candidate rows) or `classic` (the rollback: the exact-damage scorer + joint lookahead alone, = champion v3.2).
+    Anything else also means classic."""
+    v = str(os.environ.get("ARENA_BATTLE") or "search").strip().lower()
+    return "search" if v == "search" else "classic"
+
+
+# The deployed search configuration (ARENA_SEARCH_* env knobs below override any of it):
+#   mode blend: our best reply to 50% the opponent's equilibrium mix + 50% its greedy (max-damage) joint action, not a
+#     sample of our own mix (picked on dev seed 62 as the best of three variants vs the champion: blend 96, nash
+#     sampling 86, delta 85 of 150, classic mirror 78; clean recheck on seed 63: +15.3 [+5.1, +25.6], p = 0.006; gates
+#     on fresh seeds: ladder 7 / 11 +9.8 / +10.8 over the champion, VGC-Bench sampling / argmax +8.5 / +15.5, simbot
+#     -9.0 n.s.);
+#   fixed 1: a fixed amount of work per decision (agent/js/search.js header), so the answer does not depend on the
+#     machine's speed or load (the platform server's CPU is unknown) unless the safety net below cuts a search.
+#     ARENA_SEARCH_FIXED=0 restores the time budget (SEARCH_MS) it was tuned with.
+SEARCH_CONFIG = {"mode": "blend", "fixed": 1}
+SEARCH_MS = _env_num("ARENA_SEARCH_MS", 2500, int)       # the time budget (ARENA_SEARCH_FIXED=0 only)
+# The safety net (hard_ms): min(SEARCH_CAP_MS, 80% of the search's limit), the limit being SEARCH_SHARE of the decision's
+# time left minus its reserve, at most SEARCH_HARD_S. A battle decision gets at most timecontrol.BATTLE_S = 10 s, on
+# the platform too (every recorded real state: 10 s; the timer line only ever lowers it), so the limit is ~4.9 s and
+# the net ~3.9 s: SEARCH_CAP_MS does not bind unless ARENA_TC_BATTLE_S raises the budget. search.js also takes 1
+# sample instead of 2 once pruning used half the net (~2 s): at load ~14 (the gates ran at 6-14) 15 of 50 searches did
+# and 3 hit the net (review measurement on 3 real matches). Gate latency: 1.8 s per search on average, 4.8 s at most;
+# the platform's turn timer is 55 s.
+SEARCH_CAP_MS = _env_num("ARENA_SEARCH_CAP_MS", 6000, int)
+SEARCH_HARD_S = _env_num("ARENA_SEARCH_HARD_S", 8.0)     # a search answer later than this is dropped (classic plays)
+SEARCH_MIN_S = 0.4                                        # less time than this left: classic only
+SEARCH_SHARE = 0.6                                        # the search may use this share of the decision's time left
+TRACE_KEYS = ("choice", "rows", "cols", "n_my", "n_opp", "samples", "sims", "errors", "stageA_ms", "build_ms", "ms",
+              "value", "pick_value", "classic_value", "classic_prob", "is_classic", "kept_classic", "forced", "cut",
+              "prune_cut", "guard")
+SEARCH_KNOBS = {"samples": ("ARENA_SEARCH_SAMPLES", int), "rollout": ("ARENA_SEARCH_ROLLOUT", int),
+                "keep": ("ARENA_SEARCH_KEEP", int), "slot_keep": ("ARENA_SEARCH_SLOT_KEEP", int),
+                "probes": ("ARENA_SEARCH_PROBES", int), "mode": ("ARENA_SEARCH_MODE", str),
+                "min_prob": ("ARENA_SEARCH_MIN_PROB", float), "iters": ("ARENA_SEARCH_ITERS", int),
+                "margin": ("ARENA_SEARCH_MARGIN", float), "delta": ("ARENA_SEARCH_DELTA", float),
+                "blend_w": ("ARENA_SEARCH_BLEND_W", float), "guard": ("ARENA_SEARCH_GUARD", int),
+                "guard_delta": ("ARENA_SEARCH_GUARD_DELTA", float), "free_delta": ("ARENA_SEARCH_FREE_DELTA", float),
+                "fixed": ("ARENA_SEARCH_FIXED", int)}
+
+
+def search_params() -> dict:
+    """SEARCH_CONFIG with the ARENA_SEARCH_* overrides (an unparsable value is ignored)."""
+    out = dict(SEARCH_CONFIG)
+    for k, (var, cast) in SEARCH_KNOBS.items():
+        v = os.environ.get(var)
+        if v not in (None, ""):
+            try:
+                out[k] = cast(v)
+            except (TypeError, ValueError):
+                pass
+    return out
+
+
+def _template_ok(tmpl: dict, action: dict) -> bool:
+    """Is a doubles_turn `action` one of the template's options (agent.doubles_ok's rules; never raises)?"""
+    try:
+        used = set()
+        for slot in tmpl.get("slots", []):
+            c = action.get(f"slot_{slot['slot']}")
+            if not isinstance(c, dict):
+                return False
+            opts = slot.get("options") or []
+            if c.get("type") == "move":
+                if not any(o.get("type") == "move" and to_id(o.get("move_id")) == to_id(c.get("move_id"))
+                           and c.get("target") in (o.get("targets") or [0]) for o in opts):
+                    return False
+            elif c.get("type") == "switch":
+                sp = to_id(c.get("species"))
+                if sp in used or not any(o.get("type") == "switch" and to_id(o.get("species")) == sp for o in opts):
+                    return False
+                used.add(sp)
+            elif c.get("type") == "pass":
+                if not any(o.get("type") == "pass" for o in opts):
+                    return False
+            else:
+                return False
+        return True
+    except Exception:
+        return False
 
 # ---- exact-damage scoring scale ("points"): removing all of a foe's current HP = 100, a KO adds KO_BONUS.
 KO_BONUS = 50.0
@@ -410,6 +504,18 @@ class PokemonPolicy:
         self.lookahead_skipped = 0               # doubles decisions whose deadline left no time for the lookahead
         self.degraded: list[str] = []            # time-control degradations of the current match (diagnostics)
         self._reported: set = set()              # unknown phases already reported on stderr
+        # Engine search (ARENA_BATTLE=search): mode, the foe's six and the preview game's prior over their lineups,
+        # foes seen on the field this battle, per-match counters and the last search's diagnostics.
+        self.battle_mode = battle_mode()
+        self.opp_roster: list[str] = []
+        self.lineup_prior: list | None = None
+        self.seen_foes: list[str] = []
+        self.last_search: dict | None = None
+        self.search_stats = {"decisions": 0, "searched": 0, "used": 0, "same_as_classic": 0, "fallback": 0,
+                             "skipped_time": 0, "reasons": {}}
+        self.search_ms: list[float] = []         # wall time of every search round trip (latency diagnostics)
+        self.search_trace: list[dict] = []       # the last 400 searches' summaries (diagnostics)
+        self.oracle = None                       # local ablation only: callable -> the true battle as JSON
 
     def _warm_calc(self) -> None:
         """Pay the node + @smogon/calc start-up before the first battle decision (the draft, teambuild and team
@@ -421,6 +527,25 @@ class PokemonPolicy:
             DamageCalc.get().warm()
         except Exception:
             log.warning("damage calc warm-up failed", exc_info=True)
+
+    def _warm_search(self, wait: bool) -> None:
+        """ARENA_BATTLE=search: spawn the engine's node process during the draft (it loads in the background) and, at
+        team preview, wait a little for it, so the first battle decision does not pay the ~1 s load. VGC doubles
+        only. Never raises."""
+        try:
+            game = to_id(self.game_type or "")
+            if game and "vgc" not in game and "doubles" not in game:
+                return
+            from .engine import SearchEngine
+            eng = SearchEngine.get()
+            if not wait:
+                eng.start_background()
+                return
+            limit = min(5.0, timecontrol.cap(5.0, 0.3)) if timecontrol.current() is not None else 5.0
+            if limit > 0.05:
+                eng.warm(limit)
+        except Exception:
+            log.warning("engine search warm-up failed", exc_info=True)
 
     def _track_draft(self, obs: dict, me: str | None) -> None:
         """Full sets are only visible while a card is still in `available_cards`; rosters/picks carry just
@@ -489,6 +614,8 @@ class PokemonPolicy:
             self.game_type = str(st.get("game_type"))
         if phase in ("draft", "teambuild", "team_preview"):
             self._warm_calc()
+            if self.battle_mode == "search" and phase in ("draft", "team_preview"):
+                self._warm_search(wait=phase == "team_preview")
         if phase == "draft":
             return self._draft(st, obs)
         if phase == "teambuild":
@@ -642,6 +769,14 @@ class PokemonPolicy:
         except Exception:
             log.debug("opponent set recovery failed", exc_info=True)
         try:
+            self.opp_roster = []
+            for p in obs.get("opponent_roster") or []:
+                sid = to_id(p.get("species", ""))
+                card = preview_matrix.resolve_card(sid, self.opp_cards)
+                self.opp_roster.append(to_id((card or {}).get("species") or sid))
+        except Exception:
+            log.debug("opponent roster capture failed", exc_info=True)
+        try:
             out = self._preview_matrix(obs, session_id)
             if out is not None:
                 return out
@@ -682,6 +817,8 @@ class PokemonPolicy:
         self.last_protect.clear()
         self.last_move.clear()
         self.cond_set.clear()
+        self.seen_foes = []
+        self.lineup_prior = None
 
     def _preview_matrix(self, obs: dict, session_id: str) -> dict | None:
         fmt = to_id(obs.get("battle_format") or "")
@@ -717,6 +854,13 @@ class PokemonPolicy:
         res = preview_matrix.choose(mine, my_cards, opp, opp_cards, seed_text=seed, opp_guess=guess, knobs=knobs)
         if res is None:
             return None
+        try:        # the foe's equilibrium lineup mix: the engine search's prior for the four they brought
+            lus = preview_matrix.lineups(len(opp))
+            ids = [to_id((c or {}).get("species") or p["species"]) for p, c in zip(opp, opp_cards)]
+            self.lineup_prior = [(tuple(ids[k] for k in lus[c]), float(q))
+                                 for c, q in zip(res.get("cols") or [], res.get("pc") or []) if q > 1e-3]
+        except Exception:
+            self.lineup_prior = None
         # Echo the roster's own species strings (the platform validates bring/leads against them).
         bring = [mine[i]["species"] for i in res["bring"]]
         leads = [mine[i]["species"] for i in res["leads"]]
@@ -1167,8 +1311,19 @@ class PokemonPolicy:
             la_ms = round(1000 * (time.monotonic() - la_t0), 1)
         if pick is None:
             pick = self._doubles_heuristic(obs, slots, actives, opps, turn)
+        for o in list(opps)[:2]:                     # every foe seen on the field (the search's revealed set)
+            sid = to_id((o or {}).get("species", ""))
+            if sid and sid not in self.seen_foes:
+                self.seen_foes.append(sid)
+        search_ms = None
+        if self.battle_mode == "search":
+            t_s = time.monotonic()
+            better = self._search_pick(st, obs, tmpl, pick, turn)
+            search_ms = round(1000 * (time.monotonic() - t_s), 1)
+            if better is not None:
+                pick = better
         self.last_timing = {"table_ms": round(1000 * (t_table - t0), 1), "lookahead_ms": la_ms,
-                            "total_ms": round(1000 * (time.monotonic() - t0), 1)}
+                            "search_ms": search_ms, "total_ms": round(1000 * (time.monotonic() - t0), 1)}
         self._remember_protect(pick, slots, actives, turn)       # lookahead: no Protect chains (species -> turn)
         self._remember(obs, pick, actives)                       # speed-protect: last action per slot (stall moves)
         # Who was on the field for a whole turn (Fake Out freshness, ours and theirs). A forced-switch state is
@@ -1181,6 +1336,87 @@ class PokemonPolicy:
             self.opp_prev_active = [to_id((o or {}).get("species", "")) or None
                                     if o and not o.get("fainted") else None for o in (list(opps) + [None, None])[:2]]
         return {"action": {"type": "doubles_turn", **pick}}
+
+    # ---- engine search (ARENA_BATTLE=search) ----
+    def _search_reason(self, why: str) -> None:
+        r = self.search_stats["reasons"]
+        r[why] = r.get(why, 0) + 1
+
+    def _search_pick(self, st: dict, obs: dict, tmpl: dict, classic: dict, turn) -> dict | None:
+        """The engine search's joint action (agent/js/search.js on the battle rebuilt from platform-legal information,
+        agent/pokemon/battlestate.py), or None: the classic pick then plays. Never raises; never waits past the
+        decision's deadline (the search gets SEARCH_SHARE of the time left, at most SEARCH_HARD_S)."""
+        self.search_stats["decisions"] += 1
+        self.last_search = None
+        try:
+            from . import battlestate
+            from .engine import SearchEngine
+            eng = SearchEngine.get()
+            if not eng.enabled:
+                self._search_reason("engine off")
+                self.search_stats["fallback"] += 1
+                return None
+            limit = SEARCH_HARD_S
+            if timecontrol.current() is not None:
+                limit = timecontrol.cap(SEARCH_HARD_S, SEARCH_SHARE)
+            if limit < SEARCH_MIN_S:
+                self.search_stats["skipped_time"] += 1
+                self._search_reason("no time")
+                return None
+            # the time budget (fixed=0) and the safety net (both), never past the time this decision may spend
+            params = {"budget_ms": int(min(SEARCH_MS, 1000 * limit * 0.6)),
+                      "hard_ms": int(min(SEARCH_CAP_MS, 1000 * limit * 0.8)), **search_params()}
+            key = f"{st.get('session_id')}|{st.get('state_version')}|{turn}|{obs.get('turn')}"
+            params["rng"] = zlib.crc32(key.encode()) % 2147483646 + 1
+            has_log = isinstance(obs.get("protocol_log"), list) and bool(obs.get("protocol_log"))
+            cond_left = None
+            if not has_log:
+                cond_left = {}
+                for k in ("my_tailwind", "opp_tailwind", "trickroom"):
+                    left = self._cond_left(k, int(turn or 0)) if k in self.cond_set else None
+                    if left:
+                        cond_left[k] = left
+            state = battlestate.build(obs, tmpl, self.cards, self.opp_cards, opp_roster=self.opp_roster,
+                                      lineup_prior=self.lineup_prior, seen_foes=self.seen_foes,
+                                      classic=classic, seed=[params["rng"] % 65000 + 1, 17, 29, 43],
+                                      cond_left=cond_left,
+                                      prev_mine=None if has_log else self.prev_active,
+                                      prev_foe=None if has_log else self.prev_opp)
+            battle_json = None
+            if self.oracle is not None:                  # local ablation only (never on the platform)
+                battle_json = self.oracle()
+            t0 = time.monotonic()
+            ans = eng.search(state, params, limit, battle_json=battle_json)
+            self.search_ms.append(round(1000 * (time.monotonic() - t0), 1))
+            self.search_stats["searched"] += 1
+            if ans is None:
+                self._search_reason(f"engine: {(eng.last_error or 'no answer')[:60]}")
+                self.search_stats["fallback"] += 1
+                _debug_dump(state, eng.last_error)
+                return None
+            action = ans.get("action") or {}
+            info = ans.get("info") or {}
+            self.last_search = info
+            self.search_trace.append({k: info.get(k) for k in TRACE_KEYS if k in info})
+            del self.search_trace[:-400]
+            if not _template_ok(tmpl, action):
+                self._search_reason("answer not in the template")
+                self.search_stats["fallback"] += 1
+                return None
+            out = {f"slot_{s['slot']}": action[f"slot_{s['slot']}"] for s in tmpl.get("slots", [])}
+            self.search_stats["used"] += 1
+            if all(_same_choice(out.get(k), classic.get(k)) for k in out):
+                self.search_stats["same_as_classic"] += 1
+            return out
+        except ValueError as e:
+            self._search_reason(f"state: {str(e)[:60]}")
+            self.search_stats["fallback"] += 1
+            return None
+        except Exception:
+            log.warning("engine search failed; playing the classic pick", exc_info=True)
+            self._search_reason("crash")
+            self.search_stats["fallback"] += 1
+            return None
 
     # ---- memory across turns (the policy instance lives for the whole match) ----
     def _track_conditions(self, obs: dict) -> None:
@@ -1654,6 +1890,32 @@ def _speed_control_value(mid: str, sm: dict, obs: dict, default: float) -> float
     if tr:
         return 40.0 if gain > 0 else -60.0
     return max(-30.0, min(80.0, 10.0 + 25.0 * gain))
+
+
+def _debug_dump(state: dict, error) -> None:
+    """ARENA_SEARCH_DEBUG_DIR (local diagnostics only): keep the battle description of a failed search."""
+    d = os.environ.get("ARENA_SEARCH_DEBUG_DIR")
+    if not d:
+        return
+    try:
+        import json
+        os.makedirs(d, exist_ok=True)
+        name = f"fail-{os.getpid()}-{int(time.time() * 1000)}.json"
+        with open(os.path.join(d, name), "w") as f:
+            json.dump({"error": error, "state": state}, f)
+    except Exception:
+        log.debug("search debug dump failed", exc_info=True)
+
+
+def _same_choice(a: dict | None, b: dict | None) -> bool:
+    a, b = a or {}, b or {}
+    if a.get("type") != b.get("type"):
+        return False
+    if a.get("type") == "move":
+        return to_id(a.get("move_id")) == to_id(b.get("move_id")) and a.get("target") == b.get("target")
+    if a.get("type") == "switch":
+        return to_id(a.get("species")) == to_id(b.get("species"))
+    return True
 
 
 def _concrete(opt: dict) -> dict:
