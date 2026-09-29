@@ -76,8 +76,9 @@ def test_warm_without_a_calculator_is_a_no_op(monkeypatch):
     assert out["action"]["type"] == "select_lineup" and pol.warmed and dc.proc is None
 
 
-SLOW, CAP = 1.5, 1.2            # node start-up alone exceeds the (shrunk) lookahead cap; the cap leaves
-                                # headroom for the K_THEIRS=6 search on a loaded machine
+SLOW, CAP = 3.0, 2.5            # node start-up alone exceeds the (shrunk) lookahead cap; the cap leaves
+                                # headroom for the lookahead on a heavily loaded machine (1.5 / 1.2 flaked
+                                # under parallel ladders)
 
 
 @needs_calc

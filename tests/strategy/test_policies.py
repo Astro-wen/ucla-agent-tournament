@@ -142,13 +142,14 @@ def test_adapter_survives_policy_crash():
 
 def test_adapter_werewolf_chat_then_terminate_and_clipped():
     c = Contestant()
-    c.ww.chat = lambda st: [{"content": "word " * 80}, {"content": "hi", "recipients": [3]}]
+    c.ww.chat = lambda st: [{"content": "word " * 80}, {"content": "hi", "recipients": [3]}, {"content": "bye"}]
     raw = ww_state("Your role: VILLAGER", "day_vote", []) | {"game_type": "werewolf", "phase": "messaging"}
     gs = GameState.from_mcp_state(raw)
     m1 = c.choose_message(gs, ctx("werewolf"))
     assert isinstance(m1, SendMessage) and len(m1.content.split()) == 50
     m2 = c.choose_message(gs, ctx("werewolf"))
-    assert isinstance(m2, SendMessage) and not m2.recipients          # PM to self -> broadcast
+    # a PM to self is dropped, never broadcast (a private message must not go public by mistake)
+    assert isinstance(m2, SendMessage) and m2.content == "bye" and not m2.recipients
     assert c.choose_message(gs, ctx("werewolf")) is TERMINATE_MESSAGING
 
 

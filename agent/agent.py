@@ -25,6 +25,7 @@ import contextvars
 import json
 import logging
 import os
+import re
 import threading
 import time
 from pathlib import Path
@@ -43,6 +44,8 @@ MAX_CHATS_PER_WINDOW = 5
 MAX_WORDS = 50
 RECORD_DIR = os.environ.get("ARENA_RECORD_DIR", "logs")   # every state we act on -> logs/<session>.jsonl
 BUSY_WAIT_S = 1.0          # how long a decision waits for an earlier, overrun policy call to finish
+_UNSET = object()
+_DAY_RE = re.compile(r"Day\s+(\d+)\s*\|")
 
 
 def record(kind: str, context: DecisionContext, state: GameState, out=None, public_reason: str | None = None) -> None:
@@ -77,8 +80,11 @@ class Contestant:
     def __init__(self) -> None:
         self.ww = WerewolfPolicy()
         self.pk = PokemonPolicy()
-        self._chat_day: object = None
+        self._chat_day: object = _UNSET                # the day the chat state below belongs to
         self._chat_queue: list[dict] = []
+        self._chat_done = False                       # we terminated this window: never chat again in it
+        self._chat_sent = 0
+        self._chat_said: set = set()
         self.watchdog = os.environ.get("ARENA_TC_WATCHDOG", "1") != "0"   # 0: run the policy inline (debugging)
         self._busy: threading.Thread | None = None   # a policy call that overran its deadline and is still running
         self._warned: set = set()                     # unknown game types / phases already reported
@@ -271,27 +277,45 @@ class Contestant:
         return out
 
     def _choose_message(self, state: GameState, context: DecisionContext):
+        """One chat or TERMINATE per call. The runner calls again after every change while the window is open, so a
+        reactive policy (`reactive_chat`) is asked again once its queued messages are sent: it can answer what was
+        said meanwhile. After we terminate, and whenever the server lists us as terminated, only TERMINATE (a
+        no-op server side) goes out: a chat then could be rejected, and a rejected chat ends the match process."""
         st = state.raw if isinstance(state.raw, dict) else {}
         self.ww.observe(st)
         gs = st.get("game_state")
         day = gs.get("day") if isinstance(gs, dict) else None
+        if day is None:                                   # the observation carries it too ("Day 2 | phase ...")
+            m = _DAY_RE.search(str(st.get("observation") or ""))
+            day = int(m.group(1)) if m else None
         if day != self._chat_day:
-            self._chat_day = day
-            try:
-                self._chat_queue = [m for m in list(self.ww.chat(st) or []) if isinstance(m, dict)][:MAX_CHATS_PER_WINDOW]
-            except Exception:
-                log.exception("chat policy crashed")
-                self._chat_queue = []
-        while self._chat_queue:
+            self._chat_day, self._chat_done, self._chat_sent, self._chat_said = day, False, 0, set()
+            self._chat_queue = self._ask_chat(st)
+        me, term = st.get("your_position"), st.get("terminated_messaging")
+        if isinstance(term, list) and isinstance(me, int) and me in term:
+            self._chat_done = True
+        if not self._chat_done and not self._chat_queue and self._chat_sent and getattr(self.ww, "reactive_chat", False):
+            self._chat_queue = self._ask_chat(st)
+        while not self._chat_done and self._chat_queue and self._chat_sent < MAX_CHATS_PER_WINDOW:
             m = self._chat_queue.pop(0)
             text = " ".join(str(m.get("content", "")).split()[:MAX_WORDS])
             rec = m.get("recipients") or None
             if rec is not None and (not isinstance(rec, list) or len(rec) != 1 or not isinstance(rec[0], int)
-                                    or rec[0] == st.get("your_position")):
-                rec = None
-            if text:
+                                    or isinstance(rec[0], bool) or not 0 <= rec[0] <= 6 or rec[0] == me):
+                continue                                  # a private message with a bad recipient is dropped, never broadcast
+            if text and (text, tuple(rec or ())) not in self._chat_said:     # never the same message twice a day
+                self._chat_said.add((text, tuple(rec or ())))
+                self._chat_sent += 1
                 return SendMessage(text, recipients=rec)
+        self._chat_done = True
         return TERMINATE_MESSAGING
+
+    def _ask_chat(self, st: dict) -> list[dict]:
+        try:
+            return [m for m in list(self.ww.chat(st) or []) if isinstance(m, dict)][:MAX_CHATS_PER_WINDOW]
+        except Exception:
+            log.exception("chat policy crashed")
+            return []
 
 
 def _raw_with_legal(state) -> dict:

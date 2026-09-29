@@ -529,9 +529,9 @@ def test_werewolf_messages_survive_odd_payloads(monkeypatch):
     monkeypatch.setattr(c.ww, "observe", lambda st: 1 / 0)
     assert c.choose_message(state, ctx("werewolf")) is TERMINATE_MESSAGING
     c = Contestant()
-    c.ww.chat = lambda st: ["not a dict", {"content": "ok", "recipients": ["x"]}]
+    c.ww.chat = lambda st: ["not a dict", {"content": "secret", "recipients": ["x"]}, {"content": "ok"}]
     out = c.choose_message(gs({"phase": "messaging", "game_state": {"day": 1}}), ctx("werewolf"))
-    assert isinstance(out, SendMessage) and out.content == "ok" and not out.recipients
+    assert isinstance(out, SendMessage) and out.content == "ok" and not out.recipients   # the bad PM is dropped
 
 
 def test_invalid_policy_answers_are_replaced(monkeypatch):
