@@ -22,6 +22,9 @@ Panel (--opps, default all 13; groups: all, strength, field; or a comma list):
             for examples/llm_agent.py without a model); `messaging` (= basic in Pokemon) by name or in the group
   llm_live  opt-in only, by name: examples/llm_agent.py with a real model from OPENAI_API_KEY / OPENAI_MODEL /
             OPENAI_BASE_URL (its real latency on the VGC timer; not reproducible, costs API calls)
+  llm_real  opt-in only, by name: the same agent on Nebius Token Factory (NEBIUS_API_KEY from the environment or the
+            .env; local/llm_client.py caps and ledgers the spend, all workers share one NEBIUS_RUN_ID). Without a key
+            it plays the agent's rule fallback (= llm_fallback) and says so before the first game
 Any versions/<dir> name, or a dotted package that holds agent/agent.py, works as an extra opponent. Every opponent
 package must run its own calc.js (versions/*/agent/js/node_modules and local/sparring/*/agent/js/node_modules linked
 to agent/js/node_modules, see scripts/setup_machine.sh); the panel checks that before the first game.
@@ -92,7 +95,7 @@ GROUPS = {"all": PANEL, "panel": PANEL, "": PANEL, "strength": STRENGTH, "field"
 PACKAGES = {"v0": "versions.v0_heuristic", "v1": "versions.v1_exact_damage", "v2": "versions.v2_joint_lookahead",
             "v3": "versions.v3_draft_preview", "cautious": "local.sparring.v2_cautious"}
 BOTS = ("greedy", "protect_spam")
-LIVE = ("llm_live",)                                                             # = local.field_opps.LIVE
+LIVE = ("llm_live", "llm_real")                                                  # = local.field_opps.LIVE
 BUILTIN = ("official_baseline", "random") + BOTS + FIELD_ALL + LIVE
 KNOB_PREFIXES = ("LOOKAHEAD_", "ARENA_DRAFT_", "PREVIEW_MATRIX_")
 # Time-dependent lookahead counters (agent/pokemon/lookahead.py STATS) -> per-game row fields <name>_cand / <name>_opp:
@@ -102,7 +105,7 @@ DIAG = {"timeouts": "cap", "mix_fallback": "mixfb"}
 PREVIEW_FALLBACK = "preview matrix failed"
 # local.field_opps.PlatformSeat.stats keys copied to the rows (pf_<key>) and summed per opponent
 PF_KEYS = ("requests", "crashes", "rejected", "timer_defaults", "late", "forfeit", "random_played", "draft_stalls",
-           "fallbacks", "model_calls")
+           "fallbacks", "model_calls", "invalid_answers")
 WARM_CALC = [{"attacker": {"species": "Pikachu", "level": 50}, "defender": {"species": "Pikachu", "level": 50},
               "move": "Thunderbolt"}]
 Z = 1.96
@@ -279,7 +282,8 @@ def print_summary(s: dict, title: str = "") -> None:
         if "pf_requests" in p:
             extra += (f"  platform: crashed games {p['pf_crashed_games']}, rejected {p['pf_rejected']}, "
                       f"timer-played {p['timer_opp']} of {p['pf_requests']} requests (draft incl.), forfeits "
-                      f"{p['forfeit_opp']}, llm fallbacks {p['pf_fallbacks']} (model calls {p['pf_model_calls']})")
+                      f"{p['forfeit_opp']}, llm fallbacks {p['pf_fallbacks']} (model calls {p['pf_model_calls']}, "
+                      f"invalid answers {p.get('pf_invalid_answers', 0)})")
         if p.get("timer_cand") or p.get("forfeit_cand"):
             extra += f"  CANDIDATE timer-played {p['timer_cand']}, forfeits {p['forfeit_cand']}"
         err = f"  ERRORS {p['errors']}" if p["errors"] else ""
@@ -341,9 +345,17 @@ def resolve_opps(spec: str) -> list[str]:
     if bad:
         raise SystemExit(f"unknown opponent(s) {bad}; groups: {', '.join(k for k in GROUPS if k)}; "
                          f"panel: {', '.join(PANEL)}; also messaging, llm_live, any versions/<dir> or a dotted package")
-    if any(n in LIVE for n in names) and not os.environ.get("OPENAI_API_KEY"):
+    if "llm_live" in names and not os.environ.get("OPENAI_API_KEY"):
         raise SystemExit("llm_live plays examples/llm_agent.py with a real model: set OPENAI_API_KEY (and optionally "
                          "OPENAI_MODEL / OPENAI_BASE_URL for any OpenAI-compatible endpoint) in the environment")
+    if "llm_real" in names:
+        from .llm_client import LLMClient
+        c = LLMClient.from_env(cache_path=None)
+        why = c.unavailable_reason                          # no key, or the budget is already spent
+        c.close()
+        if why:
+            print(f"WARNING: llm_real is unavailable ({why}): it plays examples/llm_agent.py's rule fallback "
+                  f"(= llm_fallback), not a model", flush=True)
     return list(dict.fromkeys(names))
 
 
@@ -851,6 +863,8 @@ def run(a) -> int:
     else:
         os.environ["PYTHONHASHSEED"] = str(int(a.hashseed))
     os.environ["ARENA_RECORD_DIR"] = str(null_record_dir(out))
+    if "llm_real" in opps:                       # one spend-cap run for all workers (local/llm_client.py)
+        os.environ.setdefault("NEBIUS_RUN_ID", f"panel-{name}-s{a.seed}-{time.strftime('%Y%m%dT%H%M%S')}")
 
     done = set()
     if out.exists() and out.stat().st_size:
@@ -939,6 +953,14 @@ def run(a) -> int:
     print(f"\n{name}: seed {a.seed}, {n_done} games in {elapsed:.0f}s"
           + (f" = {n_done / elapsed:.2f} games/s with {a.jobs} workers" if n_done and elapsed else ""))
     print_summary(s)
+    if "llm_real" in opps:
+        from .llm_client import LLMClient
+        run_id = os.environ["NEBIUS_RUN_ID"]
+        c = LLMClient.from_env(cache_path=None, run_id=run_id)
+        spent = c.spent()
+        c.close()
+        print(f"llm_real spend (ledger, run {run_id}): {spent['run_calls']} requests, {spent['run_tokens']} tokens, "
+              f"${spent['run_usd']:.4f}; ledger total ${spent['total_usd']:.4f} of ${c.budget_usd:.2f}")
     return finish(s, rows, a, out)
 
 

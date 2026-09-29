@@ -59,6 +59,11 @@ Opt-in, not deterministic (LIVE, never in a panel group):
                 OPENAI_BASE_URL in the environment (any OpenAI-compatible endpoint, e.g. a local server; this module
                 never reads .env), and each model call's real wall time charged to the seat's clock, so the VGC timer
                 sees the model's actual latency. Costs API calls; rate limits show up as fallbacks.
+  llm_real      the same examples/llm_agent.py LLMAgent on Nebius Token Factory (local/llm_seats.py + local/llm_client.py:
+                NEBIUS_API_KEY from the environment or the checkout's .env, default model Qwen3-30B-A3B-Instruct-2507,
+                60 s timeout, response cache, spend ledger and hard caps), real wall time on the seat's clock as
+                llm_live. Without a key or over a cap every call is refused at once and the agent plays its rule
+                fallback, i.e. exactly like llm_fallback; it never crashes.
 
 Per-match counters are on `PlatformSeat.stats` (local/panel.py writes them to its JSONL as pf_* fields).
 """
@@ -152,7 +157,7 @@ def platform_accepts(raw: dict, action) -> bool:
 
 # ------------------------------------------------------------------------------------------ the seat
 STAT_KEYS = ("requests", "crashes", "rejected", "timer_defaults", "late", "forfeit", "random_played", "draft_stalls",
-             "resigned", "fallbacks", "model_calls")
+             "resigned", "fallbacks", "model_calls", "invalid_answers")
 
 
 class PlatformSeat(Player):
@@ -182,6 +187,8 @@ class PlatformSeat(Player):
     def log(self, line: str) -> None:
         if "FALLBACK" in str(line):
             self.stats["fallbacks"] += 1
+        elif "invalid model response" in str(line):      # examples/llm_agent.py: an answer that did not fit, retried
+            self.stats["invalid_answers"] += 1
 
     # ---- one request ----------------------------------------------------------------------------------
     def choose(self, raw: dict):
@@ -370,7 +377,12 @@ FIELD = {
     "llm_fallback": _llm("error"),
     "llm_timeout": _llm("timeout"),
 }
-LIVE = {"llm_live": _llm_live}
+def _llm_real(seat: PlatformSeat):
+    from .llm_seats import vgc_agent                    # Nebius; no key / over budget -> the agent's rule fallback
+    return vgc_agent(seat.sim, seat.log)
+
+
+LIVE = {"llm_live": _llm_live, "llm_real": _llm_real}
 
 
 def make(name: str, clock: str = "vgc") -> PlatformSeat:
