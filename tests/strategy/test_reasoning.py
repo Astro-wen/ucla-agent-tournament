@@ -331,7 +331,8 @@ def test_battle_safe_line_never_depends_on_the_choice_and_names_no_move_or_switc
         texts = {R.attach(d, raw, raw["game_type"], R.SAFE)[1] for d in _doubles_decisions(raw)}
         assert len(texts) == 1, texts
         text = texts.pop()
-        assert text.startswith(f"Turn {raw['observation']['turn']}:") and not R.leaks(text, raw["game_type"])
+        turn = raw["observation"].get("turn")      # absent without the battle view (4b85cc32 row 16)
+        assert text.startswith(f"Turn {turn}:" if turn is not None else "Turn:") and not R.leaks(text, raw["game_type"])
         moves, switches = _option_names(raw)
         for name in moves | switches | {"protect", "switch"}:
             assert not _words(name).search(text), (text, name)

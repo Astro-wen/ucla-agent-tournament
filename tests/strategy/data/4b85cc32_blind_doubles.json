@@ -1,0 +1,181 @@
+{
+ "source": "logs/apocalypse/4b85cc32-cbb0-4440-aa8d-2cfe28f92987.jsonl row 16 (platform 2026-09-29, turn 8, Apocalypse_Red = v3.2 seat; state_version 10)",
+ "answered_live": {
+  "type": "doubles_turn",
+  "slot_0": {
+   "type": "move",
+   "move_id": "spore",
+   "target": 1
+  },
+  "slot_1": {
+   "type": "pass"
+  }
+ },
+ "raw": {
+  "session_id": "4b85cc32-cbb0-4440-aa8d-2cfe28f92987",
+  "game_type": "pokemon_vgc_doubles_draft",
+  "runtime_adapter": "pokemon",
+  "status": "in_progress",
+  "state_version": 10,
+  "observation": {
+   "message": "No pending decision is currently available.",
+   "waiting_for_action": false,
+   "finished": false
+  },
+  "phase": "moving",
+  "is_terminal": false,
+  "is_current_actor": true,
+  "current_actor": {
+   "agent_id": "3ce9ade5-5422-477d-9407-593cf10cd2de",
+   "position": 1
+  },
+  "legal_actions": {
+   "session_id": "4b85cc32-cbb0-4440-aa8d-2cfe28f92987",
+   "state_version": 10,
+   "actions": [
+    {
+     "action_id": "doubles_turn",
+     "label": "Choose actions for both active Pok\u00e9mon",
+     "input": {
+      "session_id": "4b85cc32-cbb0-4440-aa8d-2cfe28f92987",
+      "action": {
+       "type": "doubles_turn",
+       "slots": [
+        {
+         "slot": 0,
+         "board_position": -1,
+         "active": {
+          "species": "amoonguss",
+          "name": "Amoonguss",
+          "current_hp": 26,
+          "max_hp": 220,
+          "current_hp_fraction": 0.11818181818181818,
+          "status": null,
+          "ability": "regenerator",
+          "item": "rockyhelmet",
+          "types": [
+           "GRASS",
+           "POISON"
+          ],
+          "base_stats": {
+           "atk": 85,
+           "def": 70,
+           "hp": 114,
+           "spa": 85,
+           "spd": 80,
+           "spe": 30
+          },
+          "boosts": {
+           "accuracy": 0,
+           "atk": -1,
+           "def": 0,
+           "evasion": 0,
+           "spa": 0,
+           "spd": 0,
+           "spe": -2
+          },
+          "moves": [
+           "spore",
+           "ragepowder",
+           "pollenpuff",
+           "sludgebomb"
+          ],
+          "fainted": false,
+          "active": true,
+          "revealed": true,
+          "is_terastallized": false
+         },
+         "force_switch": false,
+         "options": [
+          {
+           "type": "move",
+           "move_id": "spore",
+           "base_power": 0,
+           "category": "STATUS",
+           "move_type": "GRASS",
+           "current_pp": 24,
+           "accuracy": 1.0,
+           "targets": [
+            -2,
+            1,
+            2
+           ]
+          },
+          {
+           "type": "move",
+           "move_id": "ragepowder",
+           "base_power": 0,
+           "category": "STATUS",
+           "move_type": "BUG",
+           "current_pp": 32,
+           "accuracy": 1.0,
+           "targets": [
+            0
+           ]
+          },
+          {
+           "type": "move",
+           "move_id": "pollenpuff",
+           "base_power": 90,
+           "category": "SPECIAL",
+           "move_type": "BUG",
+           "current_pp": 24,
+           "accuracy": 1.0,
+           "targets": [
+            -2,
+            1,
+            2
+           ]
+          },
+          {
+           "type": "move",
+           "move_id": "sludgebomb",
+           "base_power": 90,
+           "category": "SPECIAL",
+           "move_type": "POISON",
+           "current_pp": 13,
+           "accuracy": 1.0,
+           "targets": [
+            -2,
+            1,
+            2
+           ]
+          }
+         ]
+        },
+        {
+         "slot": 1,
+         "board_position": -2,
+         "active": null,
+         "force_switch": false,
+         "options": [
+          {
+           "type": "pass"
+          }
+         ]
+        }
+       ],
+       "target_legend": {
+        "-1": "board position A on your side (always slot 0's position)",
+        "-2": "board position B on your side (always slot 1's position)",
+        "1": "board position A on the opponent's side",
+        "2": "board position B on the opponent's side",
+        "0": "no target needed (self/field/spread move)"
+       },
+       "instructions": "Submit one action for slot 0 and one for slot 1 together via play_action with action={'type':'doubles_turn','slot_0':{...},'slot_1':{...}}. Each slot is {'type':'move','move_id':...,'target': <int>} (target required unless the move's only legal target is 0), {'type':'switch','species':...}, or {'type':'pass'} (required when this slot's own options list is just [{'type':'pass'}]). IMPORTANT: -1 and -2 are FIXED board positions (see target_legend), not 'self'/'ally' labels -- check each slot's own board_position to know which one it is. For slot 0 (board_position -1), -1 means targeting itself and -2 means its ally. For slot 1 (board_position -2), it's the reverse: -2 is itself and -1 is its ally. Never assume -1 always means self."
+      },
+      "action_id": "doubles_turn",
+      "state_version": 10
+     }
+    }
+   ]
+  },
+  "next_actions": [
+   {
+    "tool": "play_action",
+    "hint": "Pick one of legal_actions.actions and pass its `input`."
+   }
+  ],
+  "updated": true
+ }
+}

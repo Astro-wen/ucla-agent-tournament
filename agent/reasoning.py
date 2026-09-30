@@ -249,6 +249,10 @@ def _battle(obs: dict, decision, mode: str) -> str | None:
         acted = _battle_detail(obs, decision)
         if acted:
             return f"{head} {acted}."
+    if "team" not in obs and "opponent_team" not in obs:
+        # no battle view (platform 09-29, 4b85cc32 row 16: a doubles_turn next to {"message": "No pending decision is
+        # currently available.", ...}): no knockout count to report (it would read 0 for us, 0 for them)
+        return f"{head} choices locked in."
     theirs = sum(1 for p in _mons(obs.get("opponent_team")) if p.get("fainted"))
     ours = sum(1 for p in _mons(obs.get("team")) if p.get("fainted"))
     return f"{head} choices locked in. Knockouts so far: {theirs} for us, {ours} for them."
@@ -261,7 +265,9 @@ def _move_name(mid) -> str:
 def _battle_detail(obs: dict, decision) -> str | None:
     """The action just chosen, per slot: move (and its target) or switch. Nothing about any other option."""
     act = _action_of(decision)
-    if obs.get("is_doubles"):
+    # a doubles pair also by its slot keys: an observation without the battle view (4b85cc32 row 16) has no
+    # `is_doubles` and names no active Pokemon ("Slot 1 uses Spore")
+    if obs.get("is_doubles") or any(str(k).startswith("slot_") for k in act):
         actives = list(obs.get("active_pokemon") or []) + [None, None]
         foes = list(obs.get("opponent_active_pokemon") or []) + [None, None]
         team = _mons(obs.get("team"))

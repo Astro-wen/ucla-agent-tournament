@@ -637,6 +637,16 @@ class PokemonPolicy:
             return self._doubles(st, obs) if kind == "doubles" else self._singles(st, obs)
         if obs.get("is_doubles"):
             return self._doubles(st, obs)
+        if _battle_kind(st, obs) == "doubles":
+            # A doubles_turn template next to an observation without the battle view (platform 09-29, 4b85cc32 row
+            # 16: {"message": "No pending decision is currently available.", ...}; the server still took an answer).
+            # The singles scorer would send the unfilled template back (agent.py then had to repair it), and the
+            # doubles scorer has no field to read: play the template's own legal pair (`fallback`: each slot's first
+            # option, a foe as target, never a pass next to a free switch-in), leaving the per-match memory (Fake Out
+            # freshness, speed conditions, Protect chains) that a real doubles turn updates untouched.
+            log.warning("doubles_turn template without a battle view (%s); playing the template's first options",
+                        str(obs.get("message") or sorted(obs))[:80])
+            return self.fallback(st)
         return self._singles(st, obs)
 
     def _report(self, key, msg: str, *args) -> None:
@@ -647,7 +657,8 @@ class PokemonPolicy:
     def fallback(self, st: dict) -> dict:
         la = (st.get("legal_actions") or {}).get("actions") or []
         obs = st.get("observation") or {}
-        if st.get("phase") == "moving" and obs.get("is_doubles") and la:
+        # a doubles turn by its observation or, when the observation lacks the battle view, by its template's shape
+        if st.get("phase") == "moving" and la and (obs.get("is_doubles") or _battle_kind(st, obs) == "doubles"):
             tmpl = la[0]["input"]["action"]
             pick, used = {}, set()
             for slot in tmpl.get("slots", []):

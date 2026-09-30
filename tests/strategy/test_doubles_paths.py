@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from agent import fallback as F
-from agent.agent import Contestant, doubles_ok
+from agent.agent import Contestant, _doubles_template, doubles_ok
 from altruagent import DecisionContext, GameState, LegalAction, WithReasoning
 from altruagent.runner import _validate_decision
 from tests.strategy.test_doubles_pairs import DATA, forced_state, tmpl_of
@@ -193,7 +193,9 @@ def test_on_every_real_doubles_template_the_checks_agree_and_legal_answers_pass_
         raw = rec["raw"]
         obs = raw.get("observation") if isinstance(raw.get("observation"), dict) else {}
         gs = GameState.from_mcp_state(raw)
-        if not (raw.get("phase") == "moving" and obs.get("is_doubles")):
+        # a doubles turn by its observation or by its template (4b85cc32 row 16: a doubles_turn template next to an
+        # observation without the battle view; the guard rightly fills its template LegalAction in)
+        if not (raw.get("phase") == "moving" and (obs.get("is_doubles") or _doubles_template(raw) is not None)):
             # not a doubles turn: the guard leaves every answer shape alone
             for out in [a for a in gs.legal_actions[:3]] + [rec.get("out")]:
                 assert c._joint_guard(gs, out) is out, (f, out)

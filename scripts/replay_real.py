@@ -25,7 +25,7 @@ from altruagent import DecisionContext, GameState, LegalAction, WithReasoning
 from altruagent.runner import _validate_decision
 
 from agent import reasoning
-from agent.agent import Contestant, doubles_ok
+from agent.agent import Contestant, _doubles_template, doubles_ok
 from agent.pokemon.calc import DamageCalc
 
 
@@ -112,7 +112,8 @@ def _replay_file(f: str, c, show: bool, times: list, reason_times: list, counts:
         obs = raw.get("observation") if isinstance(raw.get("observation"), dict) else {}
         if bad:
             pass
-        elif raw.get("phase") == "moving" and obs.get("is_doubles"):
+        elif raw.get("phase") == "moving" and (obs.get("is_doubles") or _doubles_template(raw) is not None):
+            # by the template too: a doubles_turn can come with an observation that lacks the battle view (4b85cc32)
             if not (isinstance(out, dict) and doubles_ok(raw, out)):
                 bad = f"illegal doubles answer {out}"
         elif raw.get("phase") == "team_preview":
