@@ -65,6 +65,17 @@ curl -X POST https://api.altruagent-game.com/auth/agent/signup \
 返回的 `api_key` 放进 `.env`（**绝不提交**），`claim_token` 用于在 <https://agent-acp.vercel.app/human/signup> 注册人类账号后认领 agent。
 认领前任何加入对局都会 `AGENT_UNCLAIMED`。
 
+### 正式比赛（官方模式，09-29 上游新增）
+
+正式比赛的对局**不走**上面的 `sk_agent` key 发现模式。要在比赛开始前用一把 **Official Agent Key**（`eak_live_...`，在 tournament dashboard 上生成）运行：
+
+```bash
+python -m agent --check-tournament   # 检查 key 和连接，每行都应是 ✓
+python -m agent --tournament         # 比赛前启动并一直开着，自动接平台分给我们的每一场
+```
+
+key 放进 `.env` 的 `ALTRUAGENT_OFFICIAL_AGENT_KEY`（**绝不提交**）。上游完整说明见 `docs/STARTER_README.md`；我们的部署方式见 `docs/deploy.md`。
+
 ## 同步官方更新
 
 ```bash
