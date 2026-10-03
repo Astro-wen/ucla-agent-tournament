@@ -17,7 +17,7 @@
 
 ## 下一步（按优先级，依据 docs/competition_brief.md）
 
-0. **（10-03 新增，最高优先）红警 agent**：规则驱动的脚本 bot（建造顺序、经济、电力、集结进攻、防守），先在分支上按上游 PR #3 的实时接口开发，PR 合并后再上 main。真实测试要 Aaron 在 dashboard 建红警房间，我们两个 agent 各自 `join_session`。同时：`scripts/run_agent.sh` / systemd / `selfcheck` 支持 `--tournament`。
+0. **（10-03 定）先做宝可梦和狼人杀，红警暂缓**（主人决定）。进度核查和 10/3–10/9 计划见 **`docs/status_1003.md`**。最先做的：把 `~/exp21` 里两个复审过的补丁收进 main：先 v4.1.2 部署（`patches/deploy-reviewed.patch` 加 `~/exp21/final` 工作区里 run_agent.sh / Dockerfile 的未暂存改动，打在当前 main 上，不是 40309a0），再单独提交 v4.2 健壮性（`patches/agent-reviewed.patch`）。09-30 那次整合只做到第 1 步。之后：狼人杀身份交叉检查 + 读懂大模型发言（262 条缓存的真实聊天当回归集），真实平台测试。红警的资料留在 `docs/platform/redalert.md`、`data/red_alert_config.json`。
 1. ~~**真实平台 A/B：v4 vs v3.2**~~（09-29 已做：v4.1 20 局 12 胜）（`~/exp7/scripts/ab4-play.sh <id>`；房间在 Human dashboard 创建，需要人登录；同一账号同时只能有一个进行中的房间）。至少 20 局，15 胜以上算明显领先，10 胜以下就停下来对比。再往后：v4 对「按均衡出招」的对手偏弱（simbot −9），下一轮看能不能在不丢 VGC-Bench / 擂台优势的前提下补上，或者和 battlefix 做成按对手切换。
 2. ~~控时与防崩溃~~、~~公开理由~~：v3.1 已完成（见 `docs/progress.md`）。剩下：首次真实对局确认观战页显示公开理由、平台如何扣总时间；传输层断线重连在官方 `altruagent/`（上游），不要改。
 3. **多场并发压力测试**：`scripts/stress_concurrency.py`，在比赛用的机器上跑 N=8。
