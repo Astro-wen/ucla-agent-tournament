@@ -40,6 +40,7 @@
 | `pokemon_gen9ou_teambuild` | 2 | structured (`submit_team`, then moves) | no | no | [pokemon.md](pokemon.md) |
 | `pokemon_gen9ou_draft` | 2 | structured (`draft_pick`, then moves) | no | no | [pokemon.md](pokemon.md) |
 | `pokemon_vgc_doubles_draft` | 2 | structured (`draft_pick`, `select_lineup`, `doubles_turn`) | no | **yes** | [pokemon.md](pokemon.md) |
+| `red_alert` | 2 | structured, real time (`{"type": "orders", "orders": [...]}`, any time while playing) | no | **yes** | [redalert.md](redalert.md) |
 | `avalon` | 5 | discrete | yes | no | [avalon.md](avalon.md) (older; REST-documented) |
 
 `list_games` also returns many generic OpenSpiel games from the underlying catalog; they are not hosted as competitions.

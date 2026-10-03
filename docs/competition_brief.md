@@ -1,4 +1,48 @@
-> 2026-09-28 由多路线上调查（主办方、平台代码与接口、公开公告、各游戏最优解、我们的覆盖缺口）汇总，之后经独立审查。CONFIRMED = 一手来源；LIKELY = 证据较强但官方未明说；UNKNOWN = 没找到。文中提到的 scratchpad 路径是当时的临时目录，不在仓库里。**以本页末尾「审查意见」为准修正正文。**
+> 2026-09-28 由多路线上调查（主办方、平台代码与接口、公开公告、各游戏最优解、我们的覆盖缺口）汇总，之后经独立审查。CONFIRMED = 一手来源；LIKELY = 证据较强但官方未明说；UNKNOWN = 没找到。文中提到的 scratchpad 路径是当时的临时目录，不在仓库里。**以本页末尾「审查意见」为准修正正文。** **10-03 的新情况见下面第一节，和正文冲突时以它为准。**
+
+# 2026-10-03 更新：红警已上线平台
+
+Guang Cheng 要求只认 altruagent-game.com。以下是 10-03 对官网、平台接口、官方仓库和 Guang 回信的核对结果。
+
+## A. 红警（Red Alert）已经能在平台上玩（最大变化）
+- **CONFIRMED（平台技能文档 `docs/platform/redalert.md`，10-02/03 新增）**：游戏名 `red_alert`，1 对 1，用 OpenRA 引擎（开源重制的红警）。**实时制**：游戏每秒走 25 个 tick（引擎的时间单位），不等任何人。我们随时可以发一批命令，每批最多 20 条，两批之间至少隔 0.2 秒。没有聊天。
+- **怎么赢**：摧毁对方所有建筑和 MCV（基地车，开局唯一的单位，展开后变成建造场）得 1.0。到时限（房主选 10–20 分钟，默认 20）还没分胜负，比 `(击杀价值 − 损失价值, 资产价值)`，先比第一项。双方 10 分钟都没有被接受的命令也按这个比。
+- **支持单场和锦标赛（循环赛）**。单场由人类在 dashboard 建房，agent 自己 `join_session`。10-03 平台上已经有一个等待中的 `red_alert` 房间（10-02 23:59 创建）。
+- **地图和开局**：地图池 3 张（sidestep 96×96、trapped 97×97、shadowfiend-ii 83×90，都是 2 人图）；阵营每局随机（盟军或苏军，兵种不同）；只有一辆 MCV；地图未探索；有随机奖励箱。起始资金：文档写 5,000，`get_game_config` 写默认 10,000，**以对局里的 `match_rules.starting_cash` 为准**。
+- **完整数据已存**：`data/red_alert_config.json`（`python scripts/fetch_game_config.py red_alert`，只读）：42 种建筑、46 种单位的造价 / 建造时间 / 电力 / 前置 / 阵营 / 血量 / 速度 / 武器，3 张地图的出生点和地形图，命令格式。引擎版本 OpenRA commit `9b271c1a`。
+- **官方仓库 PR #3（10-02，Warren Wu，未合并）**：SDK 增加实时模式（`WAIT` = 这次不发命令、`on_action_result` = 收到命令结果的回调、`game_config`）；官方 LLM 示例 agent 能玩红警。主办方实测：gpt-4o 能展开基地、造电厂 / 兵营 / 矿场、出兵进攻，两个 gpt-4o 一局 4.9 分钟分出胜负，198 次模型调用。
+- **对我们的意义**：
+  - **漏洞**：现在的 SDK 没有实时模式，红警的 `legal_actions` 结构也不同（是一组清单，不是可选动作列表），我们的 agent 会解析出 0 个合法动作 → 兜底失败 → 进程被杀。**碰到红警等于每局白送。**
+  - **机会**：LLM agent 每次思考要几秒，脚本 bot 每 0.2–0.5 秒就能下一批命令，还不会犯低级错误。对 LLM 对手（包括 Oracle 要提供的通用 agent）这是四个游戏里最容易拉开差距的。
+  - 红警是否计分仍未定（见 B），但 09-28 简报的条件「除非官方发布接口」已经满足。
+
+## B. Guang Cheng 回信（Aaron 收到）
+- **肯定有**：狼人杀、宝可梦 Showdown。
+- **王者荣耀和红警**：还在做，希望两个都进正式比赛，**10/6 提交窗口开始前公布**。
+- 官方网站是 altruagent-game.com。
+- **Replit 可能给所有参赛者 pro 账号；Oracle 会提供通用 agent**；最终规则「很快」公布；鼓励学生自带 agent，成绩更好。
+- 抄送了 Sandra，之后她会在官网上做 Q&A。
+- **解读**：Oracle 的通用 agent 很可能就是大量对手的样子（LLM 驱动、慢、通用）。Replit pro 账号暗示可能在 Replit 上运行 agent，所以我们的包要能在 Replit 跑（需要 Node 和伤害计算器）。
+
+## C. 官网（Last-Modified 10-03）
+- **新增 Discord 社区**：https://discord.com/invite/yRFHT7EY5k 。更新可能先在这里发，建议 Aaron 加入并留意公告。
+- 新增赞助商 Amazon Science Hub at UCLA（只在首页；赞助页仍只列 OCI 和 Replit）。
+- 赞助页：**第 2 届比赛 2027 年 2 月在湾区举办**。
+- 新官网明写「Ranked on a public leaderboard」（09-28 审查意见说这句只来自旧站，现在新站也有：CONFIRMED）。另写「或者用我们提供的通用 agent」「agent 提前提交，现场和同伴实时对战」。
+- 提交入口仍没开放（HTML 注释：等平台能收作品再换成真实链接）。没有 FAQ / 规则页（faq.html、rules.html 都是 404）。
+- 日期不变：提交 10/6–13；现场 10/16，9:00 PDT（暂定），UCLA Engineering VI 134。游戏仍列 4 个。
+
+## D. 平台和官方仓库
+- **官方仓库 altruagent-starter 是什么**：主办方的官方入门代码加 Python SDK。我们仓库里的 `altruagent/` 就是它（git remote 名 `upstream`）。0 star，唯一的 fork 是主办方自己（wu-warren），还看不到其他参赛者。
+- **09-29 官方锦标赛运行方式（已合并进我们的 main）**：在锦标赛 dashboard 生成 Official Agent Key（`eak_live_...`，只显示一次），`python -m agent --check-tournament` 自检，比赛开始前 `python -m agent --tournament` 一直开着，平台分配的每一场自动接、各开一个进程、可同时多场；断了重开会接着打。**这基本说明正式比赛是我们自托管（LIKELY → 接近 CONFIRMED）。**
+- 10-01 提交 b03b633：只改官方 LLM 示例的提示（双打目标写清楚是谁），不影响我们。从中得知 GameAPI 的双打招式选项新增 `target_options`（每个目标是 self / ally / opponent 加物种名），我们不读它，不受影响。
+- 宝可梦、狼人杀、锦标赛的技能文档与 09-28 完全相同；`list_sessions` 改为列最近 25 个。
+- `/stats`：887 个 agent（09-28 为 855）、60 个用户（58）、累计 2,124 局（1,996）。
+
+## E. 由此产生的缺口（按急迫程度）
+1. **红警 agent（P0）**：从零写规则驱动的脚本 bot（建造顺序、经济、电力、集结后进攻、基地防守），不靠 LLM。PR #3 合并前，先在分支上按 PR #3 的接口开发；本地没有引擎，测试要在平台上打（需要 Aaron 在 dashboard 建红警房间）。
+2. **部署支持 `--tournament`（P0，小）**：`scripts/run_agent.sh`、systemd 单元、`selfcheck` 还只会跑旧的 `python -m agent`，不认 `ALTRUAGENT_OFFICIAL_AGENT_KEY`。
+3. **问主办方**：红警 / 王者荣耀是否计分；官方 key 由谁生成（dashboard 上线了吗）；Replit 是否是指定运行环境。
 
 # 比赛情报简报（截至 2026-09-28）
 

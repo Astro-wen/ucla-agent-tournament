@@ -1,6 +1,9 @@
-# 交接：在另一台机器上继续（2026-09-27，09-29 更新）
+# 交接：在另一台机器上继续（2026-09-27，09-29、10-03 更新）
 
 ## 现在到哪了
+
+- **10-03 情报（先读 `docs/competition_brief.md` 开头的「10-03 更新」）**：**红警 `red_alert` 已经能在平台上玩**（实时 1v1，OpenRA，单场和锦标赛都支持；规则 `docs/platform/redalert.md`，数据 `data/red_alert_config.json`）。我们的 agent 现在碰到红警会一步不走（SDK 没有实时模式，上游 PR #3 才加）。Guang 回信：狼人杀和宝可梦肯定有，红警 / 王者荣耀 10/6 前公布；Oracle 会提供通用 agent，Replit 可能给 pro 账号。正式比赛用 `python -m agent --tournament` + Official Agent Key（已合并），我们的部署脚本还不支持。
+- v5 第 2 轮（深搜、引擎预览）没上位，冠军仍是 v4.1.1（见 `docs/progress.md`、`docs/v5_standard.md`）。
 
 - **2026-09-27 起在新机器上开发**：Windows 11 Pro + WSL2 Ubuntu 24.04，仓库在 `~/ucla-agent-tournament`。从 Windows 侧改 WSL 里的文件会变成 root 所有，改完要 chown 回来。
 - **冠军 v4.1（main / `champion/`，09-29）**：v4 + 两个真实平台 bug 的修复（平台的 `team` 列出全部 6 只 → 局面重建只用带上场的 4 只；两格回答合起来必须合法），见 `docs/progress.md` 的 v4.1 节。以后的 v5 按 `docs/v5_standard.md`。以下是 v4 本身：
@@ -14,7 +17,8 @@
 
 ## 下一步（按优先级，依据 docs/competition_brief.md）
 
-1. **真实平台 A/B：v4 vs v3.2**（`~/exp7/scripts/ab4-play.sh <id>`；房间在 Human dashboard 创建，需要人登录；同一账号同时只能有一个进行中的房间）。至少 20 局，15 胜以上算明显领先，10 胜以下就停下来对比。再往后：v4 对「按均衡出招」的对手偏弱（simbot −9），下一轮看能不能在不丢 VGC-Bench / 擂台优势的前提下补上，或者和 battlefix 做成按对手切换。
+0. **（10-03 新增，最高优先）红警 agent**：规则驱动的脚本 bot（建造顺序、经济、电力、集结进攻、防守），先在分支上按上游 PR #3 的实时接口开发，PR 合并后再上 main。真实测试要 Aaron 在 dashboard 建红警房间，我们两个 agent 各自 `join_session`。同时：`scripts/run_agent.sh` / systemd / `selfcheck` 支持 `--tournament`。
+1. ~~**真实平台 A/B：v4 vs v3.2**~~（09-29 已做：v4.1 20 局 12 胜）（`~/exp7/scripts/ab4-play.sh <id>`；房间在 Human dashboard 创建，需要人登录；同一账号同时只能有一个进行中的房间）。至少 20 局，15 胜以上算明显领先，10 胜以下就停下来对比。再往后：v4 对「按均衡出招」的对手偏弱（simbot −9），下一轮看能不能在不丢 VGC-Bench / 擂台优势的前提下补上，或者和 battlefix 做成按对手切换。
 2. ~~控时与防崩溃~~、~~公开理由~~：v3.1 已完成（见 `docs/progress.md`）。剩下：首次真实对局确认观战页显示公开理由、平台如何扣总时间；传输层断线重连在官方 `altruagent/`（上游），不要改。
 3. **多场并发压力测试**：`scripts/stress_concurrency.py`，在比赛用的机器上跑 N=8。
 4. ~~宝可梦其他格式~~、~~官方示例 agent 基准~~：v3.2 已完成（单打策略 + `local/panel.py`）。剩下：和开源强 bot（foul-play、VGC-Bench 等）对比（无 Node 时的实力已测，见 `docs/deploy.md`）。晋级时除了擂台，再跑一遍 `python -m local.panel`（见 `docs/local_sim.md`）。

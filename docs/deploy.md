@@ -172,7 +172,9 @@ python scripts/rehearsal.py --minutes 20 --agent-env ARENA_CALC=off --agent-env 
 
 ## 加入锦标赛
 
-`python -m agent` **不会自动加入锦标赛**，它只打已分配的对局。如果主办方不替我们入座：
+**正式比赛（09-29 上游新增，10-03 核对）**：在锦标赛 dashboard 生成 Official Agent Key（`eak_live_...`），写进 `.env` 的 `ALTRUAGENT_OFFICIAL_AGENT_KEY`，先 `python -m agent --check-tournament`（每行都要 ✓），比赛开始前 `python -m agent --tournament` 一直开着，平台分给我们的每一场会自动接上（见 `docs/STARTER_README.md` 的 Official tournament 一节）。**`scripts/run_agent.sh` / systemd / `selfcheck` 还不支持这个模式**，要补。
+
+不带 `--tournament` 的 `python -m agent` **不会自动加入锦标赛**，它只打已分配的对局。如果主办方不替我们入座：
 
 ```bash
 .venv/bin/python -c "

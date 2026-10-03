@@ -23,5 +23,6 @@ The owner is new to this domain: explain in plain Chinese, define terms.
 - Real payload shapes are in `docs/real_payloads.md` (authoritative over `docs/platform/`): foe HP is out of 100, foe item/ability/moves hidden in battle, the opponent's full sets are only visible during the draft (the policy caches them), doubles targets: slot 0 single-target moves `[-2, 1, 2]`, slot 1 `[-1, 1, 2]`, spread/self `[0]`.
 - The 18-card draft pool is sampled per match from a larger set; `data/vgc_cards.json` grows with `python -m local.pool --harvest`.
 - The official runner kills a match process on any `INVALID_ACTION`; the platform then random-plays our seat (300 s Pokémon, 120 s Werewolf). Every policy path must fall back safely.
-- `python -m agent` does NOT join tournaments by itself (see `docs/deploy.md`).
+- Plain `python -m agent` does NOT join tournaments by itself; official matches are played with `python -m agent --tournament` and an Official Agent Key (`ALTRUAGENT_OFFICIAL_AGENT_KEY`, see `docs/deploy.md`).
+- Red Alert (`red_alert`, real time, OpenRA) is live on the platform since 10-02: rules in `docs/platform/redalert.md`, unit/map data in `data/red_alert_config.json`. The current SDK has no real-time mode (upstream PR #3 adds it), so without that our agent cannot play it.
 - Only one machine may run `python -m agent` for a given agent key at a time.
