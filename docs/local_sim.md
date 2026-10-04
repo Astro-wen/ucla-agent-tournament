@@ -35,7 +35,7 @@ cd local/js && npm install && cd ../..          # 一次
 python -m local.pool                             # 校验卡池合法性
 python -m local.eval_pokemon --games 300 --opponent official_baseline
 python -m local.eval_pokemon --games 300 --opponent random
-python -m local.eval_werewolf --games 1000 --seeds 7 --jobs 3     # 狼人杀混桌评测，候选 agent/ 对冠军 champion/（种子 1、2 调参用过）
+python -m local.eval_werewolf --games 1000 --seeds 7 --jobs 3     # 狼人杀混桌评测，候选 agent/ 对冠军 champion/（种子 1、2 调参用过；1003、1004 用于 10-03 身份交叉检查 + 读聊天的测量）
 python -m local.werewolf_platform --games 40      # 狼人杀：用官方 runner（run_game）跑 7 个座位，按平台文档检查
 ```
 

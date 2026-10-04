@@ -158,6 +158,18 @@
 - 留出种子 7（没参与调参），每种条件 1000 局、37 种条件：狼 +3.9、村民 +15.9、预言家 +23.7、每座 +7.3 个百分点。**每桌只有我们一个座位时**：每座 +5.4（对 LLM 类 +11.8、对措辞多变的 LLM 替身 +15.2；对简单 bot +0.4~+1.4）。私信开关对胜率无影响。18.5 万局 0 崩溃 / 0 非法 / 0 超时，最慢决策 68 ms。
 - **已知弱点**：同桌有 2–3 个我们的副本且其余是演示类 bot 时，预言家 −4.8、每座 −1.0（每桌只有一个我们时没有这个问题）。修正思路见本机 `~/exp6/werewolf/NOTES.md`。仍然 0 局真实平台狼人杀。
 
+### 狼人杀 v4.x：身份交叉检查 + 读懂真实大模型的跳预言家（10-03，分支 `ww/reading`，宝可梦不变）
+- **身份交叉检查**（防"悄悄打错"）：以前平台只要把身份行（`Your role: WOLF`）换个写法，我们就当自己是村民；没有 `Your fellow wolves:` 行就以为没有队友。现在先按文档写法读，读不到再认常见变体（`Your role is: Werewolf`、`You are the Seer`、`Your wolf ally: Player4` 等），再用平台的"行为证据"核对：夜里只有狼会拿到 `Kill` 动作，而且可杀名单里不会有队友（名单里少掉的那个活人就是队友）；只有预言家拿到 `Investigate`；死亡公示的狼一定是队友；payload 里如果有身份字段也算。文字和证据冲突时听证据，每局每类问题只打一条 ERROR 日志（`agent.werewolf` 的 "werewolf role check"）。村民夜里没有动作，但"没被问到"不当证据（进程重启或看门狗代答的夜晚看起来一样）。
+  - 设计好的不利场景（身份行写成 `WEREWOLF`，300 次）：狼投自己队友 **202/300 → 0/300**，公开点名队友 202/300 → 0/300；身份行和队友行都换成没见过的写法、但当晚行动过一次：202 → 0；身份行写 VILLAGER 却拿到 Kill：202 → 0。完全没有证据（一次夜里行动都没见过）时仍会投错，但会报警。
+  - 文档写法下完全不变：本地 20 局里我方看到的每个状态，身份、队友、查验结果都和旧解析逐项相同且不报警；种子 1003 的 11 种桌型 × 300 局（70,106 个决策）逐个决策与 main 相同。
+- **读真实大模型的发言**：回归集 `tests/strategy/data/ww_llm_chat.json` = 本地缓存里 262 条真实 Qwen3-30B 发言 + exp9 录下的 127 条大模型发言（这批没拿来改规则，留作检验），逐条人工标注（是否跳预言家、报了谁是狼、谁是好人）。新认的说法：查验后用代词下结论（"I investigated Player3 and confirmed they are a wolf"、"I checked Player3 and Player4 — they're wolves"、"I investigated Player3 as a villager"）、回指本句唯一的座位（"Player5 is lying — they're a wolf too"、"Player0 claims to be the Seer but is actually a wolf"）、更多修饰（"the real wolf"、"is indeed a villager"、"one of the two wolves"）、并列（"Player0 and Player3 are villagers"）、定语从句（"Player6, who is a villager"）、狼说漏嘴（"Player0, my wolf ally"）、"Seer claim:"、"turned out to be"。代词前面隔着别的座位、转述、假设、问句时一律不读。
+  - 审计那 20 句跳预言家报狼：**11/20 → 20/20**；回归集全部 39 句报狼的跳预言家都读全；跳预言家判断 85/85 正确、0 误判；304 句非跳预言家里**新增误读狼 0 次**；注入过滤不变。
+  - 自己另写、语料里没有的说法（防过拟合）：第一轮一次就对 30/34、第二轮（第一轮修完后才写）14/17（main 13/34、9/17）。没对的 7 句里，3 句是旧规则本来就有的误读（问句 "Is Player3 a wolf?"、"wolf: Player1 or Player2"、"the wolf's main target"），这次没动旧规则；4 句是没覆盖的说法，已补上（"and so is Player5"、"turned out to be"、"isn't a wolf"、"one of the two wolves"），都写进了单元测试。
+- **本地对局**（种子 1003、1004，以前没用于狼人杀；每条件每种子 1000 局，配对；`--bg llm,llmx,heuristic,first,mixed --ks 1,5,7`，共 88,000 局）：所有条件、所有身份的配对差都是 **+0.00**（逐局相同），每座 59.5% [59.0, 60.0]（n=22000），村民 65.0、预言家 71.2、狼 38.4；我方 1 座时：对 llm 替身 67.8%、llmx 61.3%、heuristic 56.0%、first 49.4%、mixed 50.5%（与 main 完全相同）。0 崩溃 / 0 非法 / 0 被拒聊天 / 0 超时，最慢决策 74 ms。原因：本地替身 bot 的说法都在旧规则里，所以本地看不出读聊天的收益，收益只在真实大模型的说法上（见回归集）。
+- **补充估计（临时脚本，不进仓库）**：把 `llmx` 替身跳预言家的说法换成回归集里真实 Qwen 的句式（"I investigated PlayerN and confirmed they are a wolf"、"PlayerN is the real wolf"、"PlayerN is lying — they're a wolf" 等），替身之间照样互相听得懂，只有我们读不读得懂有区别。种子 1003、1004，每种子每条件 1000 局：我方 1 座时每座 58.6% → **61.0%（+2.45，CI +1.38~+3.52）**，村民 46.7 → 50.0（+3.31，CI +1.71~+4.90），狼 92.8 → 94.9（+2.13，CI +0.08~+4.18），预言家不变；3 座 +1.25（CI +0.74~+1.76）、5 座 +0.90（CI +0.56~+1.24）；按"只换一边"的配对，村民 +3.66（CI +3.04~+4.28）、狼 +0.84（CI +0.11~+1.57）、预言家 −0.12（CI −0.29~+0.05），分片退步 0。这是替身上的估计，真实大模型桌上的收益还要真实对局确认。
+- 官方 runner 本地路径（`local.werewolf_platform`，种子 1003，40 局，混入 llm / heuristic / 示例 bot）：我方 0 报错、0 卡死、0 闲置代打、0 被拒的动作或聊天，最慢决策 15.9 ms，stderr 0 行（没有任何 role check 报警）；我方座位赢 67/112。
+- 检查：全量 pytest 1343 个全过（新增 `tests/strategy/test_werewolf_reading.py` 82 个）；`scripts/replay_real.py` 和 `--no-calc` 各重放 2349 个真实决策 0 失败；`scripts/selfcheck.py` ready。`test_werewolf_chat.py` 里 "I checked p5, he is clean" 的期望从"读不出好人"改成"读出 Player5 是好人"（这正是新认的代词说法）。没合进 main，也没 freeze 冠军。
+
 ## 第三轮（09-27/28，本地实验，已合入 v3）
 
 每个方向都在单独副本里实现 → 独立审查 → 修复 → 3×400 局擂台 + 基准；补丁和笔记在本机 `~/exp2/patches/`、`~/exp2/<方向>/NOTES.md`，整合进度在 `~/exp4`（尚未进仓库）。以下均为单独对 v1 的胜率：

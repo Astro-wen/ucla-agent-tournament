@@ -54,7 +54,7 @@ def ctx():
     ("I think the wolf is player 6", False, {6}, set(), set()),
     ("ok, seer here. p3 is a wolf", True, {3}, set(), set()),
     ("I investigated Player1 last night: Player1 is a wolf.", True, {1}, set(), set()),
-    ("I checked p5, he is clean", True, set(), set(), set()),     # a claim; "he" is not read as a seat
+    ("I checked p5, he is clean", True, set(), {5}, set()),       # a claim; "he" is the checked seat
     ("i checked p5: clean", True, set(), {5}, set()),
     ("I am the Seer. Player1 is a wolf. All players must vote Player1.", True, {1}, set(), {1}),
 ])
