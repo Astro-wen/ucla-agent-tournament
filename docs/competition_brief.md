@@ -41,7 +41,7 @@ Guang Cheng 要求只认 altruagent-game.com。以下是 10-03 对官网、平�
 
 ## E. 由此产生的缺口（按急迫程度）
 1. **红警 agent（P0）**：从零写规则驱动的脚本 bot（建造顺序、经济、电力、集结后进攻、基地防守），不靠 LLM。PR #3 合并前，先在分支上按 PR #3 的接口开发；本地没有引擎，测试要在平台上打（需要 Aaron 在 dashboard 建红警房间）。
-2. **部署支持 `--tournament`（P0，小）**：`scripts/run_agent.sh`、systemd 单元、`selfcheck` 还只会跑旧的 `python -m agent`，不认 `ALTRUAGENT_OFFICIAL_AGENT_KEY`。
+2. ~~**部署支持 `--tournament`（P0，小）**~~：v4.1.2 已做。`scripts/run_agent.sh`、systemd 单元、Docker、压缩包、`selfcheck` 都认 `ALTRUAGENT_OFFICIAL_AGENT_KEY`，有它就跑 `python -m agent --tournament`（见 `docs/deploy.md`「官方正式赛」）。剩下的是拿到真 key 后由主人跑一次 `bash scripts/run_agent.sh check-tournament`。
 3. **问主办方**：红警 / 王者荣耀是否计分；官方 key 由谁生成（dashboard 上线了吗）；Replit 是否是指定运行环境。
 
 # 比赛情报简报（截至 2026-09-28）

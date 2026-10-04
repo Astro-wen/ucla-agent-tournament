@@ -20,7 +20,20 @@ from altruagent.client import AltruAgentClient  # noqa: E402
 from altruagent.errors import AltruAgentError, AuthenticationError, ConfigurationError  # noqa: E402
 
 
+DEFAULT_CONTROL_URL = "https://api.altruagent-game.com"   # as agent/__main__.py: a key alone is enough
+
+
 def main() -> int:
+    import os
+
+    from dotenv import load_dotenv
+
+    load_dotenv()                                  # (what AltruAgentClient() does first; the real environment wins)
+    os.environ.setdefault("ALTRUAGENT_CONTROL_URL", DEFAULT_CONTROL_URL)
+    if not os.environ.get("ALTRUAGENT_API_KEY") and os.environ.get("ALTRUAGENT_OFFICIAL_AGENT_KEY"):
+        print("Only an Official Agent Key is configured: check the official tournament connection with "
+              "`python -m agent --check-tournament` (or bash scripts/run_agent.sh check-tournament).")
+        return 1
     try:
         client = AltruAgentClient()
     except ConfigurationError as exc:

@@ -153,6 +153,25 @@
 - preview 改了阵容的局反而赢得少（247 局 47.8%，没改的 153 局 54.9%），代理上的收益大概是噪声；赛前选人一步最慢 6.7 秒，超过 5 秒的测试上限。
 - 教训已写进 `docs/v5_standard.md` 第 3 节：代理（P1 只有 120 局、负载高时双方都降级）对擂台的预测力很弱，以后代理过了先在低负载下跑擂台种子 7 的前 200 局再决定。补丁留在 `~/exp19/patches/`。
 
+### v4.1.2（09-30 写成，10-03 合入）：官方正式赛的部署（本地对局不变）
+
+09-29 的上游更新定下正式赛方式：参赛者自己一直开着 `python -m agent --tournament`（Official Agent Key，`eak_live_…`），我们按自托管准备。09-29 部署审计（`~/exp21/audit_findings.json`）里确认的部署问题这次一起修，修复类版本，不改打法。
+- **官方模式**：`scripts/run_agent.sh` / systemd 单元 / Docker / 压缩包 / selfcheck 都认官方模式：有 eak key 就自动 `--tournament`（`ARENA_MODE` 可强制），只查 eak key 的格式，健康行显示 `mode=tournament(primary|standby)`；`run_agent.sh check-tournament` 一次性检查；出包的密钥扫描认得 `eak_live_`；同一把 eak key 的第二个进程按热备启动（sk key 仍然一机一个；另一台机器上用 key 文件里的 `ARENA_ROLE=standby` 标明）。热备只打没人持有租约的座位：新座位先让主进程 20 s（平台是「谁先申请谁拿」，`ARENA_NEW_SEAT_DELAY_S`），之后每次轮询用自己的 execution id 请求一次 `grant`，`seat_busy` 就继续等（不起 worker、不新建 agent session），主进程的租约一过期就当轮接管（以前靠 SDK 的 worker 撞 `seat_busy` 再等 35 s，dry-r5 接管 68.8 s、被代打 1 回合）。
+- **上游缺陷绕开**（不改 `altruagent/`，缺陷清单在 `docs/deploy.md` 给主人报告）：重新认证碰上一次 429 / 5xx 不再结束运行时、不再杀掉所有对局（`_SteadyOfficial`）；启动时暂时连不上平台按退避重试；冷却 / 查询 10 s 也用于官方模式；看门脚本给每个 run 循环一个 execution id，agent 重启后直接续上自己的座位租约（实测对战中 kill -9 运行时，7.4–8.5 s 后下一步，0 次 seat_busy）。
+- **其他部署修复**：`ARENA_ALLOW_NO_CALC=1` 单独设就够（node 坏了时自动 classic）、`ARENA_CALC=off` 不再关掉引擎搜索；systemd `OOMPolicy=continue`，Node 子进程优先被 OOM 杀；直接跑 `python -m agent` 时默认控制面地址、打醒目的 DEGRADED 横幅、10 s 冷却；LOG_DIR 不可写报错退出 2（不再误报「已在运行」）；录像默认写 LOG_DIR、失败会警告；平台要求 / 离线安装 / 不要 `pip install .` 写进 BUNDLE_README；包里带一整场真实对局的两个座位，`replay_real.py` 在包里能跑；包里带 `.dockerignore`，Dockerfile 加 HEALTHCHECK、`check-tournament` 可直接跑；Node 子进程不再继承任何密钥。
+- **演练**：模拟平台默认按真实录像的 payload 形状（6 只队伍、协议日志和计时行、盲状态），新增官方控制面（座位租约）和 7 人狼人杀桌。从解开的压缩包跑完整流程（2 个并发分配、kill worker、kill 运行时、认证 503、热备、主进程停止后接管），最终代码 dry-r7：13 项检查全过，102 个决策 0 非法 / 0 计时器代打，热备在主进程在时 0 个 worker，接管 30.7 s 且那一回合没被代打，非持有租约的进程 0 步；dry-r1…r6 的问题和改法见 `docs/deploy.md`「官方模式演练」。
+- **对局不变**（v5_standard 第 1 节）：改动都在进程启动、运行时对 SDK 的包装（`agent/__main__.py`）、子进程环境 / OOM 分数、日志和部署脚本里，不碰决策代码。唯一的行为变化是 deploy-1 要求的：`ARENA_CALC=off` 时引擎搜索照常（以前连带关掉）；默认设置下的本地对局不受影响。核对：2349 个真实状态用经典打法重放，修复前后答案逐个相同；引擎搜索用 `~/exp18` 的确定性设置（安全网调高）重放三场真实对局，逐个相同。Docker 镜像仍没真正构建过（本机没有 docker）。
+- **独立审阅补的两处**：`run_agent.sh status` / `health` 以前按「问的那个 shell」重新算 `mode=` 和 `key=#`，看门脚本是用环境变量 `ARENA_MODE=discovery` 起的、key 文件里又有 eak key 时，会对着一个发现模式的循环显示 `mode=tournament(primary)`（比赛日手册正是靠这一项确认模式）；现在循环在跑时显示它状态文件里记的模式和 key 哈希。计算器找 node 时的 `node --version` 也改用和 calc.js / search.js 一样的白名单环境（以前带着全部密钥）。
+- **10-03 合入 main 376048d**：补丁是在 40309a0 上写的。合入后 16 个代码和脚本文件与「40309a0 + 复审过的补丁」逐字节相同；只有 `docs/deploy.md` 的「加入锦标赛」和本文件需要手工合并，main 上 10-03 的情报和 v5 第 2 轮记录都保留。`HANDOFF.md`、`competition_brief.md`、`status_1003.md` 里「部署脚本还不支持 `--tournament`」的说法已改成现状。`~/exp21/final` 里 run_agent.sh / Dockerfile 的未暂存改动要用到 v4.2 的 `agent/health.py` 和对局状态文件，留给 v4.2 一起提交。
+- **合入后的检查**：
+  - `python -m pytest -q`：1301 个全过（548 s）。
+  - `replay_real.py`：2349 个真实决策 0 失败、0 次两格修补，1296 个双打决策全部用上搜索；`--no-calc` 同样 0 失败。
+  - `selfcheck.py`：ready。配上假的 eak key 时显示 `mode tournament (python -m agent --tournament)`；格式不对的 key 判 FAIL。
+  - 新压缩包（`376048d-dirty`：提交前从同一工作区出的包，代码和本次提交相同）：干净环境里 selfcheck ready，包里的 replay_real 60 个决策 0 失败。
+  - 从这个压缩包跑 `rehearsal_official.py`（dry-i1）：13 项检查全过。宝可梦 7 场、狼人杀 3 桌，110 个决策，0 非法、0 计时器代打。kill worker 后 13.5 s 起新 worker、15.5 s 后下一步；kill 运行时后 3.4 s 起新运行时、8.4 s 后下一步。热备接管用了 32.7 s，那一步等了 34.2 s，没被代打。不持有租约的进程 0 步，key 没进日志。接管的那桌狼人杀有 1 次 `WRONG_PHASE`：讨论窗口换阶段时撞上的竞态，runner 没退出，这桌照常打完。
+  - `rehearsal.py` 发现模式 5 分钟：开了 9 场、打完 8 场（最后 1 场到时还在打），120 个决策，0 非法、0 计时器代打、0 个 Traceback；停止用了 0.6 s，没有残留进程。
+- **合入后对局仍不变**（和 main 376048d 比）：2349 个真实状态用经典打法、3 场真实对局（140 个决策）用确定性搜索，答案逐个相同；本地对冠军 20 局经典打法加 10 局确定性搜索，Showdown 协议日志逐局相同。
+
 ### 狼人杀改进（09-28，宝可梦不变）
 - 合入 `candidates/r2-ww-seer-and-villager`，加上模拟得出的规则（村民不弃票、集中投票、不假跳；预言家查到狼或快被投出时跳；对跳时投两个跳的人之一；狼只在被点名时对跳、先刀已跳的预言家），聊天只读有限事实并识别注入，狼的私信默认关闭（`ARENA_WW_DM=on` 可开；观战数据流可能暴露私信）。
 - 留出种子 7（没参与调参），每种条件 1000 局、37 种条件：狼 +3.9、村民 +15.9、预言家 +23.7、每座 +7.3 个百分点。**每桌只有我们一个座位时**：每座 +5.4（对 LLM 类 +11.8、对措辞多变的 LLM 替身 +15.2；对简单 bot +0.4~+1.4）。私信开关对胜率无影响。18.5 万局 0 崩溃 / 0 非法 / 0 超时，最慢决策 68 ms。

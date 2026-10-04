@@ -71,8 +71,15 @@ def record(kind: str, context: DecisionContext, state: GameState, out=None, publ
             entry["reasoning_summary"] = public_reason
         with open(Path(RECORD_DIR) / f"{context.session_id}.jsonl", "a") as f:
             f.write(json.dumps(entry) + "\n")
-    except Exception:
+    except Exception as e:
+        if not _record_failed:                  # once per process (= per match): a read-only disk must not go unseen
+            _record_failed.append(e)
+            log.warning("recording to %s failed (%r): this match's states are not saved; set ARENA_RECORD_DIR (or "
+                        "run_agent.sh's LOG_DIR) to a writable directory", RECORD_DIR, e)
         log.debug("record failed", exc_info=True)
+
+
+_record_failed: list = []
 
 
 def _jsonable(x):

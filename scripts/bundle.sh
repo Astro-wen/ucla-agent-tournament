@@ -16,6 +16,13 @@
 #   bash scripts/bundle.sh --no-showdown        # leave the engine search's simulator out (then the bundle runs only
 #                                               # with ARENA_BATTLE=classic: selfcheck fails, run_agent.sh refuses)
 #   bash scripts/bundle.sh --no-sample-logs     # leave the recorded match out (selfcheck then skips its replay)
+#   bash scripts/bundle.sh --wheels DIR         # ship a wheelhouse for an offline install (DIR/*.whl, made on a machine
+#                                               # with network: see BUNDLE_README.txt); the target then needs no PyPI
+#
+# The sample match is the largest session recorded in BOTH logs/yoriko and logs/apocalypse with a draft: both seats of
+# one whole real match (draft, team preview, ~45 battle decisions), which selfcheck and replay_real.py replay.
+# The bundle carries its own .dockerignore (the Dockerfile builds from the bundle directory): .env files, .venv, logs,
+# the node/ build (the image has its own) and wheels stay out of the build context.
 #
 # The engine-search battle policy (ARENA_BATTLE=search, agent/js/search.js) runs the Pokemon Showdown simulator: a
 # trimmed copy of the pokemon-showdown package the local simulator already pins (local/js/package-lock.json, MIT
@@ -37,10 +44,11 @@ NODE_SHA256_XZ=df450af89261115ef9f9e3830c3eeb2cc9213b63c720b1af623cb5dcbe2e02de 
 NODE_SHA256_GZ=1084aa36196bba4c3a5e69a1ee388a6e4ff729dad09445fbcd434b28fe3c24af   # node-v22.23.3-linux-x64.tar.gz
 NODE_CACHE="${ARENA_NODE_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/arena-agent}"
 
-OUT="$ROOT/dist"; NODE_MODULES=1; SAMPLE_LOGS=1; NODE_MODE=pinned; NODE_SRC=""; SHOWDOWN=1
+OUT="$ROOT/dist"; NODE_MODULES=1; SAMPLE_LOGS=1; NODE_MODE=pinned; NODE_SRC=""; SHOWDOWN=1; WHEELS=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT="$2"; shift 2 ;;
+    --wheels) WHEELS="$2"; shift 2 ;;
     --node-dist) NODE_MODE=dist; NODE_SRC="$2"; shift 2 ;;
     --node-tarball) NODE_MODE=tarball; NODE_SRC="$2"; shift 2 ;;
     --no-node) NODE_MODE=none; shift ;;
@@ -159,12 +167,46 @@ case "$NODE_MODE" in
     NODE_NOTE="NO node binary is included (built with --no-node): install Node.js >= 18, or set ARENA_NODE to one." ;;
 esac
 [ -f "$DEST/node/bin/node" ] && chmod 755 "$DEST/node/bin/node"
-if [ "$SAMPLE_LOGS" = 1 ]; then          # one real match (both seats) for scripts/selfcheck.py's replay
-  for d in yoriko apocalypse; do
-    f="$(ls -S logs/$d/*.jsonl 2>/dev/null | tail -n 1 || true)"
-    [ -n "$f" ] && { mkdir -p "$DEST/logs/$d"; cp "$f" "$DEST/logs/$d/"; }
+SAMPLE_NOTE="none (--no-sample-logs)"
+if [ "$SAMPLE_LOGS" = 1 ]; then          # one whole real match, both seats, for selfcheck's and replay_real.py's replay
+  best=""; best_size=0
+  for f in logs/yoriko/*.jsonl; do
+    [ -f "$f" ] || continue
+    g="logs/apocalypse/$(basename "$f")"
+    [ -f "$g" ] && grep -q '"phase": "draft"' "$f" && grep -q '"phase": "draft"' "$g" || continue
+    s=$(( $(wc -c < "$f") + $(wc -c < "$g") ))
+    [ "$s" -gt "$best_size" ] && { best="$(basename "$f")"; best_size=$s; }
   done
+  if [ -n "$best" ]; then
+    mkdir -p "$DEST/logs/yoriko" "$DEST/logs/apocalypse"
+    cp "logs/yoriko/$best" "$DEST/logs/yoriko/"; cp "logs/apocalypse/$best" "$DEST/logs/apocalypse/"
+    SAMPLE_NOTE="both seats of real match ${best%.jsonl} ($(cat "logs/yoriko/$best" "logs/apocalypse/$best" | grep -c '"kind": "action"' || true) decisions)"
+  else
+    echo "WARNING: no match recorded in both logs/yoriko and logs/apocalypse: no sample match (selfcheck skips its replay)" >&2
+  fi
 fi
+WHEELS_NOTE=""
+if [ -n "$WHEELS" ]; then                # a wheelhouse made elsewhere (pip download ...): an offline install
+  ls "$WHEELS"/*.whl >/dev/null 2>&1 || { echo "--wheels: no .whl files in $WHEELS" >&2; exit 1; }
+  mkdir -p "$DEST/wheels"
+  cp "$WHEELS"/*.whl "$DEST/wheels/"
+  WHEELS_NOTE="wheels/ holds $(ls "$DEST/wheels" | wc -l | tr -d ' ') wheels: install offline with
+  python3 -m venv .venv && .venv/bin/pip install --no-index --find-links wheels -r requirements.lock"
+fi
+cat > "$DEST/.dockerignore" <<'EOF'
+# the build context of deploy/Dockerfile in this bundle: never keys, and none of the local bulk (the image installs
+# its own Python packages and brings its own node)
+.env
+.env.*
+!.env.example
+.venv
+logs
+node
+wheels
+dist
+**/__pycache__
+**/*.pyc
+EOF
 find "$DEST" \( -name __pycache__ -o -name '*.pyc' -o -name .pytest_cache -o -name '.DS_Store' \) -prune -exec rm -rf {} +
 find "$DEST" -name '*.smoke_test_backup' -delete
 chmod +x "$DEST/scripts/run_agent.sh" "$DEST/scripts/selfcheck.py" "$DEST/scripts/check_connection.py" "$DEST/scripts/replay_real.py"
@@ -188,36 +230,57 @@ fi
 
 cat > "$DEST/BUNDLE_README.txt" <<EOF
 AltruAgent tournament agent, bundle $VERSION (built $(date -u +%Y-%m-%dT%H:%MZ)).
-Contains no API key. Runbook: docs/deploy.md.
+Contains no key. Runbook: docs/deploy.md (the official tournament: section "官方正式赛").
 
-Needs: Linux x86-64, Python 3.11+ (tested 3.12). The damage calculator needs Node.js >= 18:
+Needs: Linux x86-64 with glibc >= 2.28 for the bundled node (Ubuntu >= 18.10, Debian >= 10, RHEL/Rocky/Alma >= 8,
+Amazon Linux 2023; NOT Amazon Linux 2, CentOS 7, Alpine/musl or arm64 such as AWS Graviton: those need their own
+Node >= 18 via ARENA_NODE), Python 3.11+ (tested 3.12) with its venv module (Ubuntu/Debian: apt install python3-venv).
+The damage calculator and the engine search need Node.js >= 18:
 $NODE_NOTE
 agent/js/node_modules is $([ "$NODE_MODULES" = 1 ] && echo "included" || echo "NOT included: run (cd agent/js && npm ci --omit=dev)").
 The engine search's simulator (the default battle policy, ARENA_BATTLE=search; ARENA_BATTLE=classic = the rollback): $SHOWDOWN_NOTE.
+Sample match for the replay checks: $SAMPLE_NOTE.
 WITHOUT THE CALCULATOR THE AGENT WINS ONLY ~12% AGAINST ITSELF WITH IT: selfcheck fails and run_agent.sh
-refuses to start when it cannot run (ARENA_ALLOW_NO_CALC=1 overrides; emergency only).
+refuses to start when it cannot run (ARENA_ALLOW_NO_CALC=1 overrides, emergency only; when node itself cannot run it
+covers the engine search too: the agent then plays the classic battle policy).
 
-Install and check (no network access to the platform needed):
+Run it FROM THIS DIRECTORY. Never "pip install ." (a non-editable install drops data/, the draft model and the
+JavaScript: the agent would play blind); only the pinned requirements go into the venv.
+
+Install and check (no network access to the platform needed; PyPI is, unless the bundle has wheels/):
   python3 -m venv .venv && .venv/bin/pip install -r requirements.lock
+${WHEELS_NOTE:-  (offline: on a machine with network and the same Python, pip download -r requirements.lock -d wheels
+   --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12, copy wheels/ here, then
+   .venv/bin/pip install --no-index --find-links wheels -r requirements.lock)}
   .venv/bin/python scripts/selfcheck.py            # must end with "selfcheck: ready" and show
                                                    # "OK    damage calculator answers: node ..." and
                                                    # "OK    battle policy: engine search ..."
+  .venv/bin/python scripts/replay_real.py          # the sample match through the agent: 0 failures
 
-Run one agent key (restarts, logs/agent-main.out, a health line every 5 minutes; it must show calc=ok(...)):
-  export ALTRUAGENT_API_KEY=...   (or put it in .env, mode 600; see .env.example)
-  bash scripts/run_agent.sh start   # also: stop / status / logs; "run" = foreground; systemd: install-systemd
-Always start through scripts/run_agent.sh (or Docker / systemd): plain "python -m agent" does not check the calculator.
+The official tournament (the Official Agent Key from the tournament dashboard; it replaces the sk_agent_ key):
+  put ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_... in .env (mode 600; see .env.example)
+  bash scripts/run_agent.sh check-tournament       # once, contacts the platform: every line must show a check mark
+  bash scripts/run_agent.sh start                  # runs python -m agent --tournament (health lines: mode=tournament)
+A second machine with the same key can be a hot standby (only if the organizers allow it): add ARENA_ROLE=standby to
+its .env. It plays nothing while the primary plays (new seats are left to the primary) and takes a seat over ~30-40 s
+after the primary stops renewing it.
 
-Docker (the image brings its own Node $NODE_VERSION):
-  docker build -f deploy/Dockerfile -t arena-agent . && \\
-  docker run -d --restart unless-stopped -e ALTRUAGENT_API_KEY=... -v arena-logs:/data arena-agent
+Other runs (an sk_agent_ key, ALTRUAGENT_API_KEY): the same start runs the discovery mode. Health line every 5
+minutes in logs/agent-main.out: agent=up, calc=ok(...), search=ok. Also: stop / status / logs; "run" = foreground;
+systemd: install-systemd. Start through scripts/run_agent.sh (or Docker / systemd): a plain "python -m agent" gets
+no restarts and no log rotation (it does warn loudly when the calculator or the engine search cannot run).
+
+Docker (the image brings its own Node $NODE_VERSION; this directory's .dockerignore keeps keys and bulk out):
+  docker build -f deploy/Dockerfile -t arena-agent .
+  docker run -d --restart unless-stopped --env-file .env --log-opt max-size=20m --log-opt max-file=3 \\
+      -v arena-logs:/data arena-agent
 EOF
 
 # ---- secret scan ---------------------------------------------------------------------------------------------------
 fail=0
 bad_files="$(find "$DEST" -name '.env*' ! -name .env.example; find "$DEST" \( -name '*.pem' -o -name '*.key' -o -name 'id_rsa*' -o -name 'id_ed25519*' \))"
 if [ -n "$bad_files" ]; then echo "SECRET SCAN: key files in the bundle:" >&2; echo "$bad_files" >&2; fail=1; fi
-PATTERN="sk_agent_[A-Za-z0-9_-]{8,}|seatclaim_[A-Za-z0-9_-]{8,}|sk-(proj-|ant-)?[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ALTRUAGENT_API_KEY=[\"']?[A-Za-z0-9_-]{16,}"
+PATTERN="sk_agent_[A-Za-z0-9_-]{8,}|seatclaim_[A-Za-z0-9_-]{8,}|eak_live_[0-9A-Fa-f]{16,}|sk-(proj-|ant-)?[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ALTRUAGENT_API_KEY=[\"']?[A-Za-z0-9_-]{16,}|ALTRUAGENT_OFFICIAL_AGENT_KEY=[\"']?[A-Za-z0-9_-]{16,}"
 hits="$(grep -rIlE "$PATTERN" "$DEST" --exclude-dir=node_modules --exclude-dir=node 2>/dev/null || true)"
 for f in $hits; do
   if grep -IoE "$PATTERN" "$f" | grep -vqE '^(ALTRUAGENT_API_KEY=)?sk_agent_your_key_here$'; then
@@ -226,7 +289,7 @@ for f in $hits; do
     fail=1
   fi
 done
-nm_hits="$(grep -rIlE 'sk_agent_[A-Za-z0-9]{8,}|seatclaim_[A-Za-z0-9]{8,}' "$DEST/agent/js/node_modules" "$DEST/node" 2>/dev/null || true)"
+nm_hits="$(grep -rIlE 'sk_agent_[A-Za-z0-9]{8,}|seatclaim_[A-Za-z0-9]{8,}|eak_live_[0-9a-f]{16,}' "$DEST/agent/js/node_modules" "$DEST/node" 2>/dev/null || true)"
 [ -n "$nm_hits" ] && { echo "SECRET SCAN: platform tokens inside node_modules / node: $nm_hits" >&2; fail=1; }
 [ "$fail" = 0 ] || { echo "bundle NOT written" >&2; exit 1; }
 

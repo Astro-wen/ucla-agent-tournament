@@ -5,8 +5,10 @@ with scheduled failures, sampling memory / open files / processes. Linux only (r
     python scripts/rehearsal.py --minutes 120 --supervise systemd    # the same loop as a transient systemd user unit
     python scripts/rehearsal.py --minutes 10 --no-chaos --concurrent 1
 
-Stack: local/fake_platform.py (127.0.0.1, test key) <- scripts/run_agent.sh run -> python -m agent (supervisor) ->
-one worker process per match -> node agent/js/calc.js. Everything the rehearsal writes goes to --out
+Stack: local/fake_platform.py (127.0.0.1, test key; payloads shaped like the real platform's unless --plain) <-
+scripts/run_agent.sh run -> python -m agent (supervisor) -> one worker process per match -> node agent/js/calc.js.
+The official tournament mode (--tournament, a fake Official Agent Key, seat leases, a Werewolf table, a hot standby):
+scripts/rehearsal_official.py. Everything the rehearsal writes goes to --out
 (default logs/rehearsal/<timestamp>/): the agent's log (LOG_DIR), platform.json (per-match results and answer
 latencies), samples.jsonl (every --sample-every s), events.jsonl (failures injected) and report.json.
 
@@ -140,6 +142,7 @@ class Rehearsal:
         cmd = ["nice", "-n", str(self.a.nice), sys.executable, "-m", "local.fake_platform", "--port", str(self.a.port),
                "--concurrent", str(self.a.concurrent), "--gap", str(self.a.gap), "--opponent", self.a.opponent,
                "--stats", str(self.out / "platform.json"), "--outage-file", str(self.out / "outage")]
+        cmd += ["--plain"] if self.a.plain else []                  # (default: payloads shaped like the real platform's)
         penv = dict(os.environ, PYTHONPATH=str(ROOT), ARENA_RECORD="0")      # (no LOG_DIR: not part of mine())
         self.platform = subprocess.Popen(cmd, cwd=ROOT, env=penv, stdout=open(self.out / "platform.out", "w"),
                                          stderr=subprocess.STDOUT, start_new_session=True)
@@ -151,7 +154,7 @@ class Rehearsal:
         if self.a.supervise == "systemd":
             env = self.env()
             props = ["KillMode=mixed", "TimeoutStopSec=45", "Restart=always", "RestartSec=5",
-                     "RestartPreventExitStatus=3", f"Nice={self.a.nice}"]
+                     "RestartPreventExitStatus=3", "OOMPolicy=continue", f"Nice={self.a.nice}"]   # (= the unit file)
             cmd = ["systemd-run", "--user", "--collect", f"--unit={UNIT}", f"--working-directory={ROOT}"]
             cmd += [f"--property={p}" for p in props]
             keys = ["LOG_DIR", "HEALTH_EVERY", "PYTHON", "PYTHONPATH", "ARENA_RECORD", "PATH"]
@@ -473,9 +476,12 @@ def main(argv=None) -> None:
     ap.add_argument("--sample-every", type=float, default=30.0)
     ap.add_argument("--health-every", type=int, default=300)
     ap.add_argument("--no-chaos", action="store_true")
+    ap.add_argument("--plain", action="store_true",
+                    help="the fake platform's old local payloads instead of the real platform's shapes (six-entry "
+                         "team, protocol_log with the timer line, blind states)")
     ap.add_argument("--agent-env", action="append", metavar="KEY=VALUE",
-                    help="extra environment for the agent only, e.g. ARENA_CALC=off plus ARENA_ALLOW_NO_CALC=1 (a "
-                         "machine without node: run_agent.sh refuses to start it otherwise)")
+                    help="extra environment for the agent only, e.g. ARENA_CALC=off plus ARENA_ALLOW_NO_CALC=1 (the "
+                         "calculator off; the engine search still runs), or ARENA_BATTLE=classic")
     ap.add_argument("--seed", type=int, default=1)
     a = ap.parse_args(argv)
     if not os.path.isdir("/proc"):

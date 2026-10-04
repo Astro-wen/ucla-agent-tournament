@@ -28,13 +28,15 @@ import time
 from pathlib import Path
 
 from . import dex
-from .calc import _node_bin
+from .calc import find_node as _node_bin      # (not the calculator's own: ARENA_CALC=off turns off only the calculator)
+from .calc import node_env, prefer_for_oom_kill
 
 log = logging.getLogger("agent.engine")
 
 COLD_START_S = 30.0         # a new process must answer its warm-up within this (loads the engine: ~1 s idle)
 MAX_STARTS = 6              # processes per match (1 + 5 restarts), then the search is off for the match
 RESTART_BACKOFF_S = (0.0, 1.0, 3.0, 8.0, 15.0)
+SEARCH_OOM_SCORE = 800      # oom_score_adj of the search process: the first to go under memory pressure
 _TIMEOUT = object()
 
 
@@ -137,11 +139,10 @@ class SearchEngine:
                 self._disable("search.js / pokemon-showdown missing")
                 return False
             script, mods = p
-            env = dict(os.environ)
-            env["NODE_PATH"] = os.pathsep.join([str(m) for m in mods] + ([env["NODE_PATH"]] if env.get("NODE_PATH") else []))
             self.proc = subprocess.Popen([_node_bin() or "node", str(script / "search.js")], stdin=subprocess.PIPE,
-                                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env, text=True,
-                                         bufsize=1)
+                                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=node_env(mods),
+                                         text=True, bufsize=1)
+            prefer_for_oom_kill(self.proc.pid, SEARCH_OOM_SCORE)
         except Exception as e:
             self.proc = None
             self.starts += 1

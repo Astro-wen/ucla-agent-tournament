@@ -10,10 +10,12 @@ selfcheck FAILS (exit 1) unless --allow-no-calc or ARENA_ALLOW_NO_CALC=1 (withou
 against itself with the calculator; --require-calc is the default and still accepted);
 with ARENA_BATTLE=search (the default battle policy) the engine search's simulator loads in a fresh node process:
 when it cannot, selfcheck FAILS (every battle decision would quietly play the classic policy; ARENA_BATTLE=classic
-runs that policy on purpose);
+runs that policy on purpose; ARENA_ALLOW_NO_CALC=1 covers it too when node itself cannot run, see run_agent.sh);
 recorded real platform states (logs/*/*.jsonl) replay through the agent with and without the calculator,
-every answer passing the official runner's own validation; the agent key is configured (only its presence and a
-short hash are printed, never the key).
+every answer passing the official runner's own validation; which key is configured and so which mode run_agent.sh
+runs: tournament (ALTRUAGENT_OFFICIAL_AGENT_KEY, format-checked) or discovery (ALTRUAGENT_API_KEY). Only presence
+and a short hash are printed, never a key. The platform connection itself: bash scripts/run_agent.sh check-tournament
+(python -m agent --check-tournament; that one contacts the platform).
 """
 from __future__ import annotations
 
@@ -22,6 +24,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -188,24 +191,43 @@ def replay(limit: int, with_calc: bool) -> None:
     (fail if bad else ok)(f"replayed {n} recorded decisions ({label}; {phases}): {bad} rejected, slowest {worst:.2f}s")
 
 
+OFFICIAL_KEY_RE = re.compile(r"^eak_live_[0-9a-f]{64}$")      # altruagent/official.py _KEY_PATTERN
+
+
 def check_key() -> None:
+    """Which key is configured (never the key: presence, format and a short hash) and so which mode
+    scripts/run_agent.sh would run: tournament when an Official Agent Key is set (ARENA_MODE can force one)."""
     try:
         from dotenv import load_dotenv
         load_dotenv(ROOT / ".env")
     except Exception:  # noqa: BLE001
         pass
     key = os.environ.get("ALTRUAGENT_API_KEY") or ""
-    url = os.environ.get("ALTRUAGENT_CONTROL_URL") or "(unset: run_agent.sh uses https://api.altruagent-game.com)"
-    if not key or key == "sk_agent_your_key_here":
-        warn(f"no agent key configured (.env or ALTRUAGENT_API_KEY); control plane {url}")
-    else:
-        ok(f"agent key configured (#{hashlib.sha256(key.encode()).hexdigest()[:10]}), control plane {url}")
+    official = "".join(str(os.environ.get("ALTRUAGENT_OFFICIAL_AGENT_KEY") or "").split())
+    url = os.environ.get("ALTRUAGENT_CONTROL_URL") or "(unset: https://api.altruagent-game.com is used)"
+    mode = str(os.environ.get("ARENA_MODE") or "").strip().lower() or ("tournament" if official else "discovery")
+    if official and not OFFICIAL_KEY_RE.match(official):
+        fail("ALTRUAGENT_OFFICIAL_AGENT_KEY is set but doesn't look like an Official Agent Key (eak_live_ followed by "
+             "64 hex characters): copy it again from the tournament dashboard")
+    elif official:
+        run = " (python -m agent --tournament)" if mode in ("tournament", "official") else ""
+        ok(f"Official Agent Key configured (#{hashlib.sha256(official.encode()).hexdigest()[:10]}): run_agent.sh runs "
+           f"mode {mode}{run}; control plane {url}. Connection check (contacts the platform): "
+           "bash scripts/run_agent.sh check-tournament")
+    if key and key != "sk_agent_your_key_here":
+        ok(f"agent key (sk_agent_) configured (#{hashlib.sha256(key.encode()).hexdigest()[:10]})"
+           + ("" if official else f": run_agent.sh runs mode {mode}; control plane {url}"))
+    elif not official:
+        warn(f"no key configured (.env: ALTRUAGENT_OFFICIAL_AGENT_KEY for the official tournament, or "
+             f"ALTRUAGENT_API_KEY); control plane {url}")
 
 
-def check_search() -> None:
+def check_search(calc_ok: bool = True, allow_no_calc: bool = False) -> None:
     """ARENA_BATTLE=search (the default): the engine search's node process must start and load the simulator
     (agent/pokemon/engine.py probe()). When it cannot, every battle decision would quietly play the classic policy, so
-    this FAILS, like run_agent.sh's refusal to start. Classic (the rollback, ARENA_BATTLE=classic): info only."""
+    this FAILS, like run_agent.sh's refusal to start. Classic (the rollback, ARENA_BATTLE=classic): info only.
+    ARENA_ALLOW_NO_CALC=1 while the calculator cannot run either (node itself is the problem) makes it a warning, like
+    run_agent.sh, which then starts the agent with ARENA_BATTLE=classic."""
     try:
         from agent.pokemon import engine
         from agent.pokemon.policy import battle_mode, search_params
@@ -219,6 +241,9 @@ def check_search() -> None:
         good, why, params = False, f"check raised {ex!r}", {}
     if good:
         ok(f"battle policy: engine search (ARENA_BATTLE=search, {params}), {why}")
+    elif allow_no_calc and not calc_ok:
+        warn(f"engine search cannot run either ({why}): allowed by ARENA_ALLOW_NO_CALC=1 / --allow-no-calc (node "
+             "itself cannot run); run_agent.sh then starts the agent with the classic policy (ARENA_BATTLE=classic)")
     else:
         fail(f"ARENA_BATTLE=search but the engine search cannot run ({why}): every battle decision would play the "
              "classic policy. Fix: deploy a bundle (scripts/bundle.sh vendors the simulator) or, in a git checkout, "
@@ -238,8 +263,9 @@ def main(argv=None) -> int:
     check_python()
     if not FAILS:
         check_data()
-        calc_ok = check_calc(a.allow_no_calc or no_calc_allowed())
-        check_search()
+        allow = a.allow_no_calc or no_calc_allowed()
+        calc_ok = check_calc(allow)
+        check_search(calc_ok, allow)
         if not a.no_replay:
             replay(a.replay_limit, with_calc=calc_ok)
             if calc_ok:

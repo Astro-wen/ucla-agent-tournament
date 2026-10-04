@@ -2,20 +2,29 @@
 # pinned version that scripts/bundle.sh ships). Build from an extracted bundle directory (scripts/bundle.sh): the
 # bundle's agent/js/node_modules carries the engine search's simulator (a trimmed pokemon-showdown), which the
 # repository root does not (.dockerignore drops node_modules and local/), so a build from the repository root stops at
-# the selfcheck step (ARENA_BATTLE=search, the default battle policy, needs the simulator). The key comes from the
-# environment at run time, never the image.
+# the selfcheck step (ARENA_BATTLE=search, the default battle policy, needs the simulator). The bundle brings its own
+# .dockerignore (keys, .venv, logs and its node/ build stay out of the build context). The key comes from the
+# environment at run time, never the image: use --env-file with a mode-600 file, not -e KEY=... (shell history,
+# docker inspect).
 #
 #   bash scripts/bundle.sh && tar xzf dist/arena-agent-*.tar.gz -C /tmp && cd /tmp/arena-agent-*
 #   docker build -f deploy/Dockerfile -t arena-agent .
-#   docker run -d --name arena-main --restart unless-stopped \
-#       -e ALTRUAGENT_API_KEY=... -v arena-logs:/data arena-agent
-#   docker logs -f arena-main          # same lines as /data/logs/agent-main.out
+#   # the official tournament: arena.keys holds ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_... (mode 600)
+#   docker run --rm --env-file arena.keys arena-agent check-tournament      # once: contacts the platform
+#   docker run -d --name arena-main --restart unless-stopped --env-file arena.keys \
+#       --log-opt max-size=20m --log-opt max-file=3 -v arena-logs:/data arena-agent
+#   docker logs -f arena-main          # same lines as /data/logs/agent-main.out (bounded by --log-opt)
+#   docker ps                          # STATUS shows (healthy) only while the agent process is up
 #   docker stop arena-main             # clean stop (SIGTERM -> scripts/run_agent.sh stops the agent tree)
 #
-# (No --init: the entrypoint already runs under tini.) The build fails when the calculator cannot answer a calc or the
-# engine search cannot load its simulator (selfcheck), and the container refuses to start without them unless
-# -e ARENA_ALLOW_NO_CALC=1 (emergency only) / -e ARENA_BATTLE=classic (the classic policy on purpose).
+# (No --init: the entrypoint already runs under tini.) With ALTRUAGENT_OFFICIAL_AGENT_KEY set the container runs
+# `python -m agent --tournament`; with only ALTRUAGENT_API_KEY the discovery mode (ARENA_MODE forces one). The build
+# fails when the calculator cannot answer a calc or the engine search cannot load its simulator (selfcheck), and the
+# container refuses to start without them unless -e ARENA_ALLOW_NO_CALC=1 (emergency only; covers the search too when
+# node itself cannot run) / -e ARENA_BATTLE=classic (the classic policy on purpose).
 # Optional env: ALTRUAGENT_CONTROL_URL (default: the platform), ARENA_REASONING, HEALTH_EVERY, ARENA_RECORD=0.
+# Never built on the development machine (no docker there): build it once on the deployment host and check that
+# `node --version` prints v22.23.3 and selfcheck ends with "selfcheck: ready".
 
 # Node.js (official build, pinned by version) + the calculator's node_modules, installed exactly from
 # agent/js/package-lock.json (pure JavaScript)
@@ -48,4 +57,8 @@ RUN python scripts/selfcheck.py --no-replay \
  && mkdir -p /data/logs && chown -R arena /data
 USER arena
 VOLUME ["/data"]
-ENTRYPOINT ["/usr/bin/tini", "--", "bash", "/app/scripts/run_agent.sh", "run", "--name", "main"]
+# healthy = the run loop's agent process is up (run_agent.sh health: agent=up); the start takes a few seconds
+HEALTHCHECK --interval=60s --timeout=20s --start-period=120s --retries=3 \
+  CMD bash /app/scripts/run_agent.sh health --name main | grep -q ' agent=up '
+ENTRYPOINT ["/usr/bin/tini", "--", "bash", "/app/scripts/run_agent.sh"]
+CMD ["run", "--name", "main"]
