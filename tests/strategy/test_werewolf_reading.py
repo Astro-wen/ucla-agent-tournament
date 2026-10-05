@@ -110,11 +110,108 @@ def test_claim_clears_are_exact_and_non_claim_clears_not_worse():
     ("They keep targeting Player1, my wolf partner.", False, {1}, set()),
     # claim formulas
     ("Seer claim: Player5 is a wolf.", True, {5}, set()),
+    ("Seer claim: I am the seer and Player5 is a wolf.", True, {5}, set()),
     ("Player5 is definitely a werewolf, I checked them.", True, {5}, set()),
+    ("Player5 is a wolf, I checked him last night.", True, {5}, set()),
+    ("Player2 is a villager, I checked her.", True, set(), {2}),
+    # "no doubt" / "without a doubt" are not doubt
+    ("Player3 voted me, and I have no doubt they're a wolf.", False, {3}, set()),
+    ("I'm the seer. I checked Player2 and without a doubt they're a wolf.", True, {2}, set()),
 ])
 def test_llm_phrasing_families(text, claim, wolves, clears):
     f = read_chat(text, None, {})
     assert (f.claim, f.wolves, f.clears) == (claim, wolves, clears)
+
+
+@pytest.mark.parametrize("text", [
+    # negation or doubt before a pronoun verdict (review: read as accusations, and from a trusted seer they named a
+    # third wolf, which made the real seer a liar)
+    "Player3 voted against me, but that doesn't mean they're a wolf.",
+    "Player3 voted against me, but that does not mean they are a wolf.",
+    "Player3 is quiet, but I doubt they're a wolf.",
+    "Player3 is quiet - not that they're a wolf.",
+    "Player3 is loud, but I'm not convinced they're a wolf.",
+    "Player3 got accused, which doesn't prove they're a wolf.",
+    "Player3 is quiet, but there's no evidence they're a wolf.",
+    "Player3 is quiet, but there's no evidence at all that they're a wolf.",
+    "Player3 is quiet, but it's unlikely they're a wolf.",
+    "Player3 is quiet, which means they are a wolf or a scared villager.",
+    "Player3 is acting odd, but no proof they are werewolves.",
+    "Player3 spoke first. It doesn't mean they're a wolf.",
+    "Player3 is quiet, but that doesn't mean they're innocent.",
+    "That doesn't mean Player3 is the real wolf.",
+    # "it" / a plural verdict / a reported death is not a seat's verdict (review: last night's victim read as a wolf)
+    "Player3 was killed last night. It was the wolves, obviously.",
+    "Player3 was killed last night. It was clearly the wolves.",
+    "Poor Player3. It was the wolves, of course.",
+    "Player3 was lynched. They were a villager.",
+    "Player3 and I agree they're wolves.",
+    "Look at Player3. Both of them are wolves.",
+    # hypotheticals and reported speech on the new direct patterns
+    "If Player3 is the real wolf, we lose.",
+    "Player2 thinks Player3 is one of the two wolves.",
+    "Player2 claims Player3 is evil.",
+    "Maybe Player3 is evil, maybe not.",
+    "Player2 said: Player3 turned out to be a wolf.",
+])
+def test_hedges_negations_and_victims_are_not_verdicts(text):
+    f = read_chat(text, 6, {})
+    assert (f.claim, f.wolves, f.clears) == (False, set(), set())
+
+
+@pytest.mark.parametrize("text", [
+    # review: plain table talk read as a seer claim, so a real claim looked contested and our seer called the
+    # speaker a fake seer (the old patterns still read the named seat; only the claim is new)
+    "Seer claim: none yet. Let's vote carefully.",
+    "Seer claim - anyone? Please speak up.",
+    "Seer claim: Player2 says Player4 is a wolf. I believe them.",
+    "Seer claim: we need one now, otherwise we vote blind.",
+    "Seer claim: Player4 is a wolf?",
+    "Player4 is a villager, I checked her votes.",
+    "Player4 is good, I checked him off my list.",
+    "Player4 is innocent, I checked them earlier in the vote log.",
+    "Player2 said Player4 is a wolf, I checked her claim and it is weak.",
+    "If Player4 is a wolf, I checked him wrong.",
+    "Player4 is a wolf, I checked him?",
+])
+def test_table_talk_is_not_a_seer_claim(text):
+    assert not read_chat(text, 6, {}).claim
+
+
+def test_negated_check_report_names_no_wolf_and_negated_so_is_clears_one():
+    f = read_chat("I'm the seer. I checked Player3 and that doesn't mean they're a wolf.", 6, {})
+    assert f.claim and f.wolves == set()
+    assert read_chat("Player3 is not a wolf and so is Player5.", 6, {}).clears == {3}
+
+
+def _talk(content, sender=2, seq=0):
+    return {"seq": seq, "sender": sender, "recipients": [], "visibility": "broadcast", "type": "chat",
+            "content": content}
+
+
+@pytest.mark.parametrize("msgs,vote", [
+    # S1: the trusted seer's hedge about Player4 does not name Player4
+    ([_talk("I am the Seer. I checked Player6: villager."),
+      _talk("Player4 pushed hard on me, but that doesn't mean they're a wolf.", seq=1)], "1"),
+    # S2: the seer named two wolves; a hedge about a third does not make it a liar
+    ([_talk("I am the Seer. Player1 is a wolf. Player5 is a wolf too."),
+      _talk("Player3 is quiet, but that doesn't mean they're a wolf.", seq=1)], "1"),
+    # S3: "Seer claim: none yet." from a villager does not contest the real claim
+    ([_talk("Seer claim: none yet. Let's vote carefully.", sender=4),
+      _talk("I am the Seer. Player1 is a wolf.", seq=1)], "1"),
+    # I1: the seer mentions last night's victim; it does not become a liar for naming a revealed villager
+    ([_talk("I am the Seer. I checked Player1: wolf."),
+      _talk("Player3 was killed last night. It was the wolves, obviously.", seq=1)], "1"),
+])
+def test_our_villager_still_follows_the_real_seer(msgs, vote):
+    dead = [(3, "villager", "night_kill", 2)] if any("killed" in m["content"] for m in msgs) else []
+    alive = [s for s in range(7) if s not in {d[0] for d in dead}]
+    st = _state("Your role: VILLAGER\nYou do not know anyone else's role.", "day_vote",
+                [s for s in alive if s != 0] + [7], me=0, day=2 if dead else 1, alive=alive, dead=dead)
+    st["new_messages"] = msgs
+    c = WerewolfPolicy.claims(parse(st))
+    assert c.trusted == 2 and not c.liars
+    assert WerewolfPolicy().act(st)["action_id"] == vote
 
 
 @pytest.mark.parametrize("text,clears", [
@@ -190,18 +287,58 @@ def _kill(a):
     ("Your role: WEREWOLF\nYour fellow wolves: Player5", "wolf", [5], {}),
     ("Your role is: Werewolf\nYour fellow werewolves: Player5", "wolf", [5], {}),
     ("You are a werewolf.\nYour wolf ally: Player 5", "wolf", [5], {}),
-    ("Role: wolf\nWolves: Player3, Player5", "wolf", [5], {}),                     # the list names me too
+    ("Role: wolf\nYour wolf team: Player3, Player5", "wolf", [5], {}),             # the list names me too
     ("Your role: LYCAN\nYour fellow wolves: Player5", "wolf", [5], {}),            # unknown word, ally line
+    ("Your role: ???\nYour wolf partner is Player 4", "wolf", [4], {}),
     ("You are the Seer.\nYour investigations: Player0 is a werewolf, Player4 is a villager", "seer", [],
      {0: "wolf", 4: "villager"}),
     ("Your role: SEER\nYour investigations: Player1 is werewolf", "seer", [], {1: "wolf"}),
     ("Your role is the villager.", "villager", [], {}),
-    ("Your role: VILLAGER\nYour fellow wolves: Player5", "wolf", [5], {}),          # only a wolf has an ally line
     ("Your role: ???\nYou do not know anyone else's role.", "villager", [], {}),
+    # a recognised role line is never overridden by weaker lines (logged instead): review, a drifted villager
+    # observation made us play as a wolf or a seer and fake-claim seer against the real one
+    ("Your role: VILLAGER\nYour fellow wolves: Player5", "villager", [], {}),
+    ("Your role: VILLAGER\nYou do not know anyone else's role.\nYour teammates: everyone who is not a wolf.",
+     "villager", [], {}),
+    ("Your role: VILLAGER\nWolves remaining: 2", "villager", [], {}),
+    ("Your role: VILLAGER\nInvestigation results: none", "villager", [], {}),
+    # lines without a seat are not ally lines at all
+    ("Your role: ???\nWolves remaining: 2", "villager", [], {}),
+    ("Your role: ???\nYour allies: everyone who is not a wolf.", "villager", [], {}),
 ])
 def test_role_wording_variants(block, role, allies, inv):
     v = parse(_state(block, "day_vote", []))
     assert (v.role, v.allies, v.investigations) == (role, allies, inv)
+
+
+def test_weaker_lines_against_the_role_line_are_logged_not_followed(caplog):
+    with caplog.at_level(logging.ERROR, logger="agent.werewolf"):
+        v = WerewolfPolicy()._view(_state("Your role: VILLAGER\nYour fellow wolves: Player5", "day_vote", [0, 1, 7]))
+    assert (v.role, v.allies) == ("villager", [])
+    msgs = [r.getMessage() for r in caplog.records if r.name == "agent.werewolf"]
+    assert len(msgs) == 1 and "role line: villager, other lines suggest: wolf; playing as villager" in msgs[0]
+
+
+@pytest.mark.parametrize("extra", ["Your teammates: everyone who is not a wolf.", "Wolves remaining: 2",
+                                   "Investigation results: none"])
+def test_drifted_villager_lines_do_not_make_our_villager_fake_claim(extra):
+    """Review S4/S4b/S4c: a real seer names us; we stay a villager (the claim is a lie to us) and never claim seer."""
+    block = "Your role: VILLAGER\nYou do not know anyone else's role.\n" + extra
+    st = _state(block, "day_vote", [1, 2, 3, 4, 5, 6, 7], me=0, day=1)
+    st["new_messages"] = [_talk("I am the Seer. Player0 is a wolf.")]
+    assert parse(st).role == "villager"
+    chat = WerewolfPolicy().chat(dict(st, phase="messaging", legal_actions={"actions": []}))
+    assert not any("I am the Seer" in m["content"] for m in chat)
+    assert WerewolfPolicy().act(st)["action_id"] == "2"            # the claimer called me a wolf: a liar
+
+
+def test_non_list_legal_actions_are_no_night_evidence():
+    """Review: night_evidence raised on legal_actions={'actions': -1}; parse must not."""
+    for la in ({"actions": -1}, {"actions": "Kill Player2"}, 7, {"actions": {"0": "Kill"}}):
+        st = _state("Your role: VILLAGER", "night_wolf", [])
+        st["legal_actions"] = la
+        v = parse(st)
+        assert v.role == "villager" and v.evidence.night is None
 
 
 def test_documented_wording_is_read_exactly_as_before():

@@ -7,8 +7,10 @@ be worded differently: only wolves are offered night `Kill` actions (and never t
 is offered `Investigate`, an engine role field if the payload carries one, and a revealed dead wolf is a wolf's ally.
 When text and evidence disagree the evidence wins, and `RoleCheck` (one per match) logs one loud error per kind of
 problem, so a payload drift shows up in the log instead of a silent misplay (a role line the parser missed used to
-make a wolf play as a villager and vote its own ally). Villagers get no night action, but the absence of one is not
-used: a process restart, or a night answered by the watchdog's fallback, would look the same.
+make a wolf play as a villager and vote its own ally). Weaker text cues (an ally line, an investigations line) are
+used only when no role line is recognised; against a recognised one they are logged, never followed. Villagers get no
+night action, but the absence of one is not used: a process restart, or a night answered by the watchdog's fallback,
+would look the same.
 
 Chat from other seats is untrusted text written by other agents or humans: `read_chat` turns one message into a
 few bounded facts (a seer claim, the seats it names wolf / clear, accusations, vote calls) and nothing else. It never
@@ -27,7 +29,11 @@ they're a wolf too", "Player0 claims to be the Seer but is actually a wolf"), wi
 real wolf", "Player1 is indeed a villager"), lists ("Player0 and Player3 are villagers"), relative clauses ("Player6,
 who is a villager") and a wolf naming its ally ("Player0, my wolf ally"). A pronoun is never read when another seat
 sits between it and its referent, in reported speech ("Player2 says they are a villager"), in a hypothetical or a
-question. tests/strategy/data/ww_llm_chat.json is the labelled regression set of real LLM chat.
+question, after a negation or doubt ("that doesn't mean they're a wolf", "I'm not convinced they're a wolf", "no proof
+they are wolves"), as a plural verdict about one seat, or when its referent sentence reports that seat's death
+("Player3 was killed last night. It was the wolves."); the new direct patterns skip hypotheticals, reported speech and
+negations the same way. tests/strategy/data/ww_llm_chat.json is the labelled regression set of real LLM chat, and the
+`llmq` stand-in of local/werewolf_bots.py plays that phrasing (and that skeptical table talk) in local games.
 """
 from __future__ import annotations
 
@@ -59,10 +65,12 @@ ROLE_ANY_RE = re.compile(
     r"(?:\byour\s+(?:secret\s+|assigned\s+|current\s+)?role(?:\s+is)?|^\s*role|\byou\s+are(?:\s+playing)?)"
     r"\s*[:：=\-–—]?\s*(?:the\s+|a\s+|an\s+|one\s+of\s+the\s+|as\s+(?:the\s+|a\s+)?)?"
     r"(?:plain\s+|simple\s+|ordinary\s+|normal\s+)?" + _ROLE_WORD + r"\b", re.I | re.M)
+# Explicit ally / fellow-wolf phrasing followed by "is", "are" or a separator; it counts only when the rest of its line
+# names a seat (not "Your teammates: everyone who is not a wolf", "Wolves remaining: 2").
 ALLY_ANY_RE = re.compile(
     r"(?:\b(?:your\s+)?fellow\s+(?:were-?)?wol(?:f|ves)|\b(?:your\s+)?(?:were-?)?wolf\s+(?:allies|ally|partners?|"
-    r"teammates?|pack(?:mates?)?|team)|\bother\s+(?:were-?)?wol(?:f|ves)|\byour\s+(?:allies|ally|partners?|teammates?|"
-    r"pack)|^\s*(?:the\s+)?(?:were-?)?wolves)\s*(?:is|are)?\s*[:：=\-–—]?\s*(.*)$", re.I | re.M)
+    r"teammates?|pack(?:mates?)?|team)|\bother\s+(?:were-?)?wol(?:f|ves)|\byour\s+(?:allies|ally|partners?))"
+    r"\s*(?:(?:is|are)\b\s*[:：=\-–—]?|[:：=\-–—])\s*(.*)$", re.I | re.M)
 INVEST_LINE_ANY_RE = re.compile(
     r"(?:\byour\s+investigations?(?:\s+results?)?|\binvestigation\s+results?|\bseer\s+results?|"
     r"\byour\s+(?:checks|results|visions?))\s*[:：=\-]\s*(.+)", re.I)
@@ -116,7 +124,9 @@ def night_evidence(st: dict, sub: str | None, alive: list[int], me) -> tuple[str
     seer. (None, None) when the state offers no night action."""
     la = st.get("legal_actions")
     acts = la.get("actions") if isinstance(la, dict) else la
-    acts = [a for a in acts or [] if isinstance(a, dict) and str(a.get("action_id")) in {str(i) for i in range(7)}]
+    if not isinstance(acts, list):
+        return None, None
+    acts = [a for a in acts if isinstance(a, dict) and str(a.get("action_id")) in {str(i) for i in range(7)}]
     if not acts:
         return None, None
     labels = " ".join(str(a.get("label") or "") for a in acts)
@@ -139,14 +149,14 @@ def night_evidence(st: dict, sub: str | None, alive: list[int], me) -> tuple[str
 def resolve_role(ev: RoleEvidence, me, dead: dict, night: str | None = None,
                  night_allies: list[int] | None = None) -> tuple[str, list[int], dict[str, str]]:
     """(role, allies, problems by kind). Evidence beats text: night actions, then an engine field, then the role line,
-    then the weaker text cues, else villager; an ally line or an investigations line (only a wolf / the seer has one)
-    also beats a role line that says villager. A wolf's allies: the seat a night_wolf target list left out and any
-    revealed dead wolf; they replace the text's when they disagree. `night` / `night_allies` default to this state's."""
+    then the weaker text cues (used only when no role line is recognised; against one they are logged, never
+    followed), else villager. A wolf's allies: the seat a night_wolf target list left out and any revealed dead wolf;
+    they replace the text's when they disagree. Only a wolf has allies. `night` / `night_allies` default to this
+    state's."""
     night = night if night is not None else ev.night
     night_allies = night_allies if night_allies is not None else ev.night_allies
     problems: dict[str, str] = {}
-    text = ev.hint if ev.text == "villager" and ev.hint in ("wolf", "seer") else ev.text
-    role = night or ev.engine or text or ev.hint or "villager"
+    role = night or ev.engine or ev.text or ev.hint or "villager"
     if ev.observed and ev.text is None:
         problems["role-unparsed"] = "role line not recognised"
     seen = [(name, r) for name, r in (("night actions", night), ("engine role field", ev.engine),
@@ -155,7 +165,7 @@ def resolve_role(ev: RoleEvidence, me, dead: dict, night: str | None = None,
         problems["role-mismatch"] = ", ".join(f"{name}: {r}" for name, r in seen)
     elif ev.text and ev.hint and ev.hint != ev.text and not night and not ev.engine:
         problems["role-mismatch"] = f"role line: {ev.text}, other lines suggest: {ev.hint}"
-    allies = list(ev.text_allies)
+    allies = list(ev.text_allies) if role == "wolf" else []
     if role == "wolf":
         e = set(night_allies or ()) | {s for s, r in (dead or {}).items() if r == "wolf" and s != me}
         if len(e) > 1:
@@ -235,9 +245,10 @@ _CHAT_SUS = [
 ]
 # A seer claim is "I am the seer" said in the sender's own voice (not "what if I am the seer", not "Player2 said I am
 # the seer", not a question), "seer here" opening a sentence (not "is the seer here?"), "as the seer, I", "Seer claim:"
-# opening a sentence, or a report of a check that carries a verdict on the checked seat ("I checked Player0:
-# villager", "Player5 is a wolf, I checked them"; "I checked Player3's votes" and "I looked at Player2 and they seem
-# nervous" are not claims).
+# opening a sentence with a verdict on a seat or "I am the seer" right after it (not "Seer claim: none yet", not
+# "Seer claim: Player2 says ..."), or a report of a check that carries a verdict on the checked seat ("I checked
+# Player0: villager", "Player5 is a wolf, I checked them."; "I checked Player3's votes", "Player4 is a villager, I
+# checked her votes" and "I looked at Player2 and they seem nervous" are not claims).
 _CLAIM_IAM = re.compile(r"\b(?:i\s*am|i'm|i’m|im|i\s+m)\s+(?:the\s+|a\s+|actually\s+|really\s+|truly\s+)*"
                         r"(?:real\s+|true\s+|actual\s+|only\s+)?seer\b(?!\s*\?)")
 _NOT_OWN_VOICE = re.compile(
@@ -249,7 +260,6 @@ _CHAT_CLAIM = [
     re.compile(r"(?:^|[.!?;:,]\s*|\b(?:hi|hey|hello|ok|okay|yes|yep|yeah|so|alright|well|guys|fine)\s*,?\s*)"
                r"(?:(?:the\s+)?(?:real|true|actual)\s+)?seer\s+here\b(?!\s*\?)"),
     re.compile(r"\bas\s+(?:the\s+)?seer,?\s+i\b"),
-    re.compile(r"(?:^|[.!?]\s*)(?:hard\s+)?seer\s+claim\s*[:\-—–]"),
 ]
 _CHECK = re.compile(r"\bi\s+(?:have\s+|'ve\s+|’ve\s+)?(?:checked|investigated|inspected|scanned|peeked\s+at|looked\s+at)"
                     r"\s+player([0-6])\b(?!\s*['’]s\b)([^.!?]{0,60})")
@@ -263,9 +273,10 @@ _ADV2 = (r"(?:(?:definitely|def|prob|probably|clearly|obviously|surely|totally|c
          r"{0,2}")
 _DET = (r"(?:(?:a|an|the|one\s+of\s+the(?:\s+two)?|our|my)\s+)?"
         r"(?:(?:real|true|actual|confirmed|known|other|second|last|remaining|fellow)\s+)?")
-# a verdict word must end its phrase: "a wolf." / "a wolf too" / "a wolf, vote" but not "a wolf bluff" / "wolf's"
+# a verdict word must end its phrase: "a wolf." / "a wolf too" / "a wolf, vote" but not "a wolf bluff" / "wolf's" /
+# "a wolf or a scared villager"
 _END = (r"(?=\s*(?:$|[.,!?;:)\]—–-]|(?:too|also|as\s+well|for\s+sure|for\s+certain|imo|tbh|then|now|confirmed|indeed|"
-        r"and|but|so|or|last\s+night|tonight|today|yesterday|here|btw|lol)\b))")
+        r"and|but|so|last\s+night|tonight|today|yesterday|here|btw|lol)\b))")
 _SEATS = r"player[0-6](?:\s*(?:,\s*(?:and\s+)?|and\s+|&\s*)player[0-6])*"
 _LIST = r"player[0-6](?:\s*(?:,\s*(?:and\s+)?|and\s+|&\s*)player[0-6])+"
 _IS = r"\s*(?:is|=|was|['’]s|:)\s+"
@@ -288,10 +299,10 @@ _DIRECT = [   # (pattern with group "s" = the seat or seats, verdict)
     (re.compile(r"(?P<s>player[0-6])" + _TURNED + _ADV2 + _CLEAR_PHRASE + _END), "clear"),
     (re.compile(r"\bplayer[0-6]" + _IS + _ADV2 + _DET + _W2 + r"\s*,?\s+(?:and\s+)?so\s+(?:is|was)\s+(?P<s>player[0-6])"
                 + _END), "wolf"),
-    (re.compile(r"\bplayer[0-6]" + _IS + _ADV2 + _CLEAR_PHRASE + r"\s*,?\s+(?:and\s+)?so\s+(?:is|was)\s+"
+    (re.compile(r"\bplayer[0-6]" + _IS + _ADV2 + _DET + _CLEARW + r"\s*,?\s+(?:and\s+)?so\s+(?:is|was)\s+"
                 r"(?P<s>player[0-6])" + _END), "clear"),
 ]
-_PRON = r"(?:they|he|she|it|both(?:\s+of\s+them)?)"
+_PRON = r"(?:they|he|she|both(?:\s+of\s+them)?)"     # not "it": "It was the wolves" is about the killers
 _BE = (r"(?:\s*['’](?:re|s)|\s+(?:are|is|was|were|turned\s+out\s+to\s+be|came\s+back(?:\s+as)?|showed\s+up\s+as|"
        r"returned(?:\s+as)?|reads?\s+as|tested\s+as))")
 _PV = [   # a pronoun verdict, or one whose subject is left out after "but" / "and"
@@ -305,11 +316,28 @@ _PV_YOU = [   # "Player3, you're a wolf": only when the sentence opens by addres
     (re.compile(r"\byou(?:\s*['’]re|\s+are)\s+" + _ADV2 + _DET + _W2 + _END), "wolf"),
     (re.compile(r"\byou(?:\s*['’]re|\s+are)\s+" + _ADV2 + _CLEAR_PHRASE + _END), "clear"),
 ]
-# Someone else's words, a hypothetical, or uncertainty right before a pronoun verdict: not read.
+# Someone else's words, a hypothetical, or uncertainty right before a verdict: not read.
 _CUE = re.compile(r"(?:\b(?P<who>\w+)\s+)?(?:said|says|say|claims?|claimed|claiming|thinks?|thought|believes?|"
                   r"believed|insists?|insisted|swears?|swore|admits?|admitted|denies|denied|deny|knows?|knew|wonders?|"
                   r"asks?|asked|pretends?|pretended|pretending|told\s+\w+|tells\s+\w+|if|whether|unless|maybe|perhaps|"
-                  r"suppose|imagine|might|could)\s+(?:that\s+)?$")
+                  r"suppose|imagine|might|could)\s*[:,]?\s+(?:that\s+)?$")
+# Negation or doubt before a verdict ("that doesn't mean they're a wolf", "I doubt they're a wolf", "I'm not convinced
+# they're a wolf", "no proof they are wolves", "it's unlikely they're a wolf"): never a verdict, in the first person
+# too. Up to four words may sit between the cue and the verdict ("no evidence at all that they're a wolf").
+_NEG_CUE = re.compile(
+    r"(?:(?<!\bno\s)(?<!\ba\s)\bdoubt(?:s|ed|ful)?|\bunlikely|\b(?:im)?possibl[ey]|\bunsure|\buncertain|"
+    r"\bnot\s+(?:that|sure|convinced|certain|saying|necessarily|clear|positive)|\bno\s+idea|\bwho\s+knows|"
+    r"\bhard\s+to\s+(?:say|tell)|"
+    r"\b(?:doesn['’]t|does\s+not|don['’]t|do\s+not|didn['’]t|did\s+not|won['’]t|wouldn['’]t|can['’]t|cannot|"
+    r"isn['’]t|aren['’]t)\s+(?:\w+\s+)?(?:mean|means|prove|proves|make|makes|show|shows|think|believe|buy|say|"
+    r"suggest|suggests|imply|implies)|"
+    r"\b(?:no|not|without|any|zero|little|lack\s+of)\s+(?:\w+\s+)?(?:evidence|proof|reason|signs?|indication|basis))"
+    r"(?:\s+\w+){0,4}?\s*[,:;—–-]?\s*(?:(?:that|if|whether)\s+)?$")
+# The sentence a pronoun refers back to reports that seat's death ("Player3 was killed last night. They were ..."):
+# not read (the game reveals a dead seat's role anyway).
+_DEATH = re.compile(r"\b(?:died|dead|(?:was|were|got|been|is|are)\s+(?:\w+\s+)?(?:killed|lynched|eliminated|"
+                    r"murdered|executed|voted\s+out|taken\s+out))\b")
+_PLURAL_VERDICT = re.compile(r"\b(?:both|wolves|werewolves|villagers)\b")
 _IF_START = re.compile(r"^\s*(?:if|what\s+if|even\s+if|suppose|supposing|unless|whether|imagine)\b")
 _CHECK_OPEN = re.compile(
     r"(?:\bi\s+(?:(?:have|'ve|’ve|had|just|also|personally|already|first)\s+)*(?:checked|investigated|inspected|"
@@ -327,9 +355,14 @@ _WIN_LEAD = re.compile(r"^\s*(?:last\s+night|tonight|yesterday)?\s*(?:[:=—–-
 _WIN_CAME = re.compile(r"\b(?:came\s+back|turned\s+out\s+to\s+be|showed\s+up\s+as|returned|was\s+revealed\s+as|"
                        r"revealed\s+as|reads?\s+as)\s+(?:as\s+)?" + _ADV2 + _DET + _VERDICT_WORD + _END)
 _WIN_IS = re.compile(r"^\s*(?:to\s+be|as|is|are|was|were|=|:)\s*" + _ADV2 + _DET + _VERDICT_WORD + _END)
+# "Player5 is a wolf, I checked them." -- the object pronoun ends the clause (not "I checked her votes")
 _CLAIM_AFTER_VERDICT = re.compile(r"\bplayer[0-6]" + _IS + _ADV2 + _DET + r"(?:" + _W2 + r"|" + _CLEARW + r")\b"
                                   r"[^.!?]{0,20}?\bi\s+(?:have\s+|'ve\s+|’ve\s+)?(?:checked|investigated|inspected)\s+"
-                                  r"(?:them|him|her)\b")
+                                  r"(?:them|him|her)(?=\s*(?:$|[.!;,]|and\b|last\s+night|yesterday|tonight))")
+# "Seer claim: Player5 is a wolf" / "Seer claim: I am the seer" (not "Seer claim: none yet", "Seer claim - anyone?")
+_CLAIM_OPEN = re.compile(r"(?:^|[.!?]\s*)(?:hard\s+)?seer\s+claim\s*[:\-—–]\s*(?:player[0-6]" + _IS + _ADV2 + _DET
+                         + r"(?:" + _W2 + r"|" + _CLEARW + r"|not\s+(?:a\s+|an\s+)?" + _W2 + r")\b|"
+                         r"i\s*(?:am|['’]m|m)\s+(?:the\s+)?(?:real\s+|true\s+)?seer\b)")
 _TERM = re.compile(r"[.!?]")
 
 
@@ -344,7 +377,15 @@ def _claims_seer(t: str) -> bool:
         v = _VERDICT.search(m.group(2))
         if v and all(x == m.group(1) for x in re.findall(r"player([0-6])", m.group(2)[:v.start()])):
             return True
-    return bool(_CLAIM_AFTER_VERDICT.search(t))
+    for m in _CLAIM_OPEN.finditer(t):
+        if not _question(t, m.end()):
+            return True
+    for m in _CLAIM_AFTER_VERDICT.finditer(t):
+        start, _ = _sentence(t, m.start())
+        if not (_question(t, m.end()) or _NOT_OWN_VOICE.search(t[max(start, m.start() - 40):m.start()])
+                or _hedged(t[start:m.start()])):
+            return True
+    return False
 
 
 def _sentence(t: str, pos: int) -> tuple[int, int]:
@@ -368,6 +409,17 @@ def _cued(before: str) -> bool:
     return bool(m) and m.group("who") != "i"
 
 
+def _negated(before: str) -> bool:
+    """Negation or doubt right before a verdict ("that doesn't mean", "I doubt", "no proof"), first person included."""
+    return bool(_NEG_CUE.search(before))
+
+
+def _hedged(prefix: str) -> bool:
+    """The part of a sentence before a verdict makes it not the sender's verdict: a hypothetical opening ("If ..."),
+    reported speech or uncertainty right before it, or a negation / doubt."""
+    return bool(_IF_START.search(prefix)) or _cued(prefix) or _negated(prefix)
+
+
 def _kind(word: str) -> str:
     return "clear" if re.match(r"not\b|" + _CLEARW, word) else "wolf"
 
@@ -386,7 +438,8 @@ def _verdicts(t: str) -> tuple[set[int], set[int]]:
 
     for rx, kind in _DIRECT:
         for m in rx.finditer(t):
-            if not _question(t, m.end()):
+            start, _ = _sentence(t, m.start())
+            if not _question(t, m.end()) and not _hedged(t[start:m.start()]):
                 out[kind].update(seats_of(m.group("s")))
     # A check report: the verdict after the checked seat(s), up to the sentence end or the next seat named.
     for opener in (_CHECK_OPEN, _REVEAL_OPEN):
@@ -400,7 +453,7 @@ def _verdicts(t: str) -> tuple[set[int], set[int]]:
             hit = None
             for rx, kind in _PV:
                 for pm in rx.finditer(win):
-                    if not _cued(win[:pm.start()]):
+                    if not _cued(win[:pm.start()]) and not _negated(win[:pm.start()]):
                         hit = (kind, pm.group(0))
                         break
                 if hit:
@@ -408,13 +461,14 @@ def _verdicts(t: str) -> tuple[set[int], set[int]]:
             if hit is None:
                 for rx in ((_WIN_IS, _WIN_LEAD, _WIN_CAME) if opener is _REVEAL_OPEN else (_WIN_LEAD, _WIN_CAME)):
                     vm = rx.search(win)
-                    if vm and not _cued(win[:vm.start()]):
+                    if vm and not _cued(win[:vm.start()]) and not _negated(win[:vm.start()]):
                         hit = (_kind(vm.group("v")), vm.group(0))
                         break
             if hit and (hit[0] == "clear" or _plural(seats, hit[1])):
                 out[hit[0]].update(seats)
     # A pronoun (or a left-out subject) refers to the one seat its sentence names before it, or, when it opens the
-    # sentence, to the one seat the previous sentence names.
+    # sentence, to the one seat the previous sentence names; a plural verdict ("they're wolves") never refers to one
+    # seat, and a sentence that reports the seat's death is not a referent.
     for rxs, vocative in ((_PV, False), (_PV_YOU, True)):
         for rx, kind in rxs:
             for m in rx.finditer(t):
@@ -422,20 +476,22 @@ def _verdicts(t: str) -> tuple[set[int], set[int]]:
                 if end < len(t) and t[end] == "?":
                     continue
                 prefix = t[start:m.start()]
-                if _IF_START.search(prefix) or _cued(prefix):
+                if _hedged(prefix):
                     continue
                 if vocative:
                     vm = re.match(r"\s*player([0-6])\s*,", prefix)
                     if vm and len(set(seats_of(prefix))) == 1:
                         out[kind].add(int(vm.group(1)))
                     continue
-                seats = set(seats_of(prefix))
+                if _PLURAL_VERDICT.search(m.group(0)):
+                    continue
+                ref, seats = prefix, set(seats_of(prefix))
                 if not seats and not prefix.strip() and start > 0:
                     pstart, _ = _sentence(t, start - 1)
                     prev = t[pstart:start - 1]
                     if t[start - 1] != "?" and not _IF_START.search(prev):
-                        seats = set(seats_of(prev))
-                if len(seats) == 1:
+                        ref, seats = prev, set(seats_of(prev))
+                if len(seats) == 1 and not _DEATH.search(ref):
                     out[kind] |= seats
     return out["wolf"], out["clear"]
 
@@ -549,10 +605,11 @@ def _text_role(obs: str) -> tuple[str | None, str | None, list[int], bool, dict[
     if m:
         allies = [int(x) for x in SEAT_RE.findall(m.group(1))]
     else:
-        m = ALLY_ANY_RE.search(obs)
-        if m:
-            ally_line = True
-            allies = sorted({int(x) for x in _SEAT_ANY.findall(m.group(1)) if int(x) <= 6})
+        for m in ALLY_ANY_RE.finditer(obs):
+            seats = sorted({int(x) for x in _SEAT_ANY.findall(m.group(1)) if int(x) <= 6})
+            if seats:
+                ally_line, allies = True, seats
+                break
 
     invest: dict[int, str] = {}
     m = re.search(r"Your investigations:\s*(.+)", obs)
