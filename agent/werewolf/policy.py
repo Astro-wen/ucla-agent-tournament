@@ -119,6 +119,18 @@ class WerewolfPolicy:
         self._dm_target: int | None = None  # the kill target we sent our ally
         self._dm_day = None
 
+    # The match memory a restarted worker takes over (agent/matchstate.py): `new_messages` only covers the current
+    # discussion window, so the transcript of earlier days (claims, accusations) exists nowhere else.
+    MATCH_MEMORY = ("transcript", "_said_day", "_topics", "_dm_target", "_dm_day")
+
+    def export_memory(self) -> dict:
+        return {k: getattr(self, k) for k in self.MATCH_MEMORY}
+
+    def import_memory(self, mem: dict) -> None:
+        for k in self.MATCH_MEMORY:
+            if k in mem:
+                setattr(self, k, mem[k])
+
     # ---- helpers -------------------------------------------------------
     def observe(self, st: dict) -> None:
         if not isinstance(st, dict):

@@ -3,7 +3,7 @@
 ## 现在到哪了
 
 - **10-03 情报（先读 `docs/competition_brief.md` 开头的「10-03 更新」）**：**红警 `red_alert` 已经能在平台上玩**（实时 1v1，OpenRA，单场和锦标赛都支持；规则 `docs/platform/redalert.md`，数据 `data/red_alert_config.json`）。我们的 agent 现在碰到红警会一步不走（SDK 没有实时模式，上游 PR #3 才加）。Guang 回信：狼人杀和宝可梦肯定有，红警 / 王者荣耀 10/6 前公布；Oracle 会提供通用 agent，Replit 可能给 pro 账号。正式比赛用 `python -m agent --tournament` + Official Agent Key（已合并）；v4.1.2 起我们的部署脚本也支持：key 文件里有 eak key 时看门脚本自动跑 `--tournament`，systemd / Docker / 压缩包 / selfcheck 都认（见 `docs/deploy.md`「官方正式赛」）。
-- v5 第 2 轮（深搜、引擎预览）没上位，冠军仍是 v4.1.1（见 `docs/progress.md`、`docs/v5_standard.md`）。
+- v5 第 2 轮（深搜、引擎预览）没上位（见 `docs/progress.md`、`docs/v5_standard.md`）。`integrate/v42` 分支上依次提交了 v4.1.2（10-03，官方正式赛部署）和 v4.2（10-05，重启接上记忆、整机搜索上限、健康探测、双打模板按位置读、game_type 认写法），紧接着把 v4.2 冻结成冠军（`champion/`）：打法仍是 v4.1.1（本地对局逐局相同），只是更稳。这个分支还没合进 main，由主人合并。上游 10-04 合并了 PR #3（红警实时 SDK），这个分支没有合上游，合进 main 之后再按惯例 `git merge upstream/main`。
 
 - **2026-09-27 起在新机器上开发**：Windows 11 Pro + WSL2 Ubuntu 24.04，仓库在 `~/ucla-agent-tournament`。从 Windows 侧改 WSL 里的文件会变成 root 所有，改完要 chown 回来。
 - **冠军 v4.1（main / `champion/`，09-29）**：v4 + 两个真实平台 bug 的修复（平台的 `team` 列出全部 6 只 → 局面重建只用带上场的 4 只；两格回答合起来必须合法），见 `docs/progress.md` 的 v4.1 节。以后的 v5 按 `docs/v5_standard.md`。以下是 v4 本身：
@@ -17,7 +17,7 @@
 
 ## 下一步（按优先级，依据 docs/competition_brief.md）
 
-0. **（10-03 定）先做宝可梦和狼人杀，红警暂缓**（主人决定）。进度核查和 10/3–10/9 计划见 **`docs/status_1003.md`**。最先做的：把 `~/exp21` 里两个复审过的补丁收进 main。v4.1.2 部署（`patches/deploy-reviewed.patch`，10-03 打在 main 376048d 上）已提交，见 `docs/progress.md` 的 v4.1.2 节；下一步单独提交 v4.2 健壮性（`patches/agent-reviewed.patch`），`~/exp21/final` 工作区里 run_agent.sh / Dockerfile 的未暂存改动（`ARENA_HEALTH_PROBE`、`ARENA_STATE*`、`ARENA_SEARCH_*`）要用 v4.2 的 `agent/health.py` 和对局状态，跟 v4.2 一起提交。之后：狼人杀身份交叉检查 + 读懂大模型发言（262 条缓存的真实聊天当回归集），真实平台测试。红警的资料留在 `docs/platform/redalert.md`、`data/red_alert_config.json`。
+0. **（10-03 定）先做宝可梦和狼人杀，红警暂缓**（主人决定）。进度核查和 10/3–10/9 计划见 **`docs/status_1003.md`**。最先做的：把 `~/exp21` 里两个复审过的补丁收进 main。两个都已在 `integrate/v42` 分支上提交（v4.1.2 在 10-03、v4.2 在 10-05，基于 main 376048d）：v4.1.2 部署（`patches/deploy-reviewed.patch`）和 v4.2 健壮性（`patches/agent-reviewed.patch`，加上 `~/exp21/final` 里 run_agent.sh / Dockerfile 的集成改动），见 `docs/progress.md` 的 v4.1.2、v4.2 两节；v4.2 提交后紧接着冻结为冠军。剩下由主人把这个分支合进 main。之后：狼人杀身份交叉检查 + 读懂大模型发言（262 条缓存的真实聊天当回归集），真实平台测试。红警的资料留在 `docs/platform/redalert.md`、`data/red_alert_config.json`。
 1. ~~**真实平台 A/B：v4 vs v3.2**~~（09-29 已做：v4.1 20 局 12 胜）（`~/exp7/scripts/ab4-play.sh <id>`；房间在 Human dashboard 创建，需要人登录；同一账号同时只能有一个进行中的房间）。至少 20 局，15 胜以上算明显领先，10 胜以下就停下来对比。再往后：v4 对「按均衡出招」的对手偏弱（simbot −9），下一轮看能不能在不丢 VGC-Bench / 擂台优势的前提下补上，或者和 battlefix 做成按对手切换。
 2. ~~控时与防崩溃~~、~~公开理由~~：v3.1 已完成（见 `docs/progress.md`）。剩下：首次真实对局确认观战页显示公开理由、平台如何扣总时间；传输层断线重连在官方 `altruagent/`（上游），不要改。
 3. **多场并发压力测试**：`scripts/stress_concurrency.py`，在比赛用的机器上跑 N=8。

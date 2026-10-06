@@ -51,7 +51,9 @@
 # RESTART_MAX_DELAY=60, STOP_TIMEOUT=20, ARENA_LOCK_DIR=/tmp, ARENA_ALLOW_NO_CALC, ARENA_MODE, ARENA_ROLE,
 # ARENA_DISCOVERY_S=10, ARENA_WORKER_COOLDOWN_S=10, ARENA_SEAT_BUSY_RETRY_S, ARENA_NEW_SEAT_DELAY_S
 # (agent/__main__.py), ARENA_NODE, ARENA_CALC (agent/pokemon/calc.py), ARENA_BATTLE, ARENA_SHOWDOWN
-# (agent/pokemon/policy.py, engine.py).
+# (agent/pokemon/policy.py, engine.py), ARENA_STATE, ARENA_STATE_DIR (a restarted worker's memory, under
+# LOG_DIR/state by default), ARENA_SEARCH_MAX_PROCS, ARENA_SEARCH_MIN_FREE_MB (the machine's search processes; all in
+# docs/restart_load.md), ARENA_HEALTH_PROBE=0 (a health line never starts a probe search: Docker's HEALTHCHECK).
 # Needs bash >= 4.2 and ps; setsid and flock are used when present.
 set -uo pipefail
 
@@ -198,7 +200,22 @@ engine_status() {  # cheap mirror of agent/pokemon/engine.py available() for the
   [ "$b" = search ] || { echo "classic(ARENA_BATTLE)"; return; }
   [ -f "$ROOT/agent/js/search.js" ] || { echo "MISSING"; return; }
   if [ -d "$ROOT/agent/js/node_modules/pokemon-showdown" ] || [ -d "$ROOT/local/js/node_modules/pokemon-showdown" ] \
-     || [ -n "${ARENA_SHOWDOWN:-}" ]; then echo ok; else echo "NO-SIMULATOR"; fi
+     || [ -n "${ARENA_SHOWDOWN:-}" ]; then search_live; else echo "NO-SIMULATOR"; fi
+}
+
+search_live() {   # agent/health.py: did the matches' battle decisions get searched answers (last 30 min), else
+  local out t=() np=()  # a real probe search (every 15 min at most): ok(used=38/40) / DEGRADED(...) / idle(probe=1.9s)
+  command -v timeout >/dev/null 2>&1 && t=(timeout 90)
+  case "$(printf '%s' "${ARENA_HEALTH_PROBE:-1}" | tr -d '[:space:]' | tr 'A-Z' 'a-z')" in
+    0|off|no|false) np=(--no-probe) ;;               # (Docker's HEALTHCHECK has 20 s: counters only, never a probe)
+  esac
+  # The counters are where the loop's agent keeps its match state: under ARENA_RECORD_DIR, which preflight sets to
+  # LOG_DIR (a `status` shell has not run preflight). engine_status calls this only when the loop (or a start from
+  # here) plays the search, whatever ARENA_BATTLE the asking shell has.
+  out="$(cd "$ROOT" && ARENA_RECORD_DIR="${ARENA_RECORD_DIR:-$LOG_ABS}" ARENA_BATTLE=search ${t[@]+"${t[@]}"} \
+         "$PYTHON" -c 'import sys; from agent.health import main; sys.exit(main())' ${np[@]+"${np[@]}"} 2>/dev/null \
+         | tail -n 1)"
+  echo "${out:-files-ok}"
 }
 
 cmdline_of() {    # $1 pid: its arguments, one per line ('' when gone)
@@ -657,7 +674,8 @@ case "$CMD" in
     for v in PYTHON PYTHONPATH PATH LOG_DIR LOG_MAX_MB LOG_KEEP HEALTH_EVERY RESTART_DELAY RESTART_MAX_DELAY STOP_TIMEOUT \
              ARENA_NODE ARENA_CALC ARENA_ALLOW_NO_CALC ARENA_BATTLE ARENA_SHOWDOWN ARENA_LOCK_DIR ARENA_REASONING ARENA_RECORD ARENA_RECORD_DIR \
              ARENA_DISCOVERY_S ARENA_WORKER_COOLDOWN_S ARENA_DISCOVERY_MAX_FAILURES ARENA_MODE ARENA_SEAT_BUSY_RETRY_S \
-             ARENA_ROLE ARENA_NEW_SEAT_DELAY_S; do
+             ARENA_ROLE ARENA_NEW_SEAT_DELAY_S ARENA_STATE ARENA_STATE_DIR ARENA_SEARCH_MAX_PROCS \
+             ARENA_SEARCH_MIN_FREE_MB ARENA_SEARCH_GRACE_S ARENA_SUMMARY ARENA_HEALTH_PROBE; do
       [ -n "${!v+x}" ] && envs+=(-e "$v=${!v}")
     done
     targs="run --name $(printf '%q' "$NAME") --env $(printf '%q' "$ENV_FILE")"; [ -n "$MODE_ARG" ] && targs+=" --tournament"

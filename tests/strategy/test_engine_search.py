@@ -6,6 +6,7 @@ import json
 import os
 import random
 import shutil
+import time
 
 import pytest
 
@@ -376,15 +377,19 @@ def test_fixed_work_still_stops_at_the_safety_net(eng):
 
 
 @needs_engine
-def test_engine_timeout_kills_and_restarts(eng):
+def test_engine_timeout_keeps_the_process_and_drops_the_late_answer(eng):
+    """A search that misses its timeout is slow, not dead: its process is kept (killing it would throw the loaded
+    simulator away on a busy CPU, deploy-2); its late answer is read and dropped before the next request."""
     e = engine.SearchEngine()
     assert e.warm(60)
-    slow = dict(FAST, samples=50, budget_ms=60000, hard_ms=60000, keep=12, slot_keep=6)
+    pid = e.proc.pid
+    slow = dict(FAST, samples=50, budget_ms=60000, hard_ms=3000, keep=12, slot_keep=6)
     assert e.search(real_state(), slow, 0.05) is None
-    assert e.timeouts == 1 and e.errors == 1
-    assert e.warm(60)                                                       # a fresh process answers again
-    assert e.search(real_state(), dict(FAST, rng=3), 20.0) is not None
-    e._kill()
+    assert e.timeouts == 1 and e.errors == 0 and e.proc.pid == pid
+    time.sleep(4.0)                                                         # it stops at its 3 s net and answers
+    assert e.search(real_state(), dict(FAST, rng=3), 20.0) is not None      # the late answer is not taken for this one
+    assert e.late == 1 and e.starts == 1 and e.proc.pid == pid
+    e.close()
 
 
 # ---------------------------------------------------------------- the real platform's six-entry `team`
@@ -513,9 +518,9 @@ class FakeEngine:
     def __init__(self, answer):
         self.answer, self.calls = answer, 0
 
-    def search(self, state, params, timeout, battle_json=None):
+    def search(self, state, params, timeout, battle_json=None, grace=0.0):
         self.calls += 1
-        self.state, self.params = state, params
+        self.state, self.params, self.grace = state, params, grace
         return self.answer
 
 

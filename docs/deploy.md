@@ -45,7 +45,8 @@ echo 'ALTRUAGENT_OFFICIAL_AGENT_KEY=<粘贴 key>' >> .env && chmod 600 .env
 bash scripts/run_agent.sh check-tournament
 # 5) 常驻（systemd 推荐，见下）
 bash scripts/run_agent.sh install-systemd && systemctl --user enable --now arena-agent@main && sudo loginctl enable-linger $USER
-bash scripts/run_agent.sh status                # 健康行必须有 mode=tournament(primary) agent=up calc=ok(...) search=ok
+bash scripts/run_agent.sh status                # 健康行必须有 mode=tournament(primary) agent=up calc=ok(...)，还没开打时
+                                                # search=idle(probe=…s)（真跑了一次搜索），开打后 search=ok(used=…)
 ```
 
 **模式怎么定**（每次启动的第一行日志和每条健康行都写着 `mode=`）：命令行 `--tournament`（或 `-- --tournament`）> key 文件里的 `ARENA_MODE=tournament|discovery` > 自动：**只要设了 `ALTRUAGENT_OFFICIAL_AGENT_KEY` 就是官方模式**。所以 `.env` 里 sk key 和 eak key 同时存在时，比赛日不会悄悄跑成发现模式（那样一场正式对局都接不到）。要用 Yoriko_Red 打陪练，用 `.env.apocalypse` 之类只放 sk key 的文件，或在该文件里写 `ARENA_MODE=discovery`。官方模式下 eak key 格式不对（不是 `eak_live_` + 64 位十六进制）就拒绝启动（退出码 2），日志只写原因、不写 key。
@@ -58,7 +59,7 @@ Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）即自�
 |---|---|---|
 | T−1 天 | `git pull` 到冻结的 tag；`python -m pytest -q`；`selfcheck.py`；`check-tournament` | 全绿；每行 ✓ |
 | T−2 小时 | 确认只有计划中的机器在跑这把 key（主机 + 经主办方同意的热备）；`free -m`、`df -h` | 内存 ≥ 1.2 GB × 预计并发场数，磁盘 > 1 GB |
-| T−1 小时 | `systemctl --user restart arena-agent@main`（或 `start`），看 `status` | `mode=tournament(primary) agent=up restarts=0 calc=ok(...) search=ok` |
+| T−1 小时 | `systemctl --user restart arena-agent@main`（或 `start`），看 `status` | `mode=tournament(primary) agent=up restarts=0 calc=ok(...)`，`search=idle(probe=…s)`（还没对局）或 `search=ok(used=…)` |
 | 比赛中每小时 | `bash scripts/run_agent.sh status`；`grep -c 'Match assigned' logs/agent-main.out` | `restarts` 不涨；`workers` = 在打的座位数；日志没有 Traceback |
 | 比赛后 | `systemctl --user stop arena-agent@main`；`python -m local.pool --harvest`；提交 `logs/yoriko` 之外的新录像按惯例处理 | — |
 
@@ -149,17 +150,17 @@ bash scripts/run_agent.sh stop   # 停止
 
   ```
   [health] name=main mode=tournament(primary) agent=up pid=… run_up=2h05m agent_up=1h47m restarts=1 workers=2 node=4 calc_procs=2 rss=1010MB fds=87
-           last_output=3s records=41 last_record=12s disk_free=38.2G logs=12M calc=ok(v18.19.1) search=ok key=#762c809cde
+           last_output=3s records=41 last_record=12s disk_free=38.2G logs=12M calc=ok(v18.19.1) search=ok(used=38/40) key=#762c809cde
   ```
 
-  `mode` = `tournament(primary)` / `tournament(standby)` / `discovery`，比赛日必须是 `tournament(primary)`；`workers` = 正在打的对局数；`calc_procs` 应 ≤ `workers`；`node` = 计算器 + 搜索进程（每场各一个）；`restarts` 比赛中应不变；`calc` 必须是 `ok(...)`，出现 `MISSING` / `NO-NODE_MODULES` / `OFF(ARENA_CALC)` 立刻处理；`search` 应是 `ok`（`NO-SIMULATOR` / `MISSING` = 模拟器不见了，每步都在用冠军打法；`classic(ARENA_BATTLE)` = 有意关掉了搜索，或 `ARENA_ALLOW_NO_CALC` 的紧急退回）；`key=#…` 是当前模式所用密钥哈希的前 10 位（不是密钥），用来核对两台机器跑的是哪把 key。
+  `mode` = `tournament(primary)` / `tournament(standby)` / `discovery`，比赛日必须是 `tournament(primary)`；`workers` = 正在打的对局数；`calc_procs` 应 ≤ `workers`；`node` = 计算器 + 搜索进程（每场各一个）；`restarts` 比赛中应不变；`calc` 必须是 `ok(...)`，出现 `MISSING` / `NO-NODE_MODULES` / `OFF(ARENA_CALC)` 立刻处理；`search`（v4.2 起看真实效果，`agent/health.py`，细节见 `docs/restart_load.md` 第 4 节）：`ok(used=38/40)` = 最近 30 分钟的对战回合 ≥ 80% 用上了搜索的答案；`DEGRADED(used=3/20,no_answer=10,…)` = 低于 80%，后面是机器原因（CPU 被抢、内存不够、槽位满），要查；`idle(probe=1.9s)` = 最近 30 分钟没有对战，刚真跑过一次搜索（最多 15 分钟一次），`SLOW(probe=…)` 是超过 2.5 秒，`FAILED(…)` 是没答出来；`NO-SIMULATOR` / `MISSING` = 模拟器不见了，每步都在用冠军打法；`classic(ARENA_BATTLE)` = 有意关掉了搜索，或 `ARENA_ALLOW_NO_CALC` 的紧急退回。`key=#…` 是当前模式所用密钥哈希的前 10 位（不是密钥），用来核对两台机器跑的是哪把 key。
 - **干净停止**：`stop`（或 systemd stop、tmux 里 Ctrl-C）向 agent 整个进程组发 SIGTERM，20 s 内不退就 SIGKILL；不认输、不再调用平台。实测 0.6 s 停完。看门脚本自己被 SIGKILL / OOM 杀掉时，它的健康循环 5 s 内自行退出，日志写入进程在最后一个写端关闭后退出，下一次 `start` / `stop` 会清理残留的 agent 和这两个辅助进程（测试覆盖：`kill -9` 看门脚本后 `stop`，本测试的进程一个不剩）。
 - **pid 文件不盲信**：`start` / `stop` 只认命令行是 `run_agent.sh run` 且环境里 `ARENA_RUN_ID=<NAME>@<LOG_DIR>` 对得上的进程；pid 文件过期、pid 被别的进程复用时，既不会误报「已在运行」，也不会去杀别人的进程。
 - 启动自检写进日志：模式和选择原因、密钥是否设置（不打印密钥）、`.env` 权限、计算器（真算一次）、磁盘空间。
 
 不经看门脚本直接跑 `python -m agent`（例如主办方的 harness，或按上游 README 在终端里跑）：没设 `ALTRUAGENT_CONTROL_URL` 时默认用 `https://api.altruagent-game.com`（以前直接退出）；启动时检查数据文件、计算器和引擎搜索，**有问题就在 stdout 和 stderr 各打一个 `WARNING: THIS MACHINE PLAYS DEGRADED` 横幅**（不拒绝启动：能打总比不在线强），一切正常时打一行 `Local checks: …`；`--check-tournament` 把这几项作为最前面的 ✓/✗ 行。
 
-可调环境变量：`PYTHON`、`LOG_DIR`、`LOG_MAX_MB`、`LOG_KEEP`、`HEALTH_EVERY`、`RESTART_DELAY`、`RESTART_MAX_DELAY`、`STOP_TIMEOUT`、`ARENA_LOCK_DIR`（密钥锁目录，默认 `/tmp`）、`ARENA_MODE`（`tournament` / `discovery`，不设 = 有 eak key 就官方模式）、`ARENA_DISCOVERY_S`、`ARENA_WORKER_COOLDOWN_S`、`ARENA_DISCOVERY_MAX_FAILURES`、`ARENA_SEAT_BUSY_RETRY_S`（官方模式 `seat_busy` 后的重试间隔，默认 35 s）、`ARENA_RECORD_DIR`（录像目录，默认 `LOG_DIR`）、`ARENA_NODE`（node 可执行文件路径，systemd / nvm 下 PATH 里没有 node 时用；路径失效时只记一条警告、改用包里的 `node/bin/node` 或 PATH 里的 node，不会因此关掉计算器）、`ARENA_CALC=off`（**只用于诊断**：强制关计算器，看门脚本和 selfcheck 会拒绝，除非同时设 `ARENA_ALLOW_NO_CALC=1`；不影响引擎搜索）、`ARENA_ALLOW_NO_CALC=1`（计算器跑不起来也照样启动；仅紧急情况，用完删掉）、`ARENA_BATTLE`（对战策略：不设或 `search` = 引擎搜索，默认；`classic` = 冠军 v3.2 的打法，回退开关）。`ARENA_EXECUTION_ID` 只由看门脚本设置，不要手动设。
+可调环境变量：`PYTHON`、`LOG_DIR`、`LOG_MAX_MB`、`LOG_KEEP`、`HEALTH_EVERY`、`RESTART_DELAY`、`RESTART_MAX_DELAY`、`STOP_TIMEOUT`、`ARENA_LOCK_DIR`（密钥锁目录，默认 `/tmp`）、`ARENA_MODE`（`tournament` / `discovery`，不设 = 有 eak key 就官方模式）、`ARENA_DISCOVERY_S`、`ARENA_WORKER_COOLDOWN_S`、`ARENA_DISCOVERY_MAX_FAILURES`、`ARENA_SEAT_BUSY_RETRY_S`（官方模式 `seat_busy` 后的重试间隔，默认 35 s）、`ARENA_RECORD_DIR`（录像目录，默认 `LOG_DIR`）、`ARENA_NODE`（node 可执行文件路径，systemd / nvm 下 PATH 里没有 node 时用；路径失效时只记一条警告、改用包里的 `node/bin/node` 或 PATH 里的 node，不会因此关掉计算器）、`ARENA_CALC=off`（**只用于诊断**：强制关计算器，看门脚本和 selfcheck 会拒绝，除非同时设 `ARENA_ALLOW_NO_CALC=1`；不影响引擎搜索）、`ARENA_ALLOW_NO_CALC=1`（计算器跑不起来也照样启动；仅紧急情况，用完删掉）、`ARENA_BATTLE`（对战策略：不设或 `search` = 引擎搜索，默认；`classic` = 冠军 v3.2 的打法，回退开关）。v4.2 加的（含义和默认值见 `docs/restart_load.md`，一般不用设）：`ARENA_STATE` / `ARENA_STATE_DIR`（worker 重启后接上记忆的状态目录，默认 `LOG_DIR/state`）、`ARENA_SEARCH_MAX_PROCS` / `ARENA_SEARCH_MIN_FREE_MB`（整台机器的搜索进程上限和所需可用内存）、`ARENA_SEARCH_GRACE_S`、`ARENA_SUMMARY=0`（关掉每局的 `[match-summary]` 行）、`ARENA_HEALTH_PROBE=0`（健康行只看对局计数，从不另起探测搜索；Docker 的 HEALTHCHECK 用它）。`ARENA_EXECUTION_ID` 只由看门脚本设置，不要手动设。
 
 ## B. 压缩包 / Docker
 
@@ -203,6 +204,7 @@ docker run -d --name arena-main --restart unless-stopped --env-file arena.keys \
     --log-opt max-size=20m --log-opt max-file=3 -v arena-logs:/data arena-agent
 docker logs -f arena-main            # 与 /data/logs/agent-main.out 内容相同（--log-opt 限制了大小）
 docker ps                            # HEALTHCHECK：agent 进程在时显示 (healthy)，退避等待中显示 unhealthy
+                                     # （它带 ARENA_HEALTH_PROBE=0：20 s 超时内只读对局计数，不另起探测搜索）
 ```
 
 - 用 `--env-file`，不要 `-e KEY=值`（会留在 shell 历史和 `docker inspect` 里）。
@@ -340,7 +342,7 @@ from altruagent import AltruAgentClient; c = AltruAgentClient(); print(c.join_to
 - [ ] `.venv/bin/python scripts/selfcheck.py` → `selfcheck: ready`，且有 `OK    damage calculator answers`、`OK    battle policy: engine search` 和 `OK    Official Agent Key configured … mode tournament`
 - [ ] `bash scripts/run_agent.sh check-tournament` → 每行 ✓（会连平台，主人执行）；`.env` 权限 600；`.env` 里没有 `ARENA_CALC` / `ARENA_ALLOW_NO_CALC` / `ARENA_BATTLE=classic` / `ARENA_EXECUTION_ID` / `ARENA_MODE=discovery` / `ARENA_NEW_SEAT_DELAY_S`，主机的 `.env` 里也没有 `ARENA_ROLE=standby`（只有热备机器才写）
 - [ ] 这把 eak key 只在计划中的机器上跑（主机；热备只在主办方同意后才开）；笔记本、旧云主机上的都已停掉
-- [ ] systemd 已重新 `install-systemd`（单元里有 `OOMPolicy=continue`）、`enable --now` 且 `enable-linger`；`bash scripts/run_agent.sh status` 显示 `mode=tournament(primary)`、`agent=up`、`calc=ok(...)`、`search=ok`、`restarts=0`
+- [ ] systemd 已重新 `install-systemd`（单元里有 `OOMPolicy=continue`）、`enable --now` 且 `enable-linger`；`bash scripts/run_agent.sh status` 显示 `mode=tournament(primary)`、`agent=up`、`calc=ok(...)`、`search=idle(probe=…s)`（还没对局）或 `search=ok(used=…)`、`restarts=0`
 - [ ] 磁盘剩余 > 1 GB；`logs/` 可写；内存至少 1.2 GB × 预计并发场数空闲
 - [ ] 提前至少 1 小时启动并看到健康行；比赛中每小时看一次 `status`（`restarts` 不涨、`calc` 仍是 ok、`workers` 与在打的对局数一致）
 - [ ] 已加入主办方 Discord 公告频道；主办方回复了：几点开始、要在线到几点、允不允许热备、同时最多几场
@@ -361,6 +363,8 @@ from altruagent import AltruAgentClient; c = AltruAgentClient(); print(c.join_to
 | 日志有 "THE DAMAGE CALCULATOR CANNOT RUN … NOT STARTING" | 按横幅里的原因修（装 node / 设 `ARENA_NODE` / `cd agent/js && npm ci --omit=dev` / 删掉 `ARENA_CALC=off`），systemd 会自己重试；实在修不好又必须上场：临时设 `ARENA_ALLOW_NO_CALC=1`（node 本身坏了时搜索也会自动改 classic；启发式也比被随机代打强），修好后删掉并重启 |
 | 运行中 `calc=MISSING` / `NO-NODE_MODULES` | 同上修好后重启；在此之前 agent 仍在用启发式打 |
 | 日志有 "ARENA_BATTLE=search BUT THE ENGINE SEARCH CANNOT RUN … NOT STARTING"，或健康行 `search=NO-SIMULATOR` | 模拟器没装或坏了：git checkout 里 `(cd local/js && npm ci)`，或换成压缩包；systemd 会自己重试。实在修不好又必须上场：临时设 `ARENA_BATTLE=classic`（冠军 v3.2 的打法，照样能打），修好后删掉并重启 |
+| 健康行 `search=DEGRADED(...)` / `SLOW(probe=…)`，或日志有 `ENGINE SEARCH DEGRADED` / `ENGINE SEARCH NOT STARTED` | 机器太忙或内存不够，部分回合退回了经典打法（合法，只是弱一些）：`free -m`、`uptime`，停掉同机的其他重活；`NOT STARTED` 是整机搜索槽位满或可用内存 < 500 MB，别的对局结束后每 5 秒自动重试（`docs/restart_load.md` 第 2、3 节） |
+| 日志 `resumed match … after a worker restart` | 正常：worker 重启后从状态文件接上了这局的记忆（v4.2）。频繁出现说明 worker 在反复崩，按上面「Match ended with an error」处理 |
 | "ERROR: LOG_DIR … is not writable" | 把 `LOG_DIR` 指到可写目录（systemd：单元里加 `Environment=LOG_DIR=…`，或修目录权限），systemd 会自己重试 |
 | `restarts` 一直涨 | 看日志里 `exited with code` 前的报错；网络问题先 `curl -sI https://api.altruagent-game.com` |
 | 磁盘满 | 删旧的 `logs/agent-*.out.N` 和不需要的 `logs/rehearsal/` |

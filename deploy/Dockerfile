@@ -57,8 +57,10 @@ RUN python scripts/selfcheck.py --no-replay \
  && mkdir -p /data/logs && chown -R arena /data
 USER arena
 VOLUME ["/data"]
-# healthy = the run loop's agent process is up (run_agent.sh health: agent=up); the start takes a few seconds
+# healthy = the run loop's agent process is up (run_agent.sh health: agent=up); the start takes a few seconds.
+# ARENA_HEALTH_PROBE=0: this check's search= field reads the matches' counters only and never starts a probe search
+# (a fresh simulator plus one search, which a busy machine may not finish within the 20 s timeout).
 HEALTHCHECK --interval=60s --timeout=20s --start-period=120s --retries=3 \
-  CMD bash /app/scripts/run_agent.sh health --name main | grep -q ' agent=up '
+  CMD ARENA_HEALTH_PROBE=0 bash /app/scripts/run_agent.sh health --name main | grep -q ' agent=up '
 ENTRYPOINT ["/usr/bin/tini", "--", "bash", "/app/scripts/run_agent.sh"]
 CMD ["run", "--name", "main"]

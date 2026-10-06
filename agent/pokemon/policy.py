@@ -20,13 +20,15 @@ Tailwind, spread moves), exactly as v0 played. See docs/strategy.md for the upgr
 """
 from __future__ import annotations
 
+import copy
 import logging
 import os
 import time
 import zlib
+from collections import deque
 
 from .. import timecontrol
-from ..fallback import joint_problems, repair_doubles
+from ..fallback import action_template, gives_up, joint_problems, repair_doubles
 from . import dex
 from . import drafter as drafter_mod
 from . import lookahead as lookahead_mod
@@ -107,6 +109,24 @@ SEARCH_CAP_MS = _env_num("ARENA_SEARCH_CAP_MS", 6000, int)
 SEARCH_HARD_S = _env_num("ARENA_SEARCH_HARD_S", 8.0)     # a search answer later than this is dropped (classic plays)
 SEARCH_MIN_S = 0.4                                        # less time than this left: classic only
 SEARCH_SHARE = 0.6                                        # the search may use this share of the decision's time left
+# A search that overruns its safety net (a slow or contended CPU) is waited for up to SEARCH_GRACE_S longer, within
+# SEARCH_WAIT_SHARE of the decision's time left (hard_ms, and so the answer, stays tied to the limit above): an answer
+# 1 s late is still worth more than the classic pick, and the 10 s decision budget has the room. A search that misses
+# even that finishes in the background (agent/pokemon/engine.py), its process is not killed.
+SEARCH_GRACE_S = _env_num("ARENA_SEARCH_GRACE_S", 1.5)
+SEARCH_WAIT_SHARE = 0.85
+# Load adaptation: after SLOW_SEARCHES searches of a match timed out (no answer even with the grace: an overloaded CPU),
+# each search plays one sample of the payoff matrix instead of `samples` (half the work, so the process is free again
+# sooner) until LITE_RECOVER searches in a row finished within LITE_FAST of their net; ARENA_SEARCH_SAMPLES pins the
+# count. Never at normal load (the gates: 0 timeouts). A search cut by its net still answers and is only counted
+# (search_stats["cut"]): a big matrix gets cut at normal load too, so a cut says little about the machine.
+SLOW_SEARCHES = 2
+LITE_RECOVER = 5
+LITE_FAST = 0.35
+# Fallback reasons that say the machine (CPU, memory, node) is the problem, not the state: counted as degradation
+# (per-match summary, health line, loud log lines).
+MACHINE_REASONS = ("engine", "no time", "crash")
+DEGRADED_WINDOW, DEGRADED_SHARE = 10, 0.3                 # >= 30% of the last 10 battle decisions: logged as DEGRADED
 TRACE_KEYS = ("choice", "rows", "cols", "n_my", "n_opp", "samples", "sims", "errors", "stageA_ms", "build_ms", "ms",
               "value", "pick_value", "classic_value", "classic_prob", "is_classic", "kept_classic", "forced", "cut",
               "prune_cut", "guard")
@@ -227,7 +247,7 @@ def card_score(card: dict, roster: list[dict]) -> float:
     s = float(STAPLES.get(sp, 0))
     bst = sum(dex.base_stats(sp).values()) or 500
     s += (bst - 500) / 40
-    moves = [to_id(m) for m in card.get("moves", [])]
+    moves = [to_id(m) for m in card.get("moves") or []]      # `or`: a card listing "moves": null scores as moveless
     s += sum(SUPPORT_MOVES.get(m, 0) for m in moves)
     s += min(1.4, 0.7 * sum(dex.move(m).get("target") in SPREAD_TARGETS for m in moves))
     s += ABILITIES.get(to_id(card.get("ability", "")), 0)
@@ -522,6 +542,21 @@ class PokemonPolicy:
         self.search_ms: list[float] = []         # wall time of every search round trip (latency diagnostics)
         self.search_trace: list[dict] = []       # the last 400 searches' summaries (diagnostics)
         self.oracle = None                       # local ablation only: callable -> the true battle as JSON
+        # Load handling / observability of the search (see SEARCH_GRACE_S, SLOW_SEARCHES, MACHINE_REASONS): searches
+        # timed out this match, the one-sample mode, the last battle decisions' outcomes (True = searched answer,
+        # False = a machine fallback), and what the last battle decision did (agent.py records it with the move).
+        self.search_slow = 0
+        self.search_lite = False
+        self._lite_fast = 0
+        self._recent: deque = deque(maxlen=DEGRADED_WINDOW)
+        self._degraded_logged = -DEGRADED_WINDOW
+        self.last_search_brief: dict | None = None
+        self._battle_warm = False                # the engine was started at this policy's first battle decision
+        # The doubles decision last answered and the per-battle memory as it was before that answer: a second ask of
+        # the same decision (the runner re-asks after a race error; a restarted worker re-asks the one its predecessor
+        # died on) starts from the same memory (`_same_decision`).
+        self._decision_key: tuple | None = None
+        self._decision_mem: dict | None = None
 
     def _warm_calc(self) -> None:
         """Pay the node + @smogon/calc start-up before the first battle decision (the draft, teambuild and team
@@ -610,6 +645,40 @@ class PokemonPolicy:
         out.update({k: v for k, v in card.items() if v not in (None, {}, [])})
         return out
 
+    # ---- the match's memory across a worker restart (agent/matchstate.py) ----
+    # Everything a later decision of the match reads that earlier decisions wrote: the draft (our / their sets, the
+    # pool, every set seen), team preview (their six, the lineup prior the search samples their four from), the battle
+    # trackers (Fake Out freshness, Protect chains, speed-control turns, Supreme Overlord entries, foes seen, singles
+    # memory), the same-decision snapshot, and the per-match counters the summary line reports.
+    MATCH_MEMORY = ("cards", "opp_cards", "draft_pool", "me", "game_type", "opp_roster", "lineup_prior", "seen_foes",
+                    "prev_active", "prev_opp", "opp_prev_active", "last_protect", "last_move", "cond_set",
+                    "_active_sets", "_entry_fallen", "singles_prev", "_decision_key", "_decision_mem",
+                    "search_stats", "lookahead_skipped", "search_slow", "search_lite", "_lite_fast")
+
+    def export_memory(self) -> dict:
+        """The match memory (MATCH_MEMORY, the sets seen beyond the card catalog, recent diagnostics) for
+        agent/matchstate.py. Read-only."""
+        out = {k: getattr(self, k) for k in self.MATCH_MEMORY}
+        catalog = dex.card_catalog()
+        out["seen_extra"] = [[cid, c] for cid, c in self.seen.items() if catalog.get(cid) != c]
+        out["search_ms"] = self.search_ms[-200:]
+        out["degraded"] = self.degraded[-50:]
+        out["recent"] = list(self._recent)
+        return out
+
+    def import_memory(self, mem: dict) -> None:
+        """Take over the memory `export_memory` saved (a restarted worker's fresh policy): this policy then decides as
+        the one that saved it would have. Unknown / missing keys are left at their defaults."""
+        for k in self.MATCH_MEMORY:
+            if k in mem:
+                setattr(self, k, mem[k])
+        for pair in mem.get("seen_extra") or []:
+            if isinstance(pair, (list, tuple)) and len(pair) == 2 and isinstance(pair[1], dict):
+                self.seen[pair[0]] = pair[1]
+        self.search_ms = list(mem.get("search_ms") or [])
+        self.degraded = list(mem.get("degraded") or [])
+        self._recent.extend(bool(x) for x in mem.get("recent") or [])
+
     # ---- dispatch ------------------------------------------------------
     def act(self, st: dict) -> dict:
         obs = st.get("observation") or {}
@@ -622,6 +691,11 @@ class PokemonPolicy:
             self._warm_calc()
             if self.battle_mode == "search" and phase in ("draft", "team_preview"):
                 self._warm_search(wait=phase == "team_preview")
+        elif self.battle_mode == "search" and not self._battle_warm:
+            # A policy whose first decision is a battle turn (a worker restarted mid-match) never warmed the engine:
+            # spawn it now, so its load overlaps this decision's classic scoring. (Already running: a no-op.)
+            self._battle_warm = True
+            self._warm_search(wait=False)
         if phase == "draft":
             return self._draft(st, obs)
         if phase == "teambuild":
@@ -658,8 +732,9 @@ class PokemonPolicy:
         la = (st.get("legal_actions") or {}).get("actions") or []
         obs = st.get("observation") or {}
         # a doubles turn by its observation or, when the observation lacks the battle view, by its template's shape
-        if st.get("phase") == "moving" and la and (obs.get("is_doubles") or _battle_kind(st, obs) == "doubles"):
-            tmpl = la[0]["input"]["action"]
+        tmpl = action_template(la, "doubles_turn")
+        if st.get("phase") == "moving" and tmpl is not None and (obs.get("is_doubles")
+                                                                 or _battle_kind(st, obs) == "doubles"):
             pick, used = {}, set()
             for slot in tmpl.get("slots", []):
                 pick[f"slot_{slot['slot']}"] = {"type": "pass"}
@@ -678,7 +753,8 @@ class PokemonPolicy:
         if st.get("phase") == "team_preview":
             roster = [to_id(p.get("species", "")) for p in obs.get("your_roster", [])]
             return {"action": {"type": "select_lineup", "bring": roster[:4], "leads": roster[:2]}}
-        return {k: v for k, v in la[0]["input"].items() if k not in ("session_id", "state_version")}
+        first = next((a for a in la if not gives_up(a)), la[0])      # never a listed forfeit / resign
+        return {k: v for k, v in first["input"].items() if k not in ("session_id", "state_version")}
 
     # ---- teambuild (pokemon_gen9ou_teambuild) ---------------------------
     def _teambuild(self, obs: dict) -> dict:
@@ -930,7 +1006,7 @@ class PokemonPolicy:
             sp = to_id(p.get("species", ""))
             card = self.cards.get(sp, {"species": sp, "moves": p.get("moves", [])})
             base = card_score(card, [])
-            moves = [to_id(m) for m in card.get("moves", [])]
+            moves = [to_id(m) for m in card.get("moves") or []]
             offense = sum(max((move_value(m, sp, ot) for m in moves), default=0) for ot in opp_types)
             return base + offense / max(1, len(opp_types)) / 40
 
@@ -939,7 +1015,7 @@ class PokemonPolicy:
 
         def lead_value(sid: str) -> float:
             card = self.cards.get(sid, {})
-            moves = [to_id(m) for m in card.get("moves", [])]
+            moves = [to_id(m) for m in card.get("moves") or []]
             return (3 if "fakeout" in moves else 0) + (2 if to_id(card.get("ability", "")) == "intimidate" else 0) \
                 + (1.5 if "tailwind" in moves else 0) + value({"species": sid}) / 5
 
@@ -1236,6 +1312,8 @@ class PokemonPolicy:
         sun = calc_field(obs, True).get("weather") == "Sun"
         best, best_v = None, -1.0
         for a in la:
+            if gives_up(a):                  # a listed forfeit is never scored (it would count as a 0-point switch)
+                continue
             act = a["input"].get("action") or {}
             if act.get("type") == "move":
                 mid = to_id(act.get("move_id", ""))
@@ -1262,7 +1340,7 @@ class PokemonPolicy:
                 v = 5.0 + _singles_switch_score(act, obs) if obs.get("force_switch") else 0.0
             if v > best_v:
                 best, best_v = a, v
-        best = best or la[0]
+        best = best or next((a for a in la if not gives_up(a)), la[0])
         return {k: v for k, v in best["input"].items() if k not in ("session_id", "state_version")}
 
     def _singles_table(self, obs: dict, la: list, me_mon: dict, opp: dict) -> dict | None:
@@ -1286,9 +1364,32 @@ class PokemonPolicy:
             log.warning("singles damage table failed; using the heuristic", exc_info=True)
             return None
 
+    _TURN_MEMORY = ("prev_active", "prev_opp", "opp_prev_active", "last_protect", "last_move", "cond_set")
+
+    def _same_decision(self, st: dict, obs: dict) -> None:
+        """Make a doubles decision idempotent: the end of `_doubles` updates the per-battle memory (who was on the
+        field: Fake Out freshness; last actions: Protect chains), so a second ask of the same decision would read the
+        memory its first ask left and could answer differently (turn 1: Fake Out dropped). The same decision (session,
+        state_version, turn, forced slots) restores the memory from before its first ask; any other decision
+        snapshots it. Never raises."""
+        try:
+            key = (st.get("session_id"), st.get("state_version"), obs.get("turn"),
+                   tuple(bool(_forced(obs, i)) for i in (0, 1)))
+            if key == self._decision_key and self._decision_mem is not None:
+                for k, v in self._decision_mem.items():
+                    setattr(self, k, copy.deepcopy(v))
+            else:
+                self._decision_key = key
+                self._decision_mem = {k: copy.deepcopy(getattr(self, k)) for k in self._TURN_MEMORY}
+        except Exception:
+            log.debug("decision memory snapshot failed", exc_info=True)
+
     def _doubles(self, st: dict, obs: dict) -> dict:
         t0 = time.monotonic()
-        tmpl = st["legal_actions"]["actions"][0]["input"]["action"]
+        tmpl = action_template((st.get("legal_actions") or {}).get("actions"), "doubles_turn")
+        if tmpl is None:                # (a doubles state always lists one; see agent.py for the answer then)
+            raise ValueError("no doubles_turn template among the legal actions")
+        self._same_decision(st, obs)
         actives = obs.get("active_pokemon") or [None, None]
         opps = obs.get("opponent_active_pokemon") or [None, None]
         turn = obs.get("turn", 0)
@@ -1357,15 +1458,59 @@ class PokemonPolicy:
 
     # ---- engine search (ARENA_BATTLE=search) ----
     def _search_reason(self, why: str) -> None:
+        """Count why a battle decision plays the classic pick; a machine reason (MACHINE_REASONS) is degradation:
+        logged, and loudly (ERROR, once per window) when DEGRADED_SHARE of the last DEGRADED_WINDOW decisions fell
+        back for such a reason."""
         r = self.search_stats["reasons"]
         r[why] = r.get(why, 0) + 1
+        self.last_search_brief = {**(self.last_search_brief or {}), "used": False, "why": why}
+        machine = why.startswith(MACHINE_REASONS)
+        self._recent.append(not machine)
+        if not machine:
+            return
+        self.search_stats["degraded"] = self.search_stats.get("degraded", 0) + 1
+        bad = sum(1 for ok in self._recent if not ok)
+        log.warning("engine search: %s; this battle decision plays the classic pick (%d of the last %d this match)",
+                    why, bad, len(self._recent))
+        if bad >= DEGRADED_SHARE * DEGRADED_WINDOW and self.search_stats["decisions"] - self._degraded_logged \
+                >= DEGRADED_WINDOW:
+            self._degraded_logged = self.search_stats["decisions"]
+            log.error("ENGINE SEARCH DEGRADED: %d of the last %d battle decisions played the classic pick for machine "
+                      "reasons (%s): check CPU load / memory / node on this host", bad, len(self._recent),
+                      ", ".join(f"{k} x{v}" for k, v in r.items() if k.startswith(MACHINE_REASONS)))
+
+    def _search_slow(self, info: dict | None, hard_ms: int, timed_out: bool = False) -> None:
+        """Load adaptation (SLOW_SEARCHES / LITE_RECOVER): count searches that timed out; switch the one-sample mode on
+        after SLOW_SEARCHES of them, off again after LITE_RECOVER fast searches in a row. A search cut by its safety
+        net is counted only (a big matrix is cut at normal load too)."""
+        info = info or {}
+        if info.get("cut"):
+            self.search_stats["cut"] = self.search_stats.get("cut", 0) + 1
+        if timed_out:
+            self.search_slow += 1
+            self._lite_fast = 0
+            if not self.search_lite and self.search_slow >= SLOW_SEARCHES \
+                    and not os.environ.get(SEARCH_KNOBS["samples"][0]):
+                self.search_lite = True
+                self.search_stats["lite"] = self.search_stats.get("lite", 0) + 1
+                log.error("engine search: %d searches of this match timed out (a slow or contended CPU): one sample "
+                          "per search from now on", self.search_slow)
+        elif self.search_lite:
+            ms = info.get("ms")
+            fast = isinstance(ms, (int, float)) and ms <= LITE_FAST * max(1, hard_ms)
+            self._lite_fast = self._lite_fast + 1 if fast else 0
+            if self._lite_fast >= LITE_RECOVER:
+                self.search_lite, self.search_slow, self._lite_fast = False, 0, 0
+                log.warning("engine search: %d fast searches in a row; back to the full search", LITE_RECOVER)
 
     def _search_pick(self, st: dict, obs: dict, tmpl: dict, classic: dict, turn) -> dict | None:
         """The engine search's joint action (agent/js/search.js on the battle rebuilt from platform-legal information,
         agent/pokemon/battlestate.py), or None: the classic pick then plays. Never raises; never waits past the
-        decision's deadline (the search gets SEARCH_SHARE of the time left, at most SEARCH_HARD_S)."""
+        decision's deadline (the search gets SEARCH_SHARE of the time left, at most SEARCH_HARD_S, and an overrun
+        up to SEARCH_GRACE_S more within SEARCH_WAIT_SHARE of it)."""
         self.search_stats["decisions"] += 1
         self.last_search = None
+        self.last_search_brief = {"used": False}
         try:
             from . import battlestate
             from .engine import SearchEngine
@@ -1375,8 +1520,11 @@ class PokemonPolicy:
                 self.search_stats["fallback"] += 1
                 return None
             limit = SEARCH_HARD_S
+            grace = SEARCH_GRACE_S
             if timecontrol.current() is not None:
                 limit = timecontrol.cap(SEARCH_HARD_S, SEARCH_SHARE)
+                grace = max(0.0, min(SEARCH_GRACE_S,
+                                     timecontrol.cap(SEARCH_HARD_S + SEARCH_GRACE_S, SEARCH_WAIT_SHARE) - limit))
             if limit < SEARCH_MIN_S:
                 self.search_stats["skipped_time"] += 1
                 self._search_reason("no time")
@@ -1384,6 +1532,8 @@ class PokemonPolicy:
             # the time budget (fixed=0) and the safety net (both), never past the time this decision may spend
             params = {"budget_ms": int(min(SEARCH_MS, 1000 * limit * 0.6)),
                       "hard_ms": int(min(SEARCH_CAP_MS, 1000 * limit * 0.8)), **search_params()}
+            if self.search_lite:
+                params["samples"] = 1
             key = f"{st.get('session_id')}|{st.get('state_version')}|{turn}|{obs.get('turn')}"
             params["rng"] = zlib.crc32(key.encode()) % 2147483646 + 1
             has_log = isinstance(obs.get("protocol_log"), list) and bool(obs.get("protocol_log"))
@@ -1404,10 +1554,15 @@ class PokemonPolicy:
             if self.oracle is not None:                  # local ablation only (never on the platform)
                 battle_json = self.oracle()
             t0 = time.monotonic()
-            ans = eng.search(state, params, limit, battle_json=battle_json)
-            self.search_ms.append(round(1000 * (time.monotonic() - t0), 1))
+            timeouts0 = getattr(eng, "timeouts", 0)
+            ans = eng.search(state, params, limit, battle_json=battle_json, grace=grace)
+            ms = round(1000 * (time.monotonic() - t0), 1)
+            self.search_ms.append(ms)
+            del self.search_ms[:-1000]
             self.search_stats["searched"] += 1
+            self.last_search_brief.update({"ms": ms, "lite": self.search_lite or None})
             if ans is None:
+                self._search_slow(None, params["hard_ms"], timed_out=getattr(eng, "timeouts", 0) > timeouts0)
                 self._search_reason(f"engine: {(eng.last_error or 'no answer')[:60]}")
                 self.search_stats["fallback"] += 1
                 _debug_dump(state, eng.last_error)
@@ -1417,6 +1572,8 @@ class PokemonPolicy:
             self.last_search = info
             self.search_trace.append({k: info.get(k) for k in TRACE_KEYS if k in info})
             del self.search_trace[:-400]
+            self._search_slow(info, params["hard_ms"])
+            self.last_search_brief.update({k: info.get(k) for k in ("rows", "cols", "samples", "cut") if k in info})
             if not _template_ok(tmpl, action, joint=False):
                 self._search_reason("answer not in the template")
                 self.search_stats["fallback"] += 1
@@ -1430,6 +1587,8 @@ class PokemonPolicy:
                 return None
             out = {f"slot_{s['slot']}": action[f"slot_{s['slot']}"] for s in tmpl.get("slots", [])}
             self.search_stats["used"] += 1
+            self._recent.append(True)
+            self.last_search_brief["used"] = True
             if all(_same_choice(out.get(k), classic.get(k)) for k in out):
                 self.search_stats["same_as_classic"] += 1
             return out
@@ -1825,7 +1984,9 @@ def switch_ranking(st: dict) -> list[str]:
     Pokemon agent.py's last-line repair brings in when it must replace an illegal `pass`. Stateless (safe from the
     watchdog's thread while an overrun policy call still runs); raises on a malformed state."""
     obs = st.get("observation") or {}
-    tmpl = st["legal_actions"]["actions"][0]["input"]["action"]
+    tmpl = action_template(st["legal_actions"]["actions"], "doubles_turn")
+    if tmpl is None:
+        raise ValueError("no doubles_turn template")
     opps = [o for o in (obs.get("opponent_active_pokemon") or []) if isinstance(o, dict)] \
         if isinstance(obs.get("opponent_active_pokemon"), list) else []
     seen, scored = set(), []
@@ -1889,10 +2050,10 @@ def _battle_kind(st: dict, obs: dict) -> str | None:
     """"doubles" / "singles" when a state of an unknown phase is shaped like a battle turn, else None."""
     try:
         la = (st.get("legal_actions") or {}).get("actions") or []
-        act = ((la[0].get("input") or {}).get("action") or {}) if la else {}
+        act = action_template(la, "doubles_turn") or {}
         if act.get("type") == "doubles_turn" and isinstance(act.get("slots"), list):
             return "doubles"
-        ids = [str(a.get("action_id", "")) for a in la]
+        ids = [str(a.get("action_id", "")) for a in la if not gives_up(a)]
         if ids and all(i.startswith(("move:", "switch:")) for i in ids) and isinstance(obs.get("active_pokemon"), dict):
             return "singles"
     except Exception:

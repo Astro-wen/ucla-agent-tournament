@@ -172,6 +172,36 @@
   - `rehearsal.py` 发现模式 5 分钟：开了 9 场、打完 8 场（最后 1 场到时还在打），120 个决策，0 非法、0 计时器代打、0 个 Traceback；停止用了 0.6 s，没有残留进程。
 - **合入后对局仍不变**（和 main 376048d 比）：2349 个真实状态用经典打法、3 场真实对局（140 个决策）用确定性搜索，答案逐个相同；本地对冠军 20 局经典打法加 10 局确定性搜索，Showdown 协议日志逐局相同。
 
+### v4.2（09-29/30 写成，10-05 合入）：重启、慢机器、内存下的自我保护（本地对局不变）
+
+修复类版本（标准见 `docs/v5_standard.md` 第 1 节），不让 agent 变强，只保证官方运行时（`python -m agent --tournament`）下 worker 重启、CPU 被抢、内存紧张时不掉链子，并且出问题时看得见。细节和开关见 `docs/restart_load.md`。来源：09-29 就绪审计（`~/exp21/audit_findings.json`）和复核（`~/exp21/reverify_results.json`）。
+
+- **重启后接着用原来的记忆**（intel-4 / robust-1）：worker 重启后新实例以前什么都不记得（选秀时才看得到的对手完整配置、预览的首发分布、Fake Out / 保护的回合记忆、狼人杀前几天的发言）。现在每个决策后把这一局的记忆原子写进私有状态目录（`logs/state/<agent>--<session>.json`，0700/0600，单个 ≤ 1 MB，3 小时或 200 个以上自动清理，只有对局信息、没有密钥），新 worker 读回后和没重启时逐步相同。
+- **慢 CPU 不再陷入「杀进程—重启—超时」**（robust-2 / deploy-2）：超时的搜索不杀，在后台算完；等过加载或迟到答案的请求把安全网缩到剩下的时间；Python 多等最多 1.5 秒（仍在 10 秒预算内）；真超时 2 次才改为每次只抽 1 遍（被安全网截断只计数）。每次因机器原因退回经典打法都打日志，比例高时打 `ENGINE SEARCH DEGRADED`。
+- **整台机器的搜索进程上限**（deploy-10）：按内存算槽位（8 GB→12 个），另要求 500 MB 可用内存；占不到时这一局用经典打法并打 `ENGINE SEARCH NOT STARTED`，5 秒后再试。狼人杀不占槽位。
+- **看得见**（deploy-9）：录像每行多 `decision`（path、battle=search/classic、resumed）和 `search` 字段；worker 退出时打一行 `[match-summary]`；健康行的 `search=` 改成看最近 30 分钟真实对局用上搜索的比例，没对局时真跑一次搜索（`python -m agent.health`）。
+- **输入健壮性**：双打模板不在第一个时不再发空的 `doubles_turn`（robust-4）；`game_type` 大小写 / 写法不同也认得出（robust-7）；同一个状态被问两次答案不变（robust-3）；狼人杀重启后不重复发言、不超 5 条（robust-9）；卡牌 `"moves": null` 不再让选秀崩溃（robust-10）。
+- **检查**（全部在 `~/exp21/out/agent`）：
+  - 本地对局不变（det.sh 设置，默认 4 只写法，不重启）：对冠军 40 局 seed 171 与 v4.1.1 逐局相同（40/40，550 个决策）；2349 个真实决策的答案 0 个不同；经典打法的真实决策和 40 局本地狼人杀逐字节相同。
+  - **每个决策前都重启 worker**（新实例从状态文件接上）：对冠军 40 局仍与 v4.1.1 逐局相同；4 场真实录像在每一步模拟重启（包括「答完还没发出去就死了、再问一次」），答案和写出的记忆都与不重启时相同；本地狼人杀每步重启，消息逐条相同。
+  - 官方运行时的 worker 路径（`run_tournament_worker`，假的官方客户端，不联网）：真实录像在选秀中途 / 对战中途换 worker，后面的答案与不换相同。
+  - 端到端（真的 `python -m agent` 进程树对本地假平台，假 key）：对战中途和选秀中途各 SIGKILL 一次 worker，新 worker 从状态文件接上，打完整局，0 非法动作，搜索用上 5/5、7/7，`[match-summary]` 行正常。
+  - 负载场景（`~/exp21/scripts/ag_load.py`，整局钉在 1 个 CPU 核上重放真实对局，v4.1.1 对 v4.2）：搜索进程被杀、之后启动慢 1.5 秒时，v4.1.1 在两局里分别有 2/21、7/17 个回合因「超时—杀—重启」连锁退回经典打法，v4.2 都是 0；worker 在对战中途重启时，v4.1.1 丢了对手的 6 张卡（重建只能猜），v4.2 全部接上；1 或 3 个抢 CPU 的忙循环时两版都 100% 用上搜索（这台机器上还没慢到出问题）。
+  - `replay_real.py` 和 `--no-calc`：2349 个真实决策都是 0 失败、0 修补，搜索用上 1296/1296。
+  - pytest 全部通过（新增 `tests/strategy/test_match_state.py`、`test_engine_load.py`）。
+- **要报给主办方的**（`altruagent/` 不改）：运行时没有「对局结束」回调，所以每局汇总只能在 worker 退出时打、状态文件只能按时间清理；README 说重连后 "Nothing is saved locally"，重启丢记忆是设计如此，我们在自己代码里补上了，但另一台机器的热备接管时仍会丢。
+- **复审（09-30）补的三处**：(1) 状态文件名加上座位（`--p<座位>`），读回时核对座位：自对弈测试里同一个 agent 占两个座位时，一个座位第一次决策会读到另一个座位的记忆（实测 12 局里 3 局打法变了、12 次读错；修后 0）；(2) 整机槽位和内存检查只管部署的 agent，本地评测（`ARENA_RECORD=0`）不受影响，免得 panel / ladder 的结果取决于机器上同时跑着什么；(3) 清理只删状态文件自己的文件。单座位的对局（重启或不重启）不受影响。
+- **10-05 合入**（`integrate/v42` 分支，打在 v4.1.2 da5adb7 上）：`agent-reviewed.patch` 用 `git apply --3way` 打上，只有本文件冲突（手工合并）；另带上 `~/exp21/final` 里没暂存的集成改动：`scripts/run_agent.sh`（健康行调 `agent/health.py` 时读 `ARENA_RECORD_DIR`（默认 LOG_DIR）下的计数、固定 `ARENA_BATTLE=search`，`ARENA_HEALTH_PROBE=0` 时加 `--no-probe`；tmux 环境透传加上 `ARENA_STATE*`、`ARENA_SEARCH_*`、`ARENA_SUMMARY`、`ARENA_HEALTH_PROBE`；文件头的变量说明）和 `deploy/Dockerfile`（HEALTHCHECK 带 `ARENA_HEALTH_PROBE=0`，20 s 超时内不另起探测搜索）。代码文件和 `~/exp21/final` 逐字节相同。检查（输出在 `~/wt/_v42_out2`）：
+  - pytest 全部通过：1346 个，604 s。
+  - `replay_real.py`：2349 个真实决策 0 失败、0 修补，搜索用上 1296/1296，决策 p99 1682 ms、最慢 2053 ms；`--no-calc` 同样 0 失败、0 修补，p99 1704 ms、最慢 1994 ms（标准：p99 ≤ 5 s、最慢 ≤ 10 s）。
+  - 双打两格合法性审计（`~/exp16/scripts/fin_audit.py`：独立的两格判定 + SDK 校验，确定性设置）：1296 个真实双打决策，main 和 v4.2 重放出的答案都是 0 个不合法，两边 0 个答案不同，0 次修补、0 次搜索退回。录像里当时实际发出的答案有 3 个违规（f525d6ac 第 10–12 行的「pass, pass」，就是 v4.1 修掉的那个事故）。
+  - 和 main 376048d 比对局不变：经典打法重放 2349 个真实决策加 40 局本地狼人杀，输出逐字节相同（`~/exp21/scripts/rv_ident.py`，2389 行）；对冠军 v4.1.1 打 40 局（seed 171，确定性设置），main 和 v4.2 逐局相同（40/40，550 个决策，都是 19 胜，搜索用上 510/510，0 非法、0 计时器代打，最慢决策 2.29 s）。
+  - 每个决策前都换一个新的 agent 实例（模拟 worker 重启，`ARENA_STATE=1`，从状态文件接上）：同样 40 局仍和 main 逐局相同，750 个决策每个都打了一次「resumed match … after a worker restart」（panel 把它们计成 warnings 750/0，09-30 的复审结果也是 750）。
+  - selfcheck：ready（没配 key，只有这 1 个警告）；配上假的 eak key 时认出官方模式，key 打印 0 次；`python -m agent.health` 没有对局时真跑一次搜索 → `idle(probe=1.5s)`，`--no-probe` → `idle(no_battle)`；`run_agent.sh health` 两种都对。
+  - 新压缩包（提交前的树）：包里有 `agent/matchstate.py`、`agent/health.py`、`data/search_probe.json`，46 MB / 415 个文件，密钥扫描干净；只有 `/usr/bin:/bin` 的干净环境下 selfcheck ready（54 s），包里 `replay_real.py` 60 个决策 0 失败，`agent.health` → `idle(probe=1.4s)`；格式不对的假 key 时 `--check-tournament` 退出 1。
+  - `rehearsal_official.py`（从这个包跑）：13 项全过，4.4 分钟，96 个决策 0 非法、0 计时器代打、0 竞争错误；kill worker 后 13.5 s 起了新 worker、16.5 s 后下一步；kill 运行时 3.4 s / 6.5 s，0 次 seat_busy；热备接管 28.9 s，那一回合没被代打（这一步等了 31.3 s，就是汇总里对战延迟 p99 31.3 s 的来源，不是算得慢）；非租约持有者 0 步，key 没进日志，停止后 0 残留。演练默认 `ARENA_RECORD=0`，所以这里状态文件是关的（kill worker 后的新 worker 是从零开始接着打的）。
+  - `rehearsal.py` 发现模式 5 分钟：开了 9 场、打完 8 场，127 个决策，0 非法、0 计时器代打、0 个 Traceback，每场都有 `[match-summary]` 行；停止 0.8 s，0 残留。
+
 ### 狼人杀改进（09-28，宝可梦不变）
 - 合入 `candidates/r2-ww-seer-and-villager`，加上模拟得出的规则（村民不弃票、集中投票、不假跳；预言家查到狼或快被投出时跳；对跳时投两个跳的人之一；狼只在被点名时对跳、先刀已跳的预言家），聊天只读有限事实并识别注入，狼的私信默认关闭（`ARENA_WW_DM=on` 可开；观战数据流可能暴露私信）。
 - 留出种子 7（没参与调参），每种条件 1000 局、37 种条件：狼 +3.9、村民 +15.9、预言家 +23.7、每座 +7.3 个百分点。**每桌只有我们一个座位时**：每座 +5.4（对 LLM 类 +11.8、对措辞多变的 LLM 替身 +15.2；对简单 bot +0.4~+1.4）。私信开关对胜率无影响。18.5 万局 0 崩溃 / 0 非法 / 0 超时，最慢决策 68 ms。
