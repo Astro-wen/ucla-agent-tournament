@@ -913,7 +913,11 @@ function search(battle, sideIdx, st, params, t0) {
       for (let j = 0; j < cols.length; j++) {
         const v = sim(ctx, rows[i].str, cols[j] ? cols[j].str : null, seeds[s], rollout);
         if (v !== null) { A[i][j] += v; ok[i][j]++; }
+        // a slow CPU: stop mid-row too (a row is up to `cols` sims, seconds when the machine is overloaded), once
+        // one row is complete; the unfinished row is not counted as tried (dropped if no sample completed)
+        if (j < cols.length - 1 && (done > 0 || i > 0) && ctx.elapsed() > hard) { cut = true; break; }
       }
+      if (cut) break;
       tried[i]++;
       if (ctx.elapsed() > hard) cut = true;          // overloaded machine: stop mid-sample
     }

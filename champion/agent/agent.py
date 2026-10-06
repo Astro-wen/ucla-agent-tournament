@@ -27,9 +27,16 @@ after 120 s in Werewolf). So everything here is defensive:
 Moves carry a short public `reasoning_summary` (altruagent.WithReasoning) built
 by agent/reasoning.py from public information only, after the move is fixed;
 ARENA_REASONING=off turns it off.
+
+A worker restarted mid-match (a new process, a new create_agent()) resumes with the memory the previous one saved
+after its last decision (agent/matchstate.py): the same answers an uninterrupted instance would give. Every decision
+records how it was answered (`decision`: path, time; `search`: the engine search's outcome in a battle turn), each
+match's worker prints one `[match-summary]` line when it exits, and the live counters feed run_agent.sh's health
+line (agent/health.py).
 """
 from __future__ import annotations
 
+import atexit
 import contextvars
 import json
 import logging
@@ -41,10 +48,11 @@ from pathlib import Path
 
 from altruagent import TERMINATE_MESSAGING, DecisionContext, GameState, LegalAction, SendMessage
 
-from . import reasoning, timecontrol
-from .fallback import doubles_from_template, doubles_problems, is_template, joint_problems, repair_doubles, safe_action
+from . import matchstate, reasoning, timecontrol
+from .fallback import (action_template, doubles_from_template, doubles_problems, gives_up, is_template, joint_problems,
+                       repair_doubles, safe_action)
 from .pokemon.dex import to_id
-from .pokemon.policy import PokemonPolicy, switch_ranking
+from .pokemon.policy import MACHINE_REASONS, PokemonPolicy, switch_ranking
 from .werewolf.policy import WerewolfPolicy
 
 log = logging.getLogger("agent")
@@ -57,8 +65,10 @@ _UNSET = object()
 _DAY_RE = re.compile(r"Day\s+(\d+)\s*\|")
 
 
-def record(kind: str, context: DecisionContext, state: GameState, out=None, public_reason: str | None = None) -> None:
-    """Append the raw platform payload (and what we answered) so real schemas can be checked offline.
+def record(kind: str, context: DecisionContext, state: GameState, out=None, public_reason: str | None = None,
+           extra: dict | None = None) -> None:
+    """Append the raw platform payload (and what we answered) so real schemas can be checked offline. `extra`: how the
+    decision was answered (`decision`: path, budget, ms; `search`: the engine search's outcome of a battle turn).
 
     Off when ARENA_RECORD=0 — local simulators and replays set it, otherwise a 400-game ladder writes GBs."""
     if os.environ.get("ARENA_RECORD", "1") == "0":
@@ -69,10 +79,20 @@ def record(kind: str, context: DecisionContext, state: GameState, out=None, publ
                  "raw": state.raw, "out": _jsonable(out)}
         if public_reason is not None:
             entry["reasoning_summary"] = public_reason
+        for k, v in (extra or {}).items():
+            if v is not None and k not in entry:
+                entry[k] = v
         with open(Path(RECORD_DIR) / f"{context.session_id}.jsonl", "a") as f:
             f.write(json.dumps(entry) + "\n")
-    except Exception:
+    except Exception as e:
+        if not _record_failed:                  # once per process (= per match): a read-only disk must not go unseen
+            _record_failed.append(e)
+            log.warning("recording to %s failed (%r): this match's states are not saved; set ARENA_RECORD_DIR (or "
+                        "run_agent.sh's LOG_DIR) to a writable directory", RECORD_DIR, e)
         log.debug("record failed", exc_info=True)
+
+
+_record_failed: list = []
 
 
 def _jsonable(x):
@@ -104,24 +124,38 @@ class Contestant:
         self._path = "policy"                         # how the current decision is being answered
         self.reasoning_mode = reasoning.mode_from_env()   # ARENA_REASONING: off | safe (default) | detail
         self.last_reasoning: str | None = None             # the public line sent with the last move, if any
+        # The match this instance plays ((agent id, session id), bound at its first decision) and its memory across a
+        # worker restart (agent/matchstate.py): `resumed` is how far the match was when a restarted worker took over.
+        self._match: tuple | None = None
+        self._seat: int | None = None                 # our seat in it, when known (part of the saved state's key)
+        self._family = ""                             # "pokemon" / "werewolf" / "" of the match
+        self._game = ""                               # its game type (canonical, see game_kind)
+        self.resumed: list | None = None
+        self._resumes = 0                             # earlier resumes of this match (saved with its state)
+        self.decisions = 0
+        self.doubles_turns = 0                        # doubles battle decisions (the engine search's share of them)
+        self._summarized = False
 
     # ---- moves -----------------------------------------------------------
     def choose_action(self, state: GameState, context: DecisionContext):
         """Never raises; always answers within the decision's hard deadline (see the module docstring)."""
         t0 = time.monotonic()
-        game = ""
+        game, family = "", ""
         try:
-            game = str(getattr(context, "game_type", None) or getattr(state, "game_name", None) or "")
+            family, game = game_kind(getattr(context, "game_type", None) or getattr(state, "game_name", None),
+                                     getattr(state, "raw", None))
             dl = timecontrol.budget_for(getattr(state, "raw", None), game)
         except Exception:
             dl = timecontrol.Deadline(timecontrol.BATTLE_S, "unknown", "error")
         self._path = "policy"
+        self._bind(state, context, family, game)
+        self.pk.last_search_brief = None
         try:
             with timecontrol.decision(dl):
-                out = self._choose_action(state, context, game, dl)
+                out = self._choose_action(state, context, game, dl, family)
         except Exception:
             log.exception("choose_action failed; answering with a safe legal action")
-            out = self._fallback(state, game, "crash")
+            out = self._fallback(state, game, "crash", family)
         out = self._joint_guard(state, out)              # every path: a doubles pair the server takes as a whole
         # The move is fixed above; the public line is attached afterwards and can only drop itself, never the move.
         sent, self.last_reasoning = out, None
@@ -132,16 +166,29 @@ class Contestant:
             sent, self.last_reasoning = out, None
         self.last_decision = {"kind": dl.kind, "budget": round(dl.seconds, 3), "source": dl.source,
                               "path": self._path, "ms": round(1000 * (time.monotonic() - t0), 1)}
-        record("action", context, state, out, self.last_reasoning)
+        if family == "pokemon" and dl.kind == "battle" and _doubles_template(_raw_with_legal(state)) is not None:
+            self.doubles_turns += 1                     # (the engine search plays VGC doubles turns only)
+        brief = self.pk.last_search_brief if family == "pokemon" and dl.kind == "battle" else None
+        if brief is not None and self._path.split("+")[0] in ("policy", "repaired"):
+            self.last_decision["battle"] = "search" if brief.get("used") else "classic"
+        elif family == "pokemon" and dl.kind == "battle" and self._path.split("+")[0] in ("policy", "repaired"):
+            self.last_decision["battle"] = "classic"            # (ARENA_BATTLE=classic, or a singles battle)
+        if self.resumed is not None:
+            self.last_decision["resumed"] = self.resumed
+        record("action", context, state, out, self.last_reasoning,
+               extra={"decision": self.last_decision, "search": brief})
+        self._after_decision(state, family, battle=dl.kind == "battle")
         return sent
 
-    def _choose_action(self, state: GameState, context: DecisionContext, game: str, dl):
+    def _choose_action(self, state: GameState, context: DecisionContext, game: str, dl, family: str = ""):
         raw = _raw_with_legal(state)
-        if game == "werewolf":
+        if family and raw.get("game_type") and raw.get("game_type") != game:
+            raw = {**raw, "game_type": game}              # a game type in another spelling: the policy reads ours
+        if family == "werewolf":
             kw = self._guarded(lambda: self.ww.act(raw), dl, "werewolf policy")
             if isinstance(kw, dict):
                 return self._discrete(state, kw)
-        elif game.startswith("pokemon_"):
+        elif family == "pokemon":
             kw = self._guarded(lambda: self.pk.act(raw), dl, "pokemon policy")
             if isinstance(kw, dict):
                 return self._structured(state, kw)
@@ -149,7 +196,7 @@ class Contestant:
             self._warn_once(("game", game), "unknown game type %r: playing a safe legal action", game)
             self._path = "unknown-game"
             return safe_action(state, raw)
-        return self._fallback(state, game, "no policy answer")
+        return self._fallback(state, game, "no policy answer", family)
 
     def _guarded(self, fn, dl, what: str):
         """fn() under the watchdog: its answer, or None when it raised or did not answer by the hard deadline. One
@@ -241,14 +288,16 @@ class Contestant:
             return self._fallback(state, "pokemon_", "template")
         return action
 
-    def _fallback(self, state: GameState, game: str, why: str):
+    def _fallback(self, state: GameState, game: str, why: str, family: str = ""):
         """The game policy's own fallback, else the generic safe action. Never raises."""
         self.fallbacks += 1
         if self._path == "policy":
             self._path = "fallback"
         raw = _raw_with_legal(state)
         try:
-            if game.startswith("pokemon_"):
+            family = family or ("pokemon" if str(game).startswith("pokemon") else "werewolf" if game == "werewolf"
+                                else "")
+            if family == "pokemon":
                 fb = self.pk.fallback(raw)
                 out = fb.get("action") if isinstance(fb, dict) else None
                 if isinstance(out, dict) and not is_template(out) and self._fallback_ok(raw, out):
@@ -259,7 +308,7 @@ class Contestant:
                     hit = next((a for a in state.legal_actions if a.action_id == str(fb["action_id"])), None)
                     if hit is not None:
                         return hit
-            elif game == "werewolf":
+            elif family == "werewolf":
                 aid = str(self.ww.fallback(raw).get("action_id"))
                 hit = next((a for a in state.legal_actions if a.action_id == aid), None)
                 if hit is not None:
@@ -305,7 +354,7 @@ class Contestant:
             pair = isinstance(out, dict) and (out.get("type") == "doubles_turn"
                                               or any(str(k).startswith("slot_") for k in out))
             if not pair:
-                if not _doubles_only(raw, tmpl):
+                if not (_doubles_only(raw, tmpl) or _unfilled(out, tmpl)):
                     return out                            # another legal action is listed: the answer may be that one
                 filled = doubles_from_template(tmpl)
                 log.error("doubles state answered with %r, not a doubles_turn; sending the template filled in: %s",
@@ -328,7 +377,10 @@ class Contestant:
     # ---- Werewolf discussion ----------------------------------------------
     def choose_message(self, state: GameState, context: DecisionContext):
         """Never raises: any failure ends our turn to talk (TERMINATE_MESSAGING)."""
+        family = ""
         try:
+            family, _ = game_kind(getattr(context, "game_type", None), getattr(state, "raw", None))
+            self._bind(state, context, family, _)
             dl = timecontrol.budget_for(getattr(state, "raw", None), getattr(context, "game_type", None))
             with timecontrol.decision(dl):
                 out = self._guarded(lambda: self._choose_message(state, context), dl, "chat policy")
@@ -338,6 +390,7 @@ class Contestant:
             log.exception("choose_message failed; terminating messaging")
             out = TERMINATE_MESSAGING
         record("message", context, state, out)
+        self._after_decision(state, family)
         return out
 
     def _choose_message(self, state: GameState, context: DecisionContext):
@@ -352,10 +405,21 @@ class Contestant:
         if day is None:                                   # the observation carries it too ("Day 2 | phase ...")
             m = _DAY_RE.search(str(st.get("observation") or ""))
             day = int(m.group(1)) if m else None
+        me, term = st.get("your_position"), st.get("terminated_messaging")
         if day != self._chat_day:
             self._chat_day, self._chat_done, self._chat_sent, self._chat_said = day, False, 0, set()
+            # A restarted worker without its predecessor's saved memory (agent/matchstate.py) can join a window our seat
+            # already chatted in: new_messages carries the whole window, so count and remember our own chats there (the
+            # 5-chat quota and the no-repeat rule then hold across the restart). At a window's first call in one
+            # process there are none.
+            msgs = st.get("new_messages") if isinstance(st.get("new_messages"), list) else []
+            for m in msgs if isinstance(me, int) and not isinstance(me, bool) else []:
+                if isinstance(m, dict) and m.get("sender") == me and m.get("type", "chat") == "chat" \
+                        and m.get("day", day) in (day, None):
+                    self._chat_sent += 1
+                    self._chat_said.add((" ".join(str(m.get("content", "")).split()[:MAX_WORDS]),
+                                         tuple(m.get("recipients") or ())))
             self._chat_queue = self._ask_chat(st)
-        me, term = st.get("your_position"), st.get("terminated_messaging")
         if isinstance(term, list) and isinstance(me, int) and me in term:
             self._chat_done = True
         if not self._chat_done and not self._chat_queue and self._chat_sent and getattr(self.ww, "reactive_chat", False):
@@ -381,6 +445,215 @@ class Contestant:
             log.exception("chat policy crashed")
             return []
 
+    # ---- the match across worker restarts (agent/matchstate.py) and its summary ----------------------------------
+    def _bind(self, state, context, family: str, game: str) -> None:
+        """Tie this instance to its match at its first decision. When a saved state of the same match applies (a worker
+        restarted mid-match; matchstate.resumable), take it over: this instance then answers every later decision as
+        the one that saved it would have. Handed another match (the SDK never does: one instance per match), start it
+        with fresh memory. Never raises."""
+        try:
+            sid = str(getattr(context, "session_id", None) or "")
+            aid = str(getattr(context, "agent_id", None) or "")
+            if self._match == (aid, sid):
+                return
+            if self._match is not None and self._match[1] and sid and sid != self._match[1]:
+                self._summary()
+                self._fresh()
+            self._match, self._family, self._game = (aid, sid), family, game
+            self._seat = _seat_of(context, getattr(state, "raw", None))
+            global _LAST
+            _LAST = self
+            if not family or not matchstate.enabled():
+                return
+            saved = matchstate.load(aid, sid, self._seat)
+            if saved is None or not matchstate.resumable(saved, getattr(state, "raw", None), family, self._seat):
+                return
+            try:
+                self._import(saved)
+            except Exception:
+                log.warning("saved match state unusable; playing on with fresh memory", exc_info=True)
+                self._fresh()
+                return
+            self.resumed = list(saved.get("progress") or [])
+            log.warning("resumed match %s after a worker restart: memory up to %s restored (%d decisions before)",
+                        sid[:8], self.resumed, self.decisions)
+        except Exception:
+            log.warning("match binding failed", exc_info=True)
+
+    def _fresh(self) -> None:
+        self.ww, self.pk = WerewolfPolicy(), PokemonPolicy()
+        self._chat_day, self._chat_queue, self._chat_done = _UNSET, [], False
+        self._chat_sent, self._chat_said = 0, set()
+        self.overruns = self.fallbacks = self.joint_repairs = self.decisions = self._resumes = self.doubles_turns = 0
+        self.resumed, self._summarized = None, False
+
+    def _export(self, family: str, raw) -> dict:
+        chat = {"day": None if self._chat_day is _UNSET else self._chat_day, "has_day": self._chat_day is not _UNSET,
+                "queue": self._chat_queue, "done": self._chat_done, "sent": self._chat_sent, "said": self._chat_said}
+        out = {"game": family, "game_type": self._game, "seat": self._seat,
+               "progress": matchstate.progress(raw, family), "t": round(time.time(), 3), "chat": chat,
+               "counters": {"decisions": self.decisions, "overruns": self.overruns, "fallbacks": self.fallbacks,
+                            "joint_repairs": self.joint_repairs, "doubles_turns": self.doubles_turns,
+                            "resumes": self._resumes + (self.resumed is not None)}}
+        if family == "pokemon":
+            out["pk"] = self.pk.export_memory()
+        elif family == "werewolf":
+            out["ww"] = self.ww.export_memory()
+        return out
+
+    def _import(self, saved: dict) -> None:
+        chat = saved.get("chat") or {}
+        self._chat_day = chat.get("day") if chat.get("has_day") else _UNSET
+        self._chat_queue = list(chat.get("queue") or [])
+        self._chat_done = bool(chat.get("done"))
+        self._chat_sent = int(chat.get("sent") or 0)
+        self._chat_said = set(chat.get("said") or ())
+        c = saved.get("counters") or {}
+        self.decisions = int(c.get("decisions") or 0)
+        self.overruns = int(c.get("overruns") or 0)
+        self.fallbacks = int(c.get("fallbacks") or 0)
+        self.joint_repairs = int(c.get("joint_repairs") or 0)
+        self.doubles_turns = int(c.get("doubles_turns") or 0)
+        self._resumes = int(c.get("resumes") or 0)
+        if isinstance(saved.get("pk"), dict):
+            self.pk.import_memory(saved["pk"])
+        if isinstance(saved.get("ww"), dict):
+            self.ww.import_memory(saved["ww"])
+
+    def _after_decision(self, state, family: str, battle: bool = False) -> None:
+        """Save the match's memory (unless an overrun policy call is still changing it: the next decision saves) and,
+        after a battle turn, its live counters for the health line. Never raises."""
+        self.decisions += 1
+        try:
+            if not family or self._match is None or not matchstate.enabled():
+                return
+            aid, sid = self._match
+            if self._busy is None or not self._busy.is_alive():
+                matchstate.save(aid, sid, self._export(family, getattr(state, "raw", None)), seat=self._seat)
+            if battle and family == "pokemon":
+                matchstate.write_health(aid, sid, self.counters(), seat=self._seat)
+        except Exception:
+            log.debug("match state not saved", exc_info=True)
+
+    def counters(self) -> dict:
+        """The match's battle-decision counters (health line, summary)."""
+        ss = self.pk.search_stats
+        machine = {k: v for k, v in (ss.get("reasons") or {}).items() if str(k).startswith(MACHINE_REASONS)}
+        ms = sorted(self.pk.search_ms)
+        return {"session": (self._match or ("", ""))[1][:8], "game": self._game, "mode": self.pk.battle_mode,
+                "battle": self.doubles_turns, "used": ss.get("used", 0), "degraded": ss.get("degraded", 0),
+                "machine": machine, "lite": bool(self.pk.search_lite), "fallbacks": self.fallbacks,
+                "overruns": self.overruns, "ms_p50": ms[len(ms) // 2] if ms else None, "ms_max": ms[-1] if ms else None}
+
+    def summary_line(self) -> str:
+        """One line about the whole match: how its battle decisions were answered, search latency, engine health."""
+        c = self.counters()
+        ss = self.pk.search_stats
+        head = f"[match-summary] session={c['session'] or '?'} game={self._game or '?'} decisions={self.decisions}"
+        resumed = f"at {self.resumed}" if self.resumed is not None else "no"
+        if self._family != "pokemon":
+            return f"{head} fallbacks={self.fallbacks} overruns={self.overruns} resumed={resumed}"
+        by_count = sorted((ss.get("reasons") or {}).items(), key=lambda kv: -kv[1])
+        reasons = f" ({', '.join(f'{k} x{v}' for k, v in by_count)})" if by_count else ""
+        return (f"{head} battle={c['battle']} search={c['mode']} used={c['used']} classic={c['battle'] - c['used']}"
+                f"{reasons} degraded={c['degraded']}{' lite' if c['lite'] else ''} cut={ss.get('cut', 0)} "
+                f"search_ms p50={c['ms_p50']} max={c['ms_max']} fallbacks={self.fallbacks} overruns={self.overruns} "
+                f"repairs={self.joint_repairs} resumed={resumed} engine[{_engine_stats()}] calc[{_calc_stats()}]")
+
+    def _summary(self) -> None:
+        if self._summarized or not self.decisions:
+            return
+        self._summarized = True
+        try:
+            log.warning("%s", self.summary_line())
+        except Exception:
+            log.debug("match summary failed", exc_info=True)
+
+
+_LAST: "Contestant | None" = None          # the instance playing this process's match (one per worker process)
+
+
+def _engine_stats() -> str:
+    try:
+        from .pokemon.engine import SearchEngine
+        e = SearchEngine._inst
+        if e is None:
+            return "not started"
+        s = e.stats()
+        return " ".join(f"{k}={s[k]}" for k in ("starts", "timeouts", "late", "busy", "hung", "denied", "slot"))
+    except Exception:
+        return "?"
+
+
+def _calc_stats() -> str:
+    try:
+        from .pokemon.calc import DamageCalc
+        d = DamageCalc._inst
+        if d is None:
+            return "not started"
+        s = d.stats()
+        return " ".join(f"{k}={s.get(k)}" for k in ("enabled", "starts", "errors", "timeouts"))
+    except Exception:
+        return "?"
+
+
+@atexit.register
+def _summary_at_exit() -> None:
+    """A match worker exits when its match ends (or fails): the summary of the match it played. ARENA_SUMMARY=0: off."""
+    if os.environ.get("ARENA_SUMMARY", "1") != "0" and _LAST is not None:
+        _LAST._summary()
+
+
+def game_kind(game_type, raw=None) -> tuple[str, str]:
+    """(family, game type) of a decision: family "pokemon" / "werewolf" / "" (unknown), the game type lower-cased with
+    a "pokemon_" prefix. The platform's names ("pokemon_vgc_doubles_draft", "werewolf") come back as they are; another
+    spelling ("Pokemon_VGC_Doubles_Draft", "pokemon", none) is recognised by name or by the state's shape (its
+    legal actions: draft picks, a doubles turn, a lineup, moves / switches; a seat and a day for Werewolf) instead of
+    ending in a whole match of safe-action play. A Pokemon name without a format is the tournament's VGC doubles
+    draft unless the state is a singles battle. Never raises."""
+    try:
+        g = re.sub(r"[\s-]+", "_", str(game_type or "").strip().lower())
+        raw = raw if isinstance(raw, dict) else {}
+        if "werewolf" in g:
+            return "werewolf", "werewolf"
+        acts = [a for a in ((raw.get("legal_actions") or {}).get("actions") or []) if isinstance(a, dict)] \
+            if isinstance(raw.get("legal_actions"), dict) else []
+        obs = raw.get("observation")
+        kinds = {str(((a.get("input") or {}).get("action") or {}).get("type") or "") for a in acts}
+        ids = [str(a.get("action_id") or "") for a in acts if not gives_up(a)]
+        pokemon_shape = bool(kinds & {"draft_pick", "doubles_turn", "select_lineup", "submit_team", "move", "switch"}) \
+            or (bool(ids) and all(i.startswith(("draft_pick:", "move:", "switch:")) for i in ids))
+        if not (g.startswith("pokemon") or "vgc" in g or pokemon_shape):
+            if g in ("", "unknown", "none") and "your_position" in raw and (
+                    isinstance(raw.get("game_state"), dict) or _DAY_RE.search(str(obs or ""))):
+                return "werewolf", "werewolf"
+            return "", g
+        rest = g[len("pokemon"):].strip("_") if g.startswith("pokemon") else g
+        canon = f"pokemon_{rest}" if rest else "pokemon"
+        tokens = canon.split("_")
+        if "vgc" in canon or "doubles" in canon or any(t.startswith("gen") or t in _SINGLES_WORDS for t in tokens):
+            return "pokemon", canon
+        obs = obs if isinstance(obs, dict) else {}
+        singles = obs.get("is_doubles") is False or raw.get("phase") == "teambuild" or (
+            bool(ids) and all(i.startswith(("move:", "switch:")) for i in ids))
+        return "pokemon", ("pokemon_singles" if singles else "pokemon_vgc_doubles_draft")
+    except Exception:
+        return "", str(game_type or "")
+
+
+_SINGLES_WORDS = {"ou", "ubers", "uu", "random", "randombattle", "same", "singles", "teambuild"}
+
+
+def _seat_of(context, raw) -> int | None:
+    """Our seat in the match, when known: the granted / claimed seat (context.seat_position: the official runtime and
+    claimed Testing seats; the same for every worker of the seat), else the seat a seat-based game shows us
+    (`your_position`: Werewolf). None for a Pokemon match found by discovery (its draft keys the two sides by agent id,
+    so one agent never holds both)."""
+    for v in (getattr(context, "seat_position", None), raw.get("your_position") if isinstance(raw, dict) else None):
+        if isinstance(v, int) and not isinstance(v, bool) and v >= 0:
+            return v
+    return None
+
 
 def _raw_with_legal(state) -> dict:
     """The raw state the policies read, with `legal_actions` filled in from state.legal_actions when the server left
@@ -405,7 +678,7 @@ def lineup_ok(raw: dict, action: dict) -> bool:
     try:
         obs = raw.get("observation") or {}
         roster = {to_id(p.get("species", "")) for p in obs.get("your_roster") or [] if isinstance(p, dict)}
-        tmpl = (raw.get("legal_actions") or {}).get("actions", [{}])[0].get("input", {}).get("action") or {}
+        tmpl = action_template((raw.get("legal_actions") or {}).get("actions"), "select_lineup") or {}
         roster |= {to_id(r) for r in tmpl.get("roster") or [] if isinstance(r, str)}
         n_bring = int(tmpl.get("bring_count") or 4)
         n_lead = int(tmpl.get("lead_count") or 2)
@@ -418,11 +691,10 @@ def lineup_ok(raw: dict, action: dict) -> bool:
 
 
 def _doubles_template(raw: dict) -> dict | None:
-    """The doubles_turn template (per-slot options) of a state, or None."""
+    """The doubles_turn template (per-slot options) of a state, wherever its legal actions list it, or None."""
     try:
-        tmpl = raw["legal_actions"]["actions"][0]["input"]["action"]
-        return tmpl if isinstance(tmpl, dict) and isinstance(tmpl.get("slots"), list) else None
-    except (KeyError, IndexError, TypeError):
+        return action_template(raw["legal_actions"]["actions"], "doubles_turn")
+    except (KeyError, IndexError, TypeError, AttributeError):
         return None
 
 
@@ -432,6 +704,16 @@ def _doubles_only(raw: dict, tmpl: dict) -> bool:
     try:
         return (tmpl.get("type") or "doubles_turn") == "doubles_turn" and len(raw["legal_actions"]["actions"]) == 1
     except (KeyError, TypeError, AttributeError):
+        return False
+
+
+def _unfilled(out, tmpl: dict) -> bool:
+    """`out` is the doubles template itself (its LegalAction or its action dict): the runner would send it unfilled."""
+    try:
+        inp = out.get("input") if isinstance(out, dict) else getattr(out, "input", None)
+        act = inp.get("action") if isinstance(inp, dict) else None
+        return is_template(out) or (isinstance(act, dict) and act == tmpl)
+    except Exception:
         return False
 
 
@@ -446,9 +728,12 @@ def _switch_prefs(raw: dict) -> list[str] | None:
 
 def doubles_ok(raw: dict, action: dict) -> bool:
     """Check a doubles_turn against the server's per-slot option template, and the two slots as a pair (never the same
-    switch-in twice, no `pass` while a switch-in is still free for that slot: fallback.joint_problems)."""
+    switch-in twice, no `pass` while a switch-in is still free for that slot: fallback.joint_problems). An answer to a
+    state without such a template is never ok."""
     try:
-        tmpl = raw["legal_actions"]["actions"][0]["input"]["action"]
+        tmpl = _doubles_template(raw)
+        if tmpl is None:
+            return False
         switched = []
         for slot in tmpl.get("slots", []):
             choice = action.get(f"slot_{slot['slot']}")

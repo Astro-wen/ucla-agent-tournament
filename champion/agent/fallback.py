@@ -72,6 +72,29 @@ def is_template(action) -> bool:
     return isinstance(action, dict) and any(k in action for k in _TEMPLATE_KEYS)
 
 
+def gives_up(a) -> bool:
+    """A legal action that concedes the game (resign / forfeit / surrender / concede / quit, by id or label)."""
+    return bool(_GIVE_UP.search(_aid(a)) or _GIVE_UP.search(_label(a)))
+
+
+def action_template(actions, kind: str) -> dict | None:
+    """The `input.action` template of kind "doubles_turn" (per-slot `slots` list) or "select_lineup" among a state's
+    legal actions (raw dicts or LegalActions), wherever it is listed: every recorded platform state lists it first and
+    alone, but another action listed before it (a forfeit, a variant) must not hide it. None when there is none."""
+    acts = []
+    for a in actions if isinstance(actions, (list, tuple)) else []:
+        act = _input(a).get("action")
+        if isinstance(act, dict):
+            acts.append(act)
+    if kind == "doubles_turn":
+        slotted = [a for a in acts if isinstance(a.get("slots"), list)]
+        return next((a for a in slotted if (a.get("type") or "doubles_turn") == "doubles_turn"),
+                    slotted[0] if slotted else None)
+    if kind == "select_lineup":
+        return next((a for a in acts if a.get("type") == "select_lineup" or "roster" in a or "bring_count" in a), None)
+    return next((a for a in acts if a.get("type") == kind), None)
+
+
 def _move_target(opt: dict):
     """A foe (1 / 2) when the move may target one: the first listed target can be our own partner."""
     targets = opt.get("targets") if isinstance(opt.get("targets"), list) and opt["targets"] else [0]
@@ -396,7 +419,7 @@ def safe_action(state, raw: dict | None = None):
         if not la and isinstance(raw, dict):
             acts = (raw.get("legal_actions") or {}).get("actions") if isinstance(raw.get("legal_actions"), dict) else None
             la = [x for x in (acts or []) if isinstance(x, dict)]
-        keep = [a for a in la if not (_GIVE_UP.search(_aid(a)) or _GIVE_UP.search(_label(a)))] or la
+        keep = [a for a in la if not gives_up(a)] or la
         for a in keep:
             out = concrete(a, raw)
             if out is None:

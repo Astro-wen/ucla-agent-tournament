@@ -46,6 +46,7 @@ STALL_FACTOR = 3.0          # an answer still owed after 3x its allowance: the p
 MIN_ROUNDTRIP_S = 0.02      # less time left than this: don't even ask (the caller plays its heuristic)
 RESTART_BACKOFF_S = (0.0, 1.0, 2.0, 4.0, 8.0)   # wait before a restart after the n-th consecutive failure
 MAX_STARTS = 6              # node processes per match (1 + 5 restarts); then the calculator is off for the match
+CALC_OOM_SCORE = 500        # oom_score_adj of the node process (see prefer_for_oom_kill)
 _TIMEOUT = object()
 
 # One cheap calc that makes node load @smogon/calc and the gen-9 data; its answer is never cached or used.
@@ -87,9 +88,9 @@ def calc_disabled() -> bool:
 @functools.lru_cache(maxsize=8)
 def _node_version(path: str) -> str | None:
     """`path --version` (e.g. 'v22.23.3'), or None when that binary does not run here (wrong architecture, too old
-    a C library ...). Cached per process."""
+    a C library ...). Cached per process. Like calc.js and search.js it gets node_env(), never the agent keys."""
     try:
-        out = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=15)
+        out = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=15, env=node_env([]))
     except Exception:
         return None
     v = out.stdout.strip()
@@ -97,15 +98,22 @@ def _node_version(path: str) -> str | None:
 
 
 def _node_bin() -> str | None:
-    """The node executable to run, or None (calculator off: heuristic play, exactly as on a machine without node).
+    """The node executable the calculator runs, or None (calculator off: heuristic play, exactly as on a machine
+    without node). ARENA_CALC=off forces the heuristic (see calc_disabled); otherwise `find_node()`."""
+    if calc_disabled():
+        return None
+    return find_node()
+
+
+def find_node() -> str | None:
+    """The node executable to run, or None when there is none.
 
     Order: ARENA_NODE (a node binary, for a service manager whose PATH lacks node: systemd, nvm installs), then
     node/bin/node in the checkout when it runs here (scripts/bundle.sh ships a pinned official Node build there),
     then `node` from PATH. A development checkout has no node/, so without ARENA_NODE this is `node` from PATH, as
     always. A stale ARENA_NODE (not an executable) is logged and skipped rather than turning the calculator off.
-    ARENA_CALC=off forces the heuristic (see calc_disabled)."""
-    if calc_disabled():
-        return None
+    Unlike `_node_bin()` it ignores ARENA_CALC: the engine search (agent/pokemon/engine.py) needs node too, and
+    ARENA_CALC=off turns off the calculator only."""
     explicit = str(os.environ.get("ARENA_NODE") or "").strip()
     if explicit:
         if (os.path.isfile(explicit) and os.access(explicit, os.X_OK)) or shutil.which(explicit):
@@ -117,6 +125,32 @@ def _node_bin() -> str | None:
     if bundled.is_file() and os.access(bundled, os.X_OK) and _node_version(str(bundled)):
         return str(bundled)
     return "node" if shutil.which("node") is not None else None
+
+
+# The environment a node child (calc.js, search.js) gets: what node needs, never the rest of os.environ, which holds
+# the agent keys (ALTRUAGENT_API_KEY, ALTRUAGENT_OFFICIAL_AGENT_KEY) and whatever else the SDK's load_dotenv() read.
+NODE_CHILD_ENV = ("PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TMPDIR", "NODE_OPTIONS", "ARENA_SHOWDOWN",
+                  "SYSTEMROOT")
+
+
+def node_env(modules: list) -> dict:
+    """Environment for a node child: NODE_CHILD_ENV from ours, NODE_PATH = `modules` then any NODE_PATH we have."""
+    env = {k: os.environ[k] for k in NODE_CHILD_ENV if os.environ.get(k)}
+    env["NODE_PATH"] = os.pathsep.join([str(m) for m in modules] + ([os.environ["NODE_PATH"]]
+                                                                     if os.environ.get("NODE_PATH") else []))
+    return env
+
+
+def prefer_for_oom_kill(pid: int, score: int) -> None:
+    """Raise a node child's oom_score_adj, so under memory pressure the kernel kills it before a match worker or the
+    supervisor: its owner restarts a killed calculator / search process (heuristic / classic play meanwhile), while
+    a killed worker costs the match a restart. Raising a score needs no privilege; written by the parent right after
+    the spawn (no preexec_fn: workers are multi-threaded). Linux only; silently skipped elsewhere."""
+    try:
+        with open(f"/proc/{pid}/oom_score_adj", "w") as f:
+            f.write(str(int(score)))
+    except (OSError, ValueError):
+        pass
 
 
 def probe(attempts: int = 2) -> tuple[bool, str]:
@@ -219,10 +253,9 @@ class DamageCalc:
                 self._disable("calc.js / node_modules missing")
                 return False
             script, modules = paths
-            env = dict(os.environ)
-            env["NODE_PATH"] = os.pathsep.join(x for x in (str(modules), env.get("NODE_PATH", "")) if x)
-            self.proc = subprocess.Popen(self._command(script), stdin=subprocess.PIPE, env=env,
+            self.proc = subprocess.Popen(self._command(script), stdin=subprocess.PIPE, env=node_env([modules]),
                                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
+            prefer_for_oom_kill(self.proc.pid, CALC_OOM_SCORE)
         except Exception as e:
             log.warning("could not start the damage calc: %r", e)
             self.proc = None

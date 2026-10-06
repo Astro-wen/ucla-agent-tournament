@@ -204,6 +204,7 @@
   - 回退开关 `ARENA_BATTLE=classic`（两边都用经典打法打擂台，种子 7，400 局）：191/400，双方 0 非法，平均 7.7 回合，和 v3.2 镜像的数字一样。
   - 提交后补了一个小修：压缩包带上 `docs/restart_load.md`（`docs/deploy.md` 有几处指向它；`tests/test_deploy.py` 76 个通过）。从这个提交（2ef08e4）新出的包：46 MB / 416 个文件，干净环境 selfcheck ready（67 s），包里重放 60 个决策 0 失败、p99 1.8 s，`agent.health` → `idle(probe=1.6s)`。
   - 用这个包再跑 `rehearsal_official.py`：13 项全过，111 个决策 0 非法、0 计时器代打。另用演练脚本的临时副本（不进仓库）打开状态文件和整机槽位（`ARENA_STATE=1`、`ARENA_SEARCH_MAX_PROCS=8`）跑了一次：13 项全过，98 个决策 0 非法、0 计时器代打；kill worker 和 kill 运行时之后，新 worker 都从状态文件接上了（3 次 `resumed match`：宝可梦 2 次、狼人杀 1 次）；对局中健康行是 `search=ok(used=…)`，整机槽位用了 1/8；状态文件都是 0600、目录 0700，里面没有 key。数字见 `docs/deploy.md`「官方模式演练」的 dry-v42 几行。
+- **冻结为冠军**（10-05）：`./scripts/freeze_champion.sh`，`champion/` = 提交 d14a524 的 `agent/`（`champion/VERSION` = d14a524），冻结后全量 pytest 1346 个通过（586 s）。从此擂台、panel 里的「冠军」就是 v4.2，打法和 v4.1.1 相同（上面的本地对局逐局相同），所以以前对 v4.1.1 冠军测的擂台 / panel 数字可以接着比。
 
 ### 狼人杀改进（09-28，宝可梦不变）
 - 合入 `candidates/r2-ww-seer-and-villager`，加上模拟得出的规则（村民不弃票、集中投票、不假跳；预言家查到狼或快被投出时跳；对跳时投两个跳的人之一；狼只在被点名时对跳、先刀已跳的预言家），聊天只读有限事实并识别注入，狼的私信默认关闭（`ARENA_WW_DM=on` 可开；观战数据流可能暴露私信）。
