@@ -155,6 +155,11 @@ class WerewolfPolicy:
         keys = sorted(self.transcript, key=lambda k: (not isinstance(k, (int, float)), k if isinstance(k, (int, float)) else str(k)))
         return self.roles.apply(parse(st, [self.transcript[k] for k in keys]))
 
+    def seats(self, st: dict) -> tuple[int, list[int]]:
+        """(my seat, the living seats) as this policy reads the state (agent.Contestant's listening)."""
+        v = self._view(st)
+        return v.me, list(v.alive)
+
     @staticmethod
     def seer_claims(v: View) -> dict[int, list[int]]:
         """Broadcast seer claims: claimer seat -> seats they called wolf."""
