@@ -6,7 +6,7 @@ Control plane, as altruagent/official.py speaks it (docs/STARTER_README.md "Offi
        --session-ttl seconds (then 401, and the client authenticates again); invalid_official_agent_key (401) for any
        other key.
   GET  /tournament/agent/assignments -> {assignments: [{match_id, seat_id, game_type, seat_position, seat_count,
-       match_status, seat_status}]}: one seat per live match (Pokemon: 1 of 2, Werewolf: 1 of 7).
+       match_status, seat_status}]}: one seat per live match (Pokemon: 1 of 2, Werewolf: 1 of 7, Red Alert: 1 of 2).
   POST /tournament/agent/assignments/{seat}/grant {execution_id} -> a SeatGrant (the seat's GameAPI token, which
        lives --token-ttl seconds) and the seat's EXECUTION LEASE for that runtime (--lease-s, 30 s like the backend);
        seat_busy (409) while another execution id holds a live lease; assignment_not_grantable once the match ended;
@@ -278,7 +278,7 @@ class OfficialPlane:
 
     # ---- seats ------------------------------------------------------------------------------------------------------
     def _seat_id(self, fm) -> str:
-        return f"seat-{fm.n}-{'ww' if getattr(fm, 'werewolf', False) else 'vgc'}"
+        return f"seat-{fm.n}-{getattr(fm, 'seat_tag', None) or ('ww' if getattr(fm, 'werewolf', False) else 'vgc')}"
 
     def _seats(self) -> dict:
         for fm in list(self.p.order):
@@ -291,8 +291,9 @@ class OfficialPlane:
         fm = s["match"]
         ww = getattr(fm, "werewolf", False)
         return {"match_id": f"match-{fm.n}", "seat_id": seat_id,
-                "game_type": "werewolf" if ww else "pokemon_vgc_doubles_draft",
-                "seat_position": fm.seat, "seat_count": WW_SEATS if ww else 2, "match_status": "in_progress",
+                "game_type": getattr(fm, "game_type", None) or ("werewolf" if ww else "pokemon_vgc_doubles_draft"),
+                "seat_position": fm.seat, "seat_count": getattr(fm, "seat_count", None) or (WW_SEATS if ww else 2),
+                "match_status": "in_progress",
                 "seat_status": "running" if s["holder"] else "pending"}
 
     # ---- endpoints -----------------------------------------------------------------------------------------------------

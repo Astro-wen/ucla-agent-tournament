@@ -14,6 +14,8 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from altruagent import WAIT, DecisionContext, GameState
 from altruagent.runner import run_game
 from agent import agent as agent_mod
@@ -22,6 +24,11 @@ from tests.test_realtime import CONFIG, RED_ALERT, RealtimeFakeGame, ra_payload,
 from tests.test_runner import result_dict, terminal_state
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture(autouse=True)
+def _no_recording(monkeypatch):
+    monkeypatch.setenv("ARENA_RECORD", "0")             # (the deployed agent's default is on: logs/<session>.jsonl)
 
 
 def _match(views: int) -> RealtimeFakeGame:
@@ -143,6 +150,66 @@ def test_the_official_worker_plays_a_red_alert_seat_to_the_end():
     assert code == EXIT_SUCCESS
     assert played == [("red_alert", "Contestant")]
     assert game.play_action_calls == [] and len(game.wait_calls) == 25
+
+
+def test_a_red_alert_seat_on_the_fake_platform_through_the_official_worker(tmp_path, monkeypatch):
+    """End to end over HTTP / MCP: local/fake_platform.py --official --red-alert (a scripted real-time match), the SDK's
+    official tournament worker with the real OfficialAgentClient and MCPGameSession, our create_agent(). The match
+    plays to its end and the worker exits 0; no batch is sent, the runner fetches the game's reference once."""
+    import signal
+    import socket
+    import subprocess
+    import sys
+    import time
+
+    from altruagent.official import OfficialAgentClient
+    from altruagent.worker import TournamentWorkerInput, run_tournament_worker
+    from local.fake_platform import DEFAULT_OFFICIAL_KEY
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    stats = tmp_path / "platform.json"
+    proc = subprocess.Popen([sys.executable, "-m", "local.fake_platform", "--port", str(port), "--official",
+                             "--concurrent", "0", "--red-alert", "1", "--ra-seconds", "4", "--stats", str(stats),
+                             "--stats-every", "0.5"], cwd=ROOT, env=dict(os.environ, PYTHONPATH=str(ROOT)),
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    url = f"http://127.0.0.1:{port}"
+    try:
+        official = OfficialAgentClient(url, DEFAULT_OFFICIAL_KEY, load_env_file=False)
+        rows, deadline = [], time.monotonic() + 30
+        while not rows and time.monotonic() < deadline:
+            try:
+                official.authenticate()
+                rows = official.assignments()
+            except Exception:  # noqa: BLE001 - the platform is still starting
+                time.sleep(0.3)
+        assert [(r.game_type, r.seat_count) for r in rows] == [("red_alert", 2)]
+        monkeypatch.setenv("ALTRUAGENT_CONTROL_URL", url)
+        monkeypatch.setenv("ALTRUAGENT_OFFICIAL_AGENT_KEY", DEFAULT_OFFICIAL_KEY)
+        code = run_tournament_worker(TournamentWorkerInput(seat_id=rows[0].seat_id, match_id=rows[0].match_id,
+                                                           game_type="red_alert", agent_spec="agent.agent:create_agent",
+                                                           execution_id="exec-R-" + "r" * 40))
+        assert code == 0
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            st = json.loads(stats.read_text()) if stats.exists() else {}
+            if (st.get("totals") or {}).get("matches_done"):
+                break
+            time.sleep(0.3)
+        ra = next(m for m in st["matches"] if m["game_type"] == "red_alert")
+        assert ra["terminal"] and ra["reason"] == "time_limit" and not ra["error"]
+        assert ra["batches"] == 0 and ra["invalid_actions"] == 0 and ra["race_errors"] == 0
+        assert ra["views"] >= 10                                   # a view every 0.2 s, each one answered with WAIT
+        assert st["totals"]["game_config_calls"] == 1 and st["totals"]["red_alert_matches"] == 1
+        assert st["official"]["grants"] == 1 and st["official"]["moves_by_non_holder"] == 0
+        assert official.assignments() == []                        # an ended match leaves the listing
+    finally:
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 
 # ---- a recorded Red Alert state in logs/ (the deployment records next to its log): the replays take it ----------------
