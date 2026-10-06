@@ -14,6 +14,9 @@ after 120 s in Werewolf). So everything here is defensive:
     deterministic);
   * structured actions are checked against the server's own template before we
     send them, and chat is clipped to the platform limits;
+  * a real-time game (`pacing.mode == "realtime"`: Red Alert) we have no policy
+    for is answered with altruagent.WAIT for its whole match: nothing is sent,
+    the runner waits for the next view (no guessed order batches, no crash);
   * a doubles turn is also checked as a pair (Showdown's rule: never the same
     switch-in twice, no `pass` while a switch-in is still free for that slot)
     right before it goes to the runner, whatever path produced it (policy,
@@ -46,7 +49,7 @@ import threading
 import time
 from pathlib import Path
 
-from altruagent import TERMINATE_MESSAGING, DecisionContext, GameState, LegalAction, SendMessage
+from altruagent import TERMINATE_MESSAGING, WAIT, DecisionContext, GameState, LegalAction, SendMessage
 
 from . import matchstate, reasoning, timecontrol
 from .fallback import (action_template, doubles_from_template, doubles_problems, gives_up, is_template, joint_problems,
@@ -134,11 +137,16 @@ class Contestant:
         self._resumes = 0                             # earlier resumes of this match (saved with its state)
         self.decisions = 0
         self.doubles_turns = 0                        # doubles battle decisions (the engine search's share of them)
+        self.waits = 0                                # real-time views answered with WAIT (no policy for the game)
         self._summarized = False
 
     # ---- moves -----------------------------------------------------------
     def choose_action(self, state: GameState, context: DecisionContext):
         """Never raises; always answers within the decision's hard deadline (see the module docstring)."""
+        if _realtime(state):
+            out = self._realtime_wait(state, context)
+            if out is not None:
+                return out
         t0 = time.monotonic()
         game, family = "", ""
         try:
@@ -179,6 +187,30 @@ class Contestant:
                extra={"decision": self.last_decision, "search": brief})
         self._after_decision(state, family, battle=dl.kind == "battle")
         return sent
+
+    def _realtime_wait(self, state: GameState, context: DecisionContext):
+        """A real-time game none of our policies plays (Red Alert): WAIT, the runner's "nothing to send right now" (it
+        waits for the next view and asks again), at every view until the match ends. Never a guessed move: the generic
+        safe action is no order batch, and the runner, which no longer stops on a refused batch in real time, would send
+        one at every view (~5 a second for 10-20 minutes). Cheap, since it runs at every view: logged once per match,
+        the first view recorded once (a real payload sample), the count in the [match-summary] line. None for a game we
+        do play (a known family): the normal path answers it. Never raises."""
+        try:
+            family, game = game_kind(getattr(context, "game_type", None) or getattr(state, "game_name", None),
+                                     getattr(state, "raw", None))
+            if family:
+                return None
+            self.waits += 1
+            self._path = "realtime-wait"
+            self.last_decision = {"kind": "realtime", "budget": 0.0, "source": "realtime", "path": self._path, "ms": 0.0}
+            if self.waits == 1:
+                self._bind(state, context, family, game)
+                log.error("real-time game %r: no policy of ours plays it; answering every view with WAIT (no orders "
+                          "are sent) until the match ends", game)
+                record("action", context, state, WAIT, extra={"decision": self.last_decision})
+        except Exception:
+            log.debug("real-time wait bookkeeping failed", exc_info=True)
+        return WAIT
 
     def _choose_action(self, state: GameState, context: DecisionContext, game: str, dl, family: str = ""):
         raw = _raw_with_legal(state)
@@ -485,6 +517,7 @@ class Contestant:
         self._chat_day, self._chat_queue, self._chat_done = _UNSET, [], False
         self._chat_sent, self._chat_said = 0, set()
         self.overruns = self.fallbacks = self.joint_repairs = self.decisions = self._resumes = self.doubles_turns = 0
+        self.waits = 0
         self.resumed, self._summarized = None, False
 
     def _export(self, family: str, raw) -> dict:
@@ -552,7 +585,8 @@ class Contestant:
         head = f"[match-summary] session={c['session'] or '?'} game={self._game or '?'} decisions={self.decisions}"
         resumed = f"at {self.resumed}" if self.resumed is not None else "no"
         if self._family != "pokemon":
-            return f"{head} fallbacks={self.fallbacks} overruns={self.overruns} resumed={resumed}"
+            waits = f" waits={self.waits}" if self.waits else ""        # (a real-time game answered with WAIT)
+            return f"{head} fallbacks={self.fallbacks} overruns={self.overruns} resumed={resumed}{waits}"
         by_count = sorted((ss.get("reasons") or {}).items(), key=lambda kv: -kv[1])
         reasons = f" ({', '.join(f'{k} x{v}' for k, v in by_count)})" if by_count else ""
         return (f"{head} battle={c['battle']} search={c['mode']} used={c['used']} classic={c['battle'] - c['used']}"
@@ -561,7 +595,7 @@ class Contestant:
                 f"repairs={self.joint_repairs} resumed={resumed} engine[{_engine_stats()}] calc[{_calc_stats()}]")
 
     def _summary(self) -> None:
-        if self._summarized or not self.decisions:
+        if self._summarized or not (self.decisions or self.waits):
             return
         self._summarized = True
         try:
@@ -642,6 +676,18 @@ def game_kind(game_type, raw=None) -> tuple[str, str]:
 
 
 _SINGLES_WORDS = {"ou", "ubers", "uu", "random", "randombattle", "same", "singles", "teambuild"}
+
+
+def _realtime(state) -> bool:
+    """A real-time game's state: `pacing.mode == "realtime"`, the very signal the runner keys its real-time path on
+    (altruagent.runner._is_realtime: WAIT allowed, a refused batch not fatal). Pokemon and Werewolf states carry no
+    `pacing` at all. Never raises."""
+    try:
+        raw = getattr(state, "raw", None)
+        pacing = raw.get("pacing") if isinstance(raw, dict) else None
+        return isinstance(pacing, dict) and pacing.get("mode") == "realtime"
+    except Exception:
+        return False
 
 
 def _seat_of(context, raw) -> int | None:
