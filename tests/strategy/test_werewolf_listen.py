@@ -407,3 +407,62 @@ def test_platform_stand_in_with_slow_seats_and_listening(monkeypatch):
     assert not [e for e in out["log"]["errors"] if e[0] in ours and e[1] != "WRONG_PHASE_NOOP"]
     assert sum(agents[i].listen_stats["holds"] for i in ours) >= 1
     assert all(out["listen_s"][i] < 8.0 - 1.0 for i in ours)
+
+
+# ---------------------------------------------------------------- off (the default): listening code never runs
+@pytest.fixture
+def tripwire(monkeypatch):
+    """With the switch unset, every listening entry point (the frame walk, the read loop, the hold and clock rules)
+    is replaced by a tripwire that records the call and raises."""
+    monkeypatch.delenv(A.LISTEN_ENV, raising=False)
+    calls = []
+
+    def trip(name):
+        def f(*_a, **_kw):
+            calls.append(name)
+            raise AssertionError(f"listening code reached with {A.LISTEN_ENV} unset: {name}")
+        return f
+    monkeypatch.setattr(A, "_runner_game", trip("_runner_game"))
+    for name in ("_listen", "_listen_wait", "_may_hold"):
+        monkeypatch.setattr(Contestant, name, trip(name))
+    return calls
+
+
+def test_off_by_default_never_reaches_listening_through_the_runner(tripwire):
+    sg = ScriptedGame(_game(), 3, [_ev_chat(1, "Is the Seer here? Please speak up before we vote.", 5),
+                                   _ev_chat(2, "I am the Seer. Player3 is a wolf.", 20), _ev_others_done(40)])
+    c = create_agent()
+    assert c.listen is False
+    final = run_game(sg, ctx(), c, wait_seconds=0.0, sleep=lambda s: None)
+    kinds = [k for k, _ in sg.sends]
+    assert final.is_terminal and sg.voted is not None and tripwire == []
+    assert kinds[0] == "chat" and "terminate" in kinds        # ScriptedGame fails on a chat after our terminate
+    assert c.listen_stats["holds"] == 0
+
+
+@pytest.mark.parametrize("timing", ["rounds", "rt"])
+def test_off_by_default_never_reaches_listening_in_the_simulator(tripwire, timing):
+    for g in range(6):
+        ours = {g % 7, (g + 3) % 7}
+        seats = [we.ContestantSeat(create_agent) if i in ours else LLMQwenSeat() for i in range(7)]
+        game = we.Game(seats, random.Random(300 + g), timing=timing)
+        game.play()
+        for me in ours:
+            assert sum(game.stats[k][me] for k in ("crash", "illegal", "bad_chat", "timeout", "chat_after_terminate",
+                                                   "window_close", "holds")) == 0
+    assert tripwire == []
+
+
+def test_off_by_default_never_reaches_listening_on_the_platform_stand_in(tripwire, monkeypatch):
+    monkeypatch.setenv("ARENA_RECORD", "0")
+    agents, ours = [], [1, 4]
+    for i in range(7):
+        if i in ours:
+            agents.append(create_agent())
+        else:
+            agents.append(SeatAgent(LLMQwenSeat(), random.Random(i), think=0.1, think_rng=random.Random(70 + i)))
+    with contextlib.redirect_stdout(io.StringIO()):
+        out = play_table(agents, 4343, window_limit=8.0, timeout=240)
+    assert out["terminal"] and not out["hung"] and not out["errors"] and tripwire == []
+    assert not [e for e in out["log"]["errors"] if e[0] in ours and e[1] != "WRONG_PHASE_NOOP"]
+    assert all(agents[i].listen_stats["holds"] == 0 and out["listen_s"][i] == 0.0 for i in ours)
