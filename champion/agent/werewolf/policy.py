@@ -577,6 +577,8 @@ _SELF_WOLF = re.compile(r"(?i)\b(?:i am|i'm|im|we are|we're|us)\s+(?:a\s+|the\s+
 _SEER_CLAIM_OUT = re.compile(r"(?i)\b(?:i am|i'm|im)\s+(?:the\s+)?(?:real\s+|true\s+)?seer\b")
 _RESULT_OUT = re.compile(r"(?i)player\d+\s+is\s+(?:a\s+)?(?:wolf|clear|villager)")
 _WORD_CAP = 50
+_CHAR_CAP = 1024        # MESSAGE_TOO_LONG over 1024 characters (werewolf.md §8); counted in UTF-8 bytes, which is
+#                         never fewer than the characters or UTF-16 units the server might count
 
 
 def chat_guard(msg, v: View, topic: str):
@@ -585,7 +587,8 @@ def chat_guard(msg, v: View, topic: str):
         return None
     text = msg.get("content")
     rec = msg.get("recipients") or []
-    if not isinstance(text, str) or not text.strip() or len(text.split()) > _WORD_CAP or _LEAK_ANY.search(text):
+    if not isinstance(text, str) or not text.strip() or len(text.split()) > _WORD_CAP \
+            or len(text.encode("utf-8", "replace")) > _CHAR_CAP or _LEAK_ANY.search(text):
         return None
     if rec:
         # private messages: only a wolf, only to its one living ally

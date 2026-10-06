@@ -59,6 +59,7 @@ log = logging.getLogger("agent")
 
 MAX_CHATS_PER_WINDOW = 5
 MAX_WORDS = 50
+MAX_MESSAGE_CHARS = 1024   # MESSAGE_TOO_LONG above it (werewolf.md §8); checked in UTF-8 bytes (never fewer than chars)
 RECORD_DIR = os.environ.get("ARENA_RECORD_DIR", "logs")   # every state we act on -> logs/<session>.jsonl
 BUSY_WAIT_S = 1.0          # how long a decision waits for an earlier, overrun policy call to finish
 _UNSET = object()
@@ -93,6 +94,17 @@ def record(kind: str, context: DecisionContext, state: GameState, out=None, publ
 
 
 _record_failed: list = []
+
+
+def clip_chat(content) -> str:
+    """A chat as the platform takes it: whitespace collapsed, at most MAX_WORDS words and MAX_MESSAGE_CHARS (in UTF-8
+    bytes), cut at a word ("" when not even the first word fits). Our templates are far below both caps."""
+    words = str(content if content is not None else "").split()[:MAX_WORDS]
+    text = " ".join(words)
+    while words and len(text.encode("utf-8", "replace")) > MAX_MESSAGE_CHARS:
+        words.pop()
+        text = " ".join(words)
+    return text
 
 
 def _jsonable(x):
@@ -417,8 +429,7 @@ class Contestant:
                 if isinstance(m, dict) and m.get("sender") == me and m.get("type", "chat") == "chat" \
                         and m.get("day", day) in (day, None):
                     self._chat_sent += 1
-                    self._chat_said.add((" ".join(str(m.get("content", "")).split()[:MAX_WORDS]),
-                                         tuple(m.get("recipients") or ())))
+                    self._chat_said.add((clip_chat(m.get("content", "")), tuple(m.get("recipients") or ())))
             self._chat_queue = self._ask_chat(st)
         if isinstance(term, list) and isinstance(me, int) and me in term:
             self._chat_done = True
@@ -426,7 +437,7 @@ class Contestant:
             self._chat_queue = self._ask_chat(st)
         while not self._chat_done and self._chat_queue and self._chat_sent < MAX_CHATS_PER_WINDOW:
             m = self._chat_queue.pop(0)
-            text = " ".join(str(m.get("content", "")).split()[:MAX_WORDS])
+            text = clip_chat(m.get("content", ""))
             rec = m.get("recipients") or None
             if rec is not None and (not isinstance(rec, list) or len(rec) != 1 or not isinstance(rec[0], int)
                                     or isinstance(rec[0], bool) or not 0 <= rec[0] <= 6 or rec[0] == me):
