@@ -340,9 +340,10 @@ _REPORTED = re.compile(
 _HUNCH = re.compile(
     r"(?:\b(?:i|we)\s+(?:\w+\s+)?(?:suspect|guess|bet|fear|worry|reckon|feel\s+like|have\s+a\s+(?:hunch|feeling))|"
     r"\b(?:chances|odds)\s+are|\bmy\s+(?:guess|hunch|gut|feeling)\s+(?:is|says))\s*[:,]?\s+(?:that\s+)?$")
-# The verdict is followed by its source ("Player0 and Player3 are wolves, says Player2."): not the sender's verdict.
+# The verdict is followed by its source ("Player0 and Player3 are wolves, says Player2."): not the sender's verdict
+# (but "Player3 is a wolf - says he's a villager, but he lies" is).
 _SOURCE_AFTER = re.compile(r"\s*[,—–-]?\s*(?:says|said|claims?|claimed|thinks?|according\s+to|per)\s+"
-                           r"(?:player[0-6]|he|she|they)\b")
+                           r"(?:player[0-6]|he|she|they|him|her|them)\s*(?=$|[.!?,;])")
 _SPEAKER_LABEL = re.compile(r"^\s*player[0-6]\s*:\s*$")   # "Player2: Player0 and Player3 are wolves." (quoting Player2)
 # A pronoun's referent clause that agrees with, thanks or credits that seat ("Player2 is right. They're a wolf.", "I
 # agree with Player2: they're a wolf.", "Per Player2, ..."): the pronoun is about someone else.
@@ -352,7 +353,8 @@ _AGREE = re.compile(
     r"\bwell\s+said\b|\b(?:nice|great|good)\s+(?:catch|call)\b|\bthanks?\b|\bthank\s+you\b|\baccording\s+to\b|"
     r"\bper\s+player[0-6]|\bplayer[0-6]['’]s\s+(?:view|opinion|point|case|logic|reasoning|take|theory|read)\b|"
     r"\b(?:pointed|points)\s+(?:it\s+|this\s+|that\s+)?out\b|"
-    r"\bmade\s+a\s+(?:good\s+|strong\s+|fair\s+)?(?:case|point)\b|\bwith\s+player[0-6]\s+on\b|\blisten\s+to\s+player[0-6]|"
+    r"\bmade\s+a\s+(?:good\s+|strong\s+|fair\s+)?(?:case|point)\b|"
+    r"\bwith\s+player[0-6]\s+on\b|\blisten\s+to\s+player[0-6]|"
     r"\bplayer[0-6]\s+(?:also\s+)?(?:noticed|vouched|vouches|defended|defends|backed|backs|supported|supports)\b")
 # Negation or doubt before a verdict ("that doesn't mean they're a wolf", "I doubt they're a wolf", "I'm not convinced
 # they're a wolf", "no proof they are wolves", "it's unlikely they're a wolf"): never a verdict, in the first person

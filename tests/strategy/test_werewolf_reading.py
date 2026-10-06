@@ -234,9 +234,10 @@ def test_table_talk_is_not_a_seer_claim(text):
     ("I'm the Seer. Player6 is a wolf. Player4 is lying. Player5 is right; they're a wolf.", True, {6}, set()),
     ("I am the Seer. I checked Player6: wolf. Player4 is likely a wolf. Player1 is likely a wolf too.", True, {6},
      set()),
-    # first-person certainty stays the sender's verdict
+    # first-person certainty stays the sender's verdict, and so does a verdict followed by what the seat says
     ("I'm the Seer. I checked Player3 and I'm sure they're a wolf.", True, {3}, set()),
     ("I'm the Seer. Player0 and Player3 are wolves.", True, {0, 3}, set()),
+    ("I'm the Seer. Player3 is the real wolf, says he's a villager.", True, {3}, set()),
 ])
 def test_claim_results_are_the_seers_own(text, claim, wolves, clears):
     f = read_chat(text, None, {})
