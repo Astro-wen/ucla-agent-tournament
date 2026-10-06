@@ -8,10 +8,14 @@ import argparse
 import cProfile
 import pstats
 import random
+import sys
 import time
+from pathlib import Path
 
-from agent.pokemon import preview
-from agent.pokemon.dex import card_catalog, to_id
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # this tree's agent/, not the editable install's
+
+from agent.pokemon import preview  # noqa: E402
+from agent.pokemon.dex import card_catalog, to_id  # noqa: E402
 
 
 def main() -> None:

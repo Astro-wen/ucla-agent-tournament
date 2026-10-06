@@ -21,7 +21,8 @@ import time
 from pathlib import Path
 
 os.environ["ARENA_RECORD"] = "0"          # replaying must not re-record the sessions it reads
-# Run as `python scripts/replay_real.py` from a bundle too, where the project is not pip-installed (like selfcheck.py)
+# This tree's code: from a bundle, where the project is not pip-installed (like selfcheck.py), and from a worktree,
+# where the venv's editable install would otherwise map `agent` to main's checkout.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from altruagent import DecisionContext, GameState, LegalAction, WithReasoning  # noqa: E402

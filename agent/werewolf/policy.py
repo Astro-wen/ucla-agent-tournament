@@ -35,7 +35,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-from .state import ChatFacts, View, normalize, parse, read_chat
+from .state import ChatFacts, RoleCheck, View, normalize, parse, read_chat
 
 ABSTAIN = "7"
 TRUSTED_WOLF = 10.0     # suspicion added to a wolf named by a trusted seer claim
@@ -118,6 +118,7 @@ class WerewolfPolicy:
         self._topics: set[str] = set()      # what we already said today
         self._dm_target: int | None = None  # the kill target we sent our ally
         self._dm_day = None
+        self.roles = RoleCheck()            # role / allies cross-checked against the night actions we are offered
 
     # The match memory a restarted worker takes over (agent/matchstate.py): `new_messages` only covers the current
     # discussion window, so the transcript of earlier days (claims, accusations) exists nowhere else.
@@ -152,7 +153,7 @@ class WerewolfPolicy:
     def _view(self, st: dict) -> View:
         self.observe(st)
         keys = sorted(self.transcript, key=lambda k: (not isinstance(k, (int, float)), k if isinstance(k, (int, float)) else str(k)))
-        return parse(st, [self.transcript[k] for k in keys])
+        return self.roles.apply(parse(st, [self.transcript[k] for k in keys]))
 
     @staticmethod
     def seer_claims(v: View) -> dict[int, list[int]]:

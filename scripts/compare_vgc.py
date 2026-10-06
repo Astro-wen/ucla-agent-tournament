@@ -12,8 +12,10 @@ import glob
 import json
 import os
 import sys
+from pathlib import Path
 
 os.environ["ARENA_RECORD"] = "0"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # this tree's agent/ and champion/, not main's
 
 from altruagent import DecisionContext, GameState, LegalAction  # noqa: E402
 

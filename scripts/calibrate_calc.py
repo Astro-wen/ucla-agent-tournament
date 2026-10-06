@@ -19,10 +19,13 @@ import json
 import re
 import sys
 from collections import defaultdict
+from pathlib import Path
 
-from agent.pokemon import dex
-from agent.pokemon.calc import DamageCalc, _terrain_name, _weather_name
-from agent.pokemon.dex import to_id
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # this tree's agent/, not the editable install's
+
+from agent.pokemon import dex  # noqa: E402
+from agent.pokemon.calc import DamageCalc, _terrain_name, _weather_name  # noqa: E402
+from agent.pokemon.dex import to_id  # noqa: E402
 
 BOOSTABLE = ("atk", "def", "spa", "spd", "spe")
 

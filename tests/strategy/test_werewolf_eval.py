@@ -8,7 +8,7 @@ from agent.agent import create_agent
 from local import eval_werewolf as ev
 from local import werewolf_env as we
 from agent.werewolf.state import read_chat
-from local.werewolf_bots import _VARIANTS, HeuristicSeat, LLMSeat, LLMVariedSeat
+from local.werewolf_bots import _QWEN_VARIANTS, _VARIANTS, HeuristicSeat, LLMQwenSeat, LLMSeat, LLMVariedSeat
 from local.werewolf_platform import SeatAgent, play_table
 
 
@@ -41,7 +41,7 @@ def test_failure_model_auto_plays_a_broken_seat():
 
 
 def test_reference_seats_are_always_legal_and_deterministic_per_seed():
-    for Seat in (HeuristicSeat, LLMSeat, LLMVariedSeat, we.RandomSeat):
+    for Seat in (HeuristicSeat, LLMSeat, LLMVariedSeat, LLMQwenSeat, we.RandomSeat):
         outs = []
         for _ in range(2):
             g = we.Game([Seat() for _ in range(7)], random.Random(11))
@@ -68,18 +68,33 @@ def test_varied_llm_stand_in_is_read_as_it_means():
     """Review finding: the llm stand-in only wrote in our reader's format. Every phrasing of the llmx stand-in must be
     read like its plain form (the first variant): claim-looking table talk is not a claim, no claim is dropped as an
     injection, the seats named wolf / clear are the same."""
-    for form, variants in _VARIANTS.items():
-        plain = read_chat(variants[0].format(3, 5, r=2), 0)
-        for tpl in variants:
-            f = read_chat(tpl.format(3, 5, r=2), 0)
-            assert not f.injection, tpl
-            assert (f.claim, f.wolves, f.clears) == (plain.claim, plain.wolves, plain.clears), tpl
+    for variants_of in (_VARIANTS, _QWEN_VARIANTS):
+        assert set(variants_of) == set(_VARIANTS)
+        for form, variants in variants_of.items():
+            plain = read_chat(_VARIANTS[form][0].format(3, 5, r=2), 0)
+            for tpl in variants:
+                for victim in ("Player2", "Someone"):
+                    f = read_chat(tpl.format(3, 5, r=2, victim=victim), 0)
+                    assert not f.injection, tpl
+                    assert (f.claim, f.wolves, f.clears) == (plain.claim, plain.wolves, plain.clears), tpl
+
+
+def test_qwen_stand_in_writes_skeptical_talk_that_is_not_a_verdict():
+    """Review finding: no stand-in wrote the skeptical talk the extended reader misread ("that doesn't mean they're a
+    wolf", "Seer claim: none yet", "It was the wolves"), so local games could not price a misread. llmq does; the test
+    above checks each of its lines is read like the plain idle line (nothing)."""
+    added = [t for t in _QWEN_VARIANTS["idle"] if t not in _VARIANTS["idle"]]
+    assert len(added) >= 5
+    assert any("doesn't mean" in t for t in added) and any(t.startswith("Seer claim:") for t in added)
+    assert any("{victim}" in t and "It was the wolves" in t for t in added)
 
 
 def test_mixed_background_draws_are_unchanged_and_llmx_runs():
     assert ev.MIXED == ("first", "heuristic", "random", "llm")          # llmx is not drawn: old deals stay valid
-    rec = ev.play_one("agent", 1, 0, "llmx", 1)
-    assert sum(rec["fail"].values()) == 0 and sum(rec["bg_fail"].values()) == 0
+    for bg in ("llmx", "llmq"):
+        rec = ev.play_one("agent", 1, 0, bg, 1)
+        assert sum(rec["fail"].values()) == 0 and sum(rec["bg_fail"].values()) == 0
+    assert ev.deal(1, 0, "llmq", 3) != ev.deal(1, 0, "llmx", 3)       # its own deals: no earlier run is changed
 
 
 def _rec(g, win):

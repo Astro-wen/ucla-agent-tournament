@@ -802,6 +802,26 @@ def test_selfcheck_loads_the_engine_search_for_real():
     assert "simulator loads in" in r.stdout
 
 
+# ---- scripts run this tree's code -------------------------------------------------------------------------------------
+_TREE_IMPORT = re.compile(r"^\s*(?:from|import)\s+(?:agent|local|champion|versions)\b", re.M)
+
+
+def test_scripts_that_import_the_agent_put_their_own_tree_first_on_sys_path():
+    """Review: the venv's editable install maps `agent` / `local` to the main checkout and `python scripts/x.py` puts
+    only scripts/ on sys.path, so scripts/replay_real.py run in a worktree replayed main's code, not the branch's.
+    Every script importing this tree's packages puts the tree root first on sys.path before the first such import."""
+    checked = []
+    for path in sorted((ROOT / "scripts").glob("*.py")):
+        src = path.read_text(encoding="utf-8")
+        first = _TREE_IMPORT.search(src)
+        if first:
+            ins = src.find("sys.path.insert(0")
+            assert 0 <= ins < first.start(), f"{path.name} imports this tree's code without its root on sys.path"
+            checked.append(path.name)
+    assert {"replay_real.py", "preview_bench.py", "preview_ladder.py", "calibrate_calc.py",
+            "compare_vgc.py"} <= set(checked)
+
+
 # ---- scripts/run_agent.sh --------------------------------------------------------------------------------------------
 FAKE_PY = r"""#!/usr/bin/env bash
 # stands in for python in run_agent.sh tests: `-c ...` (preflight) succeeds, except the calculator probe when
