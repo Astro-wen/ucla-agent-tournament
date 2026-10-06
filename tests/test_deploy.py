@@ -361,6 +361,39 @@ def test_the_first_authentication_waits_out_a_transient_failure(monkeypatch, cap
     assert slept == [5.0, 10.0, 20.0] and "Could not connect as official tournament agent" in capsys.readouterr().out
 
 
+def test_outage_backoffs_are_capped_at_30s(monkeypatch):
+    # review 10-06: the 40 / 60 s steps (start-up retry, rate-limit pause) left the runtime blind to new seats for up to
+    # ~60 s after the control plane recovered (measured 35 s and 56 s); a Werewolf seat has 120 s, a team preview 90 s
+    from altruagent.official import OfficialAgentError as OffErr
+    slept = []
+    monkeypatch.setattr(agent_main, "_sleep", slept.append)
+
+    class Down:
+        def __init__(self, n):
+            self.n = n
+
+        def authenticate(self):
+            if self.n:
+                self.n -= 1
+                raise OffErr("down", status_code=503)
+
+    assert agent_main._authenticate(Down(6))
+    assert slept == [5.0, 10.0, 20.0, 30.0, 30.0, 30.0]
+
+    def limited():
+        raise OffErr("slow down", status_code=429, error_code="rate_limited")
+
+    clock = {"t": 0.0}
+    steady = agent_main._SteadyOfficial(limited, now=lambda: clock["t"], log=lambda m: None)
+    pauses = []
+    for _ in range(4):
+        with pytest.raises(PlatformError):
+            steady()
+        pauses.append(steady._resume_at - clock["t"])
+        clock["t"] = steady._resume_at
+    assert pauses == [15.0, 20.0, 30.0, 30.0]
+
+
 def test_tournament_mode_hands_the_sdk_the_steady_client_and_the_knobs(monkeypatch):
     seen = {}
 
@@ -1162,6 +1195,128 @@ def test_run_agent_runs_the_official_tournament_mode_with_only_the_official_key(
     text = _log(run_env, "official") + (run_env["logs"] / "agent-official.state").read_text()
     assert ids[0] not in text and FAKE_EAK not in text                # never logged, never in the state file
     assert _ra_env(run_env, envf, "stop").returncode == 0
+
+
+@needs_linux
+def test_a_new_run_loop_keeps_the_last_loops_execution_id_only_when_that_is_safe(run_env):
+    # review 10-06: every run loop drew a NEW execution id, so a new loop (systemd's Restart=, `restart`, a loop that
+    # died) found its live seats leased to its own old id: seat_busy until the lease lapsed, then the SDK's 35 s retry
+    # (measured 65 s and a timer move in a VGC battle). The id now lives in LOG_DIR/agent-NAME.execid (0600) with the
+    # boot, key and run it belongs to, and a loop reuses it only while it holds the key lock.
+    envf = _official_env(run_env)
+    eids = run_env["tmp"] / "eids"
+    env = dict(run_env["env"], FAKE_EID_FILE=str(eids), LOG_MAX_BYTES="1000000")
+    logs = run_env["logs"]
+    f = logs / "agent-official.execid"
+
+    def ids():
+        return _text(eids).split()
+
+    assert _ra_env(run_env, envf, "start", env=env).returncode == 0
+    assert _wait(lambda: len(ids()) >= 1, timeout=10)
+    assert f.stat().st_mode & 0o777 == 0o600 and "execution id: new" in _log(run_env, "official")
+    assert _ra_env(run_env, envf, "restart", env=env).returncode == 0  # a new run loop: the same id
+    assert _wait(lambda: len(ids()) >= 2, timeout=10)
+    assert "execution id: the last run loop's" in _log(run_env, "official")
+    st = _state(logs, "official")
+    loop, child = int(st["loop"]), int(st["child"])
+    assert _wait(lambda: len(re.findall(r"worker (\d+)", _log(run_env, "official"))) >= 2, timeout=10)
+    worker = int(re.findall(r"worker (\d+)", _log(run_env, "official"))[-1])   # (the second agent's)
+    os.kill(loop, signal.SIGKILL)                                     # the loop dies and so does its agent, but not
+    os.kill(child, signal.SIGKILL)                                    # the agent's worker, which could still play a
+    assert _wait(lambda: not _alive(child), timeout=5) and _alive(worker)   # seat with that id: the next loop kills it
+    r = _ra_env(run_env, envf, "start", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _wait(lambda: len(ids()) >= 3, timeout=10) and _wait(lambda: not _alive(worker), timeout=5)
+    assert f"killing leftover processes of agent group {child} (from a run loop that died): {worker}" in \
+        _log(run_env, "official")
+    assert len(set(ids())) == 1 and len(ids()[0]) == 64
+    text = _log(run_env, "official") + (logs / "agent-official.state").read_text()
+    assert ids()[0] not in text and FAKE_EAK not in text + f.read_text()   # the id: only in its own 0600 file
+    assert _ra_env(run_env, envf, "stop", env=env).returncode == 0
+    # an id file of another boot (or one copied from another machine): a fresh id, saved in its place
+    f.write_text(re.sub(r"(?m)^boot=.*$", "boot=00000000-0000-0000-0000-000000000000", f.read_text()))
+    assert _ra_env(run_env, envf, "start", env=env).returncode == 0
+    assert _wait(lambda: len(ids()) >= 4, timeout=10)
+    assert ids()[3] != ids()[0] and f"id={ids()[3]}\n" in f.read_text() and f.stat().st_mode & 0o777 == 0o600
+    # another runtime of this key on this machine holds the key lock: never a saved id, even one that matches
+    other_logs = run_env["tmp"] / "other-logs"
+    other_logs.mkdir()
+    copied = other_logs / "agent-official.execid"
+    copied.write_text(f.read_text().replace(f"run=official@{logs}\n", f"run=official@{other_logs}\n"))
+    copied.chmod(0o600)
+    assert f"run=official@{other_logs}\n" in copied.read_text()      # (boot, key and run all match: only the lock)
+    seids = run_env["tmp"] / "seids"
+    other = dict(env, LOG_DIR=str(other_logs), FAKE_EID_FILE=str(seids))
+    r = _ra_env(run_env, envf, "start", env=other)
+    assert r.returncode == 0 and "mode=tournament(standby)" in r.stdout, r.stdout
+    assert _wait(lambda: _text(seids).split(), timeout=10)
+    assert _text(seids).split()[0] not in ids()
+    assert _ra_env(run_env, envf, "stop", env=other).returncode == 0
+    assert _ra_env(run_env, envf, "stop", env=env).returncode == 0
+
+
+@needs_linux
+def test_status_exits_0_while_the_loop_runs_and_3_when_it_does_not(run_env):
+    env = dict(run_env["env"], HEALTH_EVERY="300")                    # no [health] line logged yet: status used to
+    r = _ra(run_env, "status", env=env)                               # exit 1 (2 without a log file) on a healthy agent
+    assert r.returncode == 3 and "run loop: not running" in r.stdout, r.stdout + r.stderr
+    assert _ra(run_env, "start", env=env).returncode == 0
+    r = _ra(run_env, "status", env=env)
+    assert r.returncode == 0 and "run loop: pid" in r.stdout and "last logged" not in r.stdout, r.stdout
+    assert _ra(run_env, "stop", env=env).returncode == 0
+    assert _ra(run_env, "status", env=env).returncode == 3
+
+
+def _user_systemd() -> bool:
+    if not sys.platform.startswith("linux") or not shutil.which("systemd-run") or not shutil.which("systemctl"):
+        return False
+    try:
+        r = subprocess.run(["systemctl", "--user", "is-system-running"], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return r.stdout.strip() in ("running", "degraded")
+
+
+@needs_linux
+@pytest.mark.skipif(not _user_systemd(), reason="needs a systemd user manager (systemd-run --user)")
+def test_stop_refuses_a_loop_under_systemd_even_from_a_shell_without_the_user_bus(run_env):
+    # review 10-06: from a shell without XDG_RUNTIME_DIR (su, sudo -u, cron) `systemctl --user` failed, the check
+    # found no unit, and `stop` stopped the loop, which systemd at once restarted: a stop that was a restart.
+    unit = f"arena-test-{os.getpid()}-{int(time.time())}.service"
+    keep = ("PATH", "HOME", "LANG", "PYTHON", "LOG_DIR", "HEALTH_EVERY", "RESTART_DELAY", "STOP_TIMEOUT", "FAKE_MODE",
+            "FAKE_CALC", "FAKE_ENGINE", "LOG_MAX_BYTES", "LOG_KEEP", "ARENA_LOCK_DIR")
+    cmd = ["systemd-run", "--user", "--unit", unit, "--collect", "-p", "Restart=always", "-p", "RestartSec=2",
+           "-p", "KillMode=mixed", "--working-directory", str(ROOT)]
+    for k in keep:
+        if k in run_env["env"]:
+            cmd += ["--setenv", f"{k}={run_env['env'][k]}"]
+    cmd += ["/bin/bash", str(RUN_AGENT), "run", "--env", str(run_env["envf"])]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stdout + r.stderr
+    try:
+        logs = run_env["logs"]
+        assert _wait(lambda: _state(logs, "unit").get("child") and _alive(int(_state(logs, "unit")["child"])),
+                     timeout=30), _log(run_env, "unit")
+        loop = int((logs / "agent-unit.pid").read_text())
+        nobus = {k: v for k, v in run_env["env"].items() if k not in ("XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS")}
+        r = _ra(run_env, "stop", env=nobus)                           # systemctl --user reaches the manager anyway
+        assert r.returncode == 1 and f"runs under systemd, which would just restart it: systemctl --user stop {unit}" \
+            in r.stderr, r.stdout + r.stderr
+        fakebin = run_env["tmp"] / "nobus-bin"                        # ... and when it cannot: still refused
+        fakebin.mkdir()
+        (fakebin / "systemctl").write_text("#!/bin/sh\necho 'Failed to connect to bus: No medium found' >&2\nexit 1\n")
+        (fakebin / "systemctl").chmod(0o755)
+        r = _ra(run_env, "stop", env=dict(nobus, PATH=f"{fakebin}:{nobus['PATH']}"))
+        assert r.returncode == 1 and f"runs in the systemd unit {unit}" in r.stderr, r.stdout + r.stderr
+        assert f"systemctl --user stop {unit}" in r.stderr
+        r = _ra(run_env, "restart", env=nobus)
+        assert r.returncode == 1 and f"systemctl --user restart {unit}" in r.stderr, r.stdout + r.stderr
+        time.sleep(1)
+        assert _alive(loop) and int((logs / "agent-unit.pid").read_text()) == loop   # never stopped behind systemd's back
+    finally:
+        subprocess.run(["systemctl", "--user", "stop", unit], capture_output=True, timeout=90)
+        subprocess.run(["systemctl", "--user", "reset-failed", unit], capture_output=True, timeout=30)
 
 
 @needs_linux

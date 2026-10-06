@@ -33,15 +33,20 @@
 # primary (ARENA_NEW_SEAT_DELAY_S, default 20 s for role=standby), then plays a seat only once its grant succeeds (no
 # runtime holds its lease; checked at every poll, with no worker or agent session while the primary plays it), so it
 # takes a seat over within ~10 s of the primary's lease lapsing. Each run loop hands its agent one
-# random execution id (ARENA_EXECUTION_ID, never logged, fresh per loop), kept across its restarts of the agent: a
-# restarted runtime resumes its own seats at once instead of waiting out the lease (30-45 s).
+# random execution id (ARENA_EXECUTION_ID, never logged), kept across its restarts of the agent AND across run loops
+# of the same NAME + LOG_DIR on this machine since its last boot (agent-NAME.execid, 0600): a restarted runtime, or a
+# new loop (systemd restarting it, `restart`, a loop that died), resumes its own seats at once instead of waiting out
+# the lease and the SDK's seat_busy retry (~65 s, a lost battle turn). A loop reuses the saved id only while it holds
+# the per-key lock (no other runtime of this key on this machine is alive) after killing what is left of the dead
+# loop's agent; else it uses a fresh one.
 # The damage calculator is required: the start refuses (exit 2, loudly) when it cannot answer a real calc, unless
 # ARENA_ALLOW_NO_CALC=1 (emergency only: without it the agent wins ~12% against itself with the calculator).
 # So is the engine search's simulator while ARENA_BATTLE=search (the default battle policy): without it every battle
 # decision would quietly play the classic policy, so the start refuses (exit 2, loudly) unless ARENA_BATTLE=classic.
 #
 # Files under LOG_DIR (default logs/, ignored by git): agent-NAME.out (+ .1 ... .LOG_KEEP, rotated at LOG_MAX_MB),
-# agent-NAME.pid (the run loop), agent-NAME.state (the agent process and the loop's helpers), agent-NAME.lock.
+# agent-NAME.pid (the run loop), agent-NAME.state (the agent process and the loop's helpers), agent-NAME.lock,
+# agent-NAME.execid (tournament mode: the loop's execution id with the boot, key hash and run it belongs to; 0600).
 # ARENA_ALLOW_NO_CALC=1 alone is enough when node cannot run: the engine search needs the same node, so the start
 # then goes on with the classic battle policy (ARENA_BATTLE=classic for the agent), loudly. A simulator that is
 # missing while node works still refuses (ARENA_BATTLE=classic is the switch for that).
@@ -117,6 +122,7 @@ LOG="$LOG_DIR/agent-$NAME.out"
 PIDFILE="$LOG_DIR/agent-$NAME.pid"
 STATE="$LOG_DIR/agent-$NAME.state"
 LOCK="$LOG_DIR/agent-$NAME.lock"
+EXECID_FILE="$LOG_DIR/agent-$NAME.execid"
 LOG_ABS="$(cd "$LOG_DIR" 2>/dev/null && pwd)" || LOG_ABS="$LOG_DIR"
 RUN_ID="$NAME@$LOG_ABS"                              # ARENA_RUN_ID of the loop, its helpers and the agent
 START_KNOBS='^(ARENA_CALC|ARENA_NODE|ARENA_ALLOW_NO_CALC|ARENA_BATTLE|ARENA_SHOWDOWN)$'   # what the start checks read
@@ -257,14 +263,18 @@ kill_helpers() {  # the health loop and log writer of a run loop that is gone (S
   return 0
 }
 
-systemd_unit_of() {   # $1 pid: "unit scope" when it is the MAIN process of a systemd service (which would restart it)
-  local unit main scope
-  unit="$(sed -n 's#^.*/\([^/]*\.service\)$#\1#p' "/proc/$1/cgroup" 2>/dev/null | tail -n 1)"
-  [ -n "$unit" ] && command -v systemctl >/dev/null || return 0
-  for scope in --user --system; do
-    main="$(systemctl "$scope" show -p MainPID --value "$unit" 2>/dev/null)"
-    [ "$main" = "$1" ] && { echo "$unit $scope"; return 0; }
-  done
+systemd_unit_of() {   # $1 pid: "unit scope" when it is the MAIN process of a systemd service (which would restart it),
+  local line unit main scope=--system rt=()   # "unit scope unknown" when systemctl cannot tell (stop then refuses too)
+  line="$(grep '\.service$' "/proc/$1/cgroup" 2>/dev/null | tail -n 1)"
+  unit="${line##*/}"
+  [ -n "$line" ] && command -v systemctl >/dev/null || return 0
+  if [[ "$line" =~ /user@[0-9]+\.service/ ]]; then   # a unit of the user's manager (arena-agent@NAME): systemctl --user
+    scope=--user                                    # needs XDG_RUNTIME_DIR, which su / sudo -u / cron shells lack
+    [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$(id -u)" ] && rt=(env "XDG_RUNTIME_DIR=/run/user/$(id -u)")
+  fi
+  main="$(${rt[@]+"${rt[@]}"} systemctl "$scope" show -p MainPID --value "$unit" 2>/dev/null)"
+  if [ "$main" = "$1" ]; then echo "$unit $scope"
+  elif ! [[ "$main" =~ ^[0-9]+$ ]]; then echo "$unit $scope unknown"; fi   # (a unit it does not know: MainPID 0)
   return 0
 }
 
@@ -441,6 +451,36 @@ new_execution_id() {   # 64 random hex digits, or nothing (the runtime then make
   od -An -tx1 -N32 /dev/urandom 2>/dev/null | tr -d ' \n'
 }
 
+boot_id() { tr -dc '0-9a-f-' < /proc/sys/kernel/random/boot_id 2>/dev/null; }   # (Linux; '' elsewhere: no reuse)
+
+# $1 key hash -> EXEC_ID (never printed or logged) and EXEC_HOW (kept / new / none). EXEC_ID is the id of the last run
+# loop of this NAME + LOG_DIR (EXECID_FILE) when that file belongs to this boot, key and run and this loop holds the
+# key lock (KEY_LOCKED: no other runtime of this key is alive here, and cmd_run already killed what was left of the
+# dead loop's agent); else a fresh one, saved for the next loop. An id file copied to another machine never matches
+# its boot id, so two machines never share an id (two runtimes with one id would both play the seat).
+loop_execution_id() {
+  local kh="$1" boot f old=""
+  EXEC_ID=""; EXEC_HOW=new
+  boot="$(boot_id)"; f="$EXECID_FILE"
+  if [ "${KEY_LOCKED:-0}" = 1 ] && [ -n "$boot" ] && [ -f "$f" ] && [ ! -L "$f" ] && [ -O "$f" ]; then
+    old="$(head -c 4096 "$f" 2>/dev/null)"
+    if [ "$(printf '%s\n' "$old" | sed -n 's/^boot=//p')" = "$boot" ] && [ "$(printf '%s\n' "$old" | sed -n 's/^key=//p')" = "$kh" ] \
+       && [ "$(printf '%s\n' "$old" | sed -n 's/^run=//p')" = "$RUN_ID" ]; then
+      EXEC_ID="$(printf '%s\n' "$old" | sed -n 's/^id=\([0-9a-f]\{64\}\)$/\1/p' | head -n 1)"
+    fi
+  fi
+  if [ -n "$EXEC_ID" ]; then EXEC_HOW=kept; return 0; fi
+  EXEC_ID="$(new_execution_id)"
+  [ ${#EXEC_ID} -eq 64 ] || { EXEC_ID=""; EXEC_HOW=none; return 0; }
+  [ -n "$boot" ] || return 0
+  rm -f "$f.tmp" 2>/dev/null
+  if ! ( umask 077; printf 'boot=%s\nkey=%s\nrun=%s\nid=%s\n' "$boot" "$kh" "$RUN_ID" "$EXEC_ID" > "$f.tmp" && mv -f "$f.tmp" "$f" ) 2>/dev/null; then
+    rm -f "$f.tmp" 2>/dev/null
+    say "WARNING: cannot save the execution id as $f: a new run loop of '$NAME' will wait out its seats' leases (~65 s)"
+  fi
+  return 0
+}
+
 finish() {        # $1 exit code: close the log pipe, give the writer up to 5 s to drain, exit
   local i
   exec >&- 2>&-
@@ -478,8 +518,15 @@ cmd_run() {
   exec > >(log_writer) 2>&1
   WRITER=$!
   trap '' PIPE
-  local old; old="$(state_get child)"                # (we hold the name lock: any loop of this NAME here is dead)
-  if agent_alive "$old"; then say "killing agent group $old left over from a run loop that died"; kill_group "$old" KILL; fi
+  local old p left=(); old="$(state_get child)"      # (we hold the name lock: any loop of this NAME here is dead)
+  if agent_alive "$old"; then say "killing agent group $old left over from a run loop that died"; kill_group "$old" KILL
+  elif [[ "$old" =~ ^[0-9]+$ ]]; then                # its agent is gone, but one of its workers may still play a seat
+    for p in $(group_pids "$old"); do [ "$(run_id_of "$p")" = "$RUN_ID" ] && left+=("$p"); done
+    if [ ${#left[@]} -gt 0 ]; then
+      say "killing leftover processes of agent group $old (from a run loop that died): ${left[*]}"
+      kill -KILL "${left[@]}" 2>/dev/null
+    fi
+  fi
   kill_helpers
   RUN_STARTED="$(now)"; RESTARTS=0; STOPPING=0; CHILD=""; HEALTH=""
   preflight || { say "preflight failed; exiting (code 2)"; finish 2; }
@@ -491,8 +538,11 @@ cmd_run() {
     keylock="$LOG_DIR/.key-$kh.lock"; exec 9>"$keylock"
   fi
   [ "$MODE" = tournament ] && ROLE=primary
-  if command -v flock >/dev/null && ! flock -w 5 9; then  # (-w: an old agent group just killed may still hold it)
-    if [ "$MODE" = tournament ]; then                 # the platform's seat lease arbitrates: a hot standby, not a clash
+  KEY_LOCKED=0                                        # (no flock: no lock, and a fresh execution id for every loop)
+  if command -v flock >/dev/null; then
+    if flock -w 5 9; then                             # (-w: an old agent group just killed may still hold it)
+      KEY_LOCKED=1
+    elif [ "$MODE" = tournament ]; then               # the platform's seat lease arbitrates: a hot standby, not a clash
       ROLE=standby
       loud "NOTE: another runtime on this machine already runs Official Agent Key #$kh (lock $keylock held): starting as a"
       loud "  HOT STANDBY. The platform lets one runtime play each seat (a 30 s execution lease); this one takes a seat"
@@ -512,7 +562,14 @@ cmd_run() {
   fi
   local exec_id="" launch
   unset ARENA_EXECUTION_ID ARENA_EXECUTION_ID_OWNER    # (never one from a key file or the caller's environment)
-  [ "$MODE" = tournament ] && exec_id="$(new_execution_id)"   # one per run loop, kept across agent restarts; never logged
+  if [ "$MODE" = tournament ]; then                   # kept across agent restarts and run loops; never logged
+    loop_execution_id "$kh"; exec_id="$EXEC_ID"; EXEC_ID=""
+    case "$EXEC_HOW" in
+      kept) say "execution id: the last run loop's (same boot, key and LOG_DIR): its seats' leases resume at once" ;;
+      new) say "execution id: new (none saved for this boot, key and LOG_DIR, or another runtime holds the key lock)" ;;
+      *) say "execution id: none (no /dev/urandom): the runtime makes its own" ;;
+    esac
+  fi
   echo $$ > "$PIDFILE"
   write_state
   # Stop = SIGTERM to the agent's whole process group (python -m agent, its workers, their node calculators): a
@@ -612,10 +669,18 @@ cmd_stop() {
   loop_alive "$pid" || pid=""                                  # a stale pidfile names somebody else's process
   if [ -n "$pid" ]; then
     unit="$(systemd_unit_of "$pid")"
-    if [ -n "$unit" ]; then
-      echo "agent '$NAME' runs under systemd, which would just restart it: systemctl ${unit#* } $CMD ${unit%% *}" >&2
-      return 1
-    fi
+    case "$unit" in
+      "") ;;
+      *" unknown")                                    # (fail closed: a stop that systemd undoes is a restart)
+        unit="${unit% unknown}"
+        echo "agent '$NAME' runs in the systemd unit ${unit%% *}, and 'systemctl ${unit#* }' cannot be reached from this" \
+             "shell to check whether systemd would just restart it (su / sudo -u / cron: no XDG_RUNTIME_DIR): not" \
+             "stopping it. From the owner's login shell: systemctl ${unit#* } $CMD ${unit%% *}" >&2
+        return 1 ;;
+      *)
+        echo "agent '$NAME' runs under systemd, which would just restart it: systemctl ${unit#* } $CMD ${unit%% *}" >&2
+        return 1 ;;
+    esac
     kill -TERM "$pid"
     for i in $(seq 1 $(( (STOP_TIMEOUT + 10) * 5 ))); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
     if kill -0 "$pid" 2>/dev/null; then echo "run loop $pid did not exit: SIGKILL"; kill -KILL "$pid"; sleep 0.2; fi
@@ -627,12 +692,13 @@ cmd_stop() {
   echo "agent '$NAME' stopped"
 }
 
-cmd_status() {
-  local pid; pid="$(cat "$PIDFILE" 2>/dev/null)"
+cmd_status() {     # exit 0 = the run loop is running (it restarts its agent), 3 = it is not (LSB "not running")
+  local pid rc=3; pid="$(cat "$PIDFILE" 2>/dev/null)"
   load_envs; resolve_mode
-  if loop_alive "$pid"; then echo "run loop: pid $pid"; else echo "run loop: not running"; fi
+  if loop_alive "$pid"; then echo "run loop: pid $pid"; rc=0; else echo "run loop: not running"; fi
   health_line
   grep '\[health\]' "$LOG" 2>/dev/null | tail -n 1 | sed 's/^/last logged: /'
+  return $rc
 }
 
 cmd_install_systemd() {

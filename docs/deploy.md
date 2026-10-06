@@ -7,7 +7,7 @@
 - **计算器**：`agent/js/calc.js`，用 Node 跑的精确伤害计算。**引擎搜索**：`agent/js/search.js`，在 Showdown 引擎副本上试打每一步（默认对战策略）。
 - **worker**：每场对局（每个座位）一个独立子进程。
 - **官方模式 / 发现模式**：官方模式 = `--tournament` + Official Agent Key，只打正式赛分配；发现模式 = 不带参数 + `sk_agent_` key，打平台普通对局（陪练、测试赛）。
-- **分配（assignment）**：平台告诉我们「你在哪场比赛的哪个座位」。**座位租约（lease）**：平台记录「此刻哪个进程在控制这个座位」，每次续约管 30 s。**execution id**：每个运行时进程的随机身份号，租约记在它名下。
+- **分配（assignment）**：平台告诉我们「你在哪场比赛的哪个座位」。**座位租约（lease）**：平台记录「此刻哪个进程在控制这个座位」，每次续约管 30 s。**execution id**：运行时的随机身份号，租约记在它名下（同一台机器上同一个 `--name` 和 `LOG_DIR` 的看门脚本，重启多少次都用同一个）。
 - **热备（hot standby）**：另一台机器上用同一把 key 跑的第二个进程；主进程在时它只等待，主进程停止续约后约 30–45 s 自动接管座位。
 
 两条路都准备好了：
@@ -65,10 +65,11 @@ Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）即自�
 
 ### 官方模式下看门脚本和 agent 额外做了什么（都不改 `altruagent/`）
 
-- **重新登录遇到一次 429 / 5xx 不再全军覆没**（intel-2）：上游运行时每次 agent session 过期都要重新认证，认证接口只要回一次非 200（包括限流 429、网关 502/503），`run_tournament_forever` 就会结束，并在 `finally` 里**杀掉所有正在打的对局 worker**。`agent/__main__.py` 的 `_SteadyOfficial` 把这类**暂时性**失败改成「这一轮不查分配」：运行时和所有 worker 照常，日志一行 `[agent] re-authentication failed (1 in a row; running matches continue, retrying)`，恢复后一行 `re-authentication recovered`；遇到 `rate_limited` 还会暂停查询 15 / 30 / 60 s，不去狂刷认证。key 被拒（401 `invalid_official_agent_key` 或其他 4xx）仍然立刻退出，由看门脚本按退避重启。
-- **启动时平台暂时连不上不退出**：第一次认证遇到网络错误 / 429 / 5xx，按 5、10、20、40、60 s 退避一直重试（日志 `Could not connect as official tournament agent yet …; retrying in Ns`）；key 被拒才退出。
+- **重新登录遇到一次 429 / 5xx 不再全军覆没**（intel-2）：上游运行时每次 agent session 过期都要重新认证，认证接口只要回一次非 200（包括限流 429、网关 502/503），`run_tournament_forever` 就会结束，并在 `finally` 里**杀掉所有正在打的对局 worker**。`agent/__main__.py` 的 `_SteadyOfficial` 把这类**暂时性**失败改成「这一轮不查分配」：运行时和所有 worker 照常，日志一行 `[agent] re-authentication failed (1 in a row; running matches continue, retrying)`，恢复后一行 `re-authentication recovered`；遇到 `rate_limited` 还会暂停查询 15 / 20 / 30 s，不去狂刷认证（10-06 起最长 30 s：暂停期间看不到新座位，以前的 60 s 在平台恢复后还要再瞎等近 1 分钟）。key 被拒（401 `invalid_official_agent_key` 或其他 4xx）仍然立刻退出，由看门脚本按退避重启。
+- **启动时平台暂时连不上不退出**：第一次认证遇到网络错误 / 429 / 5xx，按 5、10、20、30、30… s 退避一直重试（日志 `Could not connect as official tournament agent yet …; retrying in Ns`；10-06 起最长 30 s，平台恢复后最多约 30 s 就连上）；key 被拒才退出。
 - **worker 崩溃后 10 s 就重开**（intel-3）：上游默认 60 s 冷却，会丢一个 55 s 的对战回合；`ARENA_WORKER_COOLDOWN_S=10`、`ARENA_DISCOVERY_S=10`（查分配间隔）现在也作用于官方模式，而且不经看门脚本直接跑 `python -m agent` 也默认是 10 / 10。实测：对局中途 `kill -9` 宝可梦 worker，13.5–16 s 后新 worker 接上，约 16 s 后该局下一步，0 次计时器代打（官方模式演练 dry-r2…r7）。
-- **重启后直接续上自己的租约**（intel-3）：看门脚本每次 `run` 生成一个随机 execution id，只通过环境变量交给 agent（不写日志、不写状态文件，python 读到后立刻从环境里删掉，并核对父进程确实是这个看门脚本），同一个看门脚本重启 agent 时沿用它。所以 agent 崩溃 / OOM 被杀后，新进程拿到的还是自己的租约，不用再等 30 s 租约过期 + 35 s 重试（以前约 45–55 s 不能出手）。实测（官方模式演练 dry-r4 / dry-r7）：宝可梦对战中 `kill -9` 运行时本身，看门脚本 3.4–3.5 s 后起新运行时，7.4–8.5 s 后该局下一步，0 次 seat_busy、0 次接管、0 次计时器代打。**不要自己设 `ARENA_EXECUTION_ID`，更不要把它抄到另一台机器**：两个进程共用一个 id 会同时控制一个座位；从 .env 或别处来的值会被忽略。systemd 重启看门脚本本身时会换新 id（这种情况仍要等约 45 s）。
+- **重启后直接续上自己的租约**（intel-3）：看门脚本每次 `run` 生成一个随机 execution id，只通过环境变量交给 agent（不写日志、不写状态文件，python 读到后立刻从环境里删掉，并核对父进程确实是这个看门脚本），同一个看门脚本重启 agent 时沿用它。所以 agent 崩溃 / OOM 被杀后，新进程拿到的还是自己的租约，不用再等 30 s 租约过期 + 35 s 重试（以前约 45–55 s 不能出手）。实测（官方模式演练 dry-r4 / dry-r7）：宝可梦对战中 `kill -9` 运行时本身，看门脚本 3.4–3.5 s 后起新运行时，7.4–8.5 s 后该局下一步，0 次 seat_busy、0 次接管、0 次计时器代打。**不要自己设 `ARENA_EXECUTION_ID`，更不要把它抄到另一台机器**：两个进程共用一个 id 会同时控制一个座位；从 .env 或别处来的值会被忽略。
+- **看门脚本本身重启也沿用 execution id**（10-06 复审修复）：以前每个 run 循环都换新 id，所以 systemd 重启看门脚本（`systemctl --user restart`、看门脚本被 kill / OOM 后 `Restart=always` 拉起）、`run_agent.sh restart`、看门脚本崩溃后重新 `start` 时，新进程发现自己的座位还在旧 id 名下：`seat is held by another runtime` → 等租约过期（30 s）→ SDK 再等 35 s 重试。复审实测 63–65 s 不能出手、宝可梦被计时器代打 1 回合；本机重现 `restart`：65.8 s、1 次代打、2 次 seat_busy。现在 id 存在 `LOG_DIR/agent-NAME.execid`（0600，和本次开机的 boot id、key 哈希、NAME@LOG_DIR 写在一起；日志只写 `execution id: the last run loop's …` 或 `execution id: new …`，不写 id 本身），新的 run 循环只在**拿到本机这把 key 的锁**（本机没有别的进程在跑这把 key）、并且已经杀掉上一个循环留下的 agent 和 worker 之后才沿用；开机换了、key 换了、文件是从别的机器拷来的（boot id 对不上）都换新 id。实测（本地假平台）：对战中 `run_agent.sh restart` → 8.4 / 9.1 s 后该局下一步；systemd 单元里 `kill -9` 看门脚本 → 5.6 s 后新循环、13.1 / 14.8 s 后下一步；都是 0 次 seat_busy、0 次接管、0 次计时器代打。即便如此，**比赛进行中不要无故重启**：重启那几秒里狼人杀桌偶尔会有 1 次 `WRONG_PHASE`（换阶段的竞态，runner 不退出，修复前也有）。
 - **热备**：官方模式下同一把 key 的第二个进程**不再被拒绝**（发现模式仍然拒绝，退出码 3）。同一台机器上第二个看门脚本会打一行 `NOTE: … starting as a HOT STANDBY`，健康行显示 `mode=tournament(standby)`。热备应该放在**另一台机器**（同一台机器上只多占 CPU），那台机器的 key 文件里加一行 `ARENA_ROLE=standby`（它自己的机器锁拿得到，看门脚本只能靠这一行知道自己是热备）。**先问主办方允不允许热备**（问题清单第 3 条），同意之前只跑一台。
 - **热备怎么等、怎么接管**（09-30 三次演练后定下来）：平台对**新座位**是「谁先申请谁拿」，没有主次之分（dry-r4 里热备在主进程好好的时候抢到过一张新开的狼人杀桌）。所以热备（`role=standby`）这样做：
   1. 新座位先让给主进程 20 s（`ARENA_NEW_SEAT_DELAY_S`；主进程每 10 s 查一次分配、马上申请），日志 `standby: new seat …; leaving it to the primary for 20s …`；
@@ -119,8 +120,9 @@ bash scripts/run_agent.sh check-tournament      # 官方赛（会连平台）；
 bash scripts/run_agent.sh install-systemd       # 写 ~/.config/systemd/user/arena-agent@.service（填入仓库路径和 node 所在目录）
 systemctl --user enable --now arena-agent@main  # main 用 .env；arena-agent@apocalypse 用 .env.apocalypse
 sudo loginctl enable-linger $USER               # 不登录也运行，重启机器后自动起来
-bash scripts/run_agent.sh status                # 状态 + 健康行
-systemctl --user stop arena-agent@main          # 停止（看门脚本是某个 systemd 服务的主进程时，run_agent.sh stop 会拒绝并提示这条命令）
+bash scripts/run_agent.sh status                # 状态 + 健康行（退出码：看门脚本在跑 0，没在跑 3）
+systemctl --user stop arena-agent@main          # 停止（看门脚本是某个 systemd 服务的主进程时，run_agent.sh stop / restart 会拒绝并提示这条命令；
+                                                # 从 su、sudo -u、cron 这类没有 XDG_RUNTIME_DIR 的 shell 里查不到 systemd 时也拒绝，不会变成「停了又被拉起」）
 ```
 
 单元文件里有 `OOMPolicy=continue`：一个进程被 OOM 杀掉只影响它自己，不会让 systemd 停掉整个服务（以前默认 `OOMPolicy=stop`，实测 230 MB 上限下一次 OOM 就整服务重启，8 分钟重启 39 次）。**改了单元文件要重新 `install-systemd` 再 `systemctl --user daemon-reload`**。
@@ -298,7 +300,7 @@ python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-* --out /tmp/of
 
 - 对战决策延迟（dry-r7，44 个）：p50 1.3 s；最大 30.7 s 就是热备接管那一步；整棵进程树峰值约 290 MB。宝可梦全胜（对手是官方 baseline bot，本来就弱，只说明流程通）。
 - 第一次演练（dry-r1）发现模拟平台的一个保真问题：我们在狼人杀讨论窗口里重复发的 terminate 每次都让状态版本号 +1，runner 立刻又发一次，一桌 137 次。真实平台文档说 terminate 幂等，已改成模拟平台对重复 terminate 不改状态（dry-r2 起每桌 2–3 次）。这是模拟平台的问题，不是 agent 的问题，但上游缺陷第 6 条要问清楚。
-- 热备接管 = 主进程最后一次续约后租约剩下的时间（≤ 30 s）+ 热备下一次检查（≤ 10 s）+ 起 worker（约 3 s），最坏约 45 s，宝可梦一回合 55 s 来得及。主进程如果只是 agent 崩溃，看门脚本沿用 execution id 重启，约 7–9 s 就续上（dry-r4 / r7），比热备快得多，所以**主进程这台机器的稳定性仍是第一位**。
+- 热备接管 = 主进程最后一次续约后租约剩下的时间（≤ 30 s）+ 热备下一次检查（≤ 10 s）+ 起 worker（约 3 s），最坏约 45 s，宝可梦一回合 55 s 来得及。主进程如果只是 agent 崩溃，看门脚本沿用 execution id 重启，约 7–9 s 就续上（dry-r4 / r7）；看门脚本本身被 systemd 重启也沿用（10-06 起，约 13–15 s），比热备快得多，所以**主进程这台机器的稳定性仍是第一位**。
 - 狼人杀：我们的座位每桌 2–4 个投票决策、0 次空闲代打、0 个工具错误。
 - dry-v42s（状态文件打开）：对局中健康行是 `search=ok(used=12/12)`、`ok(used=32/35)` 这样的真实计数，没对局时 `idle(probe=1.8s)`；整机搜索槽位用了 1/8；18 个状态文件都是 0600、目录 0700。三次 v4.2 演练里 key 只出现在演练自己写的两个 key 文件里（0600），日志里没有。有几场宝可梦的汇总行是 `classic=1`：盲状态那一步（模板在、对战画面没有）用的经典打法，`degraded=0`，不是机器原因，状态文件关着的 dry-v42c 也一样。
 
@@ -362,7 +364,7 @@ from altruagent import AltruAgentClient; c = AltruAgentClient(); print(c.join_to
 | 健康行 `mode=discovery`（比赛日） | key 文件里没有 eak key，或写了 `ARENA_MODE=discovery`：改好后 restart；这时一场正式对局都接不到，立刻处理 |
 | 日志 "ALTRUAGENT_OFFICIAL_AGENT_KEY doesn't look like an Official Agent Key" / "Official Agent Key was not accepted" | 从 dashboard 重新复制（或重新生成）key，写进 `.env`，restart；不要把 key 贴到任何聊天里 |
 | 日志 `re-authentication failed (N in a row; running matches continue …)` | 平台认证接口暂时出错 / 限流，在打的对局不受影响，一般自己恢复（`re-authentication recovered`）；持续几分钟以上就 `curl -sI https://api.altruagent-game.com` 并看 Discord 公告 |
-| 日志 `Another runtime is playing this match with your Official Agent Key` | 另一个进程（忘了停的旧机器，或已经接管了座位的热备）占着座位。不是计划中的就去停掉它；主进程的看门脚本本身被重启（换了 execution id）后短时间出现属正常（租约 30 s 内过期） |
+| 日志 `Another runtime is playing this match with your Official Agent Key` | 另一个进程（忘了停的旧机器，或已经接管了座位的热备）占着座位。不是计划中的就去停掉它。看门脚本重启后正常不会出现（它沿用 execution id）；只有换了新 id（拿不到本机的 key 锁、换了 `LOG_DIR` / `--name`、机器重启过）而旧租约还没过期时出现一次属正常（约 65 s 后接上） |
 | 热备日志 `standby: seat … is free (no other runtime holds its lease): playing it`，而主机明明在跑 | 主机至少 30 s 没续上这个座位的租约（网络断了、机器卡死）：看主机日志和 `status`；热备会把这场打完，主机恢复后只接新座位 |
 | 日志 `Match ended with an error (exit code …); retrying that seat in 10s` 反复出现 | 同一座位的 worker 一直崩：看该座位 `[match … seat=…]` 前后的报错；必要时 `ARENA_BATTLE=classic` 临时退回冠军打法 |
 | 日志有 "THE DAMAGE CALCULATOR CANNOT RUN … NOT STARTING" | 按横幅里的原因修（装 node / 设 `ARENA_NODE` / `cd agent/js && npm ci --omit=dev` / 删掉 `ARENA_CALC=off`），systemd 会自己重试；实在修不好又必须上场：临时设 `ARENA_ALLOW_NO_CALC=1`（node 本身坏了时搜索也会自动改 classic；启发式也比被随机代打强），修好后删掉并重启 |
