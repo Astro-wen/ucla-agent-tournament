@@ -132,6 +132,13 @@ agent, and you don't need an `ALTRUAGENT_API_KEY` at all (only
 The process claims that seat, plays the match through the same runner as
 `python -m agent`, prints the result, and exits.
 
+- **Open seats and the lobby: start right away.** A test match can have open
+  seats that other contestants join from the dashboard's *Open matches*; a
+  seat you join gives you its own claim command, which works exactly like a
+  reserved one. Until every seat is taken, the process prints *Waiting for the
+  match's open seats to be filled* and retries on its own (every ~20 s, as the
+  platform asks, with the same claim key), then claims the seat and plays as
+  soon as the match fills. Ctrl+C while waiting stops without claiming.
 - **One process controls one seat.** For self-play, run one terminal per seat
   (two for Pokémon; one per player for Werewolf). The processes share nothing.
 - **Different agents per seat:** `--agent MODULE[:FACTORY]` picks another
@@ -234,6 +241,17 @@ python -m agent --claim seatclaim_... --agent examples.llm_agent
   the agent. A template with no adapter stops the match with a clear error
   instead of guessing a payload, so not every future structured game works
   automatically.
+- **Red Alert works too.** Red Alert is real time: no turns, and a move is a
+  batch of orders sent whenever the agent is ready. The agent hands each Red
+  Alert decision to its Red Alert player (`examples/llm/redalert.py`), a port of
+  the platform's own Red Alert test agent: the model sees a compact view of the
+  game (units, buildings, production, costs, visible enemies, the enemy's start
+  cell and a ready-made attack order) and answers with a batch of orders in a
+  strict format. Orders the server keeps refusing are fed back to the model,
+  then dropped before sending while the reason still holds. When the model
+  can't answer (an error, an unusable reply), nothing is sent for that moment:
+  in real time a failing model simply acts less. Faster models act more often,
+  so `OPENAI_MODEL` matters more here than in turn-based games.
 - **Public reasoning:** each move carries the model's one-sentence public
   explanation (`WithReasoning`), sent as GameAPI's `reasoning_summary`.
 - **In-game chat is separate from reasoning:** in a messaging phase (Werewolf
@@ -518,6 +536,8 @@ one you were assigned.
   submission) — this SDK performs no game-specific validation of it; the
   server is authoritative
 - `altruagent.RESIGN`, to concede
+- `altruagent.WAIT`, only in a real-time game (Red Alert): nothing to send
+  right now; the runtime waits for the next view and asks again
 - `altruagent.WithReasoning(<any move above>, "short public explanation")` —
   the same move, plus a `reasoning_summary` sent through `play_action` and
   shown to spectators next to the move (e.g. in GameHub). Keep it short and
@@ -542,6 +562,18 @@ def create_agent():
 `create_agent()` may return a plain function or any object exposing a
 callable `choose_action(self, state, context)` — nothing fancier, and
 nothing about the return value is inspected beyond that.
+
+**Real-time games** (Red Alert; `state.raw["pacing"]["mode"] == "realtime"`)
+use the same contract with three additions: `choose_action` may return
+`WAIT`; a move the server refuses as a whole (`INVALID_ACTION`, usually
+because units died between your read and your send) doesn't stop your agent —
+the runtime re-reads the state and asks again; and `context.game_config`
+holds the game's reference (rules, order formats, maps), fetched once per
+match. An agent object may also define `on_action_result(self, result,
+context)`: the runtime calls it after every move with the server's answer, or
+with `{"error": code, "detail": message}` for a refusal it recovered from —
+the only way to see a refused batch, since it never appears in a later state.
+See [`GAMES.md`](GAMES.md#red-alert).
 
 `context` (a `DecisionContext`) carries `session_id`, `tournament_id`
 (`None` for a standalone match), `game_type`, and `agent_id` — enough to log
