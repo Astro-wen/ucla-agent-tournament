@@ -18,15 +18,18 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
 
 os.environ["ARENA_RECORD"] = "0"          # replaying must not re-record the sessions it reads
+# This tree's code, not whatever the venv's editable install maps `agent` to (a worktree would replay main's code).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from altruagent import DecisionContext, GameState, LegalAction, WithReasoning
-from altruagent.runner import _validate_decision
+from altruagent import DecisionContext, GameState, LegalAction, WithReasoning  # noqa: E402
+from altruagent.runner import _validate_decision  # noqa: E402
 
-from agent import reasoning
-from agent.agent import Contestant, _doubles_template, doubles_ok
-from agent.pokemon.calc import DamageCalc
+from agent import reasoning  # noqa: E402
+from agent.agent import Contestant, _doubles_template, doubles_ok  # noqa: E402
+from agent.pokemon.calc import DamageCalc  # noqa: E402
 
 
 def _p99(xs: list[float]) -> float:

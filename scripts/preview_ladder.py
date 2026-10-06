@@ -9,11 +9,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
+from pathlib import Path
 
-from local.eval_pokemon import wilson
-from local.pokemon_env import ContestantPlayer, play_match
-from local.showdown import Showdown
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # this tree's agent/ and champion/, not main's
+
+from local.eval_pokemon import wilson  # noqa: E402
+from local.pokemon_env import ContestantPlayer, play_match  # noqa: E402
+from local.showdown import Showdown  # noqa: E402
 
 
 def run(a) -> None:
