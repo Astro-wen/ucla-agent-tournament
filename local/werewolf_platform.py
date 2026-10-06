@@ -67,6 +67,7 @@ class Server:
         self.sent = {i: 0 for i in range(N)}
         self.terminal = False
         self.last_active = {i: clock() for i in range(N)}
+        self.own_term: set[int] = set()
         self.log = {"errors": [], "auto": [], "violations": [], "chats": 0, "dms": 0, "actions": 0}
         self._start_night()
 
@@ -101,6 +102,7 @@ class Server:
         self.phase, self.sub = "messaging", "day_vote"
         self.g.window_start_seq = len(self.g.messages)
         self.g.terminated = [i for i in range(N) if not self.g.alive[i]]
+        self.own_term = set()                    # seats that sent their own terminate in this window
         self.sent = {i: 0 for i in range(N)}
         now = self.clock()
         self.window_opened, self.window_opened_wall = now, time.time()
@@ -191,8 +193,9 @@ class Server:
                 self._apply(seat, a)
 
     def _terminate(self, seat: int):
-        if seat not in self.g.terminated:
-            self.g.terminated.append(seat)
+        if seat in self.g.terminated:
+            return                             # a second terminate is a harmless no-op (06-messaging.md): no change
+        self.g.terminated.append(seat)
         if all(i in self.g.terminated for i in self.g.living()):
             self._close_window()
         self._bump()
@@ -260,6 +263,7 @@ class Server:
                 self._guard(seat, "messaging")
                 if message_type == "terminate":
                     self.last_active[seat] = self.clock()
+                    self.own_term.add(seat)
                     self._terminate(seat)
                     return {"phase": self.phase, "remaining": {"this_turn": MAX_CHATS - self.sent[seat]}}
                 if seat in self.g.terminated:
@@ -282,7 +286,11 @@ class Server:
                     self.log["violations"].append((seat, "recipients", rec))
                     raise _err("INVALID_RECIPIENTS")
             except MCPToolError as e:
-                self.log["errors"].append((seat, e.error_code))
+                code = e.error_code
+                if code == "WRONG_PHASE" and message_type == "terminate" and seat in self.own_term:
+                    code = "WRONG_PHASE_NOOP"      # the runner's no-op re-terminate of a seat already done, sent just
+                    #                                as the window closed (a race it re-reads, not a chat lost)
+                self.log["errors"].append((seat, code))
                 raise
             env = {"seq": len(self.g.messages), "sender": seat, "recipients": rec,
                    "visibility": "direct" if rec else "broadcast", "type": "chat", "content": content,
@@ -363,13 +371,19 @@ class Session:
 
 
 class SeatAgent:
-    """Wrap a local/werewolf_env Seat (choose(raw) / message(raw)) as a runner contestant; terminates once a day."""
+    """Wrap a local/werewolf_env Seat (choose(raw) / message(raw)) as a runner contestant; terminates once a day.
 
-    def __init__(self, seat: Seat, rng: random.Random):
+    `think` (seconds, 0 = instant): before each discussion move it still makes, the seat waits a random 0.5..1.5 x
+    `think`, like an LLM agent's model call, so other seats' chat arrives over the window (the order of events, not
+    the decisions: the wait has its own random stream)."""
+
+    def __init__(self, seat: Seat, rng: random.Random, think: float = 0.0, think_rng: random.Random | None = None):
         self.seat = seat
         seat.rng = rng
         seat.reset()
         self.done_day = None
+        self.think = float(think or 0.0)
+        self.think_rng = think_rng or random.Random(0)
 
     def choose_action(self, state: GameState, context):
         aid = self.seat.choose(state.raw)
@@ -384,6 +398,8 @@ class SeatAgent:
             if callable(read):
                 read(state.raw)
             return TERMINATE_MESSAGING
+        if self.think > 0:
+            time.sleep(self.think * self.think_rng.uniform(0.5, 1.5))
         m = self.seat.message(state.raw)
         if m is None:
             self.done_day = day
@@ -392,10 +408,13 @@ class SeatAgent:
 
 
 class Timed:
-    """Measure every decision of a contestant (the idle limit is per decision)."""
+    """Measure every decision of a contestant (the idle limit is per decision). A listening agent's time spent
+    reading the open window (its `last_listen_s`, reads only: no idle-clock activity) goes to `listen`, the rest of
+    the call to `sink`."""
 
-    def __init__(self, agent, sink: list):
+    def __init__(self, agent, sink: list, listen: list | None = None):
         self.agent, self.sink = agent, sink
+        self.listen = listen if listen is not None else []
 
     def choose_action(self, state, context):
         t0 = time.perf_counter()
@@ -410,22 +429,29 @@ class Timed:
             fn = getattr(self.agent, "choose_message", None)
             return fn(state, context) if fn else TERMINATE_MESSAGING
         finally:
-            self.sink.append(time.perf_counter() - t0)
+            spent = time.perf_counter() - t0
+            heard = float(getattr(self.agent, "last_listen_s", 0.0) or 0.0)
+            if heard > 0:
+                self.listen.append(heard)
+            self.sink.append(max(0.0, spent - heard))
 
 
 def play_table(agents: list, seed: int, idle_limit: float = 120.0, timeout: float = 120.0,
-               messaging: bool | None = None) -> dict:
+               messaging: bool | None = None, window_limit: float = WINDOW_LIMIT_S) -> dict:
     """Run one 7-seat game with run_game per seat. agents[i]: a contestant object. Returns the server log + result.
-    `messaging`: False = a game without discussion windows (None: ARENA_WW_MESSAGING, on by default)."""
-    server = Server(seed, idle_limit=idle_limit, messaging=messaging)
+    `messaging`: False = a game without discussion windows (None: ARENA_WW_MESSAGING, on by default).
+    `window_limit`: a discussion window's length (120 s on the platform; shorter to run time-compressed tables)."""
+    server = Server(seed, idle_limit=idle_limit, messaging=messaging, window_limit=window_limit)
     errors: dict[int, BaseException] = {}
     lat: dict[int, list] = {i: [] for i in range(N)}
+    heard: dict[int, list] = {i: [] for i in range(N)}
     finals: dict[int, GameState] = {}
 
     def seat_main(i):
         try:
             finals[i] = run_game(Session(server, i), DecisionContext("local", None, "werewolf", f"id{i}"),
-                                 Timed(agents[i], lat[i]), wait_seconds=0.05, sleep=lambda s: time.sleep(min(s, 0.05)))
+                                 Timed(agents[i], lat[i], heard[i]), wait_seconds=0.05,
+                                 sleep=lambda s: time.sleep(min(s, 0.05)))
         except BaseException as e:      # noqa: BLE001 - reported
             errors[i] = e
 
@@ -440,6 +466,7 @@ def play_table(agents: list, seed: int, idle_limit: float = 120.0, timeout: floa
     return {"roles": list(server.g.roles), "winner": server.g.winner, "terminal": server.terminal, "log": server.log,
             "errors": {i: repr(e) for i, e in errors.items()}, "hung": hung, "days": server.g.day,
             "max_s": {i: max(v, default=0.0) for i, v in lat.items()}, "messages": list(server.g.messages),
+            "listen_s": {i: max(v, default=0.0) for i, v in heard.items()},
             "votes": [dict(v) for v in server.g.votes], "returns": {i: finals[i].returns for i in finals}}
 
 
@@ -449,20 +476,31 @@ def main(argv=None) -> None:
     from agent.agent import create_agent
     from examples.messaging_agent import WerewolfAgent
 
-    from .werewolf_bots import HeuristicSeat, LLMSeat
+    from .werewolf_bots import HeuristicSeat, LLMQwenSeat, LLMSeat
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--games", type=int, default=20)
     ap.add_argument("--seed", type=int, default=5)
     ap.add_argument("--idle", type=float, default=120.0)
     ap.add_argument("--no-messaging", action="store_true", help="games without discussion (messaging_enabled false)")
+    ap.add_argument("--window", type=float, default=WINDOW_LIMIT_S,
+                    help="discussion window limit in seconds (120 on the platform; less = time-compressed tables)")
+    ap.add_argument("--think", type=float, default=0.0,
+                    help="mean seconds a stand-in bot takes per discussion move (0 = instant), like an LLM call")
+    ap.add_argument("--llm", choices=("llm", "llmq"), default="llm", help="the LLM stand-in kind (llmq: Qwen phrasing)")
     a = ap.parse_args(argv)
     from .werewolf_env import wording_from_env
-    print(f"wording {wording_from_env()} (ARENA_WW_WORDING), discussion {'off' if a.no_messaging else 'on'}")
+    from agent.agent import listen_enabled
+    print(f"wording {wording_from_env()} (ARENA_WW_WORDING), discussion {'off' if a.no_messaging else 'on'}, "
+          f"window {a.window:g} s, bot think {a.think:g} s, LLM stand-in {a.llm}, our listening "
+          f"{'on' if listen_enabled() else 'off'} (ARENA_WW_LISTEN)")
+    llm_cls = LLMQwenSeat if a.llm == "llmq" else LLMSeat
     kinds = ["ours", "ours", "ours", "llm", "heuristic", "messaging_example", "basic"]
     tot = {"errors": 0, "hung": 0, "auto_ours": 0, "violations_ours": 0, "games": 0, "ours_wins": 0, "ours_seats": 0,
            "votes_ours": 0, "abstain_ours": 0, "chats_ours": 0}
-    worst = 0.0
+    codes: dict[str, int] = {}
+    listen = {"holds": 0, "followups": 0, "errors": 0, "no_game": 0}
+    worst = heard_max = 0.0
     for g in range(a.games):
         r = random.Random(a.seed * 1000 + g)
         seats = [r.choice(kinds) for _ in range(N)]
@@ -470,28 +508,38 @@ def main(argv=None) -> None:
             seats[r.randrange(N)] = "ours"
         agents = []
         for i, kind in enumerate(seats):
+            think = {"think": a.think, "think_rng": random.Random(f"think:{a.seed}:{g}:{i}")}
             if kind == "ours":
                 agents.append(create_agent())
             elif kind == "llm":
-                agents.append(SeatAgent(LLMSeat(), random.Random(r.random())))
+                agents.append(SeatAgent(llm_cls(), random.Random(r.random()), **think))
             elif kind == "heuristic":
-                agents.append(SeatAgent(HeuristicSeat(), random.Random(r.random())))
+                agents.append(SeatAgent(HeuristicSeat(), random.Random(r.random()), **think))
             elif kind == "messaging_example":
                 agents.append(WerewolfAgent())
             else:
                 agents.append(SeatAgent(_First(), random.Random(0)))
         with contextlib.redirect_stdout(io.StringIO()):          # examples/messaging_agent.py prints every message
-            out = play_table(agents, a.seed * 1000 + g, idle_limit=a.idle, messaging=False if a.no_messaging else None)
+            out = play_table(agents, a.seed * 1000 + g, idle_limit=a.idle, messaging=False if a.no_messaging else None,
+                             window_limit=a.window, timeout=max(120.0, 12 * a.window + 60))
         ours = [i for i, k in enumerate(seats) if k == "ours"]
         tot["games"] += 1
         tot["errors"] += sum(1 for i in out["errors"] if i in ours)
         tot["hung"] += len(out["hung"])
         tot["auto_ours"] += sum(1 for s, _ in out["log"]["auto"] if s in ours)
         tot["violations_ours"] += sum(1 for s, *_ in out["log"]["violations"] if s in ours)
+        for s, code in out["log"]["errors"]:
+            if s in ours:
+                codes[code] = codes.get(code, 0) + 1
+        for i in ours:
+            ls = getattr(agents[i], "listen_stats", None) or {}
+            for k in listen:
+                listen[k] += int(ls.get(k, 0))
         side = {"wolf": "wolf", "seer": "villager", "villager": "villager"}
         tot["ours_seats"] += len(ours)
         tot["ours_wins"] += sum(1 for i in ours if side[out["roles"][i]] == out["winner"])
         worst = max([worst] + [out["max_s"][i] for i in ours])
+        heard_max = max([heard_max] + [out["listen_s"][i] for i in ours])
         ballots = [(s, t) for v in out["votes"] for s, t in v["votes"].items() if s in ours]
         tot["votes_ours"] += len(ballots)
         tot["abstain_ours"] += sum(1 for _, t in ballots if t is None)
@@ -503,6 +551,9 @@ def main(argv=None) -> None:
           f"{tot['violations_ours']}, slowest decision of our seats {1000 * worst:.1f} ms (limit {a.idle:.0f} s); "
           f"our seats won {tot['ours_wins']}/{tot['ours_seats']}; our ballots {tot['votes_ours']} "
           f"({tot['abstain_ours']} abstain), our chats {tot['chats_ours']}")
+    print(f"error answers to our seats by code: {dict(sorted(codes.items())) or 'none'}; listening: "
+          f"{listen['holds']} holds, {listen['followups']} follow-ups, longest {heard_max:.2f} s "
+          f"(window {a.window:g} s), {listen['errors']} errors, {listen['no_game']} without a runner session")
 
 
 class _First(Seat):
