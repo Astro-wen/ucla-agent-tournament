@@ -78,6 +78,7 @@ LISTEN_MARGIN = 1 / 8      # terminate at the latest this long before the window
 LISTEN_QUIET = 1 / 5       # ... or once no other seat has chatted for this long (24 s of 120)
 LISTEN_POLL = 1 / 24       # the longest single wait while listening (5 s of 120): another seat's terminate is seen
 LISTEN_FOLLOWUPS = 1       # chats a day after the opening ones, with listening on
+LISTEN_MIN_WAIT_S = 0.25   # a wait answered at once with nothing new is followed by this pause (no busy loop)
 _ON = {"1", "on", "true", "yes", "enable", "enabled"}
 
 
@@ -585,11 +586,12 @@ class Contestant:
             self._win = {"t0": now, "w": None, "quiet_from": None, "chats": 0}
         w = self._win
         left = st.get("messaging_seconds_left")
-        if not isinstance(left, (int, float)) or isinstance(left, bool) or left != left or left < 0:
-            left = WINDOW_S - (now - w["t0"])
-        left = float(left)
+        counted = isinstance(left, (int, float)) and not isinstance(left, bool) and left == left and left >= 0
+        left = float(left) if counted else WINDOW_S - (now - w["t0"])
         if w["w"] is None:
             w["w"], w["quiet_from"] = max(left, 1.0), left
+        elif counted:                                     # a countdown that stopped moving cannot keep us here
+            left = min(left, w["w"] - (now - w["t0"]) + 1.0)
         me = st.get("your_position")
         chats = sum(1 for m in st.get("new_messages") or [] if isinstance(m, dict)
                     and m.get("type", "chat") == "chat" and m.get("sender") != me)
@@ -620,11 +622,15 @@ class Contestant:
                     wait = self._listen_wait(st.raw if isinstance(st.raw, dict) else {})
                     if wait is None:
                         break
+                    t_wait = time.monotonic()
                     nxt = game.wait_for_update(since_version=st.state_version, since_message_seq=_seen_seq(st),
                                                since_is_current_actor=bool(st.is_current_actor), since_phase=st.phase,
                                                timeout_seconds=wait)
                     if not isinstance(nxt, GameState):
                         break
+                    if time.monotonic() - t_wait < LISTEN_MIN_WAIT_S and nxt.state_version == st.state_version \
+                            and _seen_seq(nxt) == _seen_seq(st) and nxt.phase == st.phase:
+                        time.sleep(LISTEN_MIN_WAIT_S)     # nothing new, answered at once: never spin on the server
                     if nxt.is_terminal or nxt.phase != "messaging" or (nxt.raw or {}).get("eliminated"):
                         self.ww.observe(nxt.raw if isinstance(nxt.raw, dict) else {})
                         break

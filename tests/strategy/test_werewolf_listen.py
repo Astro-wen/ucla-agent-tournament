@@ -137,6 +137,17 @@ def test_quiet_spell_ends_listening_and_a_new_chat_restarts_it():
     assert c.message_step(_gs(g), ctx()) is TERMINATE_MESSAGING
 
 
+def test_a_countdown_that_stops_moving_cannot_keep_us_listening():
+    c, g = _listener(), _game(clock=20.0)                  # the state says 100 s left, and keeps saying it
+    now = [0.0]
+    c._clock = lambda: now[0]
+    _opened(c, g)
+    for t, out in ((30.0, HOLD), (60.0, HOLD), (90.0, TERMINATE_MESSAGING)):
+        now[0] = t
+        _chat(g, 1 + int(t) % 5, f"Reminder {t}: all players should vote, abstaining helps the wolves.")
+        assert c.message_step(_gs(g), ctx()) is out
+
+
 def test_one_follow_up_a_day_then_terminate():
     c, g = _listener(), _game()
     _opened(c, g)
