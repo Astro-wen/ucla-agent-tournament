@@ -366,7 +366,10 @@ def _transient(exc: BaseException) -> bool:
     return status is None and isinstance(exc, PlatformError)       # could not reach the control plane at all
 
 
-RATE_LIMIT_BACKOFF_S = (15.0, 30.0, 60.0)    # listing pauses after the 1st, 2nd, 3rd+ rate-limited re-login in a row
+# Listing pauses after the 1st, 2nd, 3rd+ rate-limited re-login in a row. Capped at 30 s: while paused the runtime sees
+# no new seat (a Werewolf seat has 120 s, a team preview 90 s), and one re-login per 30 s is still far gentler than the
+# SDK's own poll (10 s).
+RATE_LIMIT_BACKOFF_S = (15.0, 20.0, 30.0)
 
 
 class _SteadyOfficial:
@@ -487,7 +490,7 @@ class _SteadyOfficial:
         return True
 
 
-STARTUP_RETRY_S = (5.0, 10.0, 20.0, 40.0, 60.0)
+STARTUP_RETRY_S = (5.0, 10.0, 20.0, 30.0)   # capped at 30 s: plays within ~30 s of the control plane coming back
 _sleep = time.sleep                        # (tests replace it)
 
 
