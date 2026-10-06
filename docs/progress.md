@@ -201,6 +201,9 @@
   - 新压缩包（提交前的树）：包里有 `agent/matchstate.py`、`agent/health.py`、`data/search_probe.json`，46 MB / 415 个文件，密钥扫描干净；只有 `/usr/bin:/bin` 的干净环境下 selfcheck ready（54 s），包里 `replay_real.py` 60 个决策 0 失败，`agent.health` → `idle(probe=1.4s)`；格式不对的假 key 时 `--check-tournament` 退出 1。
   - `rehearsal_official.py`（从这个包跑）：13 项全过，4.4 分钟，96 个决策 0 非法、0 计时器代打、0 竞争错误；kill worker 后 13.5 s 起了新 worker、16.5 s 后下一步；kill 运行时 3.4 s / 6.5 s，0 次 seat_busy；热备接管 28.9 s，那一回合没被代打（这一步等了 31.3 s，就是汇总里对战延迟 p99 31.3 s 的来源，不是算得慢）；非租约持有者 0 步，key 没进日志，停止后 0 残留。演练默认 `ARENA_RECORD=0`，所以这里状态文件是关的（kill worker 后的新 worker 是从零开始接着打的）。
   - `rehearsal.py` 发现模式 5 分钟：开了 9 场、打完 8 场，127 个决策，0 非法、0 计时器代打、0 个 Traceback，每场都有 `[match-summary]` 行；停止 0.8 s，0 残留。
+  - 回退开关 `ARENA_BATTLE=classic`（两边都用经典打法打擂台，种子 7，400 局）：191/400，双方 0 非法，平均 7.7 回合，和 v3.2 镜像的数字一样。
+  - 提交后补了一个小修：压缩包带上 `docs/restart_load.md`（`docs/deploy.md` 有几处指向它；`tests/test_deploy.py` 76 个通过）。从这个提交（2ef08e4）新出的包：46 MB / 416 个文件，干净环境 selfcheck ready（67 s），包里重放 60 个决策 0 失败、p99 1.8 s，`agent.health` → `idle(probe=1.6s)`。
+  - 用这个包再跑 `rehearsal_official.py`：13 项全过，111 个决策 0 非法、0 计时器代打。另用演练脚本的临时副本（不进仓库）打开状态文件和整机槽位（`ARENA_STATE=1`、`ARENA_SEARCH_MAX_PROCS=8`）跑了一次：13 项全过，98 个决策 0 非法、0 计时器代打；kill worker 和 kill 运行时之后，新 worker 都从状态文件接上了（3 次 `resumed match`：宝可梦 2 次、狼人杀 1 次）；对局中健康行是 `search=ok(used=…)`，整机槽位用了 1/8；状态文件都是 0600、目录 0700，里面没有 key。数字见 `docs/deploy.md`「官方模式演练」的 dry-v42 几行。
 
 ### 狼人杀改进（09-28，宝可梦不变）
 - 合入 `candidates/r2-ww-seer-and-villager`，加上模拟得出的规则（村民不弃票、集中投票、不假跳；预言家查到狼或快被投出时跳；对跳时投两个跳的人之一；狼只在被点名时对跳、先刀已跳的预言家），聊天只读有限事实并识别注入，狼的私信默认关闭（`ARENA_WW_DM=on` 可开；观战数据流可能暴露私信）。
