@@ -14,6 +14,12 @@ None of these import our agent: they are independent stand-ins for what we expec
 * `LLMVariedSeat` -- the same decisions as `LLMSeat`, but phrased freely (casual forms, claim-looking table talk such
   as "Is the Seer here?", "All players must vote PlayerN") and less pulled toward the seat named most in chat: `LLMSeat`
   only ever writes in the format our chat reader was built on, which flatters us.
+* `LLMQwenSeat` -- `LLMVariedSeat` writing the way the real Qwen3 seats of examples/llm_agent.py do
+  (tests/strategy/data/ww_llm_chat.json): seer results by pronoun after a check, "the real wolf", "PlayerN is lying --
+  they're a wolf", and the skeptical table talk that says nothing about anyone's role but looks like a verdict to a
+  careless reader: hedges and negations about a seat ("that doesn't mean they're a wolf", "no proof they are wolves"),
+  "Seer claim: none yet", last night's victim ("It was the wolves"). It measures both what reading real LLM chat gains
+  and what misreading it costs.
 """
 from __future__ import annotations
 
@@ -336,6 +342,7 @@ class LLMVariedSeat(LLMSeat):
     """
     name = "llmx"
     FOLLOW_PRESSURE = 0.6
+    VARIANTS = _VARIANTS
 
     def _meaning(self, text: str, s):
         hit = _SAID.get((s, text))
@@ -349,9 +356,47 @@ class LLMVariedSeat(LLMSeat):
         for rx, form in _FORMS:
             hit = rx.fullmatch(text)
             if hit:
-                me, alive, _, _ = _public(raw)
+                me, alive, dead, _ = _public(raw)
                 others = [s for s in alive if s != me] or [0]
-                out = self.rng.choice(_VARIANTS[form]).format(*hit.groups(), r=self.rng.choice(others))
+                victim = f"Player{list(dead)[-1]}" if dead else "Someone"      # the latest death, if any
+                out = self.rng.choice(self.VARIANTS[form]).format(*hit.groups(), r=self.rng.choice(others),
+                                                                  victim=victim)
                 _SAID[(me, out)] = LLMSeat._meaning(text, me)
                 return {"content": out, "recipients": []}
         return m
+
+
+# ---------------------------------------------------------------- the same stand-in, phrased like the real LLM seats
+# Seer results as the real Qwen3 seats word them (the forms the reader of agent/werewolf/state.py was extended for),
+# and their skeptical table talk: every added idle line says nothing about anyone's role, so a reader that takes one
+# for a verdict or a claim pays for it in these games. {victim} is the latest dead seat ("Someone" before any death).
+_QWEN_VARIANTS = {
+    "seer_wolf": ["I am the Seer. I investigated Player{0} and confirmed they are a wolf. Trust my result and vote "
+                  "Player{0} tonight.",
+                  "I'm the Seer. I checked Player{0} and confirmed they're a wolf. Trust me.",
+                  "I'm the Seer. Player{0} is the real wolf. Trust me.",
+                  "I am the Seer and I confirm Player{0} is a wolf. Vote Player{0} to protect the village."],
+    "seer_clear": ["I am the Seer. I investigated Player{0} and confirmed they are a villager. Let's focus on "
+                   "suspicious players.",
+                   "I'm the Seer. I checked Player{0} and confirmed they're a villager."],
+    "counter": ["I'm the real Seer. I checked Player{0} and they're a werewolf. Trust me.",
+                "I'm the Seer too. Player{0} is lying — they're a wolf. Trust me."],
+    "sus": _VARIANTS["sus"],
+    "idle": _VARIANTS["idle"] + [
+        "Player{r} voted against me, but that doesn't mean they're a wolf.",
+        "Player{r} is quiet, but I doubt they're a wolf.",
+        "Player{r} is loud, but I'm not convinced they're a wolf. No proof they are werewolves.",
+        "Player{r} is quiet, which means they are a wolf or a scared villager.",
+        "Seer claim: none yet. Let's vote carefully.",
+        "{victim} was killed last night. It was the wolves, obviously.",
+    ],
+    "deny": _VARIANTS["deny"],
+    "trust": _VARIANTS["trust"],
+}
+
+
+class LLMQwenSeat(LLMVariedSeat):
+    """`llmx` phrased like the real Qwen3 seats (background `llmq`): same decisions, same peers' understanding of each
+    other's words; seer results in the real seats' wording and skeptical table talk that is not a verdict."""
+    name = "llmq"
+    VARIANTS = _QWEN_VARIANTS

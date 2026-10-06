@@ -9,8 +9,11 @@ A condition is (background, k): k seats (1..7) are ours, the other 7-k are one b
   random     a uniformly random legal action
   llm        a chat-reading, persuadable, noisy stand-in for examples/llm_agent.py (local/werewolf_bots.py)
   llmx       the llm stand-in phrasing freely (casual text, claim-looking table talk) and less persuadable
-  mixed      each background seat drawn from first / heuristic / random / llm (llmx is not drawn, so the deals of
-             earlier runs are unchanged); `mixed:K1+K2...` draws each background seat from the listed kinds
+  llmq       llmx phrased like the real Qwen3 seats: their seer-result wording, plus skeptical table talk that is not
+             a verdict ("that doesn't mean they're a wolf", "Seer claim: none yet", "It was the wolves"); it prices
+             both reading real LLM chat and misreading it
+  mixed      each background seat drawn from first / heuristic / random / llm (llmx / llmq are not drawn, so the deals
+             of earlier runs are unchanged); `mixed:K1+K2...` draws each background seat from the listed kinds
   llm_real   the REAL examples/llm_agent.py on Nebius Token Factory (local/llm_seats.py; opt-in, costs API calls, see
              below); deals exactly like `llm`, so a `--bg llm_real` run pairs game by game with a `--bg llm` run
 k = 7 does not depend on the background and is played once. For game g of a seed, the roles, our seat set and the
@@ -65,11 +68,11 @@ import time
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 
-from .werewolf_bots import HeuristicSeat, LLMSeat, LLMVariedSeat
+from .werewolf_bots import HeuristicSeat, LLMQwenSeat, LLMSeat, LLMVariedSeat
 from .werewolf_env import ContestantSeat, Game, OfficialBaseline, RandomSeat, deal_roles
 
 BACKGROUNDS = {"first": OfficialBaseline, "heuristic": HeuristicSeat, "random": RandomSeat, "llm": LLMSeat,
-               "llmx": LLMVariedSeat}
+               "llmx": LLMVariedSeat, "llmq": LLMQwenSeat}
 MIXED = ("first", "heuristic", "random", "llm")       # what a `mixed` seat is drawn from (fixed: keeps old deals)
 LLM_REAL = "llm_real"                                   # the real examples/llm_agent.py (local/llm_seats.py), opt-in
 LOW_K = 3                                               # slice "k<=3": few of our seats at a table
@@ -514,7 +517,7 @@ def main(argv=None) -> None:
     ap.add_argument("--games", type=int, default=None, help="games per condition per seed (default 1000; 20 with "
                                                             "real LLM seats)")
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2])
-    ap.add_argument("--bg", default="first,heuristic,random,llm,llmx,mixed")
+    ap.add_argument("--bg", default="first,heuristic,random,llm,llmx,mixed,llmq")
     ap.add_argument("--ks", default="1,2,3,4,5,6,7")
     ap.add_argument("--pairs", default=None, help="cand:ref,... ('' for no comparison; default "
                                                   f"{DEFAULT_PAIRS}, or none with real LLM seats)")
