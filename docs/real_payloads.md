@@ -92,3 +92,18 @@ option：招式 `{type:"move", move_id, base_power, category, move_type, current
 
 ## 2026-09-27 · 线上 A/B：v1（Yoriko）vs v0（Apocalypse）
 5 局：**v1 3 胜 2 负**（前两局 v0 胜，后三局 v1 胜）。确认 v1 在官方运行器下全程走精确计算路径（本地重放 10/10 决策完全一致、进程日志无告警）。第二局输在选秀/首发（对手拿到 Tornadus + Rillaboom 首发），双方选秀与首发代码相同。样本太小，不构成 v1 更弱的证据；本地 400 局 v1 对 v0 为 66.8%。
+
+## 2026-10-05 · Werewolf wording 10-05（狼人杀措辞变化：只来自文档，**没在真实 payload 上验证过**）
+
+平台 10-04/05 改了 `docs/platform/werewolf.md`（10-06 同步进仓库）。我们还从没见过真实的狼人杀 payload，文档可能比服务器早改也可能晚改，所以部署的解析器**新旧两种都认**（`agent/werewolf/state.py`）：
+
+| 东西 | 旧（到 10-04） | 新（文档 10-05 起） |
+|---|---|---|
+| 投票动作的 label | `Vote to lynch PlayerN` | `Vote to eliminate PlayerN`（`Abstain` 不变；action_id 仍是座位号，`7` = 弃票） |
+| `game_state.dead[].cause` | `night_kill` / `lynch` | `night_kill` / `vote`（我们内部统一成 `night_kill` / `vote`） |
+| observation 的 Dead 行 | `day 1: Player1 was villager (lynch)` | `day 1: Player1 was villager (eliminated by vote)`、`day 2: Player5 was seer (killed at night)` |
+| 投票行结尾 | `— Player1 lynched` | `— Player1 eliminated by vote`（没人出局时怎么写文档没说） |
+| 结束时 | 无 | 最后多一行 `Game over — WOLVES win` / `Game over — VILLAGERS win` |
+| 预言家第一次查验前 | 文档没写 | `You have not investigated anyone yet.` |
+
+同一批文档里的其他事实：`new_messages` 每次换阶段都清空，**投票时是空的**（要重读白天的发言得用 `get_messages`；我们的 agent 在讨论阶段就把每条消息记进自己的记录里，见 `agent/werewolf/policy.py` 的 `observe`）；用 API 建的局可能 `messaging_enabled: false`，没有讨论窗口（runner 只在 `phase == "messaging"` 时问 `choose_message`，所以不会发消息）；一条消息超过 1024 个字符是 `MESSAGE_TOO_LONG`（runner 会因此退出进程，我们发出去之前按 UTF-8 字节截到 1024 以内）；讨论窗口开 2 分钟就强制结束，期间状态里有 `messaging_seconds_left` / `messaging_deadline`；`join_session` 回的 `position` 是加入顺序（从 1 数），座位以 `your_position` 为准；对局结束约 5 分钟后 session 被删，之后 `get_result` / `get_game_state` 回 `SESSION_NOT_FOUND`；第一夜不杀人（"from night 2 on"）。

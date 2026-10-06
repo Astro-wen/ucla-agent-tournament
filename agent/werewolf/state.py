@@ -92,6 +92,8 @@ def norm_cause(c) -> str:
     if _CAUSE_VOTE_RE.search(t):
         return CAUSE_VOTE
     return c.strip().lower()
+
+
 # Kept for callers of the old names; chat is read with the normalized patterns below.
 ACCUSE_RE = re.compile(r"Player(\d+)\s+(?:is|=|was)\s+(?:a\s+|the\s+)?(?:wolf|werewolf)", re.I)
 SEER_CLAIM_RE = re.compile(r"\b(i am|i'm|im)\s+(the\s+)?(real\s+|true\s+)?seer\b", re.I)
