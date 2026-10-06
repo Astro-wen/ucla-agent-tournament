@@ -72,7 +72,7 @@ def test_battle_budget_follows_the_turn_clock_and_the_bank(line, want):
 
 
 def test_budgets_per_decision_type_and_overrides(monkeypatch):
-    assert tc.budget_for({"phase": "draft"}, GAME).seconds == tc.DRAFT_S == 20.0
+    assert tc.budget_for({"phase": "draft"}, GAME).seconds == tc.DRAFT_CLOCK_S - tc.DRAFT_RESERVE_S == 10.0
     assert tc.budget_for({"phase": "team_preview"}, GAME).seconds == tc.PREVIEW_S == 30.0
     assert tc.budget_for({"phase": "teambuild"}, "pokemon_gen9ou_teambuild").seconds == 20.0
     assert tc.budget_for({"phase": "moving"}, "werewolf").seconds == tc.OTHER_S
@@ -84,7 +84,7 @@ def test_budgets_per_decision_type_and_overrides(monkeypatch):
     monkeypatch.setenv("ARENA_TC_BATTLE_S", "2.5")
     monkeypatch.setenv("ARENA_TC_DRAFT_S", "nonsense")
     assert tc.budget_for({"phase": "moving"}, GAME).seconds == 2.5
-    assert tc.budget_for({"phase": "draft"}, GAME).seconds == 20.0
+    assert tc.budget_for({"phase": "draft"}, GAME).seconds == 10.0
 
 
 def test_deadline_cap_and_context():
@@ -425,7 +425,7 @@ def test_decisions_carry_their_budget(monkeypatch):
     c = Contestant()
     seen = []
     monkeypatch.setattr(c.pk, "act", lambda st: seen.append(tc.current()) or c.pk.fallback(st))
-    for raw, kind, secs in ((draft_state(), "draft", 20.0), (preview_state(), "preview", 30.0),
+    for raw, kind, secs in ((draft_state(), "draft", 10.0), (preview_state(), "preview", 30.0),
                             (battle_state(), "battle", 10.0)):
         c.choose_action(gs(raw), ctx())
         assert seen[-1].kind == kind and seen[-1].seconds == secs
