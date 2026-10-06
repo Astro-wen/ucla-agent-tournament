@@ -153,6 +153,37 @@ def test_llm_phrasing_families(text, claim, wolves, clears):
     "Player2 claims Player3 is evil.",
     "Maybe Player3 is evil, maybe not.",
     "Player2 said: Player3 turned out to be a wolf.",
+    # second review: another seat's stance or someone's attribution before the verdict (from the trusted seer, a
+    # clear of a wolf later made the real seer a liar for "clearing a revealed wolf")
+    "Player3 keeps saying they're a villager. I don't buy it.",
+    "Player3 keeps insisting they're innocent, I don't buy it.",
+    "Player3 is adamant they're a villager.",
+    "Player3 is convinced they're a wolf.",
+    "Player3 seems sure they're innocent.",
+    "Player3 acts like they're innocent.",
+    "Player3 is trying to convince us they're a villager.",
+    "Player3 keeps telling everyone they're innocent.",
+    "Player2 accused Player3. According to Player2, they're a wolf.",
+    "Player0 and Player3 are wolves, says Player2.",
+    "Player2: Player0 and Player3 are wolves.",
+    # ... a pronoun after agreeing with, thanking or crediting a seat is about someone else
+    "I agree with Player2: they're a wolf.",
+    "Good point Player2, they're a wolf.",
+    "Thanks Player2. They're a wolf for sure.",
+    "Player2 is right. They're a wolf.",
+    "In Player2's view, they're a wolf.",
+    "Per Player2, they're a wolf.",
+    "Player2 noticed it too; they're a wolf.",
+    "Listen to Player2, they're a villager.",
+    "Player2 vouched for them, so they're a villager.",
+    # ... a hunch is not a result ("likely" is not read by the old patterns either; "probably" still is)
+    "Player3 is likely a wolf.",
+    "Player3 is quiet; I suspect they're a wolf.",
+    "Player3 is quiet; I guess they're a wolf.",
+    "Player3 is quiet; I bet they're a wolf.",
+    "Player3 is quiet; I feel like they're a wolf.",
+    "Player3 is quiet; chances are they're a wolf.",
+    "Player3 is quiet; odds are they're a wolf.",
 ])
 def test_hedges_negations_and_victims_are_not_verdicts(text):
     f = read_chat(text, 6, {})
@@ -173,9 +204,43 @@ def test_hedges_negations_and_victims_are_not_verdicts(text):
     "Player2 said Player4 is a wolf, I checked her claim and it is weak.",
     "If Player4 is a wolf, I checked him wrong.",
     "Player4 is a wolf, I checked him?",
+    # second review: a villager vouching from the vote log ("town" / "good" / "safe" are not seer results, and the
+    # pronoun must end the sentence); our villager then took the real seer's claim as contested and voted the seer
+    "Player5 is town, I checked them and their votes look fine.",
+    "Player5 is good, I checked him and he seems fine.",
+    "Player5 is town, I checked them, their votes look fine.",
+    "Player5 is town, I checked them.",
+    "Player5 is good, I checked him.",
+    "Player5 is safe, I checked her yesterday.",
+    "Player5 is clean, I checked them and their votes are fine.",
 ])
 def test_table_talk_is_not_a_seer_claim(text):
     assert not read_chat(text, 6, {}).claim
+
+
+@pytest.mark.parametrize("text,claim,wolves,clears", [
+    # the verdict form of a check report still claims (seer words, the pronoun ends the sentence)
+    ("Player5 is a wolf, I checked them.", True, {5}, set()),
+    ("Player5 is a wolf; I checked them. Vote Player5.", True, {5}, set()),
+    ("Player5 is clean, I checked him yesterday.", True, set(), {5}),
+    ("Player5 is innocent, I checked them!", True, set(), {5}),
+    # inside a real claim, only the seer's own results are read (second review: reported stances, agreement and
+    # hunches added wolves / clears to the trusted seer's results)
+    ("I am the Seer. I checked Player6: villager. Player3 keeps insisting they're innocent, but I don't trust them.",
+     True, set(), {6}),
+    ("I am the Seer. I checked Player6: villager. Player4 accused Player5. According to Player4, they're a wolf.",
+     True, set(), {6}),
+    ("I am the Seer. Player6 is clear. Player2 agrees with me, they're not a wolf.", True, set(), {6}),
+    ("I'm the Seer. Player6 is a wolf. Player4 is lying. Player5 is right; they're a wolf.", True, {6}, set()),
+    ("I am the Seer. I checked Player6: wolf. Player4 is likely a wolf. Player1 is likely a wolf too.", True, {6},
+     set()),
+    # first-person certainty stays the sender's verdict
+    ("I'm the Seer. I checked Player3 and I'm sure they're a wolf.", True, {3}, set()),
+    ("I'm the Seer. Player0 and Player3 are wolves.", True, {0, 3}, set()),
+])
+def test_claim_results_are_the_seers_own(text, claim, wolves, clears):
+    f = read_chat(text, None, {})
+    assert (f.claim, f.wolves, f.clears) == (claim, wolves, clears)
 
 
 def test_negated_check_report_names_no_wolf_and_negated_so_is_clears_one():
@@ -202,6 +267,13 @@ def _talk(content, sender=2, seq=0):
     # I1: the seer mentions last night's victim; it does not become a liar for naming a revealed villager
     ([_talk("I am the Seer. I checked Player1: wolf."),
       _talk("Player3 was killed last night. It was the wolves, obviously.", seq=1)], "1"),
+    # second review A1: a villager vouching from the vote log does not contest the real claim
+    ([_talk("Player5 is town, I checked them and their votes look fine.", sender=4),
+      _talk("I am the Seer. Player1 is a wolf.", seq=1)], "1"),
+    # second review D: the seer's hunches about two more seats do not make it "name too many wolves"
+    ([_talk("I am the Seer. I checked Player1: wolf. Player4 is likely a wolf. Player5 is likely a wolf too.")], "1"),
+    ([_talk("I am the Seer. I checked Player1: wolf. Player4 is quiet, I suspect they're a wolf. Player5 voted "
+            "oddly; chances are they're a wolf.")], "1"),
 ])
 def test_our_villager_still_follows_the_real_seer(msgs, vote):
     dead = [(3, "villager", "night_kill", 2)] if any("killed" in m["content"] for m in msgs) else []
@@ -212,6 +284,45 @@ def test_our_villager_still_follows_the_real_seer(msgs, vote):
     c = WerewolfPolicy.claims(parse(st))
     assert c.trusted == 2 and not c.liars
     assert WerewolfPolicy().act(st)["action_id"] == vote
+
+
+_VILLAGER = "Your role: VILLAGER\nYou do not know anyone else's role."
+
+
+def test_reported_stances_in_a_claim_are_not_the_seers_results():
+    """Second review B / C: the trusted seer reports Player3's protest of innocence and Player4's accusation. Neither
+    is its own result: Player3 is not trusted clear, so once Player3 is lynched and revealed a wolf the seer is no liar
+    and our villager follows its next result; Player5 is not a trusted wolf."""
+    said = dict(_talk("I am the Seer. I checked Player6: villager. Player3 keeps insisting they're innocent, but I "
+                      "don't trust them."), day=1)
+    st = _state(_VILLAGER, "day_vote", [1, 2, 4, 5, 6, 7], me=0, day=2, alive=[0, 1, 2, 4, 5, 6],
+                dead=[(3, "wolf", "lynch", 1)])
+    st["new_messages"] = [said, dict(_talk("I checked Player4 last night: wolf. Vote Player4.", seq=1), day=2)]
+    c = WerewolfPolicy.claims(parse(st))
+    assert c.trusted == 2 and not c.liars and 3 not in c.trusted_clears()
+    assert WerewolfPolicy().act(st)["action_id"] == "4"
+    st = _state(_VILLAGER, "day_vote", [1, 2, 3, 4, 5, 6, 7], me=0, day=1)
+    st["new_messages"] = [_talk("I am the Seer. I checked Player6: villager. Player4 accused Player5. According to "
+                                "Player4, they're a wolf.")]
+    c = WerewolfPolicy.claims(parse(st))
+    assert c.trusted == 2 and c.trusted_wolves(range(7)) == []
+
+
+def test_vote_log_vouching_is_no_claim_for_our_seer_or_wolf():
+    """Second review A2 / E: a villager's "Player5 is good, I checked him and ..." is not a seer claim, so our seer does
+    not call that villager a fake seer and our wolves do not hunt it as the claimed seer."""
+    msg = _talk("Player5 is good, I checked him and he seems fine.", sender=4)
+    seer = _state("Your role: SEER\nYour investigations: Player1 is villager", "day_vote", [1, 2, 3, 4, 5, 6, 7], me=0,
+                  day=1)
+    seer["new_messages"] = [msg]
+    c = WerewolfPolicy.claims(parse(seer))
+    assert c.order == [] and not c.liars
+    assert WerewolfPolicy().act(seer)["action_id"] != "4"
+    talk = WerewolfPolicy().chat(dict(seer, phase="messaging", legal_actions=None))
+    assert not any("Player4" in m["content"] for m in talk)
+    wolf = _state("Your role: WOLF\nYour fellow wolves: Player3", "night_wolf", [1, 2, 4, 5, 6], me=0, label=_kill)
+    wolf["new_messages"] = [msg]
+    assert WerewolfPolicy.claims(parse(wolf)).order == []
 
 
 @pytest.mark.parametrize("text,clears", [

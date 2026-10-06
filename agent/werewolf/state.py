@@ -28,12 +28,15 @@ pronoun ("I investigated Player3 and confirmed they are a wolf", "I checked Play
 they're a wolf too", "Player0 claims to be the Seer but is actually a wolf"), with more qualifiers ("Player6 is the
 real wolf", "Player1 is indeed a villager"), lists ("Player0 and Player3 are villagers"), relative clauses ("Player6,
 who is a villager") and a wolf naming its ally ("Player0, my wolf ally"). A pronoun is never read when another seat
-sits between it and its referent, in reported speech ("Player2 says they are a villager"), in a hypothetical or a
-question, after a negation or doubt ("that doesn't mean they're a wolf", "I'm not convinced they're a wolf", "no proof
-they are wolves"), as a plural verdict about one seat, or when its referent sentence reports that seat's death
-("Player3 was killed last night. It was the wolves."); the new direct patterns skip hypotheticals, reported speech and
-negations the same way. tests/strategy/data/ww_llm_chat.json is the labelled regression set of real LLM chat, and the
-`llmq` stand-in of local/werewolf_bots.py plays that phrasing (and that skeptical table talk) in local games.
+sits between it and its referent, in reported speech ("Player2 says they are a villager", "Player3 keeps insisting
+they're innocent", "According to Player2, they're a wolf"), in a hypothetical or a question, after a negation or doubt
+("that doesn't mean they're a wolf", "I'm not convinced they're a wolf", "no proof they are wolves") or a hunch ("I
+suspect they're a wolf", "chances are"), as a plural verdict about one seat, when its referent clause agrees with or
+credits that seat ("Player2 is right. They're a wolf.") or when its referent sentence reports that seat's death
+("Player3 was killed last night. It was the wolves."); the new direct patterns skip hypotheticals, reported speech,
+attributions ("..., says Player2", "Player2: ...") and negations the same way. tests/strategy/data/ww_llm_chat.json is
+the labelled regression set of real LLM chat, and the `llmq` stand-in of local/werewolf_bots.py plays that phrasing
+(and that skeptical table talk) in local games.
 """
 from __future__ import annotations
 
@@ -248,7 +251,8 @@ _CHAT_SUS = [
 # opening a sentence with a verdict on a seat or "I am the seer" right after it (not "Seer claim: none yet", not
 # "Seer claim: Player2 says ..."), or a report of a check that carries a verdict on the checked seat ("I checked
 # Player0: villager", "Player5 is a wolf, I checked them."; "I checked Player3's votes", "Player4 is a villager, I
-# checked her votes" and "I looked at Player2 and they seem nervous" are not claims).
+# checked her votes", "Player5 is town, I checked them and their votes look fine" and "I looked at Player2 and they
+# seem nervous" are not claims).
 _CLAIM_IAM = re.compile(r"\b(?:i\s*am|i'm|i’m|im|i\s+m)\s+(?:the\s+|a\s+|actually\s+|really\s+|truly\s+)*"
                         r"(?:real\s+|true\s+|actual\s+|only\s+)?seer\b(?!\s*\?)")
 _NOT_OWN_VOICE = re.compile(
@@ -269,8 +273,8 @@ _VERDICT = re.compile(r"\b(?:wolf|werewolf|villager|clear|cleared|clean|innocent
 _W2 = r"(?:wolf|wolves|werewolf|werewolves|ww|wolfie|evil)"
 _CLEARW = r"(?:villagers?|clear|cleared|clean|innocent|good|town|safe|human)"
 _ADV2 = (r"(?:(?:definitely|def|prob|probably|clearly|obviously|surely|totally|confirmed|actually|indeed|also|"
-         r"certainly|absolutely|really|likely|undoubtedly|in\s+fact|for\s+sure|without\s+(?:a\s+)?doubt|100%|both)\s+)"
-         r"{0,2}")
+         r"certainly|absolutely|really|undoubtedly|in\s+fact|for\s+sure|without\s+(?:a\s+)?doubt|100%|both)\s+)"
+         r"{0,2}")   # not "likely": "Player4 is likely a wolf" is an opinion (the old patterns do not read it either)
 _DET = (r"(?:(?:a|an|the|one\s+of\s+the(?:\s+two)?|our|my)\s+)?"
         r"(?:(?:real|true|actual|confirmed|known|other|second|last|remaining|fellow)\s+)?")
 # a verdict word must end its phrase: "a wolf." / "a wolf too" / "a wolf, vote" but not "a wolf bluff" / "wolf's" /
@@ -321,6 +325,35 @@ _CUE = re.compile(r"(?:\b(?P<who>\w+)\s+)?(?:said|says|say|claims?|claimed|claim
                   r"believed|insists?|insisted|swears?|swore|admits?|admitted|denies|denied|deny|knows?|knew|wonders?|"
                   r"asks?|asked|pretends?|pretended|pretending|told\s+\w+|tells\s+\w+|if|whether|unless|maybe|perhaps|"
                   r"suppose|imagine|might|could)\s*[:,]?\s+(?:that\s+)?$")
+# Another seat's stance or someone's attribution right before a verdict ("Player3 keeps insisting they're innocent",
+# "Player3 is adamant", "acts like", "According to Player2, they're a wolf", "Per Player2,"): the subject is a third
+# person, so "I'm sure they're a wolf" stays the sender's own verdict.
+_REPORTED = re.compile(
+    r"(?:\b(?:player[0-6]|he|she|they|someone|somebody|everyone|everybody)\s+(?:(?:keeps|kept|is|was|are|were|seems|"
+    r"seemed|sounds|sounded|has\s+been|had\s+been|just|still|really)\s+)*(?:saying|insisting|swearing|claiming|"
+    r"telling\s+\w+|adamant|convinced|sure|certain|acts?\s+like|acting\s+like|acted\s+like|"
+    r"(?:trying|tried|tries)\s+to\s+(?:convince|tell|persuade)\s+\w+)"
+    r"|\baccording\s+to\s+\w+|\bper\s+player[0-6]|\bin\s+player[0-6]['’]s\s+(?:view|opinion|words|eyes|mind))"
+    r"\s*[:,]?\s+(?:that\s+)?$")
+# A first-person hunch right before a verdict ("I suspect they're a wolf", "chances are they're a wolf"): an opinion,
+# not a result (inside a seer claim it used to add wolves until the real seer "named too many" and looked a liar).
+_HUNCH = re.compile(
+    r"(?:\b(?:i|we)\s+(?:\w+\s+)?(?:suspect|guess|bet|fear|worry|reckon|feel\s+like|have\s+a\s+(?:hunch|feeling))|"
+    r"\b(?:chances|odds)\s+are|\bmy\s+(?:guess|hunch|gut|feeling)\s+(?:is|says))\s*[:,]?\s+(?:that\s+)?$")
+# The verdict is followed by its source ("Player0 and Player3 are wolves, says Player2."): not the sender's verdict.
+_SOURCE_AFTER = re.compile(r"\s*[,—–-]?\s*(?:says|said|claims?|claimed|thinks?|according\s+to|per)\s+"
+                           r"(?:player[0-6]|he|she|they)\b")
+_SPEAKER_LABEL = re.compile(r"^\s*player[0-6]\s*:\s*$")   # "Player2: Player0 and Player3 are wolves." (quoting Player2)
+# A pronoun's referent clause that agrees with, thanks or credits that seat ("Player2 is right. They're a wolf.", "I
+# agree with Player2: they're a wolf.", "Per Player2, ..."): the pronoun is about someone else.
+_AGREE = re.compile(
+    r"\bagree(?:s|d|ing)?\s+with\b|\b(?:player[0-6]|he|she|they|you)\s+(?:is|was|are|were|['’]re|['’]s)\s+"
+    r"(?:so\s+|totally\s+|absolutely\s+|definitely\s+|100%\s+)?right\b|\b(?:good|fair|great|valid)\s+point\b|"
+    r"\bwell\s+said\b|\b(?:nice|great|good)\s+(?:catch|call)\b|\bthanks?\b|\bthank\s+you\b|\baccording\s+to\b|"
+    r"\bper\s+player[0-6]|\bplayer[0-6]['’]s\s+(?:view|opinion|point|case|logic|reasoning|take|theory|read)\b|"
+    r"\b(?:pointed|points)\s+(?:it\s+|this\s+|that\s+)?out\b|"
+    r"\bmade\s+a\s+(?:good\s+|strong\s+|fair\s+)?(?:case|point)\b|\bwith\s+player[0-6]\s+on\b|\blisten\s+to\s+player[0-6]|"
+    r"\bplayer[0-6]\s+(?:also\s+)?(?:noticed|vouched|vouches|defended|defends|backed|backs|supported|supports)\b")
 # Negation or doubt before a verdict ("that doesn't mean they're a wolf", "I doubt they're a wolf", "I'm not convinced
 # they're a wolf", "no proof they are wolves", "it's unlikely they're a wolf"): never a verdict, in the first person
 # too. Up to four words may sit between the cue and the verdict ("no evidence at all that they're a wolf").
@@ -355,10 +388,13 @@ _WIN_LEAD = re.compile(r"^\s*(?:last\s+night|tonight|yesterday)?\s*(?:[:=—–-
 _WIN_CAME = re.compile(r"\b(?:came\s+back|turned\s+out\s+to\s+be|showed\s+up\s+as|returned|was\s+revealed\s+as|"
                        r"revealed\s+as|reads?\s+as)\s+(?:as\s+)?" + _ADV2 + _DET + _VERDICT_WORD + _END)
 _WIN_IS = re.compile(r"^\s*(?:to\s+be|as|is|are|was|were|=|:)\s*" + _ADV2 + _DET + _VERDICT_WORD + _END)
-# "Player5 is a wolf, I checked them." -- the object pronoun ends the clause (not "I checked her votes")
-_CLAIM_AFTER_VERDICT = re.compile(r"\bplayer[0-6]" + _IS + _ADV2 + _DET + r"(?:" + _W2 + r"|" + _CLEARW + r")\b"
-                                  r"[^.!?]{0,20}?\bi\s+(?:have\s+|'ve\s+|’ve\s+)?(?:checked|investigated|inspected)\s+"
-                                  r"(?:them|him|her)(?=\s*(?:$|[.!;,]|and\b|last\s+night|yesterday|tonight))")
+# "Player5 is a wolf, I checked them." -- a seer's verdict word (not "good", "town", "safe", "human": table talk) and
+# the object pronoun ends the sentence, at most followed by when; not "I checked her votes", not "Player5 is town, I
+# checked them and their votes look fine" (a villager looking at the vote log)
+_CLAIM_AFTER_VERDICT = re.compile(r"\bplayer[0-6]" + _IS + _ADV2 + _DET + r"(?:" + _W2 + r"|villagers?|clear|cleared|"
+                                  r"clean|innocent)\b[^.!?]{0,20}?\bi\s+(?:have\s+|'ve\s+|’ve\s+)?(?:checked|"
+                                  r"investigated|inspected)\s+(?:them|him|her)"
+                                  r"(?=\s*(?:(?:last\s+night|yesterday|tonight)\s*)?(?:$|[.!?]))")
 # "Seer claim: Player5 is a wolf" / "Seer claim: I am the seer" (not "Seer claim: none yet", "Seer claim - anyone?")
 _CLAIM_OPEN = re.compile(r"(?:^|[.!?]\s*)(?:hard\s+)?seer\s+claim\s*[:\-—–]\s*(?:player[0-6]" + _IS + _ADV2 + _DET
                          + r"(?:" + _W2 + r"|" + _CLEARW + r"|not\s+(?:a\s+|an\s+)?" + _W2 + r")\b|"
@@ -403,10 +439,11 @@ def _question(t: str, pos: int) -> bool:
 
 
 def _cued(before: str) -> bool:
-    """Reported speech, a hypothetical or uncertainty right before a verdict ("Player2 says", "if", "maybe"); a
-    first-person "I think" / "I know" stays the sender's own voice."""
+    """Reported speech, a hypothetical or uncertainty right before a verdict ("Player2 says", "if", "maybe", "Player3
+    keeps insisting", "according to Player2", "I suspect"); a first-person "I think" / "I know" stays the sender's own
+    voice."""
     m = _CUE.search(before)
-    return bool(m) and m.group("who") != "i"
+    return (bool(m) and m.group("who") != "i") or bool(_REPORTED.search(before)) or bool(_HUNCH.search(before))
 
 
 def _negated(before: str) -> bool:
@@ -438,8 +475,10 @@ def _verdicts(t: str) -> tuple[set[int], set[int]]:
 
     for rx, kind in _DIRECT:
         for m in rx.finditer(t):
-            start, _ = _sentence(t, m.start())
-            if not _question(t, m.end()) and not _hedged(t[start:m.start()]):
+            start, end = _sentence(t, m.start())
+            prefix = t[start:m.start()]
+            if (not _question(t, m.end()) and not _hedged(prefix) and not _SPEAKER_LABEL.match(prefix)
+                    and not _SOURCE_AFTER.match(t, m.end(), max(end, m.end()))):
                 out[kind].update(seats_of(m.group("s")))
     # A check report: the verdict after the checked seat(s), up to the sentence end or the next seat named.
     for opener in (_CHECK_OPEN, _REVEAL_OPEN):
@@ -483,7 +522,7 @@ def _verdicts(t: str) -> tuple[set[int], set[int]]:
                     if vm and len(set(seats_of(prefix))) == 1:
                         out[kind].add(int(vm.group(1)))
                     continue
-                if _PLURAL_VERDICT.search(m.group(0)):
+                if _PLURAL_VERDICT.search(m.group(0)) or _SOURCE_AFTER.match(t, m.end(), max(end, m.end())):
                     continue
                 ref, seats = prefix, set(seats_of(prefix))
                 if not seats and not prefix.strip() and start > 0:
@@ -491,7 +530,7 @@ def _verdicts(t: str) -> tuple[set[int], set[int]]:
                     prev = t[pstart:start - 1]
                     if t[start - 1] != "?" and not _IF_START.search(prev):
                         ref, seats = prev, set(seats_of(prev))
-                if len(seats) == 1 and not _DEATH.search(ref):
+                if len(seats) == 1 and not _DEATH.search(ref) and not _AGREE.search(ref):
                     out[kind] |= seats
     return out["wolf"], out["clear"]
 
