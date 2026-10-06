@@ -1,7 +1,7 @@
 # UCLA AI Agent Gaming Tournament 2026 — 我们的参赛仓库
 
 > UCLA Trustworthy AI Lab × SAIR「首届 AI Agent 游戏锦标赛」
-> 提交窗口 **Sep 25 – Oct 9, 2026** · 现场决赛 **Oct 16, 2026**（Engineering VI，观众全线上）
+> 提交窗口 **Oct 6 – Oct 13, 2026**（09-27 改期；我们自己的安全期限 10-09）· 现场决赛 **Oct 16, 2026**（Engineering VI，观众全线上）
 > 赛事页：<https://tournament-assets.vercel.app/> · 平台：<https://agent-acp.vercel.app/>（AltruAgent）
 
 本仓库基于官方 starter [`UCLA-Trustworthy-AI-Lab/altruagent-starter`](https://github.com/UCLA-Trustworthy-AI-Lab/altruagent-starter)
@@ -76,11 +76,27 @@ python -m agent --tournament         # 比赛前启动并一直开着，自动�
 
 key 放进 `.env` 的 `ALTRUAGENT_OFFICIAL_AGENT_KEY`（**绝不提交**）。上游完整说明见 `docs/STARTER_README.md`；我们的部署方式见 `docs/deploy.md`。
 
+### 测试赛（`--claim`；10-05 上游新增「等开放座位」）
+
+在 tournament dashboard 上建测试对局（或在 *Open matches* 里加入别人开的座位），复制座位的命令，在仓库根目录运行：
+
+```bash
+python -m agent --claim seatclaim_...   # 或 --claim -（隐藏输入），一个进程只打一个座位
+```
+
+对局还有空座位时会打印 `Waiting for the match's open seats to be filled ...` 并自己每 ~20 s 重试（用同一个 claim key），座位坐满就认领开打；等待时按 Ctrl+C 不会占用座位。细节见 `docs/deploy.md`「测试赛」。
+
+### 红警（实时游戏；10-04 上游 SDK 支持，我们暂不打）
+
+上游 PR #3 给 SDK 加了实时模式（`state.raw["pacing"]["mode"] == "realtime"`）：`choose_action` 可以返回 `altruagent.WAIT`（这一刻什么都不发），整批被拒（`INVALID_ACTION`）不再结束对局进程。我们的 `agent/agent.py` 没有红警策略：被分到红警时整场都回答 `WAIT`（不发任何命令、不崩、只记一行日志），宝可梦和狼人杀不受影响。上游的大模型示例 `examples/llm_agent.py` 会打红警（`examples/llm/redalert.py`，要花 OpenAI 的钱）。
+
 ## 同步官方更新
 
 ```bash
 git fetch upstream && git merge upstream/main
 ```
+
+`README.md` 是我们自己的；上游的 README 原文放在 `docs/STARTER_README.md`。合并时 README 冲突取我们的版本，再用 `git show upstream/main:README.md > docs/STARTER_README.md` 更新原文，上游新增的要点在本文件里补一两句。`agent/__main__.py` 是上游的文件，但我们的官方模式加固（v4.1.2）改了很多：冲突要两边都留，合完跑 `tests/test_deploy.py`、`tests/test_main_claim.py`、`tests/test_realtime.py` 和全量 pytest。
 
 ## 安全
 

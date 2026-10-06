@@ -79,6 +79,7 @@ Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）即自�
   以前的做法（dry-r5 实测）是 20 s 后直接把座位交给 SDK：SDK 的 worker 撞到 `seat_busy` 就退出、35 s 后才重试，每次重试都起一个新 worker、用同一把 key 新认证一次（主进程也用这把 key，认证多了可能触发限流）；20 s 让座再叠加 35 s 重试，接管用了 68.8 s，那一回合被计时器代打了 1 次。已经交给 SDK 的座位不会再被藏起来（否则分配列表偶尔漏一次，SDK 就会把在打的 worker 当成「不再分配」停掉）。`ARENA_SEAT_BUSY_RETRY_S`（35 s）现在只影响主进程这一侧（例如主进程换了新 execution id、座位还被热备占着），一般不用动。
 - **OOM 不再停掉整个服务**（deploy-3）：systemd 单元加了 `OOMPolicy=continue`；引擎搜索进程（`oom_score_adj` 800）和计算器进程（500）是内核优先杀的对象，它们被杀后由 worker 自己重启（期间退回经典打法 / 启发式），不会连累 worker 和主进程。
 - **Node 子进程拿不到任何密钥**（robust-8）：计算器和搜索进程只继承 PATH、HOME、LANG、TZ、TMPDIR、NODE_OPTIONS、ARENA_SHOWDOWN 和 NODE_PATH。
+- **被分到红警（`red_alert`）也不出事**（v4.2.1，10-06）：红警是实时游戏（没有回合，`pacing.mode == "realtime"`），上游 10-04 起 SDK 支持（`altruagent.WAIT`、整批命令被拒不再结束 worker）。我们没有红警策略：worker 整场回答 `WAIT`（这一刻什么都不发），runner 等下一个画面再问，对局结束后 worker 正常退出。日志只有一行 `real-time game 'red_alert': no policy of ours plays it; answering every view with WAIT …`，第一个画面录一次（以后写红警策略时有真实 payload 可看），退出时 `[match-summary] … game=red_alert … waits=<次数>`。同时在打的宝可梦 / 狼人杀不受影响，`selfcheck`、`replay_real.py`、健康行碰到红警录像也照常。代价：这一局等于认输（被拆家，或 10 分钟双方都没下过命令时按击杀 / 资产判）。以前（合上游之前）会对每个画面发一个不合法的 `{"type": "pass"}`：旧 runner 下 worker 崩溃、冷却 10 s 后再起、再崩，新 runner 下变成每秒约 5 个被拒的命令并逐个录像。
 
 ### 上游缺陷（请主人报告给主办方；我们这边已经绕开）
 
@@ -318,7 +319,23 @@ python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-* --out /tmp/of
 from altruagent import AltruAgentClient; c = AltruAgentClient(); print(c.join_tournament('<tournament_id>'))"
 ```
 
-（确切的 SDK 调用以 `altruagent/client.py` 的 `join_tournament` 为准。）之后 agent 会看到子对局并自动开打。测试座位（`--claim seatclaim_...`）是一次性的，只在终端里手动跑，不放进看门脚本（脚本会拒绝）。
+（确切的 SDK 调用以 `altruagent/client.py` 的 `join_tournament` 为准。）之后 agent 会看到子对局并自动开打。测试座位（`--claim seatclaim_...`）是一次性的，只在终端里手动跑，不放进看门脚本（脚本会拒绝），见下一节。
+
+## 测试赛（`--claim`：在 dashboard 上建的测试对局）
+
+测试阶段在 tournament dashboard 上建测试对局，每个座位有一条一次性的认领命令。在仓库根目录（或解开的压缩包目录）的终端里运行，**一个进程只打一个座位**（自对弈：每个座位开一个终端）。不需要 API key，只要 `.env` 里有 `ALTRUAGENT_CONTROL_URL`（`.env.example` 已经写好）：
+
+```bash
+.venv/bin/python -m agent --claim seatclaim_...    # 或 --claim -（隐藏输入，token 不进 shell 历史）
+```
+
+- **开放座位（10-05 上游新增，「等座」）**：测试对局可以留开放座位，其他参赛者在 dashboard 的 *Open matches* 里加入；加入的座位同样给一条 `--claim` 命令，用法一样。座位还没坐满时，进程先打印一行
+  `Waiting for the match's open seats to be filled — this seat is claimed as soon as the match fills (Ctrl+C to stop)...`
+  然后自己每约 20 s 重试一次（平台给的 `retry_after_seconds`，再加 0–2 s 随机，免得几个座位同时重试；每次用同一个 claim key），坐满就认领开打。**等的时候座位还没被认领**：按 Ctrl+C 打印 `Stopped before the seat was claimed.`，这条命令以后还能用。等待中被限流（`rate_limited`）就停 30 s 再试；连不上平台时每 10 s 重试，5 次还不行就退出（`Could not claim seat: …`）。token 无效、过期、座位已被认领、对局不能再认领，都会立刻退出，不等。
+- **认领之后**：打印 `Claimed seat 1/2`、`Game: …`、`Match: …`（对局还在等各座位的 agent 连上时后面带 `(waiting for every seat's agent to connect)`）、`Connecting to GameAPI...`，连上后 `Connected. Playing — press Ctrl+C to stop.`，之后每换一个阶段一行（`Phase: draft` …），打完打印 `Match finished (termination_reason=…) after N decision(s).` 和比分，进程退出。**认领后不要停进程**：座位绑定这个进程，停了就不能再认领（只能重建测试对局）。agent 在认领**之前**创建，所以 agent 本身启动失败不会浪费座位。
+- claim 模式不跑 `python -m agent` 启动时的本机检查（计算器 / 引擎搜索，DEGRADED 横幅只在发现模式和官方模式打），所以先在同一个目录跑一次 `.venv/bin/python scripts/selfcheck.py`，看到 `selfcheck: ready` 再认领。
+- token 只用一次、只在内存里，不要写进 `.env`；不要放进看门脚本、systemd 或 Docker。
+- 红警测试对局：我们的 agent 整场只回答 `WAIT`（见上面「被分到红警」），不要用它测红警。
 
 ## 每局都在录
 
