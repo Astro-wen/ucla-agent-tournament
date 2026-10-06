@@ -133,9 +133,9 @@ class Session:
     `legal_actions` (`next_actions` says get_legal_actions). `die_at`: the worker is killed while waiting for that
     decision (the official runtime then starts a new worker on the seat). Records every call."""
 
-    def __init__(self, raws, *, start=0, drop=(), timeouts=1, die_at=None, termination="completed"):
+    def __init__(self, raws, *, start=0, drop=(), timeouts=1, die_at=None, stale_at=None, termination="completed"):
         self.raws, self.k, self.drop, self.timeouts, self.die_at = raws, start, set(drop), timeouts, die_at
-        self.termination = termination
+        self.stale_at, self.termination = stale_at, termination
         self.sent, self.waits, self.legal_calls = [], [], 0
         self.queue: list[dict] = []
         self.current = self._deliver(start)
@@ -191,6 +191,12 @@ class Session:
     def play_action(self, *, action_id=None, action=None, state_version, reasoning_summary=None) -> dict:
         want = self.raws[self.k]["legal_actions"]["state_version"]
         assert state_version == want, f"decision {self.k}: sent state_version {state_version}, the server has {want}"
+        if self.k == self.stale_at:          # our pick came after its 15 s: the server made it (the same card here)
+            self.stale_at = None
+            self.k += 1
+            self.current = self._deliver(self.k)
+            raise MCPToolError("MCP tool 'play_action' failed: stale state_version (the draft moved on)",
+                               status_code=None, error_code="STALE_STATE")
         self.sent.append((action_id if action is None else json.dumps(action, sort_keys=True), reasoning_summary))
         self.k += 1
         if self.k == len(self.raws):
@@ -277,8 +283,8 @@ def test_the_official_runner_plays_a_real_match_through_the_10_05_session(restar
     final = run_game(second, ctx, b)
     assert final.is_terminal and final.termination_reason == "completed"
     assert [s for s, _ in first.sent + second.sent] == want
-    assert b.resumed == matchstate.progress(raws[at - 1], "pokemon") and b.resumed < matchstate.progress(raws[at],
-                                                                                                         "pokemon")
+    saved = matchstate.progress(raws[at - 1], "pokemon")           # the killed worker's last saved decision
+    assert b.resumed == saved and saved < matchstate.progress(raws[at], "pokemon")
     assert b.pk.opp_cards == whole.pk.opp_cards and b.pk.cards == whole.pk.cards and b.pk.opp_cards
     assert a.fallbacks == b.fallbacks == 0 and a.joint_repairs == b.joint_repairs == 0
     assert all(w[1] is False for w in first.waits + second.waits)      # since_is_current_actor=false, as the doc asks
@@ -367,6 +373,19 @@ def test_a_hung_draft_decision_is_answered_before_the_pick_clock(monkeypatch):
     assert time.monotonic() - t < 3 - 1.5
     assert isinstance(out, LegalAction) and out.action_id.startswith("draft_pick:")
     assert c.last_decision["path"] == "overrun"
+
+
+def test_a_late_pick_rejected_as_stale_does_not_end_the_match(steady):
+    """Our 10th pick (row 4) arrives after its 15 s: the server already picked for us and rejects ours as STALE_STATE
+    (pokemon.md section 4). The runner re-reads the state and the match goes on; with the server's card the one we
+    chose, every later answer is the one we give without the delay."""
+    raws = platform_rows()
+    want, whole = replay(raws)
+    s = Session(raws, stale_at=4)
+    c = Contestant()
+    final = run_game(s, ctx_of(raws[0]), c)
+    assert final.is_terminal and [x for x, _ in s.sent] == want[:4] + want[5:]
+    assert c.pk.cards == whole.pk.cards and c.fallbacks == 0
 
 
 def test_a_last_pick_the_server_made_for_us_still_reaches_the_battle(steady):
