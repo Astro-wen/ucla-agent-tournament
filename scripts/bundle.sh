@@ -106,6 +106,7 @@ node_tarball() {   # prints the path of a verified node-$NODE_VERSION-linux-x64 
 
 # ---- what goes in (an allowlist: nothing else from the checkout is copied) ------------------------------------
 INCLUDE=(agent altruagent data deploy pyproject.toml requirements.lock .env.example README.md GAMES.md docs/deploy.md
+         docs/restart_load.md
          scripts/run_agent.sh scripts/selfcheck.py scripts/check_connection.py scripts/replay_real.py)
 for p in "${INCLUDE[@]}"; do
   [ -e "$p" ] || { echo "missing $p" >&2; exit 1; }

@@ -1472,8 +1472,8 @@ def test_realistic_payloads_match_the_recorded_shape():
 
 # ---- packaging ------------------------------------------------------------------------------------------------------
 BUNDLE_FILES = ["agent", "altruagent", "data", "deploy", "pyproject.toml", "requirements.lock", ".env.example",
-                "README.md", "GAMES.md", "docs/deploy.md", "scripts/run_agent.sh", "scripts/selfcheck.py",
-                "scripts/check_connection.py", "scripts/replay_real.py", "scripts/bundle.sh"]
+                "README.md", "GAMES.md", "docs/deploy.md", "docs/restart_load.md", "scripts/run_agent.sh",
+                "scripts/selfcheck.py", "scripts/check_connection.py", "scripts/replay_real.py", "scripts/bundle.sh"]
 
 
 def _mini_checkout(dst: Path) -> Path:
@@ -1513,6 +1513,7 @@ def test_bundle_leaves_env_files_out_and_its_secret_scan_blocks_keys(tmp_path):
     top = names[0].split("/")[0]
     assert f"{top}/agent/agent.py" in names and f"{top}/agent/pokemon/draft_model.json" in names
     assert f"{top}/requirements.lock" in names and f"{top}/deploy/Dockerfile" in names
+    assert f"{top}/docs/deploy.md" in names and f"{top}/docs/restart_load.md" in names   # (deploy.md points to it)
     assert f"{top}/SHA256SUMS" in names and f"{top}/BUNDLE_README.txt" in names
     assert not [n for n in names if "/.env" in n and not n.endswith(".env.example")]
     assert not [n for n in names if "__pycache__" in n or "/logs/" in n or "/tests/" in n or "/local/" in n]
