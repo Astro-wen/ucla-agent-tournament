@@ -444,11 +444,14 @@ class Gone:
         return call
 
 
-def test_a_session_gone_after_the_end_is_retried_like_a_finished_one(capsys, steady):
+def test_a_session_gone_after_the_end_is_retried_less_and_less_often(capsys, steady):
     """A worker that sees its match end with termination_reason "failed" (the battle server broke: no winner) exits as
-    finished. A worker started on the seat after the session was cleared gets SESSION_NOT_FOUND and exits as failed;
-    the official runtime treats the two alike: one new worker per cooldown while the platform still lists the seat
-    (the wait the 10-06 review measured, ~20 s apart at our 10 s cooldown), none once it is gone. No crash loop."""
+    finished. A worker started on the seat after the session was cleared gets SESSION_NOT_FOUND and exits as failed.
+    While the platform still lists the seat, the official runtime starts a new worker one cooldown after a finished one
+    (the wait the 10-06 review measured, ~15-20 s apart at our 10 s cooldown), and backs off a seat whose workers keep
+    failing (upstream 4cb083a, merged 10-07: the cooldown doubles per failure in a row); none once the seat is gone. No
+    crash loop either way."""
+    from altruagent.models import OfficialAssignment
     from altruagent.supervisor import TournamentState, run_tournament_once
     from altruagent.worker import EXIT_MATCH_FAILURE, EXIT_SUCCESS
 
@@ -477,8 +480,8 @@ def test_a_session_gone_after_the_end_is_retried_like_a_finished_one(capsys, ste
             def terminate(self):
                 self.exitcode = -15
 
-        official = SimpleNamespace(assignments=lambda: [SimpleNamespace(seat_id="seat-1", match_id="match-1",
-                                                                        game_type=GAME)] if listed[0] else [])
+        official = SimpleNamespace(assignments=lambda: [OfficialAssignment(seat_id="seat-1", match_id="match-1",
+                                                                           game_type=GAME)] if listed[0] else [])
         state = TournamentState()
         for t in range(0, 180, 5):                    # a poll every 5 s; the seat stays listed for 60 s after the end
             clock[0], listed[0] = float(t), t < 60
@@ -493,8 +496,8 @@ def test_a_session_gone_after_the_end_is_retried_like_a_finished_one(capsys, ste
         return starts
 
     gone, finished = schedule(EXIT_MATCH_FAILURE), schedule(EXIT_SUCCESS)
-    assert gone == finished
-    assert all(b - a >= 10 for a, b in zip(gone, gone[1:])) and gone and max(gone) < 60
+    assert finished == [0, 15, 30, 45]                # one cooldown (10 s, at 5 s polls) after each finished worker
+    assert gone == [0, 15, 40]                        # 10 s, then 20 s, then 40 s: the seat left the list meanwhile
 
 
 # ================================================================ (d) fixed board positions
