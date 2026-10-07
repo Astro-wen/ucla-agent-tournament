@@ -244,6 +244,7 @@
 - **检查**（树 f75722c，输出在 `~/wt/_upfix2_out`）：
   - 全量 pytest（1592 个，比 v4.2.1 多 5 个新测试）：第一次 1591 过、1 个失败（543.6 s）：`tests/strategy/test_engine_search.py::test_engine_modes_answer_legal_moves[extra1]`（引擎搜索的 guard 选择，要的是 `guard`、得到 `free`）。这个测试的搜索有 1.5 s 时间预算（`budget_ms` 1500），整套测试跑到一半机器忙时搜索迭代次数变少，结果就会变；引擎代码（`agent/pokemon`、`agent/js`）和 dac7375 一模一样，这次也没碰。单独在重任务锁下重跑：这个测试 8 次 × 5 个参数全过，整个文件 40 个全过。同一棵树第二次全量：1592 个全过（540 s）。
   - `replay_real.py`：2349 个真实决策 0 失败、0 修补，搜索用上 1296/1296，决策 p99 1456 ms、最慢 1791 ms；`--no-calc` 同样 0 失败、0 修补，p99 1437 ms、最慢 1845 ms。
+  - `rehearsal_official.py`（dry-up2，直接用工作区 b0ac3a6，不是压缩包；只对本地假平台、假 key）：13 项全过，4.5 分钟；宝可梦 6 场、狼人杀 3 桌，104 个决策，0 非法、0 计时器代打、0 竞争错误；kill worker 后 14.5 s 起新 worker、20.6 s 后下一步；kill 运行时 3.4 s / 7.4 s，0 次 seat_busy、0 次新 grant；认证接口 503 的 15 s 里运行时没换、0 个 worker 被停（日志 1 行 `re-authentication failed`、1 行 `recovered after 2 failure(s)`）；热备接管 31.1 s，那一回合没被代打；非租约持有者 0 步，key 没进日志，停止后 0 残留。
   - 本地对局不变：`agent/` 里只有 `__main__.py` 变了，而且只在官方运行时连控制面出错时起作用，决策代码一行没动（`git diff dac7375 -- agent/` 只有 `__main__.py`），所以没跑擂台 / panel。
 - **冻结为冠军**（f75722c）：`champion/` = f9e01be 的 `agent/`（`champion/VERSION` = f9e01be）。打法和 v4.2 / v4.2.1 相同，以前的擂台 / panel 数字可以接着比。上次的压缩包 `arena-agent-bfa28d3` 里是旧的 `agent/__main__.py`，部署前要从这个分支重新出包。
 
