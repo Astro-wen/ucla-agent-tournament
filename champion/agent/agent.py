@@ -45,6 +45,7 @@ import json
 import logging
 import os
 import re
+import sys
 import threading
 import time
 from pathlib import Path
@@ -62,10 +63,74 @@ log = logging.getLogger("agent")
 
 MAX_CHATS_PER_WINDOW = 5
 MAX_WORDS = 50
+MAX_MESSAGE_CHARS = 1024   # MESSAGE_TOO_LONG above it (werewolf.md §8); checked in UTF-8 bytes (never fewer than chars)
 RECORD_DIR = os.environ.get("ARENA_RECORD_DIR", "logs")   # every state we act on -> logs/<session>.jsonl
 BUSY_WAIT_S = 1.0          # how long a decision waits for an earlier, overrun policy call to finish
 _UNSET = object()
 _DAY_RE = re.compile(r"Day\s+(\d+)\s*\|")
+
+# Werewolf listening (ARENA_WW_LISTEN, see Contestant.choose_message): after the opening chat we keep the discussion
+# window open and read it, and send at most LISTEN_FOLLOWUPS more chats that day reacting to what was said since
+# (follow a seer claim, counter a fake one); we end our part of the window when a stop rule fires. Times are fractions
+# of the window's length W, the `messaging_seconds_left` of the first state we see in it (WINDOW_S when the state has
+# no countdown).
+LISTEN_ENV = "ARENA_WW_LISTEN"
+LISTEN_DEFAULT = "off"
+WINDOW_S = 120.0           # a Werewolf discussion window closes 2 minutes after it opens (werewolf.md §8)
+LISTEN_MARGIN = 1 / 8      # terminate at the latest this long before the window closes (15 s of 120)
+LISTEN_QUIET = 1 / 5       # ... or once no other seat has chatted for this long (24 s of 120)
+LISTEN_POLL = 1 / 24       # the longest single wait while listening (5 s of 120): another seat's terminate is seen
+LISTEN_FOLLOWUPS = 1       # chats a day after the opening ones, with listening on
+LISTEN_MIN_WAIT_S = 0.25   # a wait answered at once with nothing new is followed by this pause (no busy loop)
+_ON = {"1", "on", "true", "yes", "enable", "enabled"}
+
+
+def listen_enabled(env=None) -> bool:
+    """ARENA_WW_LISTEN: on | off (LISTEN_DEFAULT when unset)."""
+    env = os.environ if env is None else env
+    return str(env.get(LISTEN_ENV) or LISTEN_DEFAULT).strip().lower() in _ON
+
+
+class _Hold:
+    """`Contestant.message_step`'s third answer besides a chat and TERMINATE_MESSAGING: nothing to say yet, keep
+    listening (our part of the window stays open). Never handed to the runner. Use the HOLD singleton."""
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "HOLD"
+
+
+HOLD = _Hold()
+
+
+def _runner_game():
+    """The game session `altruagent.runner.run_game` is playing the current decision with (its `game`), or None.
+
+    choose_message gets a state and a context but no way to read the game (DecisionContext has no game handle, and
+    altruagent/ is the SDK, not ours to edit), so listening finds the runner's own session on the call stack. run_game
+    calls choose_message synchronously and waits for its answer, so nothing else uses the session meanwhile, and only
+    reads are made with it (wait_for_update, which the runner itself would call next). Must run in the runner's
+    thread. None under any other caller (local simulators, replays, tests) or if the SDK changes shape."""
+    try:
+        from altruagent import runner as sdk_runner
+        code = getattr(getattr(sdk_runner, "run_game", None), "__code__", None)
+        f = sys._getframe(1)
+        for _ in range(24):
+            if f is None or code is None:
+                return None
+            if f.f_code is code:
+                game = f.f_locals.get("game")
+                return game if callable(getattr(game, "wait_for_update", None)) else None
+            f = f.f_back
+    except Exception:
+        log.debug("runner game lookup failed", exc_info=True)
+    return None
+
+
+def _seen_seq(state) -> int | None:
+    """The highest message seq in a state's new_messages (what wait_for_update's since_message_seq takes)."""
+    seqs = [m.index for m in getattr(state, "new_messages", None) or [] if isinstance(getattr(m, "index", None), int)]
+    return max(seqs) if seqs else None
 
 
 def record(kind: str, context: DecisionContext, state: GameState, out=None, public_reason: str | None = None,
@@ -98,6 +163,17 @@ def record(kind: str, context: DecisionContext, state: GameState, out=None, publ
 _record_failed: list = []
 
 
+def clip_chat(content) -> str:
+    """A chat as the platform takes it: whitespace collapsed, at most MAX_WORDS words and MAX_MESSAGE_CHARS (in UTF-8
+    bytes), cut at a word ("" when not even the first word fits). Our templates are far below both caps."""
+    words = str(content if content is not None else "").split()[:MAX_WORDS]
+    text = " ".join(words)
+    while words and len(text.encode("utf-8", "replace")) > MAX_MESSAGE_CHARS:
+        words.pop()
+        text = " ".join(words)
+    return text
+
+
 def _jsonable(x):
     if x is None or isinstance(x, (dict, str, int, float, bool)):
         return x
@@ -109,6 +185,8 @@ def _jsonable(x):
 
 
 class Contestant:
+    HOLD = HOLD                 # message_step's "keep listening" answer, for the local simulators
+
     def __init__(self) -> None:
         self.ww = WerewolfPolicy()
         self.pk = PokemonPolicy()
@@ -117,6 +195,15 @@ class Contestant:
         self._chat_done = False                       # we terminated this window: never chat again in it
         self._chat_sent = 0
         self._chat_said: set = set()
+        # Listening (ARENA_WW_LISTEN): chats of the day's opening batch still queued, chats sent after it, and the
+        # window's clock (its length W, our first sight, when another seat last chatted; see _listen_wait).
+        self.listen = listen_enabled()
+        self._chat_opening = 0
+        self._followups = 0
+        self._win: dict | None = None
+        self._clock = time.monotonic
+        self.last_listen_s = 0.0                      # seconds the last choose_message spent listening
+        self.listen_stats = {"holds": 0, "followups": 0, "seconds": 0.0, "max_s": 0.0, "errors": 0, "no_game": 0}
         self.watchdog = os.environ.get("ARENA_TC_WATCHDOG", "1") != "0"   # 0: run the policy inline (debugging)
         self._busy: threading.Thread | None = None   # a policy call that overran its deadline and is still running
         self._warned: set = set()                     # unknown game types / phases already reported
@@ -408,7 +495,21 @@ class Contestant:
 
     # ---- Werewolf discussion ----------------------------------------------
     def choose_message(self, state: GameState, context: DecisionContext):
-        """Never raises: any failure ends our turn to talk (TERMINATE_MESSAGING)."""
+        """Never raises: any failure ends our turn to talk (TERMINATE_MESSAGING).
+
+        With listening on (ARENA_WW_LISTEN), once our opening chat is out and we have nothing more to say yet, we do
+        not terminate: we keep reading the window (the runner's own session, read-only wait_for_update calls, see
+        _listen) until there is something worth answering (one follow-up a day) or a stop rule fires, then answer.
+        Off, or without a runner to read with, this is message_step: one chat or TERMINATE per call."""
+        self.last_listen_s = 0.0
+        out = self.message_step(state, context)
+        if out is HOLD:
+            out = self._listen(state, context)
+        return out
+
+    def message_step(self, state: GameState, context: DecisionContext):
+        """One discussion decision, never blocking and never raising: a SendMessage, TERMINATE_MESSAGING, or (listening
+        on) HOLD = nothing to say yet, ask again at the next change (the local simulators drive this directly)."""
         family = ""
         try:
             family, _ = game_kind(getattr(context, "game_type", None), getattr(state, "raw", None))
@@ -416,11 +517,13 @@ class Contestant:
             dl = timecontrol.budget_for(getattr(state, "raw", None), getattr(context, "game_type", None))
             with timecontrol.decision(dl):
                 out = self._guarded(lambda: self._choose_message(state, context), dl, "chat policy")
-            if not (out is TERMINATE_MESSAGING or isinstance(out, SendMessage)):
+            if not (out is TERMINATE_MESSAGING or out is HOLD or isinstance(out, SendMessage)):
                 out = TERMINATE_MESSAGING
         except Exception:
             log.exception("choose_message failed; terminating messaging")
             out = TERMINATE_MESSAGING
+        if out is TERMINATE_MESSAGING:
+            self._chat_done = True                        # whatever answered it: never a chat after our terminate
         record("message", context, state, out)
         self._after_decision(state, family)
         return out
@@ -429,7 +532,10 @@ class Contestant:
         """One chat or TERMINATE per call. The runner calls again after every change while the window is open, so a
         reactive policy (`reactive_chat`) is asked again once its queued messages are sent: it can answer what was
         said meanwhile. After we terminate, and whenever the server lists us as terminated, only TERMINATE (a
-        no-op server side) goes out: a chat then could be rejected, and a rejected chat ends the match process."""
+        no-op server side) goes out: a chat then could be rejected, and a rejected chat ends the match process.
+
+        Listening on: the policy is asked again at every call (not only right after our own chat), at most
+        LISTEN_FOLLOWUPS chats go out after the opening ones, and HOLD replaces TERMINATE while _may_hold allows."""
         st = state.raw if isinstance(state.raw, dict) else {}
         self.ww.observe(st)
         gs = st.get("game_state")
@@ -440,6 +546,7 @@ class Contestant:
         me, term = st.get("your_position"), st.get("terminated_messaging")
         if day != self._chat_day:
             self._chat_day, self._chat_done, self._chat_sent, self._chat_said = day, False, 0, set()
+            self._followups, self._win = 0, None
             # A restarted worker without its predecessor's saved memory (agent/matchstate.py) can join a window our seat
             # already chatted in: new_messages carries the whole window, so count and remember our own chats there (the
             # 5-chat quota and the no-repeat rule then hold across the restart). At a window's first call in one
@@ -449,16 +556,24 @@ class Contestant:
                 if isinstance(m, dict) and m.get("sender") == me and m.get("type", "chat") == "chat" \
                         and m.get("day", day) in (day, None):
                     self._chat_sent += 1
-                    self._chat_said.add((" ".join(str(m.get("content", "")).split()[:MAX_WORDS]),
-                                         tuple(m.get("recipients") or ())))
+                    self._chat_said.add((clip_chat(m.get("content", "")), tuple(m.get("recipients") or ())))
             self._chat_queue = self._ask_chat(st)
+            self._chat_opening = len(self._chat_queue)
+        if self.listen:
+            self._listen_wait(st)                         # the window's clock starts at our first sight of it
         if isinstance(term, list) and isinstance(me, int) and me in term:
             self._chat_done = True
-        if not self._chat_done and not self._chat_queue and self._chat_sent and getattr(self.ww, "reactive_chat", False):
-            self._chat_queue = self._ask_chat(st)
+        if not self._chat_done and not self._chat_queue and getattr(self.ww, "reactive_chat", False):
+            if not self.listen:
+                if self._chat_sent:
+                    self._chat_queue = self._ask_chat(st)
+            elif self._followups < LISTEN_FOLLOWUPS:
+                self._chat_queue = self._ask_chat(st)[:LISTEN_FOLLOWUPS - self._followups]
         while not self._chat_done and self._chat_queue and self._chat_sent < MAX_CHATS_PER_WINDOW:
             m = self._chat_queue.pop(0)
-            text = " ".join(str(m.get("content", "")).split()[:MAX_WORDS])
+            opening = self._chat_opening > 0
+            self._chat_opening = max(0, self._chat_opening - 1)
+            text = clip_chat(m.get("content", ""))
             rec = m.get("recipients") or None
             if rec is not None and (not isinstance(rec, list) or len(rec) != 1 or not isinstance(rec[0], int)
                                     or isinstance(rec[0], bool) or not 0 <= rec[0] <= 6 or rec[0] == me):
@@ -466,7 +581,103 @@ class Contestant:
             if text and (text, tuple(rec or ())) not in self._chat_said:     # never the same message twice a day
                 self._chat_said.add((text, tuple(rec or ())))
                 self._chat_sent += 1
+                if not opening:
+                    self._followups += 1
+                    if self.listen:
+                        self.listen_stats["followups"] += 1
                 return SendMessage(text, recipients=rec)
+        if self.listen and not self._chat_done and self._may_hold(st, me):
+            return HOLD
+        self._chat_done = True
+        return TERMINATE_MESSAGING
+
+    # ---- Werewolf listening (ARENA_WW_LISTEN) -------------------------------
+    def _may_hold(self, st: dict, me) -> bool:
+        """Keep our part of the window open, i.e. not terminate yet: the window is open, we are alive, a follow-up
+        (and chat quota for it) is left, some other living seat is still talking, and no time rule says stop."""
+        if self._followups >= LISTEN_FOLLOWUPS or self._chat_sent >= MAX_CHATS_PER_WINDOW:
+            return False
+        if st.get("phase") != "messaging" or st.get("is_terminal") or st.get("eliminated") \
+                or st.get("messaging_enabled") is False:
+            return False
+        seat, alive = self.ww.seats(st)
+        if not isinstance(me, int) or isinstance(me, bool) or seat != me or me not in alive:
+            return False
+        others = [s for s in alive if s != me]
+        term = st.get("terminated_messaging")
+        if not others or (isinstance(term, list) and all(s in term for s in others)):
+            return False                                  # nobody else can still say anything
+        return self._listen_wait(st) is not None
+
+    def _listen_wait(self, st: dict) -> float | None:
+        """Seconds to the next time-based stop (at most one poll), or None = stop now: the window closes within the
+        margin, or no other seat has chatted for the quiet time. The clock is the state's own countdown
+        (`messaging_seconds_left`); without one, WINDOW_S from our first sight of the window."""
+        now = self._clock()
+        if self._win is None:
+            self._win = {"t0": now, "w": None, "quiet_from": None, "chats": 0}
+        w = self._win
+        left = st.get("messaging_seconds_left")
+        counted = isinstance(left, (int, float)) and not isinstance(left, bool) and left == left and left >= 0
+        left = float(left) if counted else WINDOW_S - (now - w["t0"])
+        if w["w"] is None:
+            w["w"], w["quiet_from"] = max(left, 1.0), left
+        elif counted:                                     # a countdown that stopped moving cannot keep us here
+            left = min(left, w["w"] - (now - w["t0"]) + 1.0)
+        me = st.get("your_position")
+        chats = sum(1 for m in st.get("new_messages") or [] if isinstance(m, dict)
+                    and m.get("type", "chat") == "chat" and m.get("sender") != me)
+        if chats > w["chats"]:
+            w["chats"], w["quiet_from"] = chats, left
+        margin = max(1.0, LISTEN_MARGIN * w["w"])
+        until = min(left - margin, LISTEN_QUIET * w["w"] - (w["quiet_from"] - left))
+        if until <= 0:
+            return None
+        return min(until, max(0.5, LISTEN_POLL * w["w"]))
+
+    def _listen(self, state: GameState, context: DecisionContext):
+        """Read the open window until message_step has an answer other than HOLD (a follow-up chat, or TERMINATE when
+        a stop rule fires); TERMINATE_MESSAGING as well if the window closed meanwhile (the runner's terminate then
+        meets WRONG_PHASE, a race it re-reads), if there is no runner session to read with, or on any error.
+        Reads do not count as activity (werewolf.md §9); the stop rules end it well before the 120 s limits."""
+        t0 = time.monotonic()
+        self.listen_stats["holds"] += 1
+        st = state
+        try:
+            game = _runner_game()
+            if game is None:
+                self.listen_stats["no_game"] += 1
+                self._warn_once(("listen", "no runner"), "Werewolf listening: no runner session to read the window "
+                                "with; ending our part of the discussion instead")
+            else:
+                while True:
+                    wait = self._listen_wait(st.raw if isinstance(st.raw, dict) else {})
+                    if wait is None:
+                        break
+                    t_wait = time.monotonic()
+                    nxt = game.wait_for_update(since_version=st.state_version, since_message_seq=_seen_seq(st),
+                                               since_is_current_actor=bool(st.is_current_actor), since_phase=st.phase,
+                                               timeout_seconds=wait)
+                    if not isinstance(nxt, GameState):
+                        break
+                    if time.monotonic() - t_wait < LISTEN_MIN_WAIT_S and nxt.state_version == st.state_version \
+                            and _seen_seq(nxt) == _seen_seq(st) and nxt.phase == st.phase:
+                        time.sleep(LISTEN_MIN_WAIT_S)     # nothing new, answered at once: never spin on the server
+                    if nxt.is_terminal or nxt.phase != "messaging" or (nxt.raw or {}).get("eliminated"):
+                        self.ww.observe(nxt.raw if isinstance(nxt.raw, dict) else {})
+                        break
+                    out = self.message_step(nxt, context)
+                    if out is not HOLD:
+                        return out
+                    st = nxt
+        except Exception:
+            self.listen_stats["errors"] += 1
+            log.warning("Werewolf listening failed; ending our part of the discussion", exc_info=True)
+        finally:
+            spent = time.monotonic() - t0
+            self.last_listen_s = spent
+            self.listen_stats["seconds"] += spent
+            self.listen_stats["max_s"] = max(self.listen_stats["max_s"], spent)
         self._chat_done = True
         return TERMINATE_MESSAGING
 
@@ -516,13 +727,15 @@ class Contestant:
         self.ww, self.pk = WerewolfPolicy(), PokemonPolicy()
         self._chat_day, self._chat_queue, self._chat_done = _UNSET, [], False
         self._chat_sent, self._chat_said = 0, set()
+        self._chat_opening, self._followups, self._win = 0, 0, None
         self.overruns = self.fallbacks = self.joint_repairs = self.decisions = self._resumes = self.doubles_turns = 0
         self.waits = 0
         self.resumed, self._summarized = None, False
 
     def _export(self, family: str, raw) -> dict:
         chat = {"day": None if self._chat_day is _UNSET else self._chat_day, "has_day": self._chat_day is not _UNSET,
-                "queue": self._chat_queue, "done": self._chat_done, "sent": self._chat_sent, "said": self._chat_said}
+                "queue": self._chat_queue, "done": self._chat_done, "sent": self._chat_sent, "said": self._chat_said,
+                "opening": self._chat_opening, "followups": self._followups}
         out = {"game": family, "game_type": self._game, "seat": self._seat,
                "progress": matchstate.progress(raw, family), "t": round(time.time(), 3), "chat": chat,
                "counters": {"decisions": self.decisions, "overruns": self.overruns, "fallbacks": self.fallbacks,
@@ -541,6 +754,8 @@ class Contestant:
         self._chat_done = bool(chat.get("done"))
         self._chat_sent = int(chat.get("sent") or 0)
         self._chat_said = set(chat.get("said") or ())
+        self._chat_opening = int(chat.get("opening") or 0)
+        self._followups = int(chat.get("followups") or 0)
         c = saved.get("counters") or {}
         self.decisions = int(c.get("decisions") or 0)
         self.overruns = int(c.get("overruns") or 0)
@@ -586,7 +801,11 @@ class Contestant:
         resumed = f"at {self.resumed}" if self.resumed is not None else "no"
         if self._family != "pokemon":
             waits = f" waits={self.waits}" if self.waits else ""        # (a real-time game answered with WAIT)
-            return f"{head} fallbacks={self.fallbacks} overruns={self.overruns} resumed={resumed}{waits}"
+            ls = self.listen_stats
+            listen = (f" listen=on holds={ls['holds']} followups={ls['followups']} listen_s={ls['seconds']:.1f} "
+                      f"max_s={ls['max_s']:.1f} listen_errors={ls['errors']} no_game={ls['no_game']}"
+                      if self.listen and self._family == "werewolf" else "")
+            return f"{head} fallbacks={self.fallbacks} overruns={self.overruns} resumed={resumed}{waits}{listen}"
         by_count = sorted((ss.get("reasons") or {}).items(), key=lambda kv: -kv[1])
         reasons = f" ({', '.join(f'{k} x{v}' for k, v in by_count)})" if by_count else ""
         return (f"{head} battle={c['battle']} search={c['mode']} used={c['used']} classic={c['battle'] - c['used']}"

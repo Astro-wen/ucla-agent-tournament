@@ -79,7 +79,7 @@ LOW_K = 3                                               # slice "k<=3": few of o
 AGENTS = {"agent": "agent.agent:create_agent", "champion": "champion.agent.agent:create_agent"}
 ROLES = ("villager", "seer", "wolf")
 SIDE = {"villager": "villager", "seer": "villager", "wolf": "wolf"}
-FAIL_KEYS = ("crash", "illegal", "bad_chat", "timeout", "chat_after_terminate")
+FAIL_KEYS = ("crash", "illegal", "bad_chat", "timeout", "chat_after_terminate", "window_close")
 DEFAULT_PAIRS = "agent:champion,agent/champion:champion,champion/agent:champion"
 LLM_SEAT_KEYS = ("decisions", "model_calls", "invalid_answers", "fallbacks", "message_requests", "message_fallbacks")
 CLIENT_KEYS = ("calls", "cache_hits", "errors", "timeouts", "refused", "json_errors", "prompt_tokens",

@@ -1,5 +1,13 @@
 """Parse a Werewolf get_game_state payload into a structured view (docs/platform/werewolf.md §2–3), and read chat.
 
+The public record (deaths, votes) comes from `game_state`, or from the observation's seat-labelled lines when that block
+is missing or its display names are ambiguous. Both platform wordings are read: until 10-04 "lynch" (a death's cause
+`lynch`, "(lynch)", "— Player1 lynched"), since then "eliminate" / "vote" (`vote`, "(eliminated by vote)", "(killed at
+night)", "— Player1 eliminated by vote"); a death's cause is normalised to one value, `night_kill` or `vote`
+(`norm_cause`). Both vote labels ("Vote to lynch PlayerN", "Vote to eliminate PlayerN") are day labels (`_DAY_LABEL`);
+actions themselves are seat numbers. The seer's line before its first check, "You have not investigated anyone yet.",
+is a seer cue like "Your investigations: ...".
+
 Our role and allies are read from the documented observation lines ("Your role: WOLF", "Your fellow wolves:
 Player4") and, only when those are missing, from reasonable variants ("Your role is: Werewolf", "You are the Seer",
 "Your wolf ally: Player4", ...). Either way the result is cross-checked against what the platform does, which cannot
@@ -54,7 +62,38 @@ SEAT_RE = re.compile(r"Player(\d+)")
 LIVING_RE = re.compile(r"^Living:\s*(.*)$", re.M)
 VOTE_LINE_RE = re.compile(r"^Day\s+(\d+)\s+vote:\s*(.*?)(?:\s+[—–-]+\s+(.*))?$", re.M)
 VOTE_PAIR_RE = re.compile(r"Player(\d+)\s*->\s*(Player\d+|abstain)", re.I)
-DEAD_LINE_RE = re.compile(r"^\s*day\s+(\d+):\s*Player(\d+)\s+was\s+(wolf|seer|villager)\s*\((night_kill|lynch)\)", re.I | re.M)
+# Two wordings of the public record (docs/platform/werewolf.md, changed 10-04/05; both are read, the server may lead
+# or lag the docs): a death line ends "(lynch)" / "(night_kill)", or "(eliminated by vote)" / "(killed at night)";
+# a vote line ends "— Player1 lynched", or "— Player1 eliminated by vote".
+DEAD_LINE_RE = re.compile(r"^\s*day\s+(\d+):\s*Player(\d+)\s+was\s+(?:an?\s+)?(wolf|werewolf|seer|villager)\s*"
+                          r"\(([^()\n]{1,40})\)", re.I | re.M)
+VOTE_OUT_RE = re.compile(r"Player(\d+)\s+(?:was\s+)?(?:lynched|eliminated|voted\s+out|executed)\b", re.I)
+# The seer's investigations line before its first check (since 10-05): "You have not investigated anyone yet."
+NO_INVEST_RE = re.compile(r"\byou\s+have\s+not\s+(?:yet\s+)?investigated\s+anyone\b", re.I)
+
+# The cause of a death, one internal value whatever the wording: game_state.dead[].cause is "night_kill" | "lynch"
+# (until 10-04) or "night_kill" | "vote" (since), the observation says "(night_kill)" / "(lynch)" or "(killed at
+# night)" / "(eliminated by vote)".
+CAUSE_NIGHT = "night_kill"
+CAUSE_VOTE = "vote"
+_CAUSE_VOTE_RE = re.compile(r"\b(?:lynch(?:ed|ing)?|votes?|voted(?:\s+out)?|eliminat(?:ed|ion)\s+by\s+vote|"
+                            r"day[\s_-]*vote|execut(?:ed|ion))\b")
+_CAUSE_NIGHT_RE = re.compile(r"\bnight[\s_-]*kill(?:ed)?\b|\bkilled\s+(?:at|by|during|in\s+the)\s+(?:night|wol(?:f|ves))\b"
+                             r"|\bwolf[\s_-]*kill\b")
+
+
+def norm_cause(c) -> str:
+    """CAUSE_NIGHT | CAUSE_VOTE for every documented wording (old and new), else the value lower-cased ("?" if none)."""
+    if not isinstance(c, str) or not c.strip():
+        return "?"
+    t = " ".join(c.strip().lower().replace("_", " ").split())
+    if t == "night kill" or _CAUSE_NIGHT_RE.search(t):
+        return CAUSE_NIGHT
+    if _CAUSE_VOTE_RE.search(t):
+        return CAUSE_VOTE
+    return c.strip().lower()
+
+
 # Kept for callers of the old names; chat is read with the normalized patterns below.
 ACCUSE_RE = re.compile(r"Player(\d+)\s+(?:is|=|was)\s+(?:a\s+|the\s+)?(?:wolf|werewolf)", re.I)
 SEER_CLAIM_RE = re.compile(r"\b(i am|i'm|im)\s+(the\s+)?(real\s+|true\s+)?seer\b", re.I)
@@ -609,7 +648,7 @@ class View:
     sub_phase: str | None                       # night_wolf | night_seer | day_vote
     alive: list[int]
     dead: dict[int, str]                        # seat -> revealed role
-    dead_cause: dict[int, str]                  # seat -> night_kill | lynch
+    dead_cause: dict[int, str]                  # seat -> CAUSE_NIGHT ("night_kill") | CAUSE_VOTE ("vote"), norm_cause
     allies: list[int] = field(default_factory=list)
     investigations: dict[int, str] = field(default_factory=dict)
     votes: list[tuple[int, dict[int, int | None], int | None]] = field(default_factory=list)
@@ -663,6 +702,8 @@ def _text_role(obs: str) -> tuple[str | None, str | None, list[int], bool, dict[
             invest_line = True
             invest = {int(s): ("wolf" if r.lower() in ("wolf", "werewolf", "were-wolf", "evil") else "villager")
                       for s, r in INVEST_ANY_RE.findall(m2.group(1)) if int(s) <= 6}
+    if not invest_line and NO_INVEST_RE.search(obs):
+        invest_line = True                      # the seer before its first check (a seer cue like the line itself)
     hint = "wolf" if ally_line else "seer" if invest_line else "villager" if _NO_INFO.search(obs) else None
     return role, hint, allies, strict_allies, invest
 
@@ -702,7 +743,7 @@ def parse(st: dict, messages: list[dict] | None = None) -> View:
         s = seat(d.get("player"))
         if s is not None:
             dead[s] = d.get("role", "?")
-            cause[s] = d.get("cause", "?")
+            cause[s] = norm_cause(d.get("cause"))
     # The observation carries the same public record by seat label: use it when the structured block is missing
     # or its names do not map to seats.
     if not alive:
@@ -711,7 +752,8 @@ def parse(st: dict, messages: list[dict] | None = None) -> View:
             alive = sorted({int(x) for x in SEAT_RE.findall(m.group(1))})
     if not dead:
         for _day, s, r, c in DEAD_LINE_RE.findall(obs):
-            dead[int(s)], cause[int(s)] = r.lower(), c.lower()
+            dead[int(s)] = "wolf" if r.lower() == "werewolf" else r.lower()
+            cause[int(s)] = norm_cause(c)
 
     votes = []
     for vh in gs.get("vote_history") or [] if isinstance(gs.get("vote_history"), list) else []:
@@ -727,7 +769,7 @@ def parse(st: dict, messages: list[dict] | None = None) -> View:
         for m in VOTE_LINE_RE.finditer(obs):
             vv = {int(a): (int(b[6:]) if b.lower().startswith("player") else None)
                   for a, b in VOTE_PAIR_RE.findall(m.group(2))}
-            e = re.search(r"Player(\d+)\s+lynched", m.group(3) or "")
+            e = VOTE_OUT_RE.search(m.group(3) or "")
             votes.append((int(m.group(1)), vv, int(e.group(1)) if e else None))
 
     day = gs.get("day") if isinstance(gs.get("day"), int) and not isinstance(gs.get("day"), bool) else None

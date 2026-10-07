@@ -11,6 +11,32 @@ State payloads are built in the platform's shape (observation text,
 game_state, players, legal_actions, new_messages, ...) so the deployed
 `agent.agent.Contestant` runs here unchanged.
 
+Wording (ARENA_WW_WORDING, read when a Game is made): "new" (default) is the
+docs since 10-04/05: labels "Vote to eliminate PlayerN", game_state.dead[].cause
+"night_kill" | "vote", Dead lines "(killed at night)" / "(eliminated by vote)",
+the vote line "— PlayerN eliminated by vote", the seer's "You have not
+investigated anyone yet." before its first check and a last "Game over — WOLVES
+win" / "Game over — VILLAGERS win" line once the game is decided; "old" is the
+wording before (Vote to lynch, cause "lynch", "(lynch)" / "(night_kill)",
+"PlayerN lynched", "Your investigations: none yet", no Game over line).
+ARENA_WW_MESSAGING=off plays without discussion windows (messaging_enabled
+false, as a game created by API without the werewolf preset may be).
+ARENA_WW_SAME_NAMES=on (eval only) shows our seats one display name for every
+seat, so the agent has to read the seat-labelled observation text.
+
+Discussion timing (ARENA_WW_TIMING, read when a Game is made): "rounds" (default)
+asks every living seat once per round, in a fresh shuffled order, our seats
+included (ROUNDS rounds, 20 s each on the window's clock); "rt" is the official
+runner's timing: our seats answer in milliseconds, so they all speak at t = 0,
+before any other seat, and are asked again after every chat or terminate (each
+event wakes the runner's wait_for_update) and at the end of every round of the
+other seats' talk (RT_ROUND_S each); after the rounds, a seat of ours still
+talking is asked every TICK_S until it stops or the 120 s window limit closes it
+(counted as `window_close`). Either way the messaging states carry the window's
+countdown `messaging_seconds_left` (WINDOW_S minus that clock), and a seat of
+ours may answer HOLD (agent.agent.Contestant.message_step with listening on):
+nothing said, not terminated, asked again later.
+
 Failure model (docs/platform/werewolf.md section 9 and altruagent/runner.py): a
 seat whose decision raises, answers an illegal action, sends a chat the
 platform would reject (empty, over 50 words, bad recipients, a 6th chat) or
@@ -39,6 +65,60 @@ IDLE_LIMIT_S = 120.0                  # werewolf.md section 9
 MAX_CHATS = 5
 MAX_WORDS = 50
 ROUNDS = 6                            # discussion rounds before the idle timeout would close the window
+WINDOW_S = 120.0                      # a discussion window closes 2 minutes after it opens (werewolf.md section 8)
+ROUND_S = 20.0                        # "rounds" timing: one round on the window's clock
+RT_ROUND_S = 15.0                     # "rt" timing: one round of the other seats' talk
+TICK_S = 5.0                          # "rt" timing: how often a seat of ours still talking is asked after the rounds
+WORDING_ENV = "ARENA_WW_WORDING"      # new (default) | old, see the module docstring
+MESSAGING_ENV = "ARENA_WW_MESSAGING"  # on (default) | off
+SAME_NAMES_ENV = "ARENA_WW_SAME_NAMES"  # on: our seats see one display name for all seats (ContestantSeat)
+TIMING_ENV = "ARENA_WW_TIMING"        # rounds (default) | rt, see the module docstring
+_OFF = {"0", "off", "false", "no", "none", "disable", "disabled"}
+
+
+class _SimHold:
+    """ContestantSeat.message's answer when our agent holds (keeps listening): no chat, not terminated."""
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "SIM_HOLD"
+
+
+SIM_HOLD = _SimHold()
+
+
+def wording_from_env() -> str:
+    return "old" if str(os.environ.get(WORDING_ENV, "") or "").strip().lower() == "old" else "new"
+
+
+def timing_from_env() -> str:
+    return "rt" if str(os.environ.get(TIMING_ENV, "") or "").strip().lower() == "rt" else "rounds"
+
+
+def messaging_from_env() -> bool:
+    return str(os.environ.get(MESSAGING_ENV, "") or "").strip().lower() not in _OFF
+
+
+def cause_field(cause: str, wording: str) -> str:
+    """game_state.dead[].cause: night_kill | vote (new) or night_kill | lynch (old); either internal name is accepted."""
+    if cause in ("vote", "lynch"):
+        return "lynch" if wording == "old" else "vote"
+    return cause
+
+
+def cause_text(cause: str, wording: str) -> str:
+    """The cause in an observation Dead line: "(eliminated by vote)" / "(killed at night)", or old "(lynch)" /
+    "(night_kill)"."""
+    if wording == "old":
+        return cause_field(cause, wording)
+    return {"vote": "eliminated by vote", "lynch": "eliminated by vote", "night_kill": "killed at night"}.get(cause, cause)
+
+
+def vote_result_text(eliminated: int | None, wording: str) -> str:
+    """The end of a "Day N vote: ..." line. The new wording without an elimination is not documented: a guess."""
+    if wording == "old":
+        return f"Player{eliminated} lynched" if eliminated is not None else "nobody lynched"
+    return f"Player{eliminated} eliminated by vote" if eliminated is not None else "nobody eliminated"
 
 
 class Seat:
@@ -58,9 +138,27 @@ class Seat:
         return None            # None = terminate; else {"content": str, "recipients": [] | [seat]}
 
 
+def same_names(raw: dict) -> dict:
+    """`raw` as a table where every seat shows the same display name (copies of one agent, e.g. a Testing match whose
+    seats one contestant's agent holds): the name-keyed game_state no longer says who is who, so a reader has to use
+    the seat-labelled observation text. Never mutates `raw`."""
+    raw = dict(raw)
+    raw["players"] = [dict(p, name="agent") for p in raw.get("players") or []]
+    gs = dict(raw.get("game_state") or {})
+    gs["alive"] = ["agent"] * len(gs.get("alive") or [])
+    gs["dead"] = [dict(d, player="agent") for d in gs.get("dead") or []]
+    gs["vote_history"] = [dict(v, votes={"agent": "agent"} if v.get("votes") else {},
+                               eliminated="agent" if v.get("eliminated") else None)
+                          for v in gs.get("vote_history") or []]
+    raw["game_state"] = gs
+    return raw
+
+
 class ContestantSeat(Seat):
     def __init__(self, factory, name="ours"):
         self.factory, self.name = factory, name
+        # ARENA_WW_SAME_NAMES=on: our seats see one display name for every seat (same_names), an eval-only switch
+        self.same_names = str(os.environ.get(SAME_NAMES_ENV, "") or "").strip().lower() in ("1", "on", "true", "yes")
 
     def reset(self):
         self.agent = self.factory()
@@ -69,6 +167,8 @@ class ContestantSeat(Seat):
         return DecisionContext(session_id="local", tournament_id=None, game_type="werewolf", agent_id="ours")
 
     def choose(self, raw: dict) -> str:
+        if self.same_names:
+            raw = same_names(raw)
         gs = GameState.from_mcp_state(raw)
         out = self.agent.choose_action(gs, self._ctx())
         if isinstance(out, WithReasoning):          # public reasoning: checked like the real runner, then unwrapped
@@ -77,7 +177,18 @@ class ContestantSeat(Seat):
         return out.action_id if isinstance(out, LegalAction) else str(out)
 
     def message(self, raw: dict):
-        out = self.agent.choose_message(GameState.from_mcp_state(raw), self._ctx())
+        if self.same_names:
+            raw = same_names(raw)
+        # An agent that can listen answers through its non-blocking step (HOLD = keep listening; the simulator asks
+        # it again later, as the real runner's session would wake it); any other agent through choose_message.
+        step = getattr(self.agent, "message_step", None)
+        if callable(step):
+            out = step(GameState.from_mcp_state(raw), self._ctx())
+            hold = getattr(self.agent, "HOLD", None)
+            if hold is not None and out is hold:
+                return SIM_HOLD
+        else:
+            out = self.agent.choose_message(GameState.from_mcp_state(raw), self._ctx())
         if out is TERMINATE_MESSAGING or out is None:
             return None
         if isinstance(out, SendMessage):
@@ -120,9 +231,13 @@ class Game:
     broken: list[bool] = field(default_factory=lambda: [False] * N)     # process gone: platform auto-plays the seat
     chat_order: str = "shuffle"       # "shuffle": a fresh random speaking order every round (agents run concurrently
     #                                   on the platform); "seat": seat order
+    wording: str = field(default_factory=wording_from_env)        # "new" | "old" (module docstring)
+    messaging: bool = field(default_factory=messaging_from_env)   # False: no discussion windows
+    timing: str = field(default_factory=timing_from_env)          # "rounds" | "rt" (module docstring)
+    clock: float | None = None        # seconds since the open discussion window opened (None: no window open)
     stats: dict = field(default_factory=lambda: {k: [0] * N for k in (
-        "decisions", "crash", "illegal", "bad_chat", "timeout", "chat_after_terminate", "chats", "dms")}
-        | {"max_ms": [0.0] * N})
+        "decisions", "crash", "illegal", "bad_chat", "timeout", "chat_after_terminate", "chats", "dms", "holds",
+        "window_close")} | {"max_ms": [0.0] * N})
 
     # ---- setup -----------------------------------------------------------
     def __post_init__(self):
@@ -151,8 +266,11 @@ class Game:
             allies = [i for i in range(N) if self.roles[i] == "wolf" and i != seat]
             lines.append("Your fellow wolves: " + ", ".join(f"Player{i}" for i in allies))
         elif role == "seer":
-            inv = ", ".join(f"Player{t} is {r}" for t, r in self.invest.items()) or "none yet"
-            lines.append(f"Your investigations: {inv}")
+            inv = ", ".join(f"Player{t} is {r}" for t, r in self.invest.items())
+            if inv or self.wording == "old":
+                lines.append(f"Your investigations: {inv or 'none yet'}")
+            else:
+                lines.append("You have not investigated anyone yet.")
         else:
             lines.append("You do not know anyone else's role.")
         if not self.alive[seat]:
@@ -161,11 +279,13 @@ class Game:
         lines.append("Living: " + ", ".join(f"Player{i}" for i in self.living()))
         lines.append("Dead:")
         for d in self.dead:
-            lines.append(f"  day {d['day']}: Player{d['seat']} was {d['role']} ({d['cause']})")
+            lines.append(f"  day {d['day']}: Player{d['seat']} was {d['role']} ({cause_text(d['cause'], self.wording)})")
         for v in self.votes:
             vs = ", ".join(f"Player{a} -> " + (f"Player{b}" if b is not None else "abstain") for a, b in v["votes"].items())
-            lines.append(f"Day {v['day']} vote: {vs} — " + (f"Player{v['eliminated']} lynched" if v["eliminated"] is not None else "nobody lynched"))
-        legal = [{"action_id": str(a), "label": _label(sub, a),
+            lines.append(f"Day {v['day']} vote: {vs} — " + vote_result_text(v["eliminated"], self.wording))
+        if self.winner and self.wording != "old":
+            lines.append(f"Game over — {'WOLVES' if self.winner == 'wolf' else 'VILLAGERS'} win")
+        legal = [{"action_id": str(a), "label": _label(sub, a, self.wording),
                   "input": {"session_id": "local", "action_id": str(a), "state_version": self.version}}
                  for a in (actions or [])]
         visible = [m for m in self.messages[self.window_start_seq:]
@@ -179,13 +299,16 @@ class Game:
             "players": [{"position": i, "name": self.names[i], "agent_id": f"id{i}"} for i in range(N)],
             "game_state": {"day": self.day, "phase": sub,
                            "alive": [self.names[i] for i in self.living()],
-                           "dead": [{"day": d["day"], "player": self.names[d["seat"]], "role": d["role"], "cause": d["cause"]} for d in self.dead],
+                           "dead": [{"day": d["day"], "player": self.names[d["seat"]], "role": d["role"],
+                                     "cause": cause_field(d["cause"], self.wording)} for d in self.dead],
                            "vote_history": [{"day": v["day"],
                                              "votes": {self.names[a]: (self.names[b] if b is not None else "abstain") for a, b in v["votes"].items()},
                                              "eliminated": self.names[v["eliminated"]] if v["eliminated"] is not None else None} for v in self.votes],
                            "winner": self.winner},
-            "eliminated": not self.alive[seat], "messaging_enabled": True, "new_messages": visible,
+            "eliminated": not self.alive[seat], "messaging_enabled": self.messaging, "new_messages": visible,
             "terminated_messaging": list(self.terminated),
+            "messaging_seconds_left": (int(max(0.0, WINDOW_S - self.clock))
+                                       if phase == "messaging" and self.clock is not None else None),
         }
 
     def _timed(self, seat: int, fn):
@@ -248,51 +371,118 @@ class Game:
         return bool(words) and len(words) <= MAX_WORDS and sent < MAX_CHATS and len(rec) <= 1 \
             and all(isinstance(r, int) and 0 <= r < N and r != seat for r in rec)
 
+    def _ask_message(self, seat: int, sent: dict) -> str | None:
+        """Ask one seat for its discussion move: "msg" (a chat or DM went out), "term" (it terminated, or its
+        process is gone), None (nothing happened: it holds, or it had already terminated and only read)."""
+        done = seat in self.terminated
+        if self.broken[seat]:
+            if not done:
+                self.terminated.append(seat)
+                return "term"
+            return None
+        if done and not isinstance(self.seats[seat], ContestantSeat):
+            return None                                # reference seats: the runner's idempotent re-terminate
+        raw = self.state(seat, "messaging", "day_vote")
+        m, err = self._timed(seat, lambda: self.seats[seat].message(raw))
+        if err is not None:
+            self.stats["crash"][seat] += 1
+            self.broken[seat] = True
+            m = None
+        if m is SIM_HOLD:
+            if not done:
+                self.stats["holds"][seat] += 1
+            return None                                # still talking, nothing said (never escapes the real runner)
+        if m is None:
+            if not done:
+                self.terminated.append(seat)
+                return "term"
+            return None
+        if done:
+            self.stats["chat_after_terminate"][seat] += 1
+            return None
+        if not self._chat_ok(seat, m, sent[seat]):
+            self.stats["bad_chat"][seat] += 1          # the platform rejects it; the runner raises: process gone
+            self.broken[seat] = True
+            self.terminated.append(seat)
+            return "term"
+        rec = list(m.get("recipients") or [])
+        self.messages.append({"seq": len(self.messages), "sender": seat, "recipients": rec,
+                              "visibility": "direct" if rec else "broadcast", "type": "chat",
+                              "content": " ".join(str(m.get("content", "")).split()), "day": self.day})
+        sent[seat] += 1
+        self.stats["dms" if rec else "chats"][seat] += 1
+        return "msg"
+
+    def _close_window(self) -> None:
+        for seat in self.living():                     # the window's limit (or the idle timeout) closes it
+            if seat not in self.terminated:
+                if isinstance(self.seats[seat], ContestantSeat) and not self.broken[seat]:
+                    self.stats["window_close"][seat] += 1
+                self.terminated.append(seat)
+        self.clock = None
+
     def discussion(self) -> None:
         self.window_start_seq = len(self.messages)
         self.terminated = [i for i in range(N) if not self.alive[i]]
+        if self.timing == "rt":
+            return self._discussion_rt()
         sent = {i: 0 for i in range(N)}
         for _round in range(ROUNDS):
             order = self.living()
             if self.chat_order == "shuffle":        # same order for every agent under test (paired comparisons)
                 random.Random(f"{self.order_seed}:{self.day}:{_round}").shuffle(order)
-            for seat in order:
-                done = seat in self.terminated
-                if self.broken[seat]:
-                    if not done:
-                        self.terminated.append(seat)
-                    continue
-                if done and not isinstance(self.seats[seat], ContestantSeat):
-                    continue                           # reference seats: the runner's idempotent re-terminate
-                raw = self.state(seat, "messaging", "day_vote")
-                m, err = self._timed(seat, lambda: self.seats[seat].message(raw))
-                if err is not None:
-                    self.stats["crash"][seat] += 1
-                    self.broken[seat] = True
-                    m = None
-                if m is None:
-                    if not done:
-                        self.terminated.append(seat)
-                    continue
-                if done:
-                    self.stats["chat_after_terminate"][seat] += 1
-                    continue
-                if not self._chat_ok(seat, m, sent[seat]):
-                    self.stats["bad_chat"][seat] += 1      # the platform rejects it; the runner raises: process gone
-                    self.broken[seat] = True
-                    self.terminated.append(seat)
-                    continue
-                rec = list(m.get("recipients") or [])
-                self.messages.append({"seq": len(self.messages), "sender": seat, "recipients": rec,
-                                      "visibility": "direct" if rec else "broadcast", "type": "chat",
-                                      "content": " ".join(str(m.get("content", "")).split()), "day": self.day})
-                sent[seat] += 1
-                self.stats["dms" if rec else "chats"][seat] += 1
+            for j, seat in enumerate(order):
+                self.clock = ROUND_S * (_round + j / len(order))
+                self._ask_message(seat, sent)
             if all(i in self.terminated for i in self.living()):
                 break
-        for seat in self.living():                     # idle timeout closes the window
-            if seat not in self.terminated:
-                self.terminated.append(seat)
+        self._close_window()
+
+    def _discussion_rt(self) -> None:
+        """The official runner's timing (module docstring): ours first at t = 0, then woken by every event."""
+        sent = {i: 0 for i in range(N)}
+        living = self.living()
+        ours = [i for i in living if isinstance(self.seats[i], ContestantSeat)]
+        others = [i for i in living if i not in ours]
+        random.Random(f"{self.order_seed}:{self.day}:rt").shuffle(ours)
+
+        def wake(src: int) -> None:
+            """An event of `src`: every other seat of ours is asked again (their own events wake the rest in turn)."""
+            pending = [src]
+            while pending:
+                s0 = pending.pop(0)
+                for s in ours:
+                    if s != s0 and self.alive[s] and self._ask_message(s, sent):
+                        pending.append(s)
+
+        def tick() -> None:
+            for s in ours:
+                if s not in self.terminated and self._ask_message(s, sent):
+                    wake(s)
+
+        self.clock = 0.0
+        for s in ours:
+            if s not in self.terminated and self._ask_message(s, sent):
+                wake(s)
+        for rnd in range(ROUNDS):
+            if all(i in self.terminated for i in self.living()):
+                break
+            order = [i for i in others if i not in self.terminated or self.broken[i]]
+            random.Random(f"{self.order_seed}:{self.day}:{rnd}").shuffle(order)
+            for j, seat in enumerate(order):
+                self.clock = RT_ROUND_S * (rnd + (j + 1) / (len(order) + 1))
+                if self._ask_message(seat, sent):
+                    wake(seat)
+            self.clock = RT_ROUND_S * (rnd + 1)
+            tick()                                     # the round's end: a seat of ours still talking polls again
+        t = self.clock
+        while any(i not in self.terminated for i in self.living()) and t < WINDOW_S:
+            t = min(WINDOW_S, t + TICK_S)
+            self.clock = t
+            if t >= WINDOW_S:
+                break
+            tick()
+        self._close_window()
 
     def vote(self) -> None:
         ballots: dict[int, int | None] = {}
@@ -315,7 +505,7 @@ class Game:
             self.stall += 1
         else:
             self.stall = 0
-            self._kill(eliminated, "lynch")
+            self._kill(eliminated, "vote")
 
     def _kill(self, seat: int, cause: str) -> None:
         self.alive[seat] = False
@@ -335,7 +525,8 @@ class Game:
             self.night()
             if self.check():
                 break
-            self.discussion()
+            if self.messaging:
+                self.discussion()
             self.vote()
             if self.check():
                 break
@@ -351,7 +542,8 @@ def deal_roles(rng: random.Random) -> list[str]:
     return roles
 
 
-def _label(sub: str | None, a: int) -> str:
+def _label(sub: str | None, a: int, wording: str = "new") -> str:
     if a == ABSTAIN:
         return "Abstain"
-    return {"night_wolf": "Kill", "night_seer": "Investigate", "day_vote": "Vote to lynch"}.get(sub or "", "") + f" Player{a}"
+    vote = "Vote to lynch" if wording == "old" else "Vote to eliminate"
+    return {"night_wolf": "Kill", "night_seer": "Investigate", "day_vote": vote}.get(sub or "", "") + f" Player{a}"
