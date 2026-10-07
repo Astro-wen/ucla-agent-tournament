@@ -231,7 +231,7 @@ fi
 
 cat > "$DEST/BUNDLE_README.txt" <<EOF
 AltruAgent tournament agent, bundle $VERSION (built $(date -u +%Y-%m-%dT%H:%MZ)).
-Contains no key. Runbook: docs/deploy.md (the official tournament: section "官方正式赛").
+Contains no key. Runbook: docs/deploy.md (the official tournament: section "比赛日手册").
 
 Needs: Linux x86-64 with glibc >= 2.28 for the bundled node (Ubuntu >= 18.10, Debian >= 10, RHEL/Rocky/Alma >= 8,
 Amazon Linux 2023; NOT Amazon Linux 2, CentOS 7, Alpine/musl or arm64 such as AWS Graviton: those need their own

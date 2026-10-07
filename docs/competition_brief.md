@@ -84,7 +84,7 @@ Guang Cheng 要求只认 altruagent-game.com。以下是 10-03 对官网、平�
 
 ## E. 由此产生的缺口（按急迫程度）
 1. **红警 agent（P0）**：从零写规则驱动的脚本 bot（建造顺序、经济、电力、集结后进攻、基地防守），不靠 LLM。PR #3 合并前，先在分支上按 PR #3 的接口开发；本地没有引擎，测试要在平台上打（需要 Aaron 在 dashboard 建红警房间）。
-2. ~~**部署支持 `--tournament`（P0，小）**~~：v4.1.2 已做。`scripts/run_agent.sh`、systemd 单元、Docker、压缩包、`selfcheck` 都认 `ALTRUAGENT_OFFICIAL_AGENT_KEY`，有它就跑 `python -m agent --tournament`（见 `docs/deploy.md`「官方正式赛」）。剩下的是拿到真 key 后由主人跑一次 `bash scripts/run_agent.sh check-tournament`。
+2. ~~**部署支持 `--tournament`（P0，小）**~~：v4.1.2 已做。`scripts/run_agent.sh`、systemd 单元、Docker、压缩包、`selfcheck` 都认 `ALTRUAGENT_OFFICIAL_AGENT_KEY`，有它就跑 `python -m agent --tournament`（10-07 起固定跑 `--tournament --match`，见 `docs/deploy.md`「比赛日手册」）。剩下的是拿到真 key 后由主人跑一次 `bash scripts/run_agent.sh check-tournament`。
 3. **问主办方**：红警 / 王者荣耀是否计分；官方 key 由谁生成（dashboard 上线了吗）；Replit 是否是指定运行环境。
 
 # 比赛情报简报（截至 2026-09-28）
@@ -199,10 +199,10 @@ Guang Cheng 要求只认 altruagent-game.com。以下是 10-03 对官网、平�
 - **容易误触发的开赛** [CONFIRMED]：报名把名额填满时会立刻开赛。随手 `GET /tournaments/{id}` 也可能触发一个已经到时间的开赛。只在准备好的时候加入，不要随便轮询单个赛事。
 - **测试阶段（Testing phase）** [CONFIRMED]：9/28 合并进 SDK。流程如下：
   1. 人在"锦标赛 dashboard"里创建一场测试赛。
-  2. dashboard 给每个座位一条命令，形如 `python -m agent --claim seatclaim_...`。
+  2. dashboard 给每个座位一条命令，形如 `python -m agent --claim seatclaim_...`。**（10-06 起停用，见最上面：认领码已被 Official Agent Key 取代，测试赛由同一个进程自动接上，不要再照这几步做。）**
   3. 每个进程占一个座位：宝可梦 2 个，狼人杀 7 个。不需要 API key，每个座位都可以换成不同的 agent。
   4. token 只能用一次，并绑定领取它的那个进程。进程一死，这个座位就作废，只能重开一场测试赛。
-  5. 我们的仓库已经合并了 `--claim` 功能。
+  5. 我们的仓库已经合并了 `--claim` 功能。（10-07 随上游 PR #5 删掉：现在 `--claim` 只打印停用说明。）
 - **测试阶段还不能用** [CONFIRMED]：部署中的前端仍是 build 6km10EQHb8aHG6EOBtk2v，里面没有测试赛界面。"创建锦标赛"仍是占位表单，横幅还写着旧日期 9/25–10/9。
 
 ### 4.3 最近的代码变化
@@ -300,7 +300,7 @@ Guang Cheng 要求只认 altruagent-game.com。以下是 10-03 对官网、平�
 10. **测试阶段一开放，马上跑真实对局。** 建测试赛是人工操作，需要 Aaron 在 dashboard 里做。
     - 真实 7 座狼人杀：我们的 agent 加 llm_agent 或 smoke_agent 混坐。
     - 宝可梦：对 llm_agent。
-    - 每个座位开一个终端；token 用 `--claim -` 手动输入，不存盘；比赛中不要关进程。
+    - 每个座位开一个终端；token 用 `--claim -` 手动输入，不存盘；比赛中不要关进程。**（10-06 起停用，见最上面：现在一个 `run_agent.sh` 进程用 Official Agent Key 自动接上所有测试赛座位。）**
 11. **狼人杀可选 LLM 说服层。**
     - key 和 base URL 从环境变量读取，方便接入主办方可能提供的端点。
     - 没有 key 时退回规则。
