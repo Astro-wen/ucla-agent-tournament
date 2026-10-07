@@ -2,7 +2,7 @@
 # Keep `python -m agent` running for ONE agent key: auto-restart with backoff, log rotation under logs/, a health
 # line every HEALTH_EVERY seconds, and a clean stop that leaves no worker or node process behind.
 #
-#   bash scripts/run_agent.sh start   [--name NAME | --env FILE] [--tournament] [-- AGENT_ARGS]
+#   bash scripts/run_agent.sh start   [--name NAME | --env FILE] [-- AGENT_ARGS]
 #                                                                  # background (setsid); returns once the agent is up
 #   bash scripts/run_agent.sh stop    [--name NAME]                # SIGTERM to the agent tree, SIGKILL after STOP_TIMEOUT
 #   bash scripts/run_agent.sh restart [--name NAME]
@@ -15,21 +15,22 @@
 #   bash scripts/run_agent.sh check-tournament [--name NAME]       # python -m agent --check-tournament (CONNECTS to
 #                                                                  # the platform: the owner runs it, once the key exists)
 #
-# Two modes. TOURNAMENT (the official competition): `python -m agent --tournament` with the Official Agent Key
-# ALTRUAGENT_OFFICIAL_AGENT_KEY (eak_live_ + 64 hex). DISCOVERY: plain `python -m agent` with an sk_agent_ key
-# (ALTRUAGENT_API_KEY; sparring, self-hosted test matches). The mode is --tournament (or `-- --tournament`), else
-# ARENA_MODE=tournament|discovery, else tournament whenever an Official Agent Key is set (key file or environment),
-# so a .env that holds both keys never quietly runs discovery on competition day. Every start logs the mode and
-# every health line shows it (mode=...).
+# One way to play since the platform's event-agent switch (10-06): the agent's Official Agent Key
+# ALTRUAGENT_OFFICIAL_AGENT_KEY (eak_live_ + 64 hex, generated on the dashboard's Agent Configuration page, the agent
+# set to Self-hosted), and `python -m agent --tournament --match`: one process that plays the key's test matches
+# (Testing page) and its tournament games, each a seat assigned to the key. Explicit kind flags after `--` (only
+# `-- --tournament` or only `-- --match`) replace the default pair. The retired ways are refused with a message: the
+# sk_agent_ keys and their discovery mode (ARENA_MODE=discovery; the platform answers 410 platform_agents_retired) and
+# Testing claim codes (--claim, 410 claim_codes_retired). Every start logs the mode and every health line shows it
+# (mode=tournament(primary|standby)).
 # NAME picks the key file: main -> .env, anything else -> .env.NAME (--name apocalypse -> .env.apocalypse).
 # Without a key file the key must already be in the environment (Docker, systemd Environment=). Keys are never
 # printed; health lines show a 10-hex-digit hash so two instances with the same key are recognisable.
-# One key = one running instance per machine: a lock file per key hash under ARENA_LOCK_DIR (default /tmp), held by
-# the run loop AND the running agent, so a second checkout, bundle or LOG_DIR cannot start the same sk_agent_ key;
-# never run one sk_agent_ key on two machines. Tournament mode differs: the platform gives each seat to ONE runtime
-# (a 30 s execution lease), so a second runtime with the same Official Agent Key is a hot standby, not a clash; it
-# starts with a note (role=standby) instead of being refused; on another machine ARENA_ROLE=standby in its key file
-# says so. The platform gives a NEW seat to whichever runtime claims it first, so a standby leaves new seats to the
+# A lock file per key hash under ARENA_LOCK_DIR (default /tmp) is held by the run loop AND the running agent. The
+# platform gives each seat to ONE runtime (a 30 s execution lease), so a second runtime with the same key (another
+# checkout, bundle or LOG_DIR on this machine) is a hot standby, not a clash: it starts with a note (role=standby)
+# instead of being refused; on another machine ARENA_ROLE=standby in its key file says so. The platform gives a NEW
+# seat to whichever runtime claims it first, so a standby leaves new seats to the
 # primary (ARENA_NEW_SEAT_DELAY_S, default 20 s for role=standby), then plays a seat only once its grant succeeds (no
 # runtime holds its lease; checked at every poll, with no worker or agent session while the primary plays it), so it
 # takes a seat over within ~10 s of the primary's lease lapsing. Each run loop hands its agent one
@@ -46,15 +47,16 @@
 #
 # Files under LOG_DIR (default logs/, ignored by git): agent-NAME.out (+ .1 ... .LOG_KEEP, rotated at LOG_MAX_MB),
 # agent-NAME.pid (the run loop), agent-NAME.state (the agent process and the loop's helpers), agent-NAME.lock,
-# agent-NAME.execid (tournament mode: the loop's execution id with the boot, key hash and run it belongs to; 0600).
+# agent-NAME.execid (the loop's execution id with the boot, key hash and run it belongs to; 0600).
 # ARENA_ALLOW_NO_CALC=1 alone is enough when node cannot run: the engine search needs the same node, so the start
 # then goes on with the classic battle policy (ARENA_BATTLE=classic for the agent), loudly. A simulator that is
 # missing while node works still refuses (ARENA_BATTLE=classic is the switch for that).
 # A LOG_DIR that cannot be written (read-only mount, another user's directory) refuses with exit 2 and says so.
 # Agent recordings go to LOG_DIR unless ARENA_RECORD_DIR is set.
 # Knobs (environment): PYTHON, LOG_DIR, LOG_MAX_MB=20, LOG_KEEP=10, HEALTH_EVERY=300, RESTART_DELAY=3,
-# RESTART_MAX_DELAY=60, STOP_TIMEOUT=20, ARENA_LOCK_DIR=/tmp, ARENA_ALLOW_NO_CALC, ARENA_MODE, ARENA_ROLE,
-# ARENA_DISCOVERY_S=10, ARENA_WORKER_COOLDOWN_S=10, ARENA_SEAT_BUSY_RETRY_S, ARENA_NEW_SEAT_DELAY_S
+# RESTART_MAX_DELAY=60, STOP_TIMEOUT=20, ARENA_LOCK_DIR=/tmp, ARENA_ALLOW_NO_CALC, ARENA_ROLE,
+# ARENA_DISCOVERY_S=10 (the assignment poll), ARENA_WORKER_COOLDOWN_S=10 (a failed seat's first retry; the SDK doubles
+# it per failure in a row, up to 600 s), ARENA_SEAT_BUSY_RETRY_S, ARENA_NEW_SEAT_DELAY_S
 # (agent/__main__.py), ARENA_NODE, ARENA_CALC (agent/pokemon/calc.py), ARENA_BATTLE, ARENA_SHOWDOWN
 # (agent/pokemon/policy.py, engine.py), ARENA_STATE, ARENA_STATE_DIR (a restarted worker's memory, under
 # LOG_DIR/state by default), ARENA_SEARCH_MAX_PROCS, ARENA_SEARCH_MIN_FREE_MB (the machine's search processes; all in
@@ -91,7 +93,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --name) NAME="${2:?--name needs a value}"; shift 2 ;;
     --env) ENV_FILE="${2:?--env needs a file}"; shift 2 ;;
-    --tournament) MODE_ARG=tournament; shift ;;
+    --tournament) MODE_ARG=tournament; shift ;;          # (accepted for older commands: the event mode is the only one)
     --) shift; AGENT_ARGS=("$@"); break ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -108,10 +110,12 @@ fi
 if [ -z "$ENV_FILE" ]; then
   if [ "$NAME" = main ]; then ENV_FILE=.env; else ENV_FILE=".env.$NAME"; fi
 fi
+KIND_ARGS=0                                          # explicit --tournament / --match after `--`: exactly those kinds
 for a in ${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"}; do
   case "$a" in
-    --claim*) echo "claim mode is one single-use seat: run it in a terminal, not under run_agent.sh" >&2; exit 2 ;;
-    --tournament) MODE_ARG=tournament ;;
+    --claim*) echo "Testing claim codes (--claim) were retired by the platform on 10-06 (410 claim_codes_retired): test" \
+                   "matches are assignments of the Official Agent Key now, and this script plays them by itself" >&2; exit 2 ;;
+    --tournament|--match) KIND_ARGS=1 ;;
     --check-tournament) [ "$CMD" = check-tournament ] || {
       echo "--check-tournament is a one-shot check: bash scripts/run_agent.sh check-tournament [--name NAME]" >&2; exit 2; } ;;
   esac
@@ -126,7 +130,7 @@ EXECID_FILE="$LOG_DIR/agent-$NAME.execid"
 LOG_ABS="$(cd "$LOG_DIR" 2>/dev/null && pwd)" || LOG_ABS="$LOG_DIR"
 RUN_ID="$NAME@$LOG_ABS"                              # ARENA_RUN_ID of the loop, its helpers and the agent
 START_KNOBS='^(ARENA_CALC|ARENA_NODE|ARENA_ALLOW_NO_CALC|ARENA_BATTLE|ARENA_SHOWDOWN)$'   # what the start checks read
-MODE=""; MODE_WHY=""; ROLE=""; CALC_GOOD=1
+MODE=""; MODE_WHY=""; MODE_RETIRED=""; ROLE=""; CALC_GOOD=1
 OFFICIAL_KEY_RE='^eak_live_[0-9a-f]{64}$'            # altruagent/official.py _KEY_PATTERN
 
 now() { printf '%(%s)T' -1; }
@@ -161,25 +165,20 @@ load_envs() {     # what the agent will see: the key file, then the calculator /
 
 official_key() { local k="${ALTRUAGENT_OFFICIAL_AGENT_KEY:-}"; printf '%s' "${k//[[:space:]]/}"; }   # (the SDK strips it)
 
-resolve_mode() {  # MODE = tournament | discovery (see the header), MODE_WHY = how it was chosen; after load_envs
-  MODE="$MODE_ARG"; MODE_WHY="--tournament"
-  if [ -z "$MODE" ]; then
-    case "$(printf '%s' "${ARENA_MODE:-}" | tr -d '[:space:]' | tr 'A-Z' 'a-z')" in
-      tournament|official) MODE=tournament; MODE_WHY="ARENA_MODE" ;;
-      discovery) MODE=discovery; MODE_WHY="ARENA_MODE" ;;
-      "") ;;
-      *) say "WARNING: ARENA_MODE=${ARENA_MODE} is neither tournament nor discovery: ignored" ;;
-    esac
-  fi
-  if [ -z "$MODE" ]; then
-    if [ -n "$(official_key)" ]; then MODE=tournament; MODE_WHY="ALTRUAGENT_OFFICIAL_AGENT_KEY is set"
-    else MODE=discovery; MODE_WHY="no ALTRUAGENT_OFFICIAL_AGENT_KEY"; fi
-  fi
+resolve_mode() {  # MODE = tournament, the only mode (see the header); MODE_WHY = what it runs; after load_envs.
+  MODE=tournament                                   # (the name health lines and state files have always shown)
+  if [ "$KIND_ARGS" = 1 ]; then MODE_WHY="the Official Agent Key; the kinds of game given after --"
+  else MODE_WHY="python -m agent --tournament --match: the Official Agent Key's test matches and tournament games"; fi
+  MODE_RETIRED=""
+  case "$(printf '%s' "${ARENA_MODE:-}" | tr -d '[:space:]' | tr 'A-Z' 'a-z')" in
+    ""|tournament|official|event) ;;
+    discovery) MODE_RETIRED="ARENA_MODE=discovery: the discovery mode (sk_agent_ keys) was retired by the platform on 10-06 (410 platform_agents_retired); remove ARENA_MODE" ;;
+    *) say "WARNING: ARENA_MODE=${ARENA_MODE} means nothing any more (one mode: the Official Agent Key): ignored" ;;
+  esac
 }
 
-key_hash() {      # of the key this mode uses
-  local k="${ALTRUAGENT_API_KEY:-}"
-  [ "$MODE" = tournament ] && k="$(official_key)"
+key_hash() {      # of the Official Agent Key
+  local k; k="$(official_key)"
   [ -n "$k" ] || { echo none; return; }
   if command -v sha256sum >/dev/null; then printf '%s' "$k" | sha256sum | cut -c1-10
   else printf '%s' "$k" | shasum -a 256 | cut -c1-10; fi
@@ -303,12 +302,12 @@ health_line() {
   disk="$(df -Pk "$LOG_DIR" 2>/dev/null | awk 'NR==2 { printf "%.1fG", $4 / 1048576 }')"
   logs_mb="$(du -sk "$LOG_DIR" 2>/dev/null | awk '{ printf "%dM", $1 / 1024 }')"
   restarts="$(state_get restarts)"
-  local mode="${MODE:-discovery}" role kh=""
-  if loop_alive "$(state_get loop)"; then       # a running loop: the mode and key IT runs, as its state file says; a
-    s="$(state_get mode)"; [ -n "$s" ] && mode="$s"  # `status` / `health` shell may see another ARENA_MODE or key file
-    kh="$(state_get keyhash)"
+  local mode="${MODE:-tournament}" role="${ROLE:-}" kh=""
+  if loop_alive "$(state_get loop)"; then       # a running loop: the mode, role and key IT runs, as its state file
+    s="$(state_get mode)"; [ -n "$s" ] && mode="$s"  # says; a `status` / `health` shell may see another key or role
+    kh="$(state_get keyhash)"; role="$(state_get role)"
   fi
-  role="$(state_get role)"; [ "$mode" = tournament ] && mode="tournament(${role:-primary})"
+  [ "$mode" = tournament ] && mode="tournament(${role:-primary})"
   printf '[health] name=%s mode=%s agent=%s pid=%s run_up=%s agent_up=%s restarts=%s workers=%d node=%d calc_procs=%d rss=%dMB fds=%d last_output=%s records=%s last_record=%s disk_free=%s logs=%s calc=%s search=%s key=#%s\n' \
     "$NAME" "$mode" "$st" "${child:--}" "$up" "$aup" "${restarts:-0}" "$npy" "$nnode" "$ncalc" \
     $((rss / 1024)) "$nfd" "$age" "$rec" "$last_rec" "${disk:-?}" "${logs_mb:-?}" "$(node_status)" "$(engine_status)" \
@@ -410,20 +409,23 @@ preflight() {     # 0 = go; everything it prints lands in the log
   if [ -f "$ENV_FILE" ]; then
     perm="$(stat -c %a "$ENV_FILE" 2>/dev/null || echo 600)"
     case "$perm" in *00) ;; *) say "WARNING: $ENV_FILE is readable by other users (mode $perm): chmod 600 $ENV_FILE" ;; esac
-  elif [ -z "${ALTRUAGENT_API_KEY:-}" ] && [ -z "$(official_key)" ]; then
-    loud "ERROR: no key file $ENV_FILE and no ALTRUAGENT_OFFICIAL_AGENT_KEY / ALTRUAGENT_API_KEY in the environment"; ok=1
+  elif [ -z "$(official_key)" ]; then
+    loud "ERROR: no key file $ENV_FILE and no ALTRUAGENT_OFFICIAL_AGENT_KEY in the environment"; ok=1
   fi
   load_envs
   resolve_mode
-  if [ "$MODE" = tournament ]; then
-    k="$(official_key)"
-    if [ -z "$k" ]; then
-      loud "ERROR: tournament mode ($MODE_WHY) but ALTRUAGENT_OFFICIAL_AGENT_KEY is not set: generate the Official Agent Key in the tournament dashboard and put it in $ENV_FILE"; ok=1
-    elif ! [[ "$k" =~ $OFFICIAL_KEY_RE ]]; then
-      loud "ERROR: ALTRUAGENT_OFFICIAL_AGENT_KEY doesn't look like an Official Agent Key (eak_live_ followed by 64 hex characters): copy it again from the tournament dashboard"; ok=1
+  [ -n "$MODE_RETIRED" ] && { loud "ERROR: $MODE_RETIRED"; ok=1; }
+  k="$(official_key)"
+  if [ -z "$k" ]; then
+    if [ -n "${ALTRUAGENT_API_KEY:-}" ]; then
+      loud "ERROR: only ALTRUAGENT_API_KEY (an sk_agent_ key) is set: the platform retired those agents on 10-06 (410 platform_agents_retired). Generate the Official Agent Key on the tournament dashboard's Agent Configuration page (agent set to Self-hosted) and put ALTRUAGENT_OFFICIAL_AGENT_KEY in $ENV_FILE"; ok=1
+    else
+      loud "ERROR: ALTRUAGENT_OFFICIAL_AGENT_KEY is not set: generate the Official Agent Key on the tournament dashboard's Agent Configuration page (agent set to Self-hosted) and put it in $ENV_FILE"; ok=1
     fi
-  else
-    case "${ALTRUAGENT_API_KEY:-}" in ""|sk_agent_your_key_here) loud "ERROR: ALTRUAGENT_API_KEY is not set"; ok=1 ;; esac
+  elif [ "$k" = eak_live_your_key_here ]; then
+    loud "ERROR: ALTRUAGENT_OFFICIAL_AGENT_KEY is still the .env.example placeholder: put your Official Agent Key in $ENV_FILE"; ok=1
+  elif ! [[ "$k" =~ $OFFICIAL_KEY_RE ]]; then
+    loud "ERROR: ALTRUAGENT_OFFICIAL_AGENT_KEY doesn't look like an Official Agent Key (eak_live_ followed by 64 hex characters): copy it again from the tournament dashboard's Agent Configuration page"; ok=1
   fi
   [ -n "${ALTRUAGENT_CONTROL_URL:-}" ] || export ALTRUAGENT_CONTROL_URL=https://api.altruagent-game.com
   [ -n "${ARENA_RECORD_DIR:-}" ] || export ARENA_RECORD_DIR="$LOG_ABS"   # (recordings next to the log, which health counts)
@@ -436,7 +438,7 @@ preflight() {     # 0 = go; everything it prints lands in the log
   fi
   free_k="$(df -Pk "$LOG_DIR" 2>/dev/null | awk 'NR==2 { print $4 }')"
   [ -n "$free_k" ] && [ "$free_k" -lt 1048576 ] && say "WARNING: less than 1 GB free under $LOG_DIR"
-  say "mode $MODE ($MODE_WHY), control plane $ALTRUAGENT_CONTROL_URL, key #$(key_hash), python $("$PYTHON" -c 'import sys; print(sys.version.split()[0])' 2>/dev/null), recording ${ARENA_RECORD:-1} (dir ${ARENA_RECORD_DIR:-logs}), reasoning ${ARENA_REASONING:-safe}, discovery ${ARENA_DISCOVERY_S}s, worker cooldown ${ARENA_WORKER_COOLDOWN_S}s"
+  say "mode $MODE ($MODE_WHY), control plane $ALTRUAGENT_CONTROL_URL, key #$(key_hash), python $("$PYTHON" -c 'import sys; print(sys.version.split()[0])' 2>/dev/null), recording ${ARENA_RECORD:-1} (dir ${ARENA_RECORD_DIR:-logs}), reasoning ${ARENA_REASONING:-safe}, assignment poll ${ARENA_DISCOVERY_S}s, worker cooldown ${ARENA_WORKER_COOLDOWN_S}s"
   return $ok
 }
 
@@ -537,18 +539,16 @@ cmd_run() {
     say "WARNING: cannot open $keylock: the per-key lock falls back to $LOG_DIR (this checkout only)"
     keylock="$LOG_DIR/.key-$kh.lock"; exec 9>"$keylock"
   fi
-  [ "$MODE" = tournament ] && ROLE=primary
+  ROLE=primary
   KEY_LOCKED=0                                        # (no flock: no lock, and a fresh execution id for every loop)
   if command -v flock >/dev/null; then
     if flock -w 5 9; then                             # (-w: an old agent group just killed may still hold it)
       KEY_LOCKED=1
-    elif [ "$MODE" = tournament ]; then               # the platform's seat lease arbitrates: a hot standby, not a clash
+    else                                              # the platform's seat lease arbitrates: a hot standby, not a clash
       ROLE=standby
       loud "NOTE: another runtime on this machine already runs Official Agent Key #$kh (lock $keylock held): starting as a"
       loud "  HOT STANDBY. The platform lets one runtime play each seat (a 30 s execution lease); this one takes a seat"
       loud "  over ~30-40 s after the other stops renewing it. A standby belongs on ANOTHER machine: here it only costs CPU."
-    else
-      loud "ERROR: another instance on this machine already runs key #$kh (lock $keylock held): not starting"; finish 3
     fi
   fi
   if [ "$ROLE" = primary ] && [ "$(printf '%s' "${ARENA_ROLE:-}" | tr -d '[:space:]' | tr 'A-Z' 'a-z')" = standby ]; then
@@ -562,14 +562,12 @@ cmd_run() {
   fi
   local exec_id="" launch
   unset ARENA_EXECUTION_ID ARENA_EXECUTION_ID_OWNER    # (never one from a key file or the caller's environment)
-  if [ "$MODE" = tournament ]; then                   # kept across agent restarts and run loops; never logged
-    loop_execution_id "$kh"; exec_id="$EXEC_ID"; EXEC_ID=""
-    case "$EXEC_HOW" in
-      kept) say "execution id: the last run loop's (same boot, key and LOG_DIR): its seats' leases resume at once" ;;
-      new) say "execution id: new (none saved for this boot, key and LOG_DIR, or another runtime holds the key lock)" ;;
-      *) say "execution id: none (no /dev/urandom): the runtime makes its own" ;;
-    esac
-  fi
+  loop_execution_id "$kh"; exec_id="$EXEC_ID"; EXEC_ID=""   # kept across agent restarts and run loops; never logged
+  case "$EXEC_HOW" in
+    kept) say "execution id: the last run loop's (same boot, key and LOG_DIR): its seats' leases resume at once" ;;
+    new) say "execution id: new (none saved for this boot, key and LOG_DIR, or another runtime holds the key lock)" ;;
+    *) say "execution id: none (no /dev/urandom): the runtime makes its own" ;;
+  esac
   echo $$ > "$PIDFILE"
   write_state
   # Stop = SIGTERM to the agent's whole process group (python -m agent, its workers, their node calculators): a
@@ -591,9 +589,7 @@ cmd_run() {
   write_state
   say "start name=$NAME mode=$MODE${ROLE:+ role=$ROLE} root=$ROOT pid=$$, health every ${HEALTH_EVERY}s, log $LOG (rotated at ${LOG_MAX_MB} MB, $LOG_KEEP kept), key lock $keylock"
   launch=("$PYTHON" -u -m agent)
-  if [ "$MODE" = tournament ] && ! printf '%s\n' ${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"} | grep -qxF -- --tournament; then
-    launch+=(--tournament)
-  fi
+  [ "$KIND_ARGS" = 1 ] || launch+=(--tournament --match)   # test matches and tournament games, one process
   launch+=(${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"})
   local fast=0 delay started code t sleeper
   while [ "$STOPPING" != 1 ]; do
@@ -712,15 +708,17 @@ cmd_install_systemd() {
   echo "next:  systemctl --user enable --now arena-agent@main    (main -> .env; arena-agent@apocalypse -> .env.apocalypse)"
   echo "       sudo loginctl enable-linger $USER                 (keeps it running without a login session and after a reboot)"
   echo "       bash scripts/run_agent.sh status; journalctl --user -u arena-agent@main"
-  echo "Tournament mode: put ALTRUAGENT_OFFICIAL_AGENT_KEY in the key file (.env for main): the unit then runs"
-  echo "       python -m agent --tournament (ARENA_MODE=tournament|discovery in the key file forces a mode)"
+  echo "Put ALTRUAGENT_OFFICIAL_AGENT_KEY in the key file (.env for main): the unit runs"
+  echo "       python -m agent --tournament --match (your test matches and tournament games)"
 }
 
 cmd_check_tournament() {   # the SDK's own check, with the key file loaded like `run` does; CONNECTS to the platform
   load_envs
   [ -n "${ALTRUAGENT_CONTROL_URL:-}" ] || export ALTRUAGENT_CONTROL_URL=https://api.altruagent-game.com
   local extra=()
-  for a in ${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"}; do [ "$a" = --check-tournament ] || [ "$a" = --tournament ] || extra+=("$a"); done
+  for a in ${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"}; do
+    case "$a" in --check-tournament|--tournament|--match) ;; *) extra+=("$a") ;; esac
+  done
   "$PYTHON" -u -m agent --check-tournament ${extra[@]+"${extra[@]}"} < /dev/null
 }
 
@@ -739,7 +737,7 @@ case "$CMD" in
     envs=()                   # an already running tmux server would not see this shell's knobs: pass them on (never keys)
     for v in PYTHON PYTHONPATH PATH LOG_DIR LOG_MAX_MB LOG_KEEP HEALTH_EVERY RESTART_DELAY RESTART_MAX_DELAY STOP_TIMEOUT \
              ARENA_NODE ARENA_CALC ARENA_ALLOW_NO_CALC ARENA_BATTLE ARENA_SHOWDOWN ARENA_LOCK_DIR ARENA_REASONING ARENA_RECORD ARENA_RECORD_DIR \
-             ARENA_DISCOVERY_S ARENA_WORKER_COOLDOWN_S ARENA_DISCOVERY_MAX_FAILURES ARENA_MODE ARENA_SEAT_BUSY_RETRY_S \
+             ARENA_DISCOVERY_S ARENA_WORKER_COOLDOWN_S ARENA_MODE ARENA_SEAT_BUSY_RETRY_S \
              ARENA_ROLE ARENA_NEW_SEAT_DELAY_S ARENA_STATE ARENA_STATE_DIR ARENA_SEARCH_MAX_PROCS \
              ARENA_SEARCH_MIN_FREE_MB ARENA_SEARCH_GRACE_S ARENA_SUMMARY ARENA_HEALTH_PROBE; do
       [ -n "${!v+x}" ] && envs+=(-e "$v=${!v}")

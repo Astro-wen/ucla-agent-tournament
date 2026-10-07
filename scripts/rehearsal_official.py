@@ -1,4 +1,5 @@
-"""Dry run of the OFFICIAL tournament mode end to end, against the LOCAL fake platform only (never the real one).
+"""Dry run of the event runtime (`python -m agent --tournament --match`, the Official Agent Key) end to end, against
+the LOCAL fake platform only (never the real one).
 
     python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-VERSION --out /tmp/official-dry-run
     python scripts/rehearsal_official.py --out /tmp/official-dry-run            # this checkout instead of a bundle
@@ -6,17 +7,19 @@
 The platform side runs from this checkout: local/fake_platform.py --official on 127.0.0.1 with one FAKE Official Agent
 Key (never a real one), VGC doubles draft matches one after another (payloads shaped like the real platform's, blind
 states included) and, at the same time, 7-seat Werewolf tables (our seat + six local bots taking ~3 s per move, a new
-table when one ends): two assignments at once all along. The agent side is the bundle's own scripts/run_agent.sh (its
-.venv, its node) in a clean environment, with a key file that holds ONLY ALTRUAGENT_OFFICIAL_AGENT_KEY, so the
-tournament mode is picked by itself.
+table when one ends): two assignments at once all along. The assignments alternate between the event platform's two
+kinds (`context`: "tournament", "testing"), and each carries its connect window (connect_deadline_at, --connect-window
+s; a seat not connected by then is a no-show, a loss). The agent side is the bundle's own scripts/run_agent.sh (its
+.venv, its node) in a clean environment, with a key file that holds ONLY ALTRUAGENT_OFFICIAL_AGENT_KEY.
 
 Timeline (each step waits for the previous one, --minutes caps the whole run):
-  1. start: both assignments get a worker (`python -m agent --tournament`, one worker per seat)
+  1. start: both assignments get a worker (`python -m agent --tournament --match`, one worker per seat)
   2. kill -9 of the VGC worker in its battle: a new worker resumes the seat (same runtime, same execution id)
   3. kill -9 of the runtime itself (`python -m agent`) in a VGC battle: the run loop starts a new runtime with the
      loop's execution id, so its workers get their seats back at once (no seat_busy, no takeover, no timer move)
   4. `auth503` for --outage-s: authenticate answers 503 and every agent session is expired, so every re-login fails
-     (the upstream runtime used to end there, with every match): the runtime and its workers must survive
+     (the upstream runtime used to end there, with every match; since upstream 1372ccc its supervisor waits it out):
+     the runtime and its workers must survive
   5. a hot standby: a second run_agent.sh loop with the same key (another NAME and LOG_DIR): its seat checks get
      seat_busy, it starts no worker and makes no move while the primary plays, and every seat assigned while both run
      goes to the primary (the standby leaves new seats alone for 20 s)
@@ -26,8 +29,9 @@ Timeline (each step waits for the previous one, --minutes caps the whole run):
 New matches keep coming until step 7 (--vgc-matches / --werewolf-tables are only caps), so every step finds a match
 to act on however fast the matches end.
 OUT/report.json: the platform's totals (decisions, timer decisions, invalid actions, blind states), its official
-counters (grants, seat_busy, takeovers, moves_by_non_holder: must be 0), each step's timings and checks, the
-processes' peak memory, and a scan of every log for the key. Linux only (reads /proc).
+counters (grants, seat_busy, takeovers, moves_by_non_holder: must be 0, no_shows: must be 0), both kinds of game
+played, every seat's connect time against its window, each step's timings and checks, the processes' peak memory, and
+a scan of every log for the key. Linux only (reads /proc).
 """
 from __future__ import annotations
 
@@ -191,7 +195,8 @@ class DryRun:
                "--session-ttl", str(self.a.session_ttl), "--token-ttl", str(self.a.token_ttl), "--lease-s", "30",
                "--opponent", "baseline", "--seed", str(self.a.seed), "--stats", str(self.out / "platform.json"),
                "--stats-every", str(STATS_EVERY_S), "--outage-file", str(self.out / "outage"),
-               "--drain-file", str(self.out / "drain")]
+               "--drain-file", str(self.out / "drain"), "--contexts", "tournament,testing",
+               "--connect-window", str(self.a.connect_window)]
         env = dict(os.environ, PYTHONPATH=str(ROOT), ARENA_RECORD="0", FAKE_OFFICIAL_KEY=self.key)
         self.platform = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=open(self.out / "platform.out", "w"),
                                          stderr=subprocess.STDOUT, start_new_session=True)
@@ -231,6 +236,10 @@ class DryRun:
         seats = self.wait(lambda: len({s for _, s, _ in self.workers("primary")}) >= 2 and self.workers("primary"),
                           timeout=240)
         self.check("both_assignments_get_a_worker", bool(seats), workers=[(g, s) for g, s, _ in seats or []])
+        log = self.log("primary")
+        self.check("runtime_plays_test_matches_and_tournament_games",
+                   "mode tournament (python -m agent --tournament --match" in log
+                   and "Playing your test matches and tournament games." in log)
 
     def step_kill_worker(self) -> None:
         for attempt in range(1, 4):                                  # (a match the killed worker had just won: again)
@@ -331,12 +340,12 @@ class DryRun:
         new_workers = len(self.workers("primary")) - n_workers0
         self.event("auth503_result", runtime_pid_unchanged=same_runtime, authenticate_503s=injected,
                    workers_started_since=new_workers, decisions_since=(st.get("totals") or {}).get("decisions", 0) - dec0,
-                   reauth_failed_lines=log.count("re-authentication failed"),
+                   renew_failed_lines=log.count("Could not renew your agent session"),
                    discovery_recovered=log.count("Assignment discovery recovered."),
                    stopped_all_workers=log.count("active match worker(s)"))
         self.check("reauthentication_503_keeps_the_runtime_and_its_matches",
                    injected > 0 and same_runtime and "active match worker(s)" not in log
-                   and "re-authentication failed" in log)
+                   and "Could not renew your agent session" in log)
 
     def step_standby(self) -> None:
         self.seats_at_standby = set((self.stats().get("official") or {}).get("seats") or {})
@@ -442,7 +451,20 @@ class DryRun:
         logs = {n: self.log(n) for n in ("primary", "standby")}
         everything = "".join(logs.values()) + "".join(p.read_text(errors="replace") for p in self.out.glob("*/agent-*.state"))
         self.check("key_never_logged", self.key not in everything)
+        off = st.get("official") or {}
+        seats = off.get("seats") or {}
+        played = sorted({s.get("context") for s in seats.values() if s.get("grants") and s.get("context")})
+        self.check("both_kinds_of_game_played", {"testing", "tournament"} <= set(played), contexts=played,
+                   by_kind={k: sum(1 for s in seats.values() if s.get("context") == k and s.get("grants"))
+                            for k in played})
+        conn = sorted(s["connected_s"] for s in seats.values() if s.get("connected_s") is not None)
+        connect = {"seats": len(conn), "p50_s": conn[len(conn) // 2] if conn else None,
+                   "max_s": conn[-1] if conn else None, "window_s": self.a.connect_window,
+                   "no_shows": off.get("no_shows")}
+        self.check("every_seat_connected_inside_its_window",
+                   off.get("no_shows", 1) == 0 and bool(conn) and conn[-1] < self.a.connect_window, **connect)
         rep = {"out": str(self.out), "bundle": str(self.bundle), "minutes": round((time.time() - self.t0) / 60, 1),
+               "connect": connect,
                "checks": self.checks, "all_ok": all(self.checks.values()),
                "platform": {k: (st.get("totals") or {}).get(k) for k in (
                    "matches_started", "matches_done", "wins", "decisions", "timer_decisions", "invalid_actions",
@@ -480,6 +502,8 @@ def main(argv=None) -> None:
     ap.add_argument("--port", type=int, default=0)
     ap.add_argument("--path", default=None, help="PATH for the agent side (default: this one; e.g. /usr/bin:/bin)")
     ap.add_argument("--outage-s", type=float, default=15.0)
+    ap.add_argument("--connect-window", type=float, default=240.0,
+                    help="each seat's connect window, as the event platform's 4 minutes (default 240 s)")
     ap.add_argument("--session-ttl", type=float, default=90.0)
     ap.add_argument("--token-ttl", type=float, default=150.0)
     ap.add_argument("--vgc-matches", type=int, default=60,
@@ -499,8 +523,8 @@ def main(argv=None) -> None:
         raise SystemExit("SIGTERM")                                  # run() then stops everything (finally)
     signal.signal(signal.SIGTERM, _term)
     rep = DryRun(a).run()
-    print(json.dumps({k: rep[k] for k in ("checks", "all_ok", "platform", "official", "battle_latency", "peak", "logs")},
-                     indent=1))
+    print(json.dumps({k: rep[k] for k in ("checks", "all_ok", "platform", "official", "connect", "battle_latency",
+                                          "peak", "logs")}, indent=1))
 
 
 if __name__ == "__main__":

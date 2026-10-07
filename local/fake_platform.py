@@ -2,10 +2,13 @@
 (scripts/run_agent.sh -> supervisor -> one worker process per match -> node damage calculator) without ever touching
 the real platform. Binds 127.0.0.1 only; the API key is a local test value.
 
-    python -m local.fake_platform --port 8765 --concurrent 2 --stats logs/rehearsal/platform.json
-    ALTRUAGENT_CONTROL_URL=http://127.0.0.1:8765 ALTRUAGENT_API_KEY=local-rehearsal-key python -m agent
+    python -m local.fake_platform --port 8765 --official --werewolf 1 --stats logs/rehearsal/platform.json
+    ALTRUAGENT_CONTROL_URL=http://127.0.0.1:8765 ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_fa4e...fa4e \
+        python -m agent --tournament --match      # (the FAKE key DEFAULT_OFFICIAL_KEY below; the event flow)
 
-Control plane (REST): POST /auth/agent/login, GET /auth/agent/me, GET /agents/me/sessions, GET /competitions/{id}.
+Control plane (REST), without --official: the RETIRED platform-agent API (POST /auth/agent/login, GET /auth/agent/me,
+GET /agents/me/sessions, GET /competitions/{id}), kept for the SDK's own client tests; `python -m agent` no longer
+speaks it (the platform turned it off on 10-06).
 GameAPI (MCP streamable HTTP, stateless, at /mcp): get_game_state, wait_for_update, get_legal_actions, play_action,
 get_result, resign. Same payload shapes as the platform (built by local/pokemon_env.Match, see docs/real_payloads.md).
 
@@ -176,6 +179,7 @@ class FakeMatch:
         self.ended = None
         self.match = None                    # the pokemon_env.Match (RemoteSeat.bind)
         self.battle_asks = 0
+        self.no_show = False                 # the official plane's connect window passed unconnected (forfeit_no_show)
         self.st = {"decisions": 0, "latency_s": [], "slow": [], "timer": {"draft": 0, "team_preview": 0, "battle": 0},
                    "invalid_actions": 0, "race_errors": 0, "reasoning_lines": 0, "reasoning_max_len": 0,
                    "reasoning_over_cap": 0, "winner_seat": None, "turns": 0, "match_invalid": 0, "error": None,
@@ -198,7 +202,16 @@ class FakeMatch:
             print(f"realistic() failed: {e!r}", flush=True)
         return raw
 
+    def forfeit_no_show(self) -> None:
+        """Our runtime never connected within the seat's connect window (local/fake_official.py): our seat loses, as
+        the platform scores a no-show; the match ends at our seat's next request (or the one pending now)."""
+        with self.cond:
+            self.no_show = True
+            self.cond.notify_all()
+
     def ask(self, raw: dict):
+        if self.no_show:
+            return RESIGN
         raw = self.shape(copy.deepcopy(raw))
         first = self.st["decisions"] == 0 and not any(self.st["timer"].values())
         phase = raw.get("phase") if raw.get("phase") in ("draft", "team_preview") else "battle"   # battle = "moving"
@@ -220,7 +233,7 @@ class FakeMatch:
             if phase == "battle":
                 limit = max(0.0, min(limit, BANK_S - self.bank_used))
             deadline = self.pending_at + limit
-            while self.answer is _NONE and not self.platform.stopping.is_set():
+            while self.answer is _NONE and not self.platform.stopping.is_set() and not self.no_show:
                 left = deadline - time.monotonic()
                 if left <= 0:
                     break
@@ -229,6 +242,8 @@ class FakeMatch:
             self.pending = None
             self.version += 1
             self.cond.notify_all()
+        if ans is _NONE and self.no_show:
+            return RESIGN                         # (a no-show: not a timer decision)
         if phase == "battle":
             self.bank_used += min(waited, limit)
         if ans is _NONE:
@@ -260,7 +275,7 @@ class FakeMatch:
                     r = m.forfeited(f.seat)
                 winner, self.st["turns"] = r.winner, r.turns
                 self.st["match_invalid"] = r.invalid[self.seat] - self.st["timer"]["draft"]
-                self.reason = "forfeit" if r.forfeit is not None else "game_over"
+                self.reason = "no_show" if self.no_show else "forfeit" if r.forfeit is not None else "game_over"
             finally:
                 sd.close()
                 try:
@@ -366,8 +381,9 @@ class FakePlatform:
         self._ww_started = 0
 
     def outage(self) -> str | None:
-        """'sessions' / 'all' while the --outage-file exists (its first word), else None: a rehearsed network blip
-        (503 on the discovery poll only, or on every request)."""
+        """The --outage-file's first word while it exists, else None: a rehearsed network blip ('assignments': 503 on
+        the assignment listing only, 'sessions': on the retired discovery poll, 'all': on every request) or a failing
+        official authentication ('auth503' / 'auth429', every agent session expired)."""
         if self.outage_file is None:
             return None
         now = time.monotonic()
@@ -709,7 +725,8 @@ def build_app(p: FakePlatform, port: int):
 
         async def __call__(self, scope, receive, send):
             outage = p.outage() if scope["type"] == "http" else None
-            if outage == "all" or (outage == "sessions" and scope["path"] == "/agents/me/sessions"):
+            if outage == "all" or (outage == "sessions" and scope["path"] == "/agents/me/sessions") or \
+                    (outage == "assignments" and scope["path"] == "/tournament/agent/assignments"):
                 with p.lock:
                     p.counters["outage_503"] += 1
                 await JSONResponse({"error": "unavailable", "detail": "rehearsal outage"},
@@ -747,8 +764,9 @@ def main(argv=None) -> None:
     ap.add_argument("--gap", type=float, default=0.0,
                     help="idle seconds after a match ends before the next one starts (default 0)")
     ap.add_argument("--outage-file", type=Path, default=None,
-                    help="while this file exists: 503 on the discovery poll ('sessions'), on everything ('all'), or "
-                         "on official authentication with every agent session expired ('auth503' / 'auth429')")
+                    help="while this file exists: 503 on the assignment listing ('assignments'; the retired discovery "
+                         "poll: 'sessions'), on everything ('all'), or on official authentication with every agent "
+                         "session expired ('auth503' / 'auth429')")
     ap.add_argument("--plain", action="store_true",
                     help="the old local payloads (four-entry team, no protocol_log, no timer line, no blind states)")
     ap.add_argument("--blind-every", type=int, default=25,
@@ -769,6 +787,12 @@ def main(argv=None) -> None:
                     help="the Official Agent Key this fake accepts (a FAKE test value)")
     ap.add_argument("--session-ttl", type=float, default=600.0, help="seconds an official agent session lives")
     ap.add_argument("--lease-s", type=float, default=30.0, help="a seat's execution lease (default 30 s)")
+    ap.add_argument("--contexts", default="tournament,testing",
+                    help="the assignments' context, cycled per new seat (default tournament,testing; '' = none)")
+    ap.add_argument("--connect-window", type=float, default=240.0,
+                    help="seconds a runtime has to connect to a new seat before it is a no-show (default 240)")
+    ap.add_argument("--ra-connect-window", type=float, default=270.0,
+                    help="the same for a Red Alert seat (default 270)")
     a = ap.parse_args(argv)
     import uvicorn
 
@@ -786,7 +810,8 @@ def main(argv=None) -> None:
     if a.official:
         from .fake_official import OfficialPlane
         p.official = OfficialPlane(p, a.official_key, session_ttl=a.session_ttl, seat_token_ttl=a.token_ttl,
-                                   lease_s=a.lease_s)
+                                   lease_s=a.lease_s, contexts=tuple(c for c in a.contexts.split(",") if c.strip()),
+                                   connect_window_s=a.connect_window, ra_connect_window_s=a.ra_connect_window)
     threading.Thread(target=p.scheduler, name="scheduler", daemon=True).start()
     server = uvicorn.Server(uvicorn.Config(build_app(p, a.port), host="127.0.0.1", port=a.port, log_level="warning",
                                            access_log=False))
@@ -797,7 +822,7 @@ def main(argv=None) -> None:
     signal.signal(signal.SIGTERM, stop)
     print(f"fake platform on http://127.0.0.1:{a.port} ({a.concurrent} concurrent, opponent {a.opponent}, "
           f"{'plain' if a.plain else 'real-shaped'} payloads, {a.werewolf} werewolf, {a.red_alert} red alert, "
-          f"{'official' if a.official else 'discovery'} control plane)", flush=True)
+          f"{'official (event) ' if a.official else 'retired platform-agent '}control plane)", flush=True)
     try:
         server.run()
     finally:

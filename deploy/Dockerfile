@@ -9,7 +9,7 @@
 #
 #   bash scripts/bundle.sh && tar xzf dist/arena-agent-*.tar.gz -C /tmp && cd /tmp/arena-agent-*
 #   docker build -f deploy/Dockerfile -t arena-agent .
-#   # the official tournament: arena.keys holds ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_... (mode 600)
+#   # arena.keys holds ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_... (mode 600)
 #   docker run --rm --env-file arena.keys arena-agent check-tournament      # once: contacts the platform
 #   docker run -d --name arena-main --restart unless-stopped --env-file arena.keys \
 #       --log-opt max-size=20m --log-opt max-file=3 -v arena-logs:/data arena-agent
@@ -17,8 +17,9 @@
 #   docker ps                          # STATUS shows (healthy) only while the agent process is up
 #   docker stop arena-main             # clean stop (SIGTERM -> scripts/run_agent.sh stops the agent tree)
 #
-# (No --init: the entrypoint already runs under tini.) With ALTRUAGENT_OFFICIAL_AGENT_KEY set the container runs
-# `python -m agent --tournament`; with only ALTRUAGENT_API_KEY the discovery mode (ARENA_MODE forces one). The build
+# (No --init: the entrypoint already runs under tini.) The container runs `python -m agent --tournament --match`
+# with ALTRUAGENT_OFFICIAL_AGENT_KEY: the key's test matches and tournament games, one process (the retired sk_agent_
+# keys are refused at the start). The build
 # fails when the calculator cannot answer a calc or the engine search cannot load its simulator (selfcheck), and the
 # container refuses to start without them unless -e ARENA_ALLOW_NO_CALC=1 (emergency only; covers the search too when
 # node itself cannot run) / -e ARENA_BATTLE=classic (the classic policy on purpose).

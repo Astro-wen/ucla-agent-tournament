@@ -5,17 +5,18 @@ with scheduled failures, sampling memory / open files / processes. Linux only (r
     python scripts/rehearsal.py --minutes 120 --supervise systemd    # the same loop as a transient systemd user unit
     python scripts/rehearsal.py --minutes 10 --no-chaos --concurrent 1
 
-Stack: local/fake_platform.py (127.0.0.1, test key; payloads shaped like the real platform's unless --plain) <-
-scripts/run_agent.sh run -> python -m agent (supervisor) -> one worker process per match -> node agent/js/calc.js.
-The official tournament mode (--tournament, a fake Official Agent Key, seat leases, a Werewolf table, a hot standby):
+Stack: local/fake_platform.py --official (127.0.0.1, the FAKE Official Agent Key; assignments of both kinds, test
+matches and tournament games; payloads shaped like the real platform's unless --plain) <- scripts/run_agent.sh run
+-> python -m agent --tournament --match (supervisor) -> one worker process per seat -> node agent/js/calc.js.
+The shorter scripted dry run (seat leases, a Werewolf table, a re-login outage, a hot standby):
 scripts/rehearsal_official.py. Everything the rehearsal writes goes to --out
 (default logs/rehearsal/<timestamp>/): the agent's log (LOG_DIR), platform.json (per-match results and answer
 latencies), samples.jsonl (every --sample-every s), events.jsonl (failures injected) and report.json.
 
 Failures injected at fixed fractions of the run (--no-chaos to skip): kill -9 of python -m agent (15%), of one
-match worker (30%), of one node calculator (45%); a 90 s outage of the discovery poll only (55%) and a 45 s outage
-of every platform request (70%); kill -9 of the run loop itself (85%): systemd restarts it, in the start mode the
-rehearsal runs `run_agent.sh start` again after 10 s like an operator would.
+match worker (30%), of one node calculator (45%); a 90 s outage of the assignment listing only (55%) and a 45 s
+outage of every platform request (70%); kill -9 of the run loop itself (85%): systemd restarts it, in the start mode
+the rehearsal runs `run_agent.sh start` again after 10 s like an operator would.
 
 Checks in report.json: no node calculator outside the agent's process group and never more calculators than
 workers (leaks), zombies, memory / fd / thread growth of the long-lived supervisor, restarts, timer decisions and
@@ -28,6 +29,7 @@ import argparse
 import json
 import os
 import random
+import re
 import shutil
 import signal
 import subprocess
@@ -36,9 +38,13 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from local.fake_platform import DEFAULT_OFFICIAL_KEY as KEY  # noqa: E402  (FAKE: accepted by the fake platform only)
+
 NAME = "rehearsal"
-KEY = "local-rehearsal-key"          # test value accepted only by local/fake_platform.py
 UNIT = "arena-rehearsal"
+_START = re.compile(r"\[match (\S+) seat=(\S+)\] starting \(pid=(\d+)\)")    # altruagent/worker.py's first line
 
 
 def procs() -> list[dict]:
@@ -136,14 +142,16 @@ class Rehearsal:
 
     # ---- lifecycle ----------------------------------------------------------------------------------------------
     def start_platform(self) -> None:
-        self.env_file.write_text(f"ALTRUAGENT_CONTROL_URL=http://127.0.0.1:{self.a.port}\nALTRUAGENT_API_KEY={KEY}\n"
-                                 "ARENA_RECORD=0\n")
+        self.env_file.write_text(f"ALTRUAGENT_CONTROL_URL=http://127.0.0.1:{self.a.port}\n"
+                                 f"ALTRUAGENT_OFFICIAL_AGENT_KEY={KEY}\nARENA_RECORD=0\n")
         os.chmod(self.env_file, 0o600)
         cmd = ["nice", "-n", str(self.a.nice), sys.executable, "-m", "local.fake_platform", "--port", str(self.a.port),
+               "--official", "--contexts", "tournament,testing",
                "--concurrent", str(self.a.concurrent), "--gap", str(self.a.gap), "--opponent", self.a.opponent,
                "--stats", str(self.out / "platform.json"), "--outage-file", str(self.out / "outage")]
         cmd += ["--plain"] if self.a.plain else []                  # (default: payloads shaped like the real platform's)
-        penv = dict(os.environ, PYTHONPATH=str(ROOT), ARENA_RECORD="0")      # (no LOG_DIR: not part of mine())
+        penv = dict(os.environ, PYTHONPATH=str(ROOT), ARENA_RECORD="0", FAKE_OFFICIAL_KEY=KEY)   # (no LOG_DIR: not
+                                                                                                  # part of mine())
         self.platform = subprocess.Popen(cmd, cwd=ROOT, env=penv, stdout=open(self.out / "platform.out", "w"),
                                          stderr=subprocess.STDOUT, start_new_session=True)
         time.sleep(3)
@@ -249,16 +257,16 @@ class Rehearsal:
             battle = self._battle_worker() if kind == "kill_worker" else None
             victim = next((p for p in pick if p["pid"] == battle), None) or self.rng.choice(pick)
             wpid = victim["pid"] if kind == "kill_worker" else victim["ppid"]
-            session = next((line.split("session_id=")[1].split()[0] for line in self.log_lines()
-                            if f"started worker pid={wpid} for session_id=" in line), None)
-            self.event(kind, pid=victim["pid"], worker=wpid, session=session)
+            seat = next((s for _, s, p in self._starts() if p == wpid), None)
+            session = self._seat_sessions().get(seat)
+            self.event(kind, pid=victim["pid"], worker=wpid, seat=seat, session=session)
             os.kill(victim["pid"], signal.SIGKILL)
             if kind == "kill_calc":
                 session = None                          # the worker restarts its calculator itself: no new worker
             else:
-                session = (session, wpid) if session else None
-        elif kind in ("outage_sessions", "outage_all"):
-            secs = 90 if kind == "outage_sessions" else 45
+                session = (session, wpid, seat) if session else None
+        elif kind in ("outage_assignments", "outage_all"):
+            secs = 90 if kind == "outage_assignments" else 45
             self.event(kind, seconds=secs)
             (self.out / "outage").write_text(kind.split("_")[1])
             end = time.time() + secs
@@ -299,6 +307,24 @@ class Rehearsal:
                     out.append((lat, clock, phase))
         return sorted(out, reverse=True)[:3]
 
+    def _starts(self) -> list[tuple[str, str, int]]:
+        """(clock, seat_id, pid) of every worker start in the log: run_agent.sh's timestamp, then the worker's own
+        first line (altruagent/worker.py)."""
+        out = []
+        for line in self.log_lines():
+            m = _START.search(line)
+            if m:
+                out.append((line[:19], m.group(2), int(m.group(3))))
+        return out
+
+    def _seat_sessions(self) -> dict:
+        """seat_id -> the platform session of its match (the fake platform's official stats)."""
+        try:
+            seats = json.loads((self.out / "platform.json").read_text())["official"]["seats"]
+            return {sid: s.get("match") for sid, s in seats.items()}
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return {}
+
     def _battle_worker(self) -> int | None:
         """pid of a live worker whose match is in its battle phase (platform phase 'moving'), if any."""
         battle = {r["session_id"] for r in self._matches() if not r.get("terminal") and r.get("phase") == "moving"}
@@ -306,12 +332,10 @@ class Rehearsal:
             return None
         child = self.child()
         alive = {p["pid"] for p in procs() if child and p["pgid"] == child and "spawn_main" in p["cmd"]}
-        for line in reversed(self.log_lines()):
-            if "started worker pid=" in line and "session_id=" in line:
-                pid = int(line.split("started worker pid=")[1].split()[0])
-                sid = line.split("session_id=")[1].split()[0]
-                if sid in battle and pid in alive:
-                    return pid
+        sessions = self._seat_sessions()
+        for _, seat, pid in reversed(self._starts()):
+            if sessions.get(seat) in battle and pid in alive:
+                return pid
         return None
 
     def _matches(self) -> list:
@@ -334,16 +358,15 @@ class Rehearsal:
         """Wait (max 3 min) until the agent is up again with a worker (for a killed worker: a new worker for its
         match, or the match's end); then 60 s more, and log the times and what the failure cost."""
         t_up = t_session = None
-        session, vpid = victim or (None, None)
+        session, vpid, vseat = victim or (None, None, None)
         old = self._old_child if kind in ("kill_main", "kill_runloop") else None
         for _ in range(180):
             s = self.sample()
             if t_up is None and s["agent_up"] and s["runloop_up"] and s["workers"] >= 1 and s["child"] != old:
                 t_up = round(time.time() - since, 1)
             if session and t_session is None:
-                lines = self.log_lines()
-                if any(f"for session_id={session}" in x and "started worker" in x and f"pid={vpid} " not in x and x[:19] >=
-                       time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(since)) for x in lines) or \
+                after = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(since))
+                if any(seat == vseat and pid != vpid and clock >= after for clock, seat, pid in self._starts()) or \
                         any(r.get("session_id") == session and r.get("terminal") for r in self._matches()):
                     t_session = round(time.time() - since, 1)
             if t_up is not None and (not session or t_session is not None):
@@ -363,7 +386,7 @@ class Rehearsal:
         self.start_agent()
         total = self.a.minutes * 60
         plan = [] if self.a.no_chaos else [(0.15, "kill_main"), (0.30, "kill_worker"), (0.45, "kill_calc"),
-                                           (0.55, "outage_sessions"), (0.70, "outage_all"), (0.85, "kill_runloop")]
+                                           (0.55, "outage_assignments"), (0.70, "outage_all"), (0.85, "kill_runloop")]
         last_done, last_change, stalled = None, time.time(), False
         try:
             while time.time() - self.t0 < total:

@@ -97,6 +97,7 @@ def test_the_sdks_per_seat_backoff_starts_from_our_10s_cooldown():
 
 # ---- the event runtime (python -m agent --tournament --match) -------------------------------------------------------
 FAKE_EAK = "eak_live_" + "fa4e" * 16                 # obviously fake, but the shape the SDK's local check accepts
+UNIT_EAK = "eak_live_" + "7e57" * 16                 # (a second fake one: the run_agent.sh tests' default key file)
 
 
 class _AuthBackend:
@@ -1004,9 +1005,9 @@ def run_env(tmp_path):
     fake = tmp_path / "fakepy"
     fake.write_text(FAKE_PY)
     fake.chmod(0o755)
-    key = "test-key-DO-NOT-LOG-12345"
+    key = UNIT_EAK                                  # (a fake Official Agent Key: the only kind run_agent.sh plays)
     envf = tmp_path / "unit.env"
-    envf.write_text(f"ALTRUAGENT_API_KEY={key}\nALTRUAGENT_CONTROL_URL=http://127.0.0.1:9\n")
+    envf.write_text(f"ALTRUAGENT_OFFICIAL_AGENT_KEY={key}\nALTRUAGENT_CONTROL_URL=http://127.0.0.1:9\n")
     envf.chmod(0o600)
     mode = tmp_path / "mode"
     mode.write_text("run")
@@ -1018,7 +1019,8 @@ def run_env(tmp_path):
     env = dict(os.environ, PYTHON=str(fake), LOG_DIR=str(tmp_path / "logs"), HEALTH_EVERY="1", RESTART_DELAY="1",
                STOP_TIMEOUT="3", FAKE_MODE=str(mode), FAKE_CALC=str(calcf), FAKE_ENGINE=str(enginef),
                LOG_MAX_BYTES="4000", LOG_KEEP="2", ARENA_LOCK_DIR=str(tmp_path / "locks"))
-    for k in ("ALTRUAGENT_API_KEY", "ARENA_ALLOW_NO_CALC", "INVOCATION_ID", "ARENA_RUN_ID"):
+    for k in ("ALTRUAGENT_API_KEY", "ALTRUAGENT_OFFICIAL_AGENT_KEY", "ARENA_ALLOW_NO_CALC", "INVOCATION_ID",
+              "ARENA_RUN_ID", "ARENA_MODE", "ARENA_ROLE", "ARENA_NEW_SEAT_DELAY_S"):
         env.pop(k, None)
     yield {"env": env, "envf": envf, "mode": mode, "calc": calcf, "engine": enginef, "logs": tmp_path / "logs",
            "key": key, "tmp": tmp_path}
@@ -1074,18 +1076,24 @@ def test_run_agent_backs_off_a_crash_loop_and_refuses_claim_mode(run_env):
     assert r.returncode == 0
     r = subprocess.run(["bash", str(RUN_AGENT), "run", "--", "--claim", "seatclaim_x"], env=run_env["env"],
                        capture_output=True, text=True)
-    assert r.returncode == 2 and "single-use seat" in r.stderr
+    assert r.returncode == 2 and "claim codes (--claim) were retired" in r.stderr
 
 
 @needs_linux
-def test_run_agent_refuses_to_start_without_a_key(tmp_path):
+@pytest.mark.parametrize("content, says", [
+    ("ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_your_key_here\n", "still the .env.example placeholder"),
+    ("ALTRUAGENT_API_KEY=sk_agent_FAKE_retired_0000\n", "only ALTRUAGENT_API_KEY (an sk_agent_ key) is set"),
+    ("ALTRUAGENT_CONTROL_URL=http://127.0.0.1:9\n", "ALTRUAGENT_OFFICIAL_AGENT_KEY is not set")])
+def test_run_agent_refuses_to_start_without_a_key(tmp_path, content, says):
     envf = tmp_path / "nokey.env"
-    envf.write_text("ALTRUAGENT_API_KEY=sk_agent_your_key_here\n")
+    envf.write_text(content)
     env = dict(os.environ, LOG_DIR=str(tmp_path / "logs"), PYTHON=sys.executable)
-    env.pop("ALTRUAGENT_API_KEY", None)
+    for k in ("ALTRUAGENT_API_KEY", "ALTRUAGENT_OFFICIAL_AGENT_KEY", "ARENA_MODE"):
+        env.pop(k, None)
     r = subprocess.run(["bash", str(RUN_AGENT), "run", "--env", str(envf)], env=env, capture_output=True, text=True, timeout=60)
     assert r.returncode == 2
-    assert "ALTRUAGENT_API_KEY is not set" in (tmp_path / "logs" / "agent-nokey.out").read_text()
+    log = (tmp_path / "logs" / "agent-nokey.out").read_text()
+    assert says in log and "sk_agent_FAKE_retired_0000" not in log
 
 
 @needs_linux
@@ -1138,9 +1146,9 @@ def test_run_agent_reads_arena_battle_from_the_checkouts_env_like_the_agent(tmp_
     shutil.copy2(RUN_AGENT, root / "scripts" / "run_agent.sh")
     (root / ".env").write_text("ARENA_BATTLE=classic\n")
     envf = tmp_path / "other.env"
-    envf.write_text("ALTRUAGENT_API_KEY=test-key-root-env-1\n")
+    envf.write_text(f"ALTRUAGENT_OFFICIAL_AGENT_KEY={UNIT_EAK}\n")
     env = dict(os.environ, LOG_DIR=str(tmp_path / "logs"))
-    for k in ("ARENA_BATTLE", "ALTRUAGENT_API_KEY"):
+    for k in ("ARENA_BATTLE", "ALTRUAGENT_API_KEY", "ALTRUAGENT_OFFICIAL_AGENT_KEY"):
         env.pop(k, None)
     r = subprocess.run(["bash", str(root / "scripts" / "run_agent.sh"), "health", "--env", str(envf)], env=env,
                        capture_output=True, text=True, timeout=60)
@@ -1150,12 +1158,13 @@ def test_run_agent_reads_arena_battle_from_the_checkouts_env_like_the_agent(tmp_
 @needs_linux
 def test_run_agent_refuses_a_leftover_arena_calc_off_in_the_key_file(tmp_path):
     envf = tmp_path / "main.env"                                    # the real probe (real python): ARENA_CALC=off from
-    envf.write_text("ALTRUAGENT_API_KEY=test-key-calc-off-123\nALTRUAGENT_CONTROL_URL=http://127.0.0.1:9\n"
+    envf.write_text(f"ALTRUAGENT_OFFICIAL_AGENT_KEY={UNIT_EAK}\nALTRUAGENT_CONTROL_URL=http://127.0.0.1:9\n"
                     "ARENA_CALC=off\n")                            # the key file is what the agent would see
     envf.chmod(0o600)
     env = dict(os.environ, LOG_DIR=str(tmp_path / "logs"), PYTHON=sys.executable, PYTHONPATH=str(ROOT),
                ARENA_LOCK_DIR=str(tmp_path))
-    for k in ("ALTRUAGENT_API_KEY", "ARENA_CALC", "ARENA_ALLOW_NO_CALC", "ARENA_RUN_ID"):
+    for k in ("ALTRUAGENT_API_KEY", "ALTRUAGENT_OFFICIAL_AGENT_KEY", "ARENA_CALC", "ARENA_ALLOW_NO_CALC",
+              "ARENA_RUN_ID", "ARENA_MODE"):
         env.pop(k, None)
     r = subprocess.run(["bash", str(RUN_AGENT), "run", "--env", str(envf)], env=env, capture_output=True, text=True,
                        timeout=120)
@@ -1208,16 +1217,20 @@ def test_stop_leaves_not_even_a_sleep_behind(run_env):
 
 @needs_linux
 def test_the_key_lock_covers_every_checkout_on_the_machine(run_env):
+    # another checkout / LOG_DIR with the same key: the platform's seat lease picks one runtime per seat, so the second
+    # one starts as a hot standby (it never plays a seat the first one holds); the key lock is how it knows
     assert _ra(run_env, "start").returncode == 0
-    other = dict(run_env["env"], LOG_DIR=str(run_env["tmp"] / "other-logs"))   # another checkout / LOG_DIR, same key
-    r = _ra(run_env, "run", env=other)
-    assert r.returncode == 3
-    assert "already runs key" in (run_env["tmp"] / "other-logs" / "agent-unit.out").read_text()
+    other = dict(run_env["env"], LOG_DIR=str(run_env["tmp"] / "other-logs"))
+    r = _ra(run_env, "start", env=other)
+    assert r.returncode == 0 and "mode=tournament(standby)" in r.stdout, r.stdout
+    assert "already runs Official Agent Key" in (run_env["tmp"] / "other-logs" / "agent-unit.out").read_text()
+    assert _ra(run_env, "stop", env=other).returncode == 0
     loop = int((run_env["logs"] / "agent-unit.pid").read_text())
     os.kill(loop, signal.SIGKILL)                                   # the loop is gone, its agent still plays:
     time.sleep(0.5)
-    r = _ra(run_env, "run", env=other)                              # the agent itself still holds the key lock
-    assert r.returncode == 3
+    r = _ra(run_env, "start", env=other)                            # the agent itself still holds the key lock
+    assert r.returncode == 0 and "mode=tournament(standby)" in r.stdout, r.stdout
+    assert _ra(run_env, "stop", env=other).returncode == 0
 
 
 @needs_linux
@@ -1290,8 +1303,8 @@ def test_run_agent_runs_the_official_tournament_mode_with_only_the_official_key(
     first = int(_state(run_env["logs"], "official")["child"])
     _wait(lambda: "fake agent env" in _log(run_env, "official"), timeout=10)
     log = _log(run_env, "official")
-    assert "fake agent args: -u -m agent --tournament" in log
-    assert "mode tournament (ALTRUAGENT_OFFICIAL_AGENT_KEY is set)" in log
+    assert "fake agent args: -u -m agent --tournament --match\n" in log   # test matches + tournament games, 1 process
+    assert "mode tournament (python -m agent --tournament --match: the Official Agent Key's test matches" in log
     assert f"record_dir={run_env['logs']}" in log                    # recordings next to the log
     assert "eid_len=64 eid_owner_ok=yes" in log                       # the loop's execution id, its own pid as owner
     run_env["mode"].write_text("crash")
@@ -1427,32 +1440,37 @@ def test_stop_refuses_a_loop_under_systemd_even_from_a_shell_without_the_user_bu
 
 
 @needs_linux
-def test_the_official_mode_refuses_a_missing_or_malformed_key_and_can_be_forced_either_way(run_env):
+def test_the_runtime_refuses_a_malformed_or_retired_key_and_plays_the_kinds_given_after_dashdash(run_env):
     bad = run_env["tmp"] / "bad.env"
     bad.write_text("ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_FAKE_not_hex\n")
     r = _ra_env(run_env, bad, "run")
     assert r.returncode == 2 and "doesn't look like an Official Agent Key" in r.stdout
     assert "eak_live_FAKE_not_hex" not in r.stdout + _log(run_env, "bad")
-    forced = run_env["tmp"] / "forced.env"
-    forced.write_text("ARENA_MODE=tournament\nALTRUAGENT_API_KEY=sk_agent_FAKE_only_the_generic_key\n")
-    r = _ra_env(run_env, forced, "run")
-    assert r.returncode == 2 and "tournament mode (ARENA_MODE) but ALTRUAGENT_OFFICIAL_AGENT_KEY is not set" in r.stdout
+    old = run_env["tmp"] / "old.env"                                  # the retired sk_agent_ key alone
+    old.write_text("ALTRUAGENT_API_KEY=sk_agent_FAKE_only_the_generic_key\n")
+    r = _ra_env(run_env, old, "run")
+    assert r.returncode == 2 and "only ALTRUAGENT_API_KEY (an sk_agent_ key) is set" in r.stdout
+    assert "platform_agents_retired" in r.stdout and "sk_agent_FAKE_only_the_generic_key" not in r.stdout
     both = _official_env(run_env, "both", "ALTRUAGENT_API_KEY=sk_agent_FAKE_generic_key_1234\n")
-    r = _ra_env(run_env, both, "health")                              # both keys: the official one wins
-    assert "mode=tournament" in r.stdout, r.stdout
-    disc = _official_env(run_env, "disc", "ALTRUAGENT_API_KEY=sk_agent_FAKE_generic_key_1234\nARENA_MODE=discovery\n")
-    r = _ra_env(run_env, disc, "start")
-    assert r.returncode == 0 and "mode=discovery" in r.stdout, r.stdout
-    _wait(lambda: "fake agent args" in _log(run_env, "disc"), timeout=10)
-    assert "fake agent args: -u -m agent\n" in _log(run_env, "disc") + "\n"  # no --tournament
-    assert "eid_len=0" in _log(run_env, "disc")
-    assert _ra_env(run_env, disc, "stop").returncode == 0
+    r = _ra_env(run_env, both, "health")                              # both keys: the official one, the old one ignored
+    assert "mode=tournament(primary)" in r.stdout and f"key=#{hashlib.sha256(FAKE_EAK.encode()).hexdigest()[:10]}" \
+        in r.stdout, r.stdout
+    disc = _official_env(run_env, "disc", "ARENA_MODE=discovery\n")   # a leftover switch to the retired mode
+    r = _ra_env(run_env, disc, "run")
+    assert r.returncode == 2 and "ARENA_MODE=discovery: the discovery mode (sk_agent_ keys) was retired" in r.stdout
+    envf = _official_env(run_env, "one")                              # `-- --match`: test matches only, on purpose
+    r = subprocess.run(["bash", str(RUN_AGENT), "start", "--env", str(envf), "--", "--match"], env=run_env["env"],
+                       capture_output=True, text=True, timeout=90)
+    assert r.returncode == 0, r.stdout + r.stderr
+    _wait(lambda: "fake agent args" in _log(run_env, "one"), timeout=10)
+    assert "fake agent args: -u -m agent --match\n" in _log(run_env, "one")
+    assert "the kinds of game given after --" in _log(run_env, "one")
+    assert _ra_env(run_env, envf, "stop").returncode == 0
 
 
 @needs_linux
 def test_a_second_runtime_with_the_same_official_key_starts_as_a_hot_standby(run_env):
-    # sk_agent_ keys: a second instance is refused (exit 3, test_the_key_lock_covers_every_checkout_on_the_machine);
-    # the official key: the platform's seat lease picks one runtime per seat, so a second one waits as a hot standby
+    # the platform's seat lease picks one runtime per seat, so a second runtime of the key waits as a hot standby
     envf = _official_env(run_env)
     assert _ra_env(run_env, envf, "start").returncode == 0
     other = dict(run_env["env"], LOG_DIR=str(run_env["tmp"] / "standby-logs"))
@@ -1477,22 +1495,22 @@ def test_a_second_runtime_with_the_same_official_key_starts_as_a_hot_standby(run
 
 
 @needs_linux
-def test_status_shows_the_mode_and_key_of_the_running_loop_not_of_the_asking_shell(run_env):
-    # the runbook's competition-day check is `status` showing mode=tournament(primary). A loop started with
-    # ARENA_MODE=discovery in its environment (key file: both keys) plays discovery; `status` from a shell without that
-    # variable used to recompute tournament from the key file and show it, next to the discovery loop.
-    env = {k: v for k, v in run_env["env"].items() if k != "ARENA_MODE"}
-    both = _official_env(run_env, "both", "ALTRUAGENT_API_KEY=sk_agent_FAKE_generic_key_1234\n")
-    r = _ra_env(run_env, both, "start", env=dict(env, ARENA_MODE="discovery"))
-    assert r.returncode == 0 and "mode=discovery" in r.stdout, r.stdout
-    sk = hashlib.sha256(b"sk_agent_FAKE_generic_key_1234").hexdigest()[:10]
+def test_status_shows_the_role_and_key_of_the_running_loop_not_of_the_asking_shell(run_env):
+    # the runbook's competition-day check is `status` showing mode=tournament(primary) and the key's hash. A loop
+    # started with another key and ARENA_ROLE=standby in its environment (the real environment wins over the key file)
+    # runs THAT; `status` from a shell without them must show the loop's role and key, not recompute them.
+    env = {k: v for k, v in run_env["env"].items() if k not in ("ARENA_ROLE", "ALTRUAGENT_OFFICIAL_AGENT_KEY")}
+    envf = _official_env(run_env, "both")
+    r = _ra_env(run_env, envf, "start", env=dict(env, ARENA_ROLE="standby", ALTRUAGENT_OFFICIAL_AGENT_KEY=UNIT_EAK))
+    assert r.returncode == 0 and "mode=tournament(standby)" in r.stdout, r.stdout
+    unit = hashlib.sha256(UNIT_EAK.encode()).hexdigest()[:10]
     eak = hashlib.sha256(FAKE_EAK.encode()).hexdigest()[:10]
-    r = _ra_env(run_env, both, "status", env=env)
+    r = _ra_env(run_env, envf, "status", env=env)
     live = next(line for line in r.stdout.splitlines() if line.startswith("[health]"))
-    assert "mode=discovery " in live and f"key=#{sk}" in live, r.stdout
-    assert f"keyhash={sk}" in (run_env["logs"] / "agent-both.state").read_text()
-    assert _ra_env(run_env, both, "stop", env=env).returncode == 0
-    r = _ra_env(run_env, both, "health", env=env)                     # no loop: what a start from here would run
+    assert "mode=tournament(standby) " in live and f"key=#{unit}" in live, r.stdout
+    assert f"keyhash={unit}" in (run_env["logs"] / "agent-both.state").read_text()
+    assert _ra_env(run_env, envf, "stop", env=env).returncode == 0
+    r = _ra_env(run_env, envf, "health", env=env)                     # no loop: what a start from here would run
     assert "mode=tournament(primary) " in r.stdout and f"key=#{eak}" in r.stdout, r.stdout
 
 
@@ -1655,6 +1673,8 @@ def test_fake_official_control_plane_leases_seats_and_serves_a_werewolf_table(tm
                      timeout=30)
         rows = {r.game_type: r for r in official.assignments()}
         assert (rows["werewolf"].seat_position, rows["werewolf"].seat_count) == (3, 7)
+        assert {r.context for r in rows.values()} == {"tournament", "testing"}          # the event's two kinds
+        assert all(r.connect_deadline_at for r in rows.values())
         vgc = rows["pokemon_vgc_doubles_draft"]
         assert vgc.seat_count == 2 and vgc.seat_id
         a, b = "exec-A-" + "a" * 40, "exec-B-" + "b" * 40
@@ -1702,6 +1722,48 @@ def test_fake_official_control_plane_leases_seats_and_serves_a_werewolf_table(tm
             proc.wait(timeout=15)
         except subprocess.TimeoutExpired:
             proc.kill()
+
+
+def test_the_fake_official_plane_serves_both_kinds_and_scores_a_missed_connect_window_as_a_no_show(monkeypatch):
+    # 04-tournaments.md: a runtime that does not connect to a tournament seat within its window (4 minutes, Red Alert
+    # 4.5) loses it as a no-show; the rehearsals check every seat's connect time against that window
+    import types
+
+    from altruagent.models import OfficialAssignment
+    from altruagent.supervisor import TESTING, TOURNAMENT, assignment_kind
+    from local import fake_official
+
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(fake_official.time, "time", lambda: clock["t"])
+
+    class Match:
+        def __init__(self, n, game_type):
+            self.n, self.seat, self.game_type, self.sid, self.terminal, self.forfeited = n, 0, game_type, f"g{n}", False, 0
+
+        def forfeit_no_show(self):
+            self.forfeited += 1
+
+    games = [Match(0, "pokemon_vgc_doubles_draft"), Match(1, "werewolf"), Match(2, "red_alert")]
+    platform = types.SimpleNamespace(order=games, issue=lambda *a, **k: "seat-token", revoke=lambda tok: None,
+                                     agent_id="a1", game_server="127.0.0.1:1", outage=lambda: None)
+    plane = fake_official.OfficialPlane(platform, "k", session_ttl=60, seat_token_ttl=60, lease_s=30)
+    rows = [OfficialAssignment.from_dict(r) for r in plane.assignments()["assignments"]]
+    assert [assignment_kind(r) for r in rows] == [TOURNAMENT, TESTING, TOURNAMENT]
+    assert rows[0].tournament_name == "Local Fake Cup" and rows[0].opponents == ("local-bot",)
+    assert rows[1].tournament_name is None
+    assert [r.connect_deadline_at for r in rows] == ["1970-01-01T00:20:40Z", "1970-01-01T00:20:40Z",
+                                                     "1970-01-01T00:21:10Z"]                # 240 s; Red Alert 270 s
+    clock["t"] = 1100.0
+    assert plane.grant(rows[1].seat_id, "exec-1")[0] == 200            # connected 100 s after it was assigned
+    clock["t"] = 1241.0                                                # the VGC seat's window passed unconnected
+    assert [r["seat_id"] for r in plane.assignments()["assignments"]] == [rows[1].seat_id, rows[2].seat_id]
+    code, body = plane.grant(rows[0].seat_id, "exec-1")
+    assert (code, body["error"]) == (409, "assignment_not_grantable") and games[0].forfeited == 1
+    clock["t"] = 1271.0
+    assert [r["seat_id"] for r in plane.assignments()["assignments"]] == [rows[1].seat_id]
+    st = plane.stats()
+    assert (st["no_shows"], st["connected"]) == (2, 1) and games[0].forfeited == 1 and games[1].forfeited == 0
+    assert st["seats"][rows[1].seat_id]["connected_s"] == 100.0 and st["seats"][rows[0].seat_id]["no_show"]
 
 
 def test_realistic_payloads_match_the_recorded_shape():

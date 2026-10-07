@@ -5,9 +5,8 @@
 # scripts/run_agent.sh does the restarts, logs (logs/agent-NAME.out) and health lines; systemd restarts the loop
 # itself if it ever dies. Stop = SIGTERM to the loop only (KillMode=mixed): it stops the agent tree cleanly and
 # systemd SIGKILLs whatever is left after TimeoutStopSec.
-# The official tournament: put ALTRUAGENT_OFFICIAL_AGENT_KEY in the key file and the loop runs
-# `python -m agent --tournament` (the mode is on every health line); ARENA_MODE=tournament|discovery in the key file
-# forces a mode.
+# Put ALTRUAGENT_OFFICIAL_AGENT_KEY in the key file and the loop runs `python -m agent --tournament --match` (the
+# key's test matches and tournament games, one process; mode=tournament(primary) on every health line).
 [Unit]
 Description=AltruAgent tournament agent (%i)
 # (a user manager has no network-online.target; without network the agent just retries with backoff)
@@ -29,8 +28,9 @@ RestartSec=5
 # restart everything): the node search / calculator processes, the kernel's preferred victims (agent/pokemon/calc.py
 # prefer_for_oom_kill), are restarted by their worker, a killed worker by the supervisor, a killed agent by the loop.
 OOMPolicy=continue
-# 3 = this key already runs here (another instance holds the lock): retrying cannot help.
-# 2 = the start refused (no key, a malformed Official Agent Key, an unwritable LOG_DIR, or the damage calculator /
+# 3 = this NAME already runs here (another loop of it holds its lock): retrying cannot help. (A second runtime of the
+# same KEY under another NAME or LOG_DIR starts as a hot standby instead.)
+# 2 = the start refused (no key, a malformed or retired key, an unwritable LOG_DIR, or the damage calculator /
 # engine search cannot run; see the ERROR banner in the journal and in logs/agent-%i.out): retried every RestartSec,
 # so it comes up by itself once that is fixed.
 RestartPreventExitStatus=3

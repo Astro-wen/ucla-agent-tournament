@@ -1,12 +1,18 @@
-"""The OFFICIAL tournament side of local/fake_platform.py (`--official`), for dry runs of `python -m agent
---tournament` with a FAKE Official Agent Key, and its 7-seat Werewolf tables (`--werewolf N`). Never the real platform.
+"""The OFFICIAL (event) side of local/fake_platform.py (`--official`), for dry runs of `python -m agent --tournament
+--match` with a FAKE Official Agent Key, and its 7-seat Werewolf tables (`--werewolf N`). Never the real platform.
 
 Control plane, as altruagent/official.py speaks it (docs/STARTER_README.md "Official tournament"):
   POST /tournament/agent/authenticate {official_agent_key} -> {access_token, expires_at}: an agent session that lives
        --session-ttl seconds (then 401, and the client authenticates again); invalid_official_agent_key (401) for any
        other key.
   GET  /tournament/agent/assignments -> {assignments: [{match_id, seat_id, game_type, seat_position, seat_count,
-       match_status, seat_status}]}: one seat per live match (Pokemon: 1 of 2, Werewolf: 1 of 7, Red Alert: 1 of 2).
+       match_status, seat_status, context, connect_deadline_at, (tournament games:) tournament_id, tournament_name,
+       round_label, opponents}]}: one seat per live match (Pokemon: 1 of 2, Werewolf: 1 of 7, Red Alert: 1 of 2).
+       `context` cycles through --contexts per new seat ("tournament", "testing": the event platform's two kinds,
+       played by `python -m agent --tournament` / `--match`). The CONNECT WINDOW (04-tournaments.md: 4 minutes, Red
+       Alert 4.5): a seat whose runtime has not connected (its first grant) by connect_deadline_at is a NO-SHOW: it
+       leaves the listing, its grant answers assignment_not_grantable, `no_shows` counts it and a Pokemon match ends
+       as our seat's forfeit. Each seat's `connected_s` (assigned -> first grant) is in the stats.
   POST /tournament/agent/assignments/{seat}/grant {execution_id} -> a SeatGrant (the seat's GameAPI token, which
        lives --token-ttl seconds) and the seat's EXECUTION LEASE for that runtime (--lease-s, 30 s like the backend);
        seat_busy (409) while another execution id holds a live lease; assignment_not_grantable once the match ended;
@@ -266,35 +272,63 @@ class FakeWerewolfMatch:
 class OfficialPlane:
     """The official tournament control plane for one registered tournament agent (see the module docstring)."""
 
-    def __init__(self, platform, key: str, *, session_ttl: float, seat_token_ttl: float, lease_s: float):
+    def __init__(self, platform, key: str, *, session_ttl: float, seat_token_ttl: float, lease_s: float,
+                 contexts: tuple = ("tournament", "testing"), connect_window_s: float = 240.0,
+                 ra_connect_window_s: float = 270.0):
         self.p = platform
         self.key = key
         self.session_ttl, self.seat_token_ttl, self.lease_s = session_ttl, seat_token_ttl, lease_s
+        self.contexts = tuple(contexts)
+        self.connect_window_s, self.ra_connect_window_s = connect_window_s, ra_connect_window_s
         self.lock = threading.Lock()
         self.seats: dict[str, dict] = {}        # seat_id -> {match, holder, lease_until, grants: [label], ...}
         self.counters = {"authenticate": 0, "authenticate_rejected": 0, "authenticate_injected": 0, "assignments": 0,
                          "grants": 0, "seat_busy": 0, "not_grantable": 0, "renewals": 0, "lease_not_held": 0,
-                         "takeovers": 0, "moves_by_holder": 0, "moves_by_non_holder": 0, "moves_unattributed": 0}
+                         "takeovers": 0, "moves_by_holder": 0, "moves_by_non_holder": 0, "moves_unattributed": 0,
+                         "connected": 0, "no_shows": 0}
 
     # ---- seats ------------------------------------------------------------------------------------------------------
     def _seat_id(self, fm) -> str:
         return f"seat-{fm.n}-{getattr(fm, 'seat_tag', None) or ('ww' if getattr(fm, 'werewolf', False) else 'vgc')}"
 
+    @staticmethod
+    def _game(fm) -> str:
+        return getattr(fm, "game_type", None) or ("werewolf" if getattr(fm, "werewolf", False)
+                                                  else "pokemon_vgc_doubles_draft")
+
     def _seats(self) -> dict:
+        now = time.time()
         for fm in list(self.p.order):
             sid = self._seat_id(fm)
             if sid not in self.seats:
-                self.seats[sid] = {"match": fm, "holder": None, "lease_until": 0.0, "grants": [], "tokens": set()}
+                window = self.ra_connect_window_s if self._game(fm) == "red_alert" else self.connect_window_s
+                ctx = self.contexts[len(self.seats) % len(self.contexts)] if self.contexts else None
+                self.seats[sid] = {"match": fm, "holder": None, "lease_until": 0.0, "grants": [], "tokens": set(),
+                                   "context": ctx, "created": now, "deadline": now + window, "connected_s": None,
+                                   "no_show": False}
+        for s in self.seats.values():               # the connect window: a seat nobody connected to is a no-show
+            if s["connected_s"] is None and not s["no_show"] and not s["match"].terminal and now > s["deadline"]:
+                s["no_show"] = True
+                self.counters["no_shows"] += 1
+                forfeit = getattr(s["match"], "forfeit_no_show", None)
+                if forfeit is not None:
+                    forfeit()                       # (a Pokemon match: our seat loses; a table plays on without us)
         return self.seats
 
     def _row(self, seat_id: str, s: dict) -> dict:
         fm = s["match"]
         ww = getattr(fm, "werewolf", False)
-        return {"match_id": f"match-{fm.n}", "seat_id": seat_id,
-                "game_type": getattr(fm, "game_type", None) or ("werewolf" if ww else "pokemon_vgc_doubles_draft"),
-                "seat_position": fm.seat, "seat_count": getattr(fm, "seat_count", None) or (WW_SEATS if ww else 2),
-                "match_status": "in_progress",
-                "seat_status": "running" if s["holder"] else "pending"}
+        row = {"match_id": f"match-{fm.n}", "seat_id": seat_id, "game_type": self._game(fm),
+               "seat_position": fm.seat, "seat_count": getattr(fm, "seat_count", None) or (WW_SEATS if ww else 2),
+               "match_status": "in_progress",
+               "seat_status": "running" if s["holder"] else "pending",
+               "connect_deadline_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(s["deadline"]))}
+        if s["context"]:
+            row["context"] = s["context"]
+        if s["context"] == "tournament":
+            row.update(tournament_id="fake-cup", tournament_name="Local Fake Cup", round_label=f"Swiss round {fm.n + 1}",
+                       opponents=[{"name": "local-bot"}])
+        return row
 
     # ---- endpoints -----------------------------------------------------------------------------------------------------
     def authenticate(self, body: dict) -> tuple[int, dict]:
@@ -316,7 +350,8 @@ class OfficialPlane:
     def assignments(self) -> dict:
         with self.lock:
             self.counters["assignments"] += 1
-            rows = [self._row(sid, s) for sid, s in self._seats().items() if not s["match"].terminal]
+            rows = [self._row(sid, s) for sid, s in self._seats().items()
+                    if not s["match"].terminal and not s["no_show"]]
         return {"assignments": rows}
 
     def grant(self, seat_id: str, execution_id: str | None) -> tuple[int, dict]:
@@ -326,9 +361,13 @@ class OfficialPlane:
             if s is None or not execution_id:
                 return 404, _err("assignment_not_found", "Assignment not found")
             fm = s["match"]
-            if fm.terminal:
+            if fm.terminal or s["no_show"]:
                 self.counters["not_grantable"] += 1
-                return 409, _err("assignment_not_grantable", "The match has ended")
+                return 409, _err("assignment_not_grantable", "The match has ended" if fm.terminal else
+                                 "The connect window passed: a no-show")
+            if s["connected_s"] is None:                  # the first grant: this runtime connected in time
+                s["connected_s"] = round(time.time() - s["created"], 1)
+                self.counters["connected"] += 1
             if s["holder"] and s["holder"] != execution_id and s["lease_until"] > now:
                 self.counters["seat_busy"] += 1
                 return 409, _err("seat_busy", "Another runtime holds this seat's execution lease")
@@ -380,8 +419,12 @@ class OfficialPlane:
 
     def stats(self) -> dict:
         with self.lock:
+            self._seats()                                 # (a connect window can pass while nobody polls)
             return {**self.counters, "seats": {sid: {"match": s["match"].sid, "grants": s["grants"],
-                                                     "holder": short(s["holder"])} for sid, s in self.seats.items()}}
+                                                     "holder": short(s["holder"]), "context": s["context"],
+                                                     "game_type": self._game(s["match"]),
+                                                     "connected_s": s["connected_s"], "no_show": s["no_show"]}
+                                               for sid, s in self.seats.items()}}
 
     # ---- routes ------------------------------------------------------------------------------------------------------
     def routes(self, mcp) -> None:

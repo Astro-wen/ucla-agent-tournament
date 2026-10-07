@@ -12,10 +12,11 @@ with ARENA_BATTLE=search (the default battle policy) the engine search's simulat
 when it cannot, selfcheck FAILS (every battle decision would quietly play the classic policy; ARENA_BATTLE=classic
 runs that policy on purpose; ARENA_ALLOW_NO_CALC=1 covers it too when node itself cannot run, see run_agent.sh);
 recorded real platform states (logs/*/*.jsonl) replay through the agent with and without the calculator,
-every answer passing the official runner's own validation; which key is configured and so which mode run_agent.sh
-runs: tournament (ALTRUAGENT_OFFICIAL_AGENT_KEY, format-checked) or discovery (ALTRUAGENT_API_KEY). Only presence
-and a short hash are printed, never a key. The platform connection itself: bash scripts/run_agent.sh check-tournament
-(python -m agent --check-tournament; that one contacts the platform).
+every answer passing the official runner's own validation; whether the Official Agent Key that run_agent.sh plays
+with (`python -m agent --tournament --match`) is configured and well-formed (ALTRUAGENT_OFFICIAL_AGENT_KEY; the old
+sk_agent_ keys and ARENA_MODE=discovery are retired). Only presence and a short hash are printed, never a key. The
+platform connection itself: bash scripts/run_agent.sh check-tournament (python -m agent --check-tournament; that one
+contacts the platform).
 """
 from __future__ import annotations
 
@@ -195,31 +196,35 @@ OFFICIAL_KEY_RE = re.compile(r"^eak_live_[0-9a-f]{64}$")      # altruagent/offic
 
 
 def check_key() -> None:
-    """Which key is configured (never the key: presence, format and a short hash) and so which mode
-    scripts/run_agent.sh would run: tournament when an Official Agent Key is set (ARENA_MODE can force one)."""
+    """Whether the Official Agent Key scripts/run_agent.sh plays with is configured (never the key: presence, format
+    and a short hash). Missing or still the .env.example placeholder: a warning (this check needs no key; run_agent.sh
+    refuses to start without one). A retired leftover (ARENA_MODE=discovery) fails, as run_agent.sh refuses it."""
     try:
         from dotenv import load_dotenv
         load_dotenv(ROOT / ".env")
     except Exception:  # noqa: BLE001
         pass
-    key = os.environ.get("ALTRUAGENT_API_KEY") or ""
+    retired = os.environ.get("ALTRUAGENT_API_KEY") or ""
     official = "".join(str(os.environ.get("ALTRUAGENT_OFFICIAL_AGENT_KEY") or "").split())
     url = os.environ.get("ALTRUAGENT_CONTROL_URL") or "(unset: https://api.altruagent-game.com is used)"
-    mode = str(os.environ.get("ARENA_MODE") or "").strip().lower() or ("tournament" if official else "discovery")
-    if official and not OFFICIAL_KEY_RE.match(official):
+    if str(os.environ.get("ARENA_MODE") or "").strip().lower() == "discovery":
+        fail("ARENA_MODE=discovery: the discovery mode (sk_agent_ keys) was retired by the platform on 10-06 "
+             "(410 platform_agents_retired); remove ARENA_MODE")
+    if official == "eak_live_your_key_here":
+        warn(f"ALTRUAGENT_OFFICIAL_AGENT_KEY is still the .env.example placeholder: put your Official Agent Key in .env "
+             f"(tournament dashboard, Agent Configuration); control plane {url}")
+    elif official and not OFFICIAL_KEY_RE.match(official):
         fail("ALTRUAGENT_OFFICIAL_AGENT_KEY is set but doesn't look like an Official Agent Key (eak_live_ followed by "
-             "64 hex characters): copy it again from the tournament dashboard")
+             "64 hex characters): copy it again from the tournament dashboard's Agent Configuration page")
     elif official:
-        run = " (python -m agent --tournament)" if mode in ("tournament", "official") else ""
         ok(f"Official Agent Key configured (#{hashlib.sha256(official.encode()).hexdigest()[:10]}): run_agent.sh runs "
-           f"mode {mode}{run}; control plane {url}. Connection check (contacts the platform): "
-           "bash scripts/run_agent.sh check-tournament")
-    if key and key != "sk_agent_your_key_here":
-        ok(f"agent key (sk_agent_) configured (#{hashlib.sha256(key.encode()).hexdigest()[:10]})"
-           + ("" if official else f": run_agent.sh runs mode {mode}; control plane {url}"))
-    elif not official:
-        warn(f"no key configured (.env: ALTRUAGENT_OFFICIAL_AGENT_KEY for the official tournament, or "
-             f"ALTRUAGENT_API_KEY); control plane {url}")
+           f"mode tournament (python -m agent --tournament --match: test matches and tournament games); control plane "
+           f"{url}. Connection check (contacts the platform): bash scripts/run_agent.sh check-tournament")
+    else:
+        old = " (ALTRUAGENT_API_KEY, an sk_agent_ key, is retired and ignored)" if \
+            retired and retired != "sk_agent_your_key_here" else ""
+        warn(f"no key configured (.env: ALTRUAGENT_OFFICIAL_AGENT_KEY, from the tournament dashboard's Agent "
+             f"Configuration page){old}; control plane {url}")
 
 
 def check_search(calc_ok: bool = True, allow_no_calc: bool = False) -> None:
