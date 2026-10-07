@@ -6,13 +6,15 @@ Control plane, as altruagent/official.py speaks it (docs/STARTER_README.md "Offi
        --session-ttl seconds (then 401, and the client authenticates again); invalid_official_agent_key (401) for any
        other key.
   GET  /tournament/agent/assignments -> {assignments: [{match_id, seat_id, game_type, seat_position, seat_count,
-       match_status, seat_status, context, connect_deadline_at, (tournament games:) tournament_id, tournament_name,
-       round_label, opponents}]}: one seat per live match (Pokemon: 1 of 2, Werewolf: 1 of 7, Red Alert: 1 of 2).
+       match_status, seat_status, context, opponents, (tournament games:) tournament_id, tournament_name, round_label,
+       connect_deadline_at}]}: one seat per live match (Pokemon: 1 of 2, Werewolf: 1 of 7, Red Alert: 1 of 2).
        `context` cycles through --contexts per new seat ("tournament", "testing": the event platform's two kinds,
-       played by `python -m agent --tournament` / `--match`). The CONNECT WINDOW (04-tournaments.md: 4 minutes, Red
-       Alert 4.5): a seat whose runtime has not connected (its first grant) by connect_deadline_at is a NO-SHOW: it
-       leaves the listing, its grant answers assignment_not_grantable, `no_shows` counts it and a Pokemon match ends
-       as our seat's forfeit. Each seat's `connected_s` (assigned -> first grant) is in the stats.
+       played by `python -m agent --tournament` / `--match`). The CONNECT WINDOW of a tournament game
+       (04-tournaments.md: 4 minutes, Red Alert 4.5; Testing games have none): a seat whose runtime has not connected
+       by connect_deadline_at is a NO-SHOW: it leaves the listing, its grant answers assignment_not_grantable,
+       `no_shows` counts it and a Pokemon match ends as our seat's forfeit. "Connected" is the seat's first grant here
+       (the platform counts the first gameplay call, which the SDK's worker makes right after its grant). Each seat's
+       `connected_s` (assigned -> first grant) is in the stats.
   POST /tournament/agent/assignments/{seat}/grant {execution_id} -> a SeatGrant (the seat's GameAPI token, which
        lives --token-ttl seconds) and the seat's EXECUTION LEASE for that runtime (--lease-s, 30 s like the backend);
        seat_busy (409) while another execution id holds a live lease; assignment_not_grantable once the match ended;
@@ -304,10 +306,12 @@ class OfficialPlane:
                 window = self.ra_connect_window_s if self._game(fm) == "red_alert" else self.connect_window_s
                 ctx = self.contexts[len(self.seats) % len(self.contexts)] if self.contexts else None
                 self.seats[sid] = {"match": fm, "holder": None, "lease_until": 0.0, "grants": [], "tokens": set(),
-                                   "context": ctx, "created": now, "deadline": now + window, "connected_s": None,
-                                   "no_show": False}
+                                   "context": ctx, "created": now, "connected_s": None, "no_show": False,
+                                   # (a Testing game has no connect deadline: official-agent.md section 7)
+                                   "deadline": None if ctx == "testing" else now + window}
         for s in self.seats.values():               # the connect window: a seat nobody connected to is a no-show
-            if s["connected_s"] is None and not s["no_show"] and not s["match"].terminal and now > s["deadline"]:
+            if s["deadline"] is not None and s["connected_s"] is None and not s["no_show"] \
+                    and not s["match"].terminal and now > s["deadline"]:
                 s["no_show"] = True
                 self.counters["no_shows"] += 1
                 forfeit = getattr(s["match"], "forfeit_no_show", None)
@@ -321,13 +325,13 @@ class OfficialPlane:
         row = {"match_id": f"match-{fm.n}", "seat_id": seat_id, "game_type": self._game(fm),
                "seat_position": fm.seat, "seat_count": getattr(fm, "seat_count", None) or (WW_SEATS if ww else 2),
                "match_status": "in_progress",
-               "seat_status": "running" if s["holder"] else "pending",
-               "connect_deadline_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(s["deadline"]))}
+               "seat_status": "running" if s["holder"] else "pending", "opponents": [{"name": "local-bot"}]}
         if s["context"]:
             row["context"] = s["context"]
+        if s["deadline"] is not None:               # tournament games only
+            row["connect_deadline_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(s["deadline"]))
         if s["context"] == "tournament":
-            row.update(tournament_id="fake-cup", tournament_name="Local Fake Cup", round_label=f"Swiss round {fm.n + 1}",
-                       opponents=[{"name": "local-bot"}])
+            row.update(tournament_id="fake-cup", tournament_name="Local Fake Cup", round_label=f"Swiss round {fm.n + 1}")
         return row
 
     # ---- endpoints -----------------------------------------------------------------------------------------------------

@@ -457,10 +457,14 @@ class DryRun:
         self.check("both_kinds_of_game_played", {"testing", "tournament"} <= set(played), contexts=played,
                    by_kind={k: sum(1 for s in seats.values() if s.get("context") == k and s.get("grants"))
                             for k in played})
-        conn = sorted(s["connected_s"] for s in seats.values() if s.get("connected_s") is not None)
+        conn = sorted(s["connected_s"] for s in seats.values()               # tournament seats: they have the window
+                      if s.get("connected_s") is not None and s.get("context") != "testing")
+        testing = [s["connected_s"] for s in seats.values() if s.get("connected_s") is not None
+                   and s.get("context") == "testing"]
         connect = {"seats": len(conn), "p50_s": conn[len(conn) // 2] if conn else None,
                    "max_s": conn[-1] if conn else None, "window_s": self.a.connect_window,
-                   "no_shows": off.get("no_shows")}
+                   "no_shows": off.get("no_shows"), "testing_seats": len(testing),
+                   "testing_max_s": max(testing) if testing else None}
         self.check("every_seat_connected_inside_its_window",
                    off.get("no_shows", 1) == 0 and bool(conn) and conn[-1] < self.a.connect_window, **connect)
         rep = {"out": str(self.out), "bundle": str(self.bundle), "minutes": round((time.time() - self.t0) / 60, 1),

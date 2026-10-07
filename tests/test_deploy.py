@@ -1674,7 +1674,7 @@ def test_fake_official_control_plane_leases_seats_and_serves_a_werewolf_table(tm
         rows = {r.game_type: r for r in official.assignments()}
         assert (rows["werewolf"].seat_position, rows["werewolf"].seat_count) == (3, 7)
         assert {r.context for r in rows.values()} == {"tournament", "testing"}          # the event's two kinds
-        assert all(r.connect_deadline_at for r in rows.values())
+        assert all(bool(r.connect_deadline_at) == (r.context == "tournament") for r in rows.values())
         vgc = rows["pokemon_vgc_doubles_draft"]
         assert vgc.seat_count == 2 and vgc.seat_id
         a, b = "exec-A-" + "a" * 40, "exec-B-" + "b" * 40
@@ -1751,7 +1751,7 @@ def test_the_fake_official_plane_serves_both_kinds_and_scores_a_missed_connect_w
     assert [assignment_kind(r) for r in rows] == [TOURNAMENT, TESTING, TOURNAMENT]
     assert rows[0].tournament_name == "Local Fake Cup" and rows[0].opponents == ("local-bot",)
     assert rows[1].tournament_name is None
-    assert [r.connect_deadline_at for r in rows] == ["1970-01-01T00:20:40Z", "1970-01-01T00:20:40Z",
+    assert [r.connect_deadline_at for r in rows] == ["1970-01-01T00:20:40Z", None,          # (Testing: no deadline)
                                                      "1970-01-01T00:21:10Z"]                # 240 s; Red Alert 270 s
     clock["t"] = 1100.0
     assert plane.grant(rows[1].seat_id, "exec-1")[0] == 200            # connected 100 s after it was assigned
