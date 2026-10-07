@@ -5,15 +5,21 @@ The platform's clocks (docs/competition_brief.md, checked against logs/*/):
     the whole battle that is never refilled (plus 90 s of first-turn grace). A turn that runs out is auto-played; a bank
     that runs out loses the battle. The bank is drawn down in real time while the server waits for us, so it pays for
     our thinking AND for the platform's round trip (about 0.7 s per decision in the recordings).
-  * The draft and teambuild phases have no idle timer (pokemon.md); team preview is covered by the 90 s.
+  * Every draft pick has its own clock (pokemon.md section 4, since 10-05): 15 s from the moment the pick becomes ours
+    (`observation.decision_timeout_seconds`), then the server picks a random legal card for us and rejects our late
+    pick as STALE_STATE. The teambuild phase has no idle timer; team preview is covered by the 90 s.
   * Werewolf / Avalon auto-play a seat after 120 s idle.
 What a battle decision can see: Showdown sends `|inactive|Time left: T sec this turn | B sec total [| G sec grace]` with
 every request, and the platform forwards the whole protocol in `observation.protocol_log` (the last such line is the
 current request's). Nothing is visible during the draft or at team preview.
 
 `budget_for(raw, game_type)` turns that into one `Deadline` per decision:
-  * draft pick DRAFT_S (20 s), teambuild TEAMBUILD_S (20 s), team preview PREVIEW_S (30 s of the 90 s), Werewolf /
-    unknown games OTHER_S (20 s of the 120 s), a chat turn MESSAGE_S;
+  * draft pick DRAFT_S (20 s), and never more than the pick's clock (decision_timeout_seconds, else DRAFT_CLOCK_S)
+    minus DRAFT_RESERVE_S: 10 s of the 15 s, the rest for noticing the turn, the round trips and the watchdog's grace
+    (a match process's first pick also waits for the calculator's start-up, DamageCalc.warm: seconds on a cold
+    machine, bounded by this budget; ARENA_TC_DRAFT_S sets the budget outright);
+    teambuild TEAMBUILD_S (20 s), team preview PREVIEW_S (30 s of the 90 s), Werewolf / unknown games OTHER_S (20 s
+    of the 120 s), a chat turn MESSAGE_S;
   * a battle decision: BATTLE_S (10 s), and when the timer line is visible also at most
     TURN_SHARE x (T - LATENCY_S)   (half of what is left of this turn after the platform's latency) and
     (bank - BANK_RESERVE_S) / BANK_SPREAD   (the bank left, spread over the next 20 decisions, 30 s kept in reserve),
@@ -41,18 +47,26 @@ from contextlib import contextmanager
 
 def _knob(name: str, default: float) -> float:
     """ARENA_TC_<NAME> override (experiments / tests only); anything unparsable or negative keeps the default."""
+    x = _override(name)
+    return default if x is None else x
+
+
+def _override(name: str) -> float | None:
+    """The value of a valid ARENA_TC_<NAME> override, None when it is unset, unparsable or negative."""
     try:
         v = os.environ.get(f"ARENA_TC_{name}")
         if v in (None, ""):
-            return default
+            return None
         x = float(v)
-        return x if math.isfinite(x) and x >= 0 else default
+        return x if math.isfinite(x) and x >= 0 else None
     except (TypeError, ValueError):
-        return default
+        return None
 
 
 # ---- budgets (seconds) -------------------------------------------------------------------------------------------
-DRAFT_S = 20.0          # a draft pick (no platform timer; v3 worst case 1.4 s)
+DRAFT_S = 20.0          # a draft pick at most (v4.2 on the real states: p99 0.17 s, max 0.42 s), and never more than
+DRAFT_CLOCK_S = 15.0    # the platform's per-pick clock (this when the state does not say, pokemon.md section 4) minus
+DRAFT_RESERVE_S = 5.0   # this: noticing the turn, the round trips around our answer, the watchdog's grace
 TEAMBUILD_S = 20.0
 PREVIEW_S = 30.0        # team preview: 90 s on the platform (v3 worst case 2.7 s)
 BATTLE_S = 10.0         # a battle decision at most (55 s per turn; v3 worst case 84 ms)
@@ -174,6 +188,31 @@ def battle_seconds(timer: dict | None) -> tuple[float, str]:
     return max(_knob("MIN_S", MIN_S), min(secs, turn_cap, bank_cap)), "timer"
 
 
+def draft_clock(raw) -> tuple[float, str]:
+    """(seconds, source) of the draft pick's platform clock: the state's `decision_timeout_seconds` (in the observation,
+    else at the top level; source "clock"), else DRAFT_CLOCK_S (source "default"). Never raises."""
+    try:
+        obs = raw.get("observation") if isinstance(raw, dict) else None
+        for where in (obs, raw):
+            v = where.get("decision_timeout_seconds") if isinstance(where, dict) else None
+            if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v > 0:
+                return float(v), "clock"
+    except Exception:
+        pass
+    return _knob("DRAFT_CLOCK_S", DRAFT_CLOCK_S), "default"
+
+
+def draft_seconds(raw) -> tuple[float, str]:
+    """(budget, source) of a draft pick: DRAFT_S, but never more than the pick's clock minus DRAFT_RESERVE_S (and
+    never below MIN_S). A valid ARENA_TC_DRAFT_S (experiments, tests) is the budget as it is (source "override")."""
+    forced = _override("DRAFT_S")
+    if forced is not None:
+        return forced, "override"
+    clock, source = draft_clock(raw)
+    left = clock - _knob("DRAFT_RESERVE_S", DRAFT_RESERVE_S)
+    return min(DRAFT_S, max(_knob("MIN_S", MIN_S), left)), source
+
+
 def budget_for(raw, game_type: str | None = None) -> Deadline:
     """The Deadline of one decision on this state (see the module docstring). Never raises."""
     try:
@@ -185,7 +224,10 @@ def budget_for(raw, game_type: str | None = None) -> Deadline:
         if game.startswith("pokemon"):
             if phase in PRE_BATTLE:
                 kind = PRE_BATTLE[phase]
-                default = {"draft": DRAFT_S, "teambuild": TEAMBUILD_S, "preview": PREVIEW_S}[kind]
+                if kind == "draft":
+                    secs, source = draft_seconds(raw)
+                    return Deadline(secs, kind, source)
+                default = {"teambuild": TEAMBUILD_S, "preview": PREVIEW_S}[kind]
                 return Deadline(_knob(f"{kind.upper()}_S", default), kind)
             secs, source = battle_seconds(parse_timer(raw))
             return Deadline(secs, "battle" if phase in BATTLE_PHASES else f"pokemon:{phase or '?'}", source)

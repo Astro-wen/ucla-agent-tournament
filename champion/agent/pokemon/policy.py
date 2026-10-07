@@ -860,8 +860,17 @@ class PokemonPolicy:
                     card = preview_matrix.resolve_card(sid, {}, by_species)
                     if card:
                         self.opp_cards[to_id(card.get("species", ""))] = card
+            # Our own six too: a card the server picked for us after our last draft decision (pokemon.md section 4,
+            # since 10-05: a pick not made within its 15 s is made at random, `"auto": true` in `picks`) never reached
+            # the draft memory, and the battle would play that Pokemon with a generic set.
+            for p in obs.get("your_roster") or []:
+                sid = to_id(p.get("species", "")) if isinstance(p, dict) else ""
+                if sid and not preview_matrix.resolve_card(sid, self.cards):
+                    card = by_species.get(sid) or preview_matrix.resolve_card(sid, {}, by_species)
+                    if card:
+                        self.cards[to_id(card.get("species", ""))] = card
         except Exception:
-            log.debug("opponent set recovery failed", exc_info=True)
+            log.debug("draft set recovery failed", exc_info=True)
         try:
             self.opp_roster = []
             for p in obs.get("opponent_roster") or []:
