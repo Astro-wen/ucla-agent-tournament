@@ -1,44 +1,56 @@
 """Entry point for `python -m agent`.
 
-Authenticates using the existing `.env`/environment configuration,
-discovers matches assigned to this agent, and plays them CONCURRENTLY — one
-independent worker process per active match — through
-`agent.agent.create_agent()` via the committed supervisor
-(`altruagent.supervisor.run_forever_concurrent`). Stops cleanly on Ctrl+C;
-does not resign or otherwise touch any match on shutdown.
+One way to run your agent: set `ALTRUAGENT_OFFICIAL_AGENT_KEY` to your
+Official Agent Key (from the tournament dashboard) and run
 
-Claim mode — `python -m agent --claim seatclaim_...` (or `--claim -` to be
-prompted without echo, or `ALTRUAGENT_CLAIM_TOKEN` in the environment) —
-instead claims exactly ONE seat of a self-hosted tournament test match and
-plays it right here, in this process: no API key, no `me()`/`sessions()`
-discovery, no supervisor or worker processes. The process itself is the
-isolation boundary, so self-play is simply one terminal per seat.
-`--agent MODULE[:FACTORY]` picks a different factory than
-`agent.agent:create_agent` for that one seat.
+    python -m agent --tournament          # your tournament games
+    python -m agent --match               # your test matches (Testing page)
+    python -m agent --tournament --match  # both, in one process
 
-Official tournament mode — `python -m agent --tournament` (with
-`ALTRUAGENT_OFFICIAL_AGENT_KEY` set) — authenticates as the contestant's
-registered tournament agent and keeps one worker process per active official
-assignment until Ctrl+C (`altruagent.supervisor.run_tournament_forever`).
-`--check-tournament` verifies the connection and the agent without playing.
+It authenticates as your registered self-hosted agent and keeps one worker
+process per assigned game of the chosen kind(s) until Ctrl+C
+(`altruagent.supervisor.run_tournament_forever`, which filters assignments
+on their `context`). Nobody copies an id and nobody claims anything. A game
+of the other kind is not played; the runtime says once per game that it is
+waiting. `--check-tournament` verifies the connection and the agent without
+playing. `--agent MODULE[:FACTORY]` picks a different factory than
+`agent.agent:create_agent`.
 
-Deployment hardening on top of the SDK (none of it edits `altruagent/`, see
-docs/deploy.md "官方正式赛"): supervisor tuning from ARENA_* knobs with 10 s
-defaults in both modes; a failed discovery poll or a TRANSIENT re-authentication
-failure (429, 5xx, network, a session the platform failed to mint or did not
-accept) no longer ends the runtime and its running matches
-(`_SteadyDiscovery`, `_SteadyOfficial`); the official runtime waits out a
-transient failure at start instead of exiting; scripts/run_agent.sh can hand it
-a per-run-loop execution id so a restarted runtime resumes its own seat leases
-at once; a hot standby plays only the seats no other runtime holds (checked
-with the seat's grant; a new seat is left to the primary for
-ARENA_NEW_SEAT_DELAY_S); and `python -m agent` run by anything but
-scripts/run_agent.sh gets the platform's control-plane URL when none is
-configured and says loudly when this machine would play degraded (`_startup`).
+Retired modes only print a notice pointing to the command above (see
+`altruagent.notices`):
 
-This file is deliberately thin — discovery/worker lifecycle lives in
-`altruagent.supervisor`, one match's play loop in `altruagent.runner`, and
-each worker's own setup in `altruagent.worker`.
+- `python -m agent` with no mode: the old platform API-key mode
+  (`ALTRUAGENT_API_KEY`), turned off on the platform.
+- `--claim seatclaim_...` (and `ALTRUAGENT_CLAIM_TOKEN`): Testing claim
+  codes, replaced by the Official Agent Key.
+
+Deployment hardening on top of the starter (none of it edits `altruagent/`;
+see docs/deploy.md "官方模式下看门脚本和 agent 额外做了什么"). The SDK's
+supervisor itself now keeps the runtime through a temporary sign-in failure
+and backs off a seat whose worker keeps failing (upstream 1372ccc, 4cb083a);
+what is added here:
+
+- supervisor tuning from ARENA_* knobs (`_tournament_options`): a 10 s
+  assignment poll and a 10 s base cooldown before a failed seat's next worker
+  (the SDK: 60 s, a lost battle turn after one crash; its per-seat back-off
+  still doubles from there, up to 10 minutes);
+- the first authentication waits out a temporary failure (the control plane
+  down or rate limiting at the moment the runtime starts, a session the
+  platform failed to mint) with a 5/10/20/30 s back-off instead of exiting
+  (`_authenticate`); a refused key still ends the process at once;
+- scripts/run_agent.sh can hand the runtime a per-run-loop execution id, so a
+  restarted runtime resumes its own seat leases at once
+  (`_take_execution_id`, `_tournament_tuning`);
+- a hot standby (a second runtime of the same key, ARENA_NEW_SEAT_DELAY_S)
+  plays only the seats no other runtime holds (`_HotStandby`);
+- `python -m agent` run by anything but scripts/run_agent.sh gets the
+  platform's control-plane URL when none is configured and says loudly when
+  this machine would play degraded: no damage calculator, no engine search
+  (`_startup`).
+
+This file is deliberately thin — the assignment loop and worker lifecycle
+live in `altruagent.supervisor`, one seat's setup in `altruagent.worker`,
+and one game's play loop in `altruagent.runner`.
 
 IMPORTANT (Windows multiprocessing): the `if __name__ == "__main__":` guard
 at the bottom of this file is not just style — `multiprocessing`'s `spawn`
@@ -51,9 +63,7 @@ and spawn further workers recursively.
 from __future__ import annotations
 
 import argparse
-import getpass
 import os
-import random
 import re
 import sys
 import time
@@ -62,40 +72,35 @@ from typing import Callable
 import altruagent.supervisor as _sdk_supervisor
 from altruagent.agent_loader import DEFAULT_AGENT_SPEC
 from altruagent.agent_loader import load_agent_factory as _load_agent_factory
-from altruagent.auth import SeatClaimError, SeatGrantAuth
-from altruagent.client import AltruAgentClient
 from altruagent.errors import AltruAgentError, AuthenticationError, ConfigurationError, PlatformError
-from altruagent.mcp_game import MCPGameSession
-from altruagent.models import AgentSessions, DecisionContext, GameState, SeatGrant
-from altruagent.official import OFFICIAL_AGENT_KEY_ENV, OfficialAgentClient, OfficialAgentError
-from altruagent.runner import RunnerError, _resolve_decision_fn, run_game
-from altruagent.supervisor import WAITING_MESSAGE, run_forever_concurrent, run_tournament_forever
+from altruagent.notices import AGENT_GUIDE_URL, CLAIM_CODES_RETIRED_NOTICE, PLATFORM_KEY_RETIRED_NOTICE
+from altruagent.official import OfficialAgentClient, OfficialAgentError, is_fatal_auth_error
+from altruagent.runner import _resolve_decision_fn
+from altruagent.supervisor import ALL_KINDS, TESTING, TOURNAMENT, WAITING_MESSAGE, run_tournament_forever
 
-from . import agent as agent_module
 
+CLAIM_TOKEN_ENV = "ALTRUAGENT_CLAIM_TOKEN"
 DEFAULT_CONTROL_URL = "https://api.altruagent-game.com"   # the platform's control plane (.env.example)
 
 
-def _resolve_create_agent(module: object) -> Callable:
-    """Look up ``create_agent`` on the given agent module. Fails clearly
-    (no fallback name, no signature inspection) if it's missing or not
-    callable. Deliberately does NOT call it here — construction happens
-    once per match, inside that match's own worker process, not once in
-    the parent (see altruagent.worker.run_worker).
-    """
-    create_agent = getattr(module, "create_agent", None)
-    if not callable(create_agent):
-        raise ValueError(
-            "agent/agent.py must define a callable create_agent() function "
-            "that returns your decision logic (a function, or an object "
-            "exposing choose_action(state, context))."
-        )
-    return create_agent
+def _retired(notice: str) -> int:
+    """Print a retired mode's notice and fail: nothing was run."""
+    print(notice)
+    return 1
 
 
-_SUPERVISOR_ENV = (
-    # (environment variable, run_forever_concurrent keyword, smallest accepted value, what `python -m agent` sets)
-    ("ARENA_DISCOVERY_S", "discovery_interval", 2.0, "10"),
+# What the runtime says it plays, by the kinds the flags chose.
+PLAYING_MESSAGES = {
+    ALL_KINDS: "Playing your test matches and tournament games.",
+    frozenset({TOURNAMENT}): "Playing your tournament games only. Add --match to also play your test matches.",
+    frozenset({TESTING}): "Playing your test matches only. Add --tournament to also play your tournament games.",
+}
+
+
+# ---- supervisor tuning ------------------------------------------------------------------------------------------------
+_TOURNAMENT_ENV = (
+    # (environment variable, run_tournament_forever keyword, smallest accepted value, what `python -m agent` sets)
+    ("ARENA_DISCOVERY_S", "poll_interval", 2.0, "10"),
     ("ARENA_WORKER_COOLDOWN_S", "cooldown_seconds", 1.0, "10"),
 )
 
@@ -114,313 +119,26 @@ def _env_number(env, name: str, low: float) -> float | None:
     return value
 
 
-def _supervisor_options(env=None) -> dict:
-    """Optional supervisor tuning from the environment. Unset = the SDK defaults (a sessions() poll every 15 s, and
-    a 60 s cooldown before a match whose worker crashed gets a new worker: a lost 55 s battle turn); both the
-    deployment wrapper scripts/run_agent.sh and `python -m agent` itself (`_startup`) set both to 10 s. Bad values
-    are ignored with a message, never fatal."""
+def _tournament_options(env=None) -> dict:
+    """Optional run_tournament_forever tuning from the environment: ARENA_DISCOVERY_S = the assignment poll (SDK
+    default 10 s), ARENA_WORKER_COOLDOWN_S = the wait before a seat whose worker ended gets a new one (SDK default
+    60 s: after a worker crash, e.g. the runner's kill on an invalid action, a whole 55 s battle turn). The SDK doubles
+    that cooldown with each failure of the same seat in a row (up to 10 minutes; a finished match or seat_busy resets
+    it), so 10 s is only the first retry. Unset = the SDK defaults; scripts/run_agent.sh and `python -m agent` itself
+    (`_startup`) set both to 10 s. Bad values are ignored with a message, never fatal."""
     env = os.environ if env is None else env
     out: dict = {}
-    for name, key, low, _ in _SUPERVISOR_ENV:
+    for name, key, low, _ in _TOURNAMENT_ENV:
         value = _env_number(env, name, low)
         if value is not None:
             out[key] = value
     return out
 
 
-def _tournament_options(env=None) -> dict:
-    """The same two knobs for run_tournament_forever: ARENA_DISCOVERY_S = the assignment poll (SDK default 10 s),
-    ARENA_WORKER_COOLDOWN_S = the wait before a seat whose worker ended gets a new one (SDK default 60 s: after a
-    worker crash, e.g. the runner's kill on an invalid action, a whole 55 s battle turn)."""
-    names = {"discovery_interval": "poll_interval", "cooldown_seconds": "cooldown_seconds"}
-    return {names[k]: v for k, v in _supervisor_options(env).items()}
-
-
-class _SteadyDiscovery:
-    """The client as the supervisor sees it, except that a failed sessions() poll (network blip, 5xx, rate limit,
-    a transient 401) no longer ends `python -m agent` — the SDK's supervisor would then terminate EVERY running
-    match worker, although each worker handles its own errors. The failed poll answers "no active matches" instead:
-    the supervisor keeps the workers it has (it never stops one because of a poll) and starts new ones at the next
-    good poll. After ARENA_DISCOVERY_MAX_FAILURES failures in a row (default 30) the error is raised as before, and
-    the wrapper (scripts/run_agent.sh / systemd) restarts the whole agent."""
-
-    def __init__(self, client, max_failures: int | None = None) -> None:
-        self._client = client
-        if max_failures is None:
-            max_failures = int(_env_number(os.environ, "ARENA_DISCOVERY_MAX_FAILURES", 1) or 30)
-        self.max_failures = max_failures
-        self.failures = 0
-
-    def sessions(self) -> AgentSessions:
-        try:
-            found = self._client.sessions()
-        except AltruAgentError as exc:
-            self.failures += 1
-            if self.failures >= self.max_failures:
-                raise
-            print(f"[agent] discovery failed ({self.failures} in a row; running workers continue): {exc}", flush=True)
-            return AgentSessions()
-        if self.failures:
-            print(f"[agent] discovery recovered after {self.failures} failed poll(s)", flush=True)
-        self.failures = 0
-        return found
-
-    def __getattr__(self, name: str):
-        return getattr(self._client, name)
-
-
-def _run_discovery() -> int:
-    """The normal workflow: authenticate with the API key, then keep one
-    worker process per assigned active match. Unchanged by claim mode.
-    """
-    try:
-        _resolve_create_agent(agent_module)  # validated eagerly; not invoked here
-    except ValueError as exc:
-        print(f"Startup error: {exc}")
-        return 1
-
-    try:
-        client = AltruAgentClient()
-    except ConfigurationError as exc:
-        print(f"Configuration error: {exc}")
-        print("Copy .env.example to .env and fill in ALTRUAGENT_API_KEY.")
-        return 1
-
-    try:
-        me = client.me()
-    except AltruAgentError as exc:
-        print(f"Could not authenticate: {exc}")
-        client.close()
-        return 1
-
-    if not me.is_claimed:
-        print(
-            f"Agent '{me.name}' is not claimed yet (status={me.status}). "
-            "Have a human claim it with your claim_token before running this."
-        )
-        client.close()
-        return 1
-
-    print(f"Authenticated as agent '{me.name}' ({me.id}).")
-    print(
-        "Watching for assigned matches — each gets its own process. "
-        "Press Ctrl+C to stop.\n"
-    )
-
-    try:
-        run_forever_concurrent(_SteadyDiscovery(client), agent_id=me.id, **_supervisor_options())
-        return 0
-    except KeyboardInterrupt:
-        print("\nStopped.")
-        return 0
-    except AltruAgentError as exc:
-        print(f"\nStopped due to an unrecoverable error: {exc}")
-        return 1
-    finally:
-        client.close()
-
-
-CLAIM_TOKEN_ENV = "ALTRUAGENT_CLAIM_TOKEN"
-_PROMPT = "-"
-
-
-def _resolve_claim_token(arg: str | None, *, prompt: Callable[[str], str]) -> str | None:
-    """``--claim TOKEN`` wins; ``--claim -`` prompts without echo; otherwise
-    ``ALTRUAGENT_CLAIM_TOKEN`` from the real process environment (never from
-    ``.env`` — a claim token is single-use and shouldn't be saved in a file).
-    ``None`` means "not claim mode".
-    """
-    if arg == _PROMPT:
-        return prompt("Seat claim token (input hidden): ")
-    if arg is not None:
-        return arg
-    return os.environ.get(CLAIM_TOKEN_ENV) or None
-
-
-def _describe_seat(grant: SeatGrant) -> list[str]:
-    if isinstance(grant.seat_position, int) and isinstance(grant.seat_count, int):
-        seat = f"Claimed seat {grant.seat_position + 1}/{grant.seat_count}"
-    else:
-        seat = "Claimed seat"
-    match = f"Match: {grant.match_id or 'unknown'}"
-    if grant.match_status == "starting":
-        match += " (waiting for every seat's agent to connect)"
-    return [seat, f"Game: {grant.game_type or 'unknown'}", match]
-
-
-class _ProgressGameSession(MCPGameSession):
-    """Claim mode's game session: identical calls and results, plus a few
-    lifecycle lines so a long match doesn't look idle — "Connected" after
-    the first successful state read, one line per phase change, and a count
-    of submitted decisions. Never prints state contents, actions, or tokens.
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.decisions = 0
-        self._connected = False
-        self._phase: str | None = None
-
-    def _observe(self, phase: str | None) -> None:
-        if not self._connected:
-            self._connected = True
-            print("Connected. Playing — press Ctrl+C to stop.", flush=True)
-        if phase and phase != self._phase:
-            self._phase = phase
-            print(f"Phase: {phase}", flush=True)
-
-    def get_state(self) -> GameState:
-        state = super().get_state()
-        self._observe(state.phase)
-        return state
-
-    def wait_for_update(self, **kwargs) -> GameState:
-        state = super().wait_for_update(**kwargs)
-        self._observe(state.phase)
-        return state
-
-    def play_action(self, **kwargs) -> dict:
-        result = super().play_action(**kwargs)
-        self.decisions += 1
-        post_move = result.get("state") if isinstance(result, dict) else None
-        if isinstance(post_move, dict):
-            self._observe(post_move.get("phase"))
-        return result
-
-
-# Waiting for a match whose open seats are still being filled (the platform's
-# 409 match_not_ready): its own retry_after_seconds, else this, plus jitter so
-# several local seats don't retry in lockstep.
-CLAIM_WAIT_DEFAULT_S = 20.0
-CLAIM_WAIT_JITTER_S = 2.0
-# rate_limited while waiting: the platform allows 30 claim requests a minute.
-CLAIM_RATE_LIMITED_WAIT_S = 30.0
-# The control plane unreachable while waiting: a few spaced retries, then stop.
-CLAIM_NETWORK_WAIT_S = 10.0
-CLAIM_NETWORK_RETRIES = 5
-
-
-class _StoppedBeforeClaim(Exception):
-    """Ctrl+C while waiting to claim: nothing was claimed."""
-
-
-def _claim_with_wait(client: AltruAgentClient) -> None:
-    """Claim the seat, waiting while the match's open seats are being filled.
-
-    ``SeatGrantAuth.login()`` stays a single attempt; this loop decides when to
-    call it again. Every attempt goes through the same client, so the same
-    ``SeatGrantAuth`` and therefore the same claim_key. Waits only on
-    ``match_not_ready`` and ``rate_limited`` (and a few network failures);
-    every other error is raised, as before. Prints nothing secret.
-    """
-    announced = False
-    network_failures = 0
-    while True:
-        try:
-            try:
-                client.login()
-                return
-            except SeatClaimError as exc:
-                if exc.error_code == "match_not_ready":
-                    if not announced:
-                        print(
-                            "Waiting for the match's open seats to be filled — "
-                            "this seat is claimed as soon as the match fills (Ctrl+C to stop)...",
-                            flush=True,
-                        )
-                        announced = True
-                    wait = exc.retry_after_seconds or CLAIM_WAIT_DEFAULT_S
-                    time.sleep(wait + random.uniform(0, CLAIM_WAIT_JITTER_S))
-                    continue
-                if exc.error_code == "rate_limited":
-                    time.sleep(CLAIM_RATE_LIMITED_WAIT_S)
-                    continue
-                raise
-            except PlatformError as exc:
-                if exc.status_code is None and network_failures < CLAIM_NETWORK_RETRIES:
-                    network_failures += 1
-                    time.sleep(CLAIM_NETWORK_WAIT_S)
-                    continue
-                raise
-        except KeyboardInterrupt:
-            raise _StoppedBeforeClaim() from None
-
-
-def _run_claim(claim_token: str, create_agent: Callable) -> int:
-    """Claim one Testing seat and play it to completion in this process."""
-    try:
-        auth = SeatGrantAuth(claim_token)
-    except SeatClaimError as exc:
-        print(f"Claim error: {exc}")
-        return 1
-
-    try:
-        client = AltruAgentClient(auth=auth)
-    except ConfigurationError as exc:
-        print(f"Configuration error: {exc}")
-        print("Claim mode needs only ALTRUAGENT_CONTROL_URL (no API key) — copy .env.example to .env.")
-        return 1
-
-    try:
-        # Build and check the contestant BEFORE claiming: a claimed seat is
-        # bound to this process's in-memory claim key, so a process that
-        # fails after claiming can't hand the seat to a fixed-up rerun.
-        try:
-            contestant = create_agent()
-            _resolve_decision_fn(contestant)
-        except Exception as exc:  # noqa: BLE001 - contestant code; report it, don't claim
-            print(f"Startup error: your agent factory failed, so the seat was not claimed: {exc!r}")
-            return 1
-
-        try:
-            _claim_with_wait(client)  # the claim itself, waiting for the lobby if needed
-        except _StoppedBeforeClaim:
-            print("\nStopped before the seat was claimed.")
-            return 0
-        except AltruAgentError as exc:
-            print(f"Could not claim seat: {exc}")
-            return 1
-
-        grant = auth.grant
-        for line in _describe_seat(grant):
-            print(line)
-        print("Connecting to GameAPI...", flush=True)
-
-        game = _ProgressGameSession(
-            client, session_id=grant.game_session_id, game_server_url=grant.gameapi_server_url
-        )
-        context = DecisionContext(
-            session_id=grant.game_session_id,
-            tournament_id=None,
-            game_type=grant.game_type,
-            agent_id=grant.agent_id,
-            seat_position=grant.seat_position,
-        )
-        final_state = run_game(game, context, contestant)
-        print(
-            f"Match finished (termination_reason={final_state.termination_reason}) "
-            f"after {game.decisions} decision(s)."
-        )
-        returns = final_state.returns or {}
-        if grant.agent_id in returns:
-            print(f"Your score: {returns[grant.agent_id]}")
-        return 0
-    except KeyboardInterrupt:
-        print("\nStopped. This seat stays claimed and can't be claimed again by another process.")
-        return 0
-    except RunnerError as exc:
-        print(f"\nMatch failed: {exc}")
-        return 1
-    except AltruAgentError as exc:
-        print(f"\nStopped due to an unrecoverable error: {exc}")
-        return 1
-    finally:
-        client.close()
-
-
+# ---- the first authentication -----------------------------------------------------------------------------------------
 # The platform has answered a failed session mint (its own sign-in service rejecting or rate-limiting the request) with
 # 401 invalid_official_agent_key and a detail starting with this: a temporary platform problem, not a key problem.
-# (Upstream 1372ccc, is_fatal_auth_error; our SDK copy is 6ba2e9c, from before it.)
+# (The SDK's supervisor treats it the same way once the runtime runs: altruagent.official.is_fatal_auth_error.)
 _MINT_FAILURE_PREFIX = "Failed to mint agent session"
 
 
@@ -429,75 +147,109 @@ def _mint_failure(exc: BaseException) -> bool:
             and str(getattr(exc, "detail", None) or "").startswith(_MINT_FAILURE_PREFIX))
 
 
-def _fresh_session_refused(exc: BaseException) -> bool:
-    """A plain AuthenticationError (not the key exchange's OfficialAgentError) with 401: the request that followed a
-    SUCCESSFUL re-login still refused the freshly issued session (the SDK retries once after a 401, then raises)."""
-    return (isinstance(exc, AuthenticationError) and not isinstance(exc, OfficialAgentError)
-            and getattr(exc, "status_code", None) == 401)
-
-
 def _transient(exc: BaseException) -> bool:
-    """A control-plane failure that retrying fixes (rate limiting, a 5xx or gateway blip, a timeout, the network, a
-    session the platform failed to mint or did not accept), as opposed to one it cannot (a rejected or revoked key,
-    an incomplete registration: any other 4xx; a malformed answer)."""
+    """A failure of the FIRST authentication that waiting fixes: rate limiting, a 5xx or gateway blip, a timeout, the
+    network, a session the platform failed to mint. Anything else (a rejected or revoked key, an incomplete
+    registration, any other 4xx, an answer without a status) ends the start at once, as upstream's start does; once
+    the runtime runs, the SDK's supervisor classifies re-authentication failures itself (is_fatal_auth_error)."""
     status = getattr(exc, "status_code", None)
     if getattr(exc, "error_code", None) == "rate_limited" or status in (408, 425, 429):
         return True
     if isinstance(status, int) and status >= 500:
         return True
-    if _mint_failure(exc) or _fresh_session_refused(exc):
+    if _mint_failure(exc):
         return True
     return status is None and isinstance(exc, PlatformError)       # could not reach the control plane at all
 
 
-def _auth_text(exc: BaseException) -> str:
-    """An authentication failure as the runtime logs it. For a failed session mint the SDK's own text is the rejected
-    key's ("copy it again"), which must not send the owner to rotate a working key in the middle of the event."""
-    if _mint_failure(exc):
-        return (f"the platform could not start an agent session (HTTP {getattr(exc, 'status_code', None)}: "
-                f"{getattr(exc, 'detail', None)}); a temporary problem on the platform, not the key")
-    if _fresh_session_refused(exc):
-        return f"the control plane did not accept a freshly issued agent session (HTTP 401: {exc})"
-    return str(exc)
+STARTUP_RETRY_S = (5.0, 10.0, 20.0, 30.0)   # capped at 30 s: plays within ~30 s of the control plane coming back
+_sleep = time.sleep                        # (tests replace it)
 
 
-# Listing pauses after the 1st, 2nd, 3rd+ rate-limited (or 401: a failed session mint, a fresh session refused)
-# re-login in a row. Capped at 30 s: while paused the runtime sees no new seat (a Werewolf seat has 120 s, a team
-# preview 90 s), and one re-login per 30 s is still far gentler than the SDK's own poll (10 s).
-RATE_LIMIT_BACKOFF_S = (15.0, 20.0, 30.0)
+def _authenticate(official) -> bool:
+    """The runtime's first authentication. A transient failure (the control plane down or rate limiting at the
+    moment the runtime starts, e.g. a restart during an outage) is waited out with a back-off instead of ending the
+    process (upstream's start exits at once; scripts/run_agent.sh would then restart it, noisily); a refused key ends
+    it (False)."""
+    attempt = 0
+    while True:
+        try:
+            official.authenticate()
+            return True
+        except AltruAgentError as exc:
+            if not _transient(exc):
+                print(f"Could not connect with your Official Agent Key: {exc}")
+                return False
+            delay = STARTUP_RETRY_S[min(attempt, len(STARTUP_RETRY_S) - 1)]
+            attempt += 1
+            print(f"Could not connect with your Official Agent Key yet ({exc}); retrying in {delay:.0f}s.", flush=True)
+            _sleep(delay)
 
 
-class _SteadyOfficial:
-    """The official client's assignments() as run_tournament_forever calls it, except that a TRANSIENT failure to
-    re-authenticate the agent session (429 rate_limited, a 5xx, a gateway blip, a timeout, a 401 "Failed to mint agent
-    session", a fresh session the next request still refuses: `_transient`) no longer ends the runtime.
+# ---- execution id and seat_busy retry (scripts/run_agent.sh) ----------------------------------------------------------
+EXECUTION_ID_ENV = "ARENA_EXECUTION_ID"
+_EXECUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
+SEAT_BUSY_RETRY_ENV = "ARENA_SEAT_BUSY_RETRY_S"
+NEW_SEAT_DELAY_ENV = "ARENA_NEW_SEAT_DELAY_S"          # a hot standby's hold on new seats (see _HotStandby)
 
-    Upstream defect (reported to the organizers, see docs/deploy.md): assignments() re-authenticates after a 401, and
-    OfficialAgentAuth raises OfficialAgentError (an AuthenticationError, not a PlatformError) for ANY non-200 answer
-    of /tournament/agent/authenticate; run_tournament_once catches only PlatformError, so one rate-limited or 503
-    re-login ends run_tournament_forever, whose finally terminates EVERY running match worker. Here such a failure is
-    re-raised as PlatformError: the SDK skips that one listing and keeps every worker. After rate_limited the listing
-    also pauses (RATE_LIMIT_BACKOFF_S) instead of asking again at every poll; so does a 401 one (each try mints a new
-    session). A key the platform rejects (any other 4xx) stays fatal at once, as upstream intends: the wrapper
-    (run_agent.sh / systemd) restarts the runtime with its back-off. Upstream fixed the same defect after our merge
-    point (1372ccc: is_fatal_auth_error, a 10-60 s listing back-off); `_transient` follows its classification except
-    that a 4xx it does not name (e.g. 403 forbidden) and a malformed answer stay fatal here. Never answers with an
-    empty list: two empty listings in a row make the SDK stop the running workers.
+
+def _take_execution_id(env=None, parent_pid: int | None = None) -> str | None:
+    """The execution id scripts/run_agent.sh hands this runtime: one random value per run loop, kept across the
+    loop's restarts of `python -m agent`, so a restarted runtime still owns its seats' execution leases and resumes
+    them at once instead of getting seat_busy for up to 30 s and then waiting SEAT_BUSY_RETRY_SECONDS (35 s). It is
+    removed from the environment here (no worker or node child inherits it; the workers get it from the supervisor)
+    and honoured only when ARENA_EXECUTION_ID_OWNER is this process's parent, the run loop that generated it: an id
+    copied into a .env or onto another machine would let two runtimes hold one lease and both play the seat."""
+    env = os.environ if env is None else env
+    value = str(env.pop(EXECUTION_ID_ENV, None) or "").strip()
+    owner = str(env.pop(EXECUTION_ID_ENV + "_OWNER", None) or "").strip()
+    if not value:
+        return None
+    if not _EXECUTION_ID_RE.match(value) or owner != str(os.getppid() if parent_pid is None else parent_pid):
+        print(f"Ignoring {EXECUTION_ID_ENV}: only scripts/run_agent.sh may set it; this runtime uses a fresh one.")
+        return None
+    return value
+
+
+def _tournament_tuning(env=None) -> tuple[Callable[[], None], str]:
+    """Apply this runtime's execution id and ARENA_SEAT_BUSY_RETRY_S to the SDK's supervisor module (its module-level
+    name and constant, read when the runtime starts / on every seat_busy; altruagent/ itself is not edited). The id is
+    the run loop's (see _take_execution_id) or, as upstream, a fresh one for this process, fixed here so that the
+    standby's seat check (_HotStandby) uses the very id the runtime's workers use. Returns the function that
+    restores both, and the id."""
+    env = os.environ if env is None else env
+    saved = (_sdk_supervisor.new_execution_id, _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS)
+    execution_id = _take_execution_id(env) or saved[0]()
+    _sdk_supervisor.new_execution_id = lambda: execution_id     # (called once per runtime, when it starts)
+    retry = _env_number(env, SEAT_BUSY_RETRY_ENV, 5.0)
+    if retry is not None:
+        _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS = retry
+
+    def restore() -> None:
+        _sdk_supervisor.new_execution_id, _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS = saved
+    return restore, execution_id
+
+
+# ---- hot standby ------------------------------------------------------------------------------------------------------
+class _HotStandby:
+    """The official client's assignments() as run_tournament_forever calls it, for a hot standby only (hold_new_s > 0,
+    ARENA_NEW_SEAT_DELAY_S; scripts/run_agent.sh sets 20 s for role=standby): the SDK gets only the seats no other
+    runtime holds.
+
+    The platform gives a seat to whichever runtime claims it first, and the primary claims a new seat within one poll
+    (10 s), so the standby leaves a NEW seat alone for hold_new_s after it first lists it; from then on it asks at
+    every poll whether the seat is free by requesting its grant with this runtime's execution id (`grant`,
+    `execution_id`): seat_busy while the primary's lease lives, and once that lease lapses (the primary stopped
+    renewing: ~30 s) the grant takes the seat and the SDK gets it at once. Without that check the SDK's own worker
+    would find seat_busy and retry only SEAT_BUSY_RETRY_SECONDS (35 s) later, with a new worker process and a new agent
+    session each time: a takeover of up to ~70 s (a lost 55 s battle turn) and steady authentication traffic on the
+    key both runtimes share. Any unexpected error of the check hands the seat over (the SDK's worker then decides). A
+    seat once handed to the SDK is never held back again, even after a listing that missed it (a seat missing from two
+    listings in a row gets its worker stopped). The listing's own errors pass through untouched: the SDK's supervisor
+    handles them (a temporary sign-in failure pauses the listing, a refused key ends the runtime).
 
     `install(official)` puts it in place of the client's own assignments (an instance attribute), so the SDK gets the
-    very client object it always got; everything else about the client is untouched.
-
-    A hot standby (hold_new_s > 0, ARENA_NEW_SEAT_DELAY_S; scripts/run_agent.sh sets 20 s for role=standby) hands the
-    SDK only the seats no other runtime holds. The platform gives a seat to whichever runtime claims it first, and the
-    primary claims a new seat within one poll (10 s), so the standby leaves a NEW seat alone for hold_new_s after it
-    first lists it; from then on it asks at every poll whether the seat is free by requesting its grant with this
-    runtime's execution id (`grant`, `execution_id`): seat_busy while the primary's lease lives, and once that lease
-    lapses (the primary stopped renewing: ~30 s) the grant takes the seat and the SDK gets it at once. Without that
-    check the SDK's own worker would find seat_busy and retry only SEAT_BUSY_RETRY_SECONDS (35 s) later, with a new
-    worker process and a new agent session each time: a takeover of up to ~70 s (a lost 55 s battle turn) and steady
-    authentication traffic on the key both runtimes share. Any unexpected error of the check hands the seat over
-    (the SDK's worker then decides). A seat once handed to the SDK is never held back again, even after a listing that
-    missed it (a seat missing from two listings in a row gets its worker stopped)."""
+    very client object it always got; everything else about the client is untouched."""
 
     def __init__(self, list_assignments: Callable[[], list], *, now: Callable[[], float] = time.monotonic,
                  log: Callable[[str], None] = print, hold_new_s: float = 0.0,
@@ -505,45 +257,21 @@ class _SteadyOfficial:
         self._list = list_assignments
         self._now = now
         self._log = log
-        self.failures = 0                  # transient re-authentication failures in a row
-        self.rate_limited = 0              # ... of which rate_limited or 401 (each pauses the listing), in a row
-        self._resume_at = 0.0
         self.hold_new_s = max(0.0, float(hold_new_s or 0.0))
-        self._grant = grant                # the client's grant(seat_id, execution_id) (standby only)
+        self._grant = grant                # the client's grant(seat_id, execution_id)
         self._execution_id = execution_id  # this runtime's: the one its workers use
-        self._first_seen: dict = {}        # seat_id -> when this runtime first listed it (hold_new_s only)
+        self._first_seen: dict = {}        # seat_id -> when this runtime first listed it
         self._handed: set = set()          # seat_ids already handed to the SDK
         self._told: set = set()            # seat_ids whose first failed check was logged
 
     @classmethod
-    def install(cls, official, **kwargs) -> "_SteadyOfficial":
-        steady = cls(official.assignments, grant=getattr(official, "grant", None), **kwargs)
-        official.assignments = steady
-        return steady
+    def install(cls, official, **kwargs) -> "_HotStandby":
+        standby = cls(official.assignments, grant=getattr(official, "grant", None), **kwargs)
+        official.assignments = standby
+        return standby
 
     def __call__(self):
-        if self._now() < self._resume_at:
-            raise PlatformError("still backing off after a rate-limited re-authentication", status_code=429,
-                                error_code="rate_limited")
-        try:
-            rows = self._list()
-        except AuthenticationError as exc:
-            if not _transient(exc):
-                raise                      # a rejected key: fatal, as upstream
-            self.failures += 1
-            if exc.error_code == "rate_limited" or exc.status_code in (401, 429):
-                self.rate_limited += 1
-                pause = RATE_LIMIT_BACKOFF_S[min(self.rate_limited, len(RATE_LIMIT_BACKOFF_S)) - 1]
-                self._resume_at = self._now() + pause
-            text = _auth_text(exc)
-            if self.failures == 1 or self.failures % 30 == 0:
-                self._log(f"[agent] re-authentication failed ({self.failures} in a row; running matches continue, "
-                          f"retrying): {text}")
-            raise PlatformError(f"transient re-authentication failure: {text}", status_code=exc.status_code,
-                                error_code=exc.error_code) from None
-        if self.failures:
-            self._log(f"[agent] re-authentication recovered after {self.failures} failure(s)")
-        self.failures = self.rate_limited = 0
+        rows = self._list()
         return self._hold_back(rows) if self.hold_new_s else rows
 
     def _hold_back(self, rows: list) -> list:
@@ -590,76 +318,11 @@ class _SteadyOfficial:
         return True
 
 
-STARTUP_RETRY_S = (5.0, 10.0, 20.0, 30.0)   # capped at 30 s: plays within ~30 s of the control plane coming back
-_sleep = time.sleep                        # (tests replace it)
-
-
-def _authenticate(official) -> bool:
-    """The runtime's first authentication. A transient failure (the control plane down or rate limiting at the
-    moment the runtime starts, e.g. a restart during an outage) is waited out with a back-off instead of ending the
-    process (so is a 401 "Failed to mint agent session", see `_transient`); a rejected key ends it (False)."""
-    attempt = 0
-    while True:
-        try:
-            official.authenticate()
-            return True
-        except AltruAgentError as exc:
-            if not _transient(exc):
-                print(f"Could not connect as official tournament agent: {exc}")
-                return False
-            delay = STARTUP_RETRY_S[min(attempt, len(STARTUP_RETRY_S) - 1)]
-            attempt += 1
-            print(f"Could not connect as official tournament agent yet ({_auth_text(exc)}); retrying in {delay:.0f}s.",
-                  flush=True)
-            _sleep(delay)
-
-
-EXECUTION_ID_ENV = "ARENA_EXECUTION_ID"
-_EXECUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
-SEAT_BUSY_RETRY_ENV = "ARENA_SEAT_BUSY_RETRY_S"
-NEW_SEAT_DELAY_ENV = "ARENA_NEW_SEAT_DELAY_S"          # a hot standby's hold on new seats (see _SteadyOfficial)
-
-
-def _take_execution_id(env=None, parent_pid: int | None = None) -> str | None:
-    """The execution id scripts/run_agent.sh hands this runtime: one random value per run loop, kept across the
-    loop's restarts of `python -m agent`, so a restarted runtime still owns its seats' execution leases and resumes
-    them at once instead of getting seat_busy for up to 30 s and then waiting SEAT_BUSY_RETRY_SECONDS (35 s). It is
-    removed from the environment here (no worker or node child inherits it; the workers get it from the supervisor)
-    and honoured only when ARENA_EXECUTION_ID_OWNER is this process's parent, the run loop that generated it: an id
-    copied into a .env or onto another machine would let two runtimes hold one lease and both play the seat."""
-    env = os.environ if env is None else env
-    value = str(env.pop(EXECUTION_ID_ENV, None) or "").strip()
-    owner = str(env.pop(EXECUTION_ID_ENV + "_OWNER", None) or "").strip()
-    if not value:
-        return None
-    if not _EXECUTION_ID_RE.match(value) or owner != str(os.getppid() if parent_pid is None else parent_pid):
-        print(f"Ignoring {EXECUTION_ID_ENV}: only scripts/run_agent.sh may set it; this runtime uses a fresh one.")
-        return None
-    return value
-
-
-def _tournament_tuning(env=None) -> tuple[Callable[[], None], str]:
-    """Apply this runtime's execution id and ARENA_SEAT_BUSY_RETRY_S to the SDK's supervisor module (its module-level
-    name and constant, read when the runtime starts / on every seat_busy; altruagent/ itself is not edited). The id is
-    the run loop's (see _take_execution_id) or, as upstream, a fresh one for this process, fixed here so that the
-    standby's seat check (_SteadyOfficial) uses the very id the runtime's workers use. Returns the function that
-    restores both, and the id."""
-    env = os.environ if env is None else env
-    saved = (_sdk_supervisor.new_execution_id, _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS)
-    execution_id = _take_execution_id(env) or saved[0]()
-    _sdk_supervisor.new_execution_id = lambda: execution_id     # (called once per runtime, when it starts)
-    retry = _env_number(env, SEAT_BUSY_RETRY_ENV, 5.0)
-    if retry is not None:
-        _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS = retry
-
-    def restore() -> None:
-        _sdk_supervisor.new_execution_id, _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS = saved
-    return restore, execution_id
-
-
-def _run_tournament(agent_spec: str) -> int:
-    """Official tournament runtime: authenticate with the Official Agent Key,
-    then keep one worker process per active official assignment until Ctrl+C.
+# ---- the runtime ------------------------------------------------------------------------------------------------------
+def _run_tournament(agent_spec: str, kinds: frozenset[str] = ALL_KINDS) -> int:
+    """The runtime: authenticate with the Official Agent Key, then keep one
+    worker process per assigned game of the chosen ``kinds`` (test matches,
+    tournament games or both) until Ctrl+C.
     """
     try:
         _load_agent_factory(agent_spec)  # validated eagerly; built once per match, in its worker
@@ -677,11 +340,13 @@ def _run_tournament(agent_spec: str) -> int:
     try:
         if not _authenticate(official):
             return 1
-        print("Connected as official tournament agent.")
+        print("Connected with your Official Agent Key.")
+        print(PLAYING_MESSAGES[kinds])
         print(f"{WAITING_MESSAGE} (Press Ctrl+C to stop.)", flush=True)
-        _SteadyOfficial.install(official, hold_new_s=_env_number(os.environ, NEW_SEAT_DELAY_ENV, 0.0) or 0.0,
-                                execution_id=execution_id)
-        run_tournament_forever(official, agent_spec=agent_spec, **_tournament_options())
+        hold = _env_number(os.environ, NEW_SEAT_DELAY_ENV, 0.0) or 0.0
+        if hold:
+            _HotStandby.install(official, hold_new_s=hold, execution_id=execution_id)
+        run_tournament_forever(official, agent_spec=agent_spec, kinds=kinds, **_tournament_options())
         return 0
     except KeyboardInterrupt:
         print("\nStopped.")
@@ -726,9 +391,9 @@ def _check_tournament(agent_spec: str) -> int:
             official.authenticate()
         except OfficialAgentError as exc:
             ok("Control plane reachable")
-            if exc.status_code in (400, 401) and not _mint_failure(exc):
+            if exc.status_code in (400, 401) and is_fatal_auth_error(exc):
                 return fail(f"Official Agent Key rejected: {exc}")
-            return fail(f"Official agent authentication failed: {_auth_text(exc)}")
+            return fail(f"Official agent authentication failed: {exc}")
         except AltruAgentError as exc:
             return fail(f"Control plane not reachable at {official.control_url}: {exc}")
         ok("Control plane reachable")
@@ -749,45 +414,79 @@ def _check_tournament(agent_spec: str) -> int:
         except Exception as exc:  # noqa: BLE001 - contestant code
             return fail(f"Agent {agent_spec} could not be created: {exc}")
         ok(f"Agent ready ({agent_spec})")
-        ok("Ready for tournament")
+        ok("Ready to play Testing and tournament games")
         return 0
     finally:
         official.close()
 
 
+_DESCRIPTION = """\
+Run your AltruAgent agent.
+
+  1. Set ALTRUAGENT_OFFICIAL_AGENT_KEY (in .env) to your Official Agent Key,
+     generated on the tournament dashboard's Agent Configuration page.
+  2. Run it with --tournament (your tournament games), --match (your test
+     matches) or both, and leave it running.
+
+It plays each game with agent/agent.py's create_agent(). While it waits for a
+game it uses no AI tokens (it checks every ~10 s). Your agent must be
+Self-hosted and your event registration complete.
+
+This repository's agent/agent.py is our contestant (Pokémon VGC draft and
+Werewolf; Red Alert, a real-time game it has no policy for, is answered with
+WAIT). scripts/run_agent.sh keeps it running with both flags."""
+
+_EPILOG = f"""examples:
+  python -m agent --check-tournament                   check your key, connection and agent
+  python -m agent --tournament                         play your tournament games (Ctrl+C to stop)
+  python -m agent --match                              play your test matches
+  python -m agent --tournament --match                 play both in one process
+  bash scripts/run_agent.sh start                      the same, kept running (restarts, logs, health)
+  python -m agent --check-tournament --agent examples.llm_agent
+                                                       check the LLM example agent
+
+guide: {AGENT_GUIDE_URL}"""
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m agent",
-        description=(
-            "With no arguments: play every match assigned to your registered agent "
-            "(ALTRUAGENT_API_KEY). With --claim: claim and play one tournament "
-            "test-match seat (no API key needed). With --tournament: play your "
-            f"official tournament assignments ({OFFICIAL_AGENT_KEY_ENV})."
-        ),
+        description=_DESCRIPTION,
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    # --tournament and --match may be combined (both kinds in one process);
+    # each excludes --check-tournament and --claim. --match's exclusions are
+    # checked in main(): argparse puts an option in one exclusive group only.
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument(
-        "--claim",
-        metavar="TOKEN",
-        help=(
-            "claim one test-match seat with its seatclaim_... token and play it; "
-            f"'-' prompts for the token without echo (or set {CLAIM_TOKEN_ENV})"
-        ),
-    )
     mode.add_argument(
         "--tournament",
         action="store_true",
-        help=f"official tournament mode: wait for and play your official assignments ({OFFICIAL_AGENT_KEY_ENV})",
+        help=(
+            'play your tournament games (Swiss/bracket games, after you press "Register my agent"); '
+            "runs until Ctrl+C"
+        ),
+    )
+    parser.add_argument(
+        "--match",
+        action="store_true",
+        help=(
+            'play your test matches (Testing page: matches you create with "Mine (self-hosted)" '
+            "or join from Open matches); runs until Ctrl+C"
+        ),
     )
     mode.add_argument(
         "--check-tournament",
         action="store_true",
-        help="check your official tournament connection and agent without playing anything",
+        help="check your Official Agent Key, connection and agent without playing anything",
     )
+    # Retired: Testing claim codes. Still parsed so an old command prints the
+    # notice instead of an argparse error; hidden from --help.
+    mode.add_argument("--claim", nargs="?", const="", metavar="TOKEN", help=argparse.SUPPRESS)
     parser.add_argument(
         "--agent",
         metavar="MODULE[:FACTORY]",
-        help=f"with --claim/--tournament/--check-tournament: agent factory to use (default: {DEFAULT_AGENT_SPEC})",
+        help=f"agent factory to use (default: {DEFAULT_AGENT_SPEC})",
     )
     return parser
 
@@ -796,32 +495,27 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args([] if argv is None else argv)
 
-    if args.tournament or args.check_tournament:
-        agent_spec = args.agent or DEFAULT_AGENT_SPEC
-        return _check_tournament(agent_spec) if args.check_tournament else _run_tournament(agent_spec)
+    if args.match and args.check_tournament:
+        parser.error("argument --match: not allowed with argument --check-tournament")
+    if args.match and args.claim is not None:
+        parser.error("argument --match: not allowed with argument --claim")
 
-    claim_token = _resolve_claim_token(args.claim, prompt=getpass.getpass)
-    if claim_token is None:
-        if args.agent is not None:
-            parser.error("--agent is only supported together with --claim, --tournament, or --check-tournament")
-        return _run_discovery()
+    if args.check_tournament:
+        return _check_tournament(args.agent or DEFAULT_AGENT_SPEC)
+    if args.tournament or args.match:
+        kinds = frozenset(kind for kind, chosen in ((TOURNAMENT, args.tournament), (TESTING, args.match)) if chosen)
+        return _run_tournament(args.agent or DEFAULT_AGENT_SPEC, kinds)
 
-    if not claim_token.strip():
-        print("Claim error: no seat claim token was given.")
-        return 1
-
-    try:
-        if args.agent is not None:
-            create_agent = _load_agent_factory(args.agent)
-        else:
-            create_agent = _resolve_create_agent(agent_module)
-    except ValueError as exc:
-        print(f"Startup error: {exc}")
-        return 1
-
-    return _run_claim(claim_token, create_agent)
+    if args.claim is not None:
+        return _retired(CLAIM_CODES_RETIRED_NOTICE)
+    if args.agent is not None:
+        parser.error("--agent is only supported together with --tournament, --match or --check-tournament")
+    if os.environ.get(CLAIM_TOKEN_ENV):
+        return _retired(CLAIM_CODES_RETIRED_NOTICE)
+    return _retired(PLATFORM_KEY_RETIRED_NOTICE)
 
 
+# ---- `python -m agent` without scripts/run_agent.sh -------------------------------------------------------------------
 def _control_url_default(env=None) -> str | None:
     """ALTRUAGENT_CONTROL_URL for a runtime given only its key (a harness that injects the key and runs `python -m
     agent`, a bundle's `export ALTRUAGENT_OFFICIAL_AGENT_KEY=...`): the platform's control plane, unless the
@@ -880,17 +574,21 @@ def _local_checks(check_search: bool = True) -> list[tuple[bool, str]]:
     return out
 
 
+_PLAYING_FLAGS = ("--tournament", "--match", "--check-tournament")
+
+
 def _startup(argv: list[str], env=None) -> bool:
-    """`python -m agent` only (main() stays what tests drive): discovery and tournament modes get the 10 s supervisor
-    knobs (ARENA_DISCOVERY_S, ARENA_WORKER_COOLDOWN_S, as scripts/run_agent.sh sets them) and the platform's
-    control-plane URL when none is configured and, unless scripts/run_agent.sh already checked this machine
-    (ARENA_RUN_ID), a report of what it would play with, LOUD (stdout and stderr) when it would play degraded. Never
-    refuses to start: a degraded agent still beats a seat the platform random-plays. --check-tournament prints the
-    checks as its first lines. Returns False when a local check failed."""
+    """`python -m agent` only (main() stays what tests drive), and only for a mode that plays or checks
+    (--tournament, --match, --check-tournament; a retired mode just prints its notice): the 10 s supervisor knobs
+    (ARENA_DISCOVERY_S, ARENA_WORKER_COOLDOWN_S, as scripts/run_agent.sh sets them), the platform's control-plane URL
+    when none is configured and, unless scripts/run_agent.sh already checked this machine (ARENA_RUN_ID), a report of
+    what it would play with, LOUD (stdout and stderr) when it would play degraded. Never refuses to start: a degraded
+    agent still beats a seat the platform random-plays. --check-tournament prints the checks as its first lines.
+    Returns False when a local check failed."""
     env = os.environ if env is None else env
-    if any(a in ("-h", "--help") or a.startswith("--claim") for a in argv) or env.get(CLAIM_TOKEN_ENV):
-        return True                                   # (claim mode: one terminal seat, as upstream)
-    for name, _, _, default in _SUPERVISOR_ENV:
+    if any(a in ("-h", "--help") for a in argv) or not any(a in _PLAYING_FLAGS for a in argv):
+        return True                                   # (help, or a retired mode: nothing runs)
+    for name, _, _, default in _TOURNAMENT_ENV:
         env.setdefault(name, default)
     url = _control_url_default(env)
     if url:
