@@ -1,6 +1,7 @@
-"""Deployment readiness: supervisor knobs and steady discovery (agent/__main__.py), the official tournament runtime's
-hardening (a transient re-authentication failure keeps the runtime and its matches, the start waits out an outage,
-the run loop's execution id, `python -m agent` without run_agent.sh: control-plane default and a loud report), the
+"""Deployment readiness: supervisor knobs (agent/__main__.py), the event runtime's hardening on top of upstream's
+(`python -m agent --tournament --match`: the SDK's supervisor keeps the runtime and its matches through a transient
+re-authentication failure, the start waits out an outage, the run loop's execution id, the hot standby, `python -m
+agent` without run_agent.sh: control-plane default and a loud report), the
 calculator's deployment knobs and probe (agent/pokemon/calc.py; node children get no keys and go first under memory
 pressure), scripts/selfcheck.py (refuses a machine whose calculator, or with ARENA_BATTLE=search whose engine search,
 cannot run; names the configured key and mode), scripts/run_agent.sh (restart, rotation, locks, clean stop, no
@@ -28,7 +29,6 @@ from pathlib import Path
 import pytest
 
 from altruagent.errors import AuthenticationError, PlatformError
-from altruagent.models import AgentSessions
 
 import agent.__main__ as agent_main
 from agent.pokemon import calc, engine
@@ -42,86 +42,60 @@ needs_node = pytest.mark.skipif(shutil.which("node") is None or calc._js_dir() i
 
 
 # ---- agent/__main__.py ---------------------------------------------------------------------------------------------
-def test_supervisor_options_default_to_the_sdk_and_ignore_bad_values(capsys):
-    assert agent_main._supervisor_options({}) == {}
-    assert agent_main._supervisor_options({"ARENA_DISCOVERY_S": "10", "ARENA_WORKER_COOLDOWN_S": "7.5"}) == \
-        {"discovery_interval": 10.0, "cooldown_seconds": 7.5}
-    assert agent_main._supervisor_options({"ARENA_DISCOVERY_S": "0.5", "ARENA_WORKER_COOLDOWN_S": "soon"}) == {}
-    assert agent_main._supervisor_options({"ARENA_DISCOVERY_S": "nan"}) == {}
-    assert capsys.readouterr().out.count("Ignoring") == 3
+def test_tournament_options_default_to_the_sdk_and_ignore_bad_values(capsys):
     assert agent_main._tournament_options({}) == {}                   # (the SDK: a 10 s poll, a 60 s cooldown)
-    assert agent_main._tournament_options({"ARENA_DISCOVERY_S": "5", "ARENA_WORKER_COOLDOWN_S": "3"}) == \
-        {"poll_interval": 5.0, "cooldown_seconds": 3.0}
+    assert agent_main._tournament_options({"ARENA_DISCOVERY_S": "10", "ARENA_WORKER_COOLDOWN_S": "7.5"}) == \
+        {"poll_interval": 10.0, "cooldown_seconds": 7.5}
+    assert agent_main._tournament_options({"ARENA_DISCOVERY_S": "0.5", "ARENA_WORKER_COOLDOWN_S": "soon"}) == {}
+    assert agent_main._tournament_options({"ARENA_DISCOVERY_S": "nan"}) == {}
+    assert capsys.readouterr().out.count("Ignoring") == 3
 
 
 def test_python_m_agent_sets_the_10s_knobs_itself(monkeypatch):
-    # the SDK's own defaults (15 s discovery, 60 s cooldown after a crashed worker) would cost a 55 s battle turn: a
-    # plain `python -m agent` (a harness, the README's way) now gets run_agent.sh's 10 s / 10 s too
+    # the SDK's own default (a 60 s cooldown after a crashed worker, doubling per failure in a row) would cost a 55 s
+    # battle turn: a plain `python -m agent --tournament --match` (a harness, the README's way) gets run_agent.sh's
+    # 10 s / 10 s too; a retired mode (no flag) only prints its notice and gets nothing
     monkeypatch.setattr(agent_main, "_local_checks", lambda check_search=True: [(True, "fine")])
     env = {"ALTRUAGENT_CONTROL_URL": "http://127.0.0.1:9"}
-    agent_main._startup(["--tournament"], env)
+    agent_main._startup(["--tournament", "--match"], env)
     assert agent_main._tournament_options(env) == {"poll_interval": 10.0, "cooldown_seconds": 10.0}
-    assert agent_main._supervisor_options(env) == {"discovery_interval": 10.0, "cooldown_seconds": 10.0}
     env = {"ALTRUAGENT_CONTROL_URL": "x", "ARENA_WORKER_COOLDOWN_S": "4"}      # (a value that is set stays)
-    agent_main._startup([], env)
+    agent_main._startup(["--match"], env)
     assert env["ARENA_WORKER_COOLDOWN_S"] == "4" and env["ARENA_DISCOVERY_S"] == "10"
+    env = {}
+    assert agent_main._startup([], env) is True and env == {}           # (the retired platform-key mode: untouched)
 
 
-class _FlakyClient:
-    def __init__(self, errors):
-        self.errors = list(errors)
-        self.closed = False
+def test_the_sdks_per_seat_backoff_starts_from_our_10s_cooldown():
+    # upstream 4cb083a: a seat whose worker keeps failing waits cooldown, 2x, 4x ... up to 600 s; a finished match
+    # resets it. Our 10 s cooldown only shortens the FIRST retry (one crash = at most one lost battle turn).
+    from altruagent.models import OfficialAssignment
+    from altruagent.supervisor import TournamentState, run_tournament_once
+    from tests.test_supervisor import FakeProcessFactory
 
-    def sessions(self):
-        if self.errors:
-            raise self.errors.pop(0)
-        return AgentSessions(active=["m1"])
+    class Official:
+        def assignments(self):
+            return [OfficialAssignment(match_id="m1", seat_id="s1", game_type="werewolf", context="testing")]
 
-    def close(self):
-        self.closed = True
+    clock, factory, state = {"t": 0.0}, FakeProcessFactory(), TournamentState()
 
+    def tick():
+        run_tournament_once(Official(), state, agent_spec="agent.agent:create_agent", now=lambda: clock["t"],
+                            cooldown_seconds=10.0, process_factory=factory, log=lambda m: None)
 
-def test_steady_discovery_keeps_running_through_failed_polls_and_raises_after_the_limit(capsys):
-    blip = PlatformError("Could not reach /agents/me/sessions", status_code=None)
-    steady = agent_main._SteadyDiscovery(_FlakyClient([blip, AuthenticationError("401", status_code=401)]),
-                                         max_failures=3)
-    assert steady.sessions().active == [] and steady.sessions().active == []   # two failures: nothing new, no raise
-    assert steady.sessions().active == ["m1"] and steady.failures == 0          # recovered
-    steady.close()                                                              # everything else passes through
-    assert steady._client.closed
-    out = capsys.readouterr().out
-    assert "discovery failed (1 in a row" in out and "recovered after 2" in out
-    dead = agent_main._SteadyDiscovery(_FlakyClient([blip] * 5), max_failures=3)
-    dead.sessions(), dead.sessions()
-    with pytest.raises(PlatformError):
-        dead.sessions()
-
-
-def test_main_hands_the_supervisor_steady_discovery_and_the_env_knobs(monkeypatch):
-    import types
-    seen = {}
-
-    class FakeClient:
-        def me(self):
-            return types.SimpleNamespace(is_claimed=True, name="bot", id="agent-1", status="claimed")
-
-        def close(self):
-            pass
-
-    def fake_supervisor(client, *, agent_id, **kw):
-        seen.update(client=client, agent_id=agent_id, **kw)
-
-    monkeypatch.setenv("ARENA_DISCOVERY_S", "10")
-    monkeypatch.setenv("ARENA_WORKER_COOLDOWN_S", "10")
-    monkeypatch.delenv("ALTRUAGENT_CLAIM_TOKEN", raising=False)
-    monkeypatch.setattr(agent_main, "AltruAgentClient", lambda *a, **k: FakeClient())
-    monkeypatch.setattr(agent_main, "run_forever_concurrent", fake_supervisor)
-    assert agent_main.main([]) == 0
-    assert isinstance(seen["client"], agent_main._SteadyDiscovery)
-    assert seen["agent_id"] == "agent-1" and seen["discovery_interval"] == 10.0 and seen["cooldown_seconds"] == 10.0
+    tick()
+    gaps = []
+    for _ in range(8):
+        factory.processes[-1].finish(exitcode=1)                    # the worker fails at once, every time
+        n, failed_at = len(factory.processes), clock["t"]
+        while len(factory.processes) == n:
+            clock["t"] += 1.0                                        # (a 1 s poll: reaped 1 s after the failure)
+            tick()
+        gaps.append(clock["t"] - failed_at)
+    assert gaps == [11.0, 21.0, 41.0, 81.0, 161.0, 321.0, 601.0, 601.0]
 
 
-# ---- the official tournament runtime (python -m agent --tournament) ------------------------------------------------
+# ---- the event runtime (python -m agent --tournament --match) -------------------------------------------------------
 FAKE_EAK = "eak_live_" + "fa4e" * 16                 # obviously fake, but the shape the SDK's local check accepts
 
 
@@ -170,10 +144,10 @@ MINT_DETAIL = "Failed to mint agent session: Request rate limit reached"      # 
                                                   (503, "agent_session_unavailable", "try again"),
                                                   (401, "invalid_official_agent_key", MINT_DETAIL)])
 def test_a_transient_reauthentication_failure_no_longer_ends_the_runtime_and_its_matches(status, code, detail):
-    # upstream defect (intel-2): assignments() -> 401 -> re-login -> 429 / 5xx raises OfficialAgentError, an
-    # AuthenticationError that run_tournament_once does not catch: run_tournament_forever ended and its finally
-    # terminated EVERY running worker. Through _SteadyOfficial the runtime keeps going and keeps its worker. So does a
-    # failed session mint, which the platform has answered with 401 invalid_official_agent_key (review 10-07).
+    # the upstream defect we wrapped since v4.1.2 (intel-2: assignments() -> 401 -> re-login -> 429 / 5xx raised an
+    # AuthenticationError run_tournament_once did not catch, so the runtime ended and terminated EVERY worker) is fixed
+    # in the SDK itself since 1372ccc (PR #5): the supervisor keeps its workers and pauses the listing (10 s doubling
+    # to 60 s, 60 s after a 429). This pins it, through the real client, so the wrapper is not needed any more.
     from altruagent.supervisor import run_tournament_forever
     from tests.test_supervisor import FakeProcessFactory
 
@@ -184,19 +158,19 @@ def test_a_transient_reauthentication_failure_no_longer_ends_the_runtime_and_its
         clock["t"] += s
 
     official = _official(backend)
-    agent_main._SteadyOfficial.install(official, now=lambda: clock["t"], log=log.append)
     run_tournament_forever(official, agent_spec="agent.agent:create_agent", sleep=sleep, now=lambda: clock["t"],
-                           process_factory=factory, log=log.append, max_iterations=12, poll_interval=10.0,
+                           process_factory=factory, log=log.append, max_iterations=20, poll_interval=10.0,
                            cooldown_seconds=10.0)
     assert len(factory.processes) == 1                               # one worker, started once and never restarted
     assert not [line for line in log if "no longer assigned" in line]  # never stopped as "unassigned"
-    assert any("re-authentication failed (1 in a row; running matches continue" in line for line in log)
-    assert any("re-authentication recovered" in line for line in log) and "Assignment discovery recovered." in log
-    if code == "rate_limited" or status == 401:                      # these pause the listing (15, 20, 30 s)
-        assert backend.calls["auth"] <= 4, backend.calls
+    assert sum("Could not renew your agent session" in line for line in log) == 1     # logged once, not every poll
+    assert "Assignment discovery recovered." in log
+    assert [line for line in log if "active match worker(s)" in line] == ["Stopping 1 active match worker(s)..."]
+    assert log[-1] == "Stopping 1 active match worker(s)..."         # (only when the bounded test loop ends)
+    assert backend.calls["auth"] <= 4, backend.calls                 # a pause between re-logins, not one per poll
     if status == 401:                                                # not "copy the key again": it is not the key
-        assert not [line for line in log if "copy it again" in line.lower()]
-        assert any("could not start an agent session" in line and "not the key" in line for line in log)
+        assert not [line for line in log if "copy the key again" in line.lower()]
+        assert any("couldn't start an agent session" in line and "not your key" in line for line in log)
 
 
 def test_a_fresh_session_the_platform_still_refuses_keeps_the_runtime_and_its_matches():
@@ -223,26 +197,36 @@ def test_a_fresh_session_the_platform_still_refuses_keeps_the_runtime_and_its_ma
         clock["t"] += s
 
     official = _official(backend)
-    agent_main._SteadyOfficial.install(official, now=lambda: clock["t"], log=log.append)
     run_tournament_forever(official, agent_spec="agent.agent:create_agent", sleep=sleep, now=lambda: clock["t"],
                            process_factory=factory, log=log.append, max_iterations=10, poll_interval=10.0,
                            cooldown_seconds=10.0)
     assert len(factory.processes) == 1 and not [line for line in log if "no longer assigned" in line]
-    assert any("did not accept a freshly issued agent session" in line for line in log)
+    assert sum("Could not renew your agent session" in line for line in log) == 1, log
     assert "Assignment discovery recovered." in log
-    assert calls["auth"] == 3                                        # paused 15 s, 20 s: not one re-login per poll
+    assert calls["auth"] == 3                                        # paused 10 s, 20 s: not one re-login per poll
 
 
-def test_the_unfixed_sdk_path_still_dies_so_the_wrapper_is_what_keeps_the_matches():
-    from altruagent.errors import AuthenticationError as AuthErr
+@pytest.mark.parametrize("status, code, detail", [(401, "invalid_official_agent_key", None),
+                                                  (401, "invalid_official_agent_key", "Invalid official agent key"),
+                                                  (403, "registration_incomplete", "rules")])
+def test_a_refused_key_at_relogin_still_ends_the_runtime_even_through_the_standby(status, code, detail):
+    # a key the platform refuses (revoked, replaced, the agent not Self-hosted) or an incomplete registration cannot
+    # get better by retrying: the SDK ends the runtime (its finally terminates the workers; run_agent.sh restarts it
+    # with its back-off and says so). The standby wrapper passes the listing's errors through untouched.
+    from altruagent.official import OfficialAgentError as OffErr
+    from altruagent.official import is_fatal_auth_error
     from altruagent.supervisor import run_tournament_forever
     from tests.test_supervisor import FakeProcessFactory
 
-    factory = FakeProcessFactory()
-    with pytest.raises(AuthErr):                                     # (report upstream: docs/deploy.md)
-        run_tournament_forever(_official(_AuthBackend(503, None)), agent_spec="agent.agent:create_agent",
-                               sleep=lambda s: None, process_factory=factory, log=lambda m: None, max_iterations=6)
-    assert factory.processes and factory.processes[0].terminated     # ... taking the running worker with it
+    for standby in (False, True):
+        factory, official = FakeProcessFactory(), _official(_AuthBackend(status, code, detail=detail))
+        if standby:
+            agent_main._HotStandby.install(official, log=lambda m: None, hold_new_s=20.0)
+        with pytest.raises(OffErr) as exc_info:
+            run_tournament_forever(official, agent_spec="agent.agent:create_agent", sleep=lambda s: None,
+                                   process_factory=factory, log=lambda m: None, max_iterations=6)
+        assert is_fatal_auth_error(exc_info.value) and exc_info.value.error_code == code
+        assert all(p.terminated for p in factory.processes)
 
 
 @pytest.mark.parametrize("hold, expected", [(0.0, [0.0, 40.0]), (20.0, [20.0, 60.0])])
@@ -273,7 +257,7 @@ def test_a_standby_holds_new_seats_back_and_keeps_the_ones_it_started(hold, expe
         clock["t"] += s
 
     official = _official(backend)
-    agent_main._SteadyOfficial.install(official, now=lambda: clock["t"], log=log.append, hold_new_s=hold)
+    agent_main._HotStandby.install(official, now=lambda: clock["t"], log=log.append, hold_new_s=hold)
     run_tournament_forever(official, agent_spec="agent.agent:create_agent", sleep=sleep, now=lambda: clock["t"],
                            process_factory=spawn, log=log.append, max_iterations=9, poll_interval=10.0,
                            cooldown_seconds=10.0)
@@ -321,8 +305,8 @@ def test_a_standby_plays_only_seats_no_runtime_holds_and_takes_one_over_as_its_l
     official = _official(backend)
     restore, eid = agent_main._tournament_tuning({})                 # (as _run_tournament: this runtime's id, fixed)
     try:
-        agent_main._SteadyOfficial.install(official, now=lambda: clock["t"], log=log.append, hold_new_s=20.0,
-                                           execution_id=eid)
+        agent_main._HotStandby.install(official, now=lambda: clock["t"], log=log.append, hold_new_s=20.0,
+                                       execution_id=eid)
         run_tournament_forever(official, agent_spec="agent.agent:create_agent", sleep=sleep, now=lambda: clock["t"],
                                process_factory=spawn, log=log.append, max_iterations=10, poll_interval=10.0,
                                cooldown_seconds=10.0)
@@ -349,46 +333,23 @@ def test_the_standbys_seat_check_never_keeps_a_seat_unplayed_on_a_fault_of_its_o
         seen.append(seat_id)
         raise TypeError("a bug")
 
-    steady = agent_main._SteadyOfficial(lambda: [_Row("s1")], now=lambda: clock["t"], log=lambda m: None,
-                                        hold_new_s=20.0, grant=broken_grant, execution_id="x" * 43)
-    assert steady() == [] and seen == []                             # a new seat: left to the primary for 20 s
+    standby = agent_main._HotStandby(lambda: [_Row("s1")], now=lambda: clock["t"], log=lambda m: None,
+                                     hold_new_s=20.0, grant=broken_grant, execution_id="x" * 43)
+    assert standby() == [] and seen == []                            # a new seat: left to the primary for 20 s
     clock["t"] = 20.0
-    assert [r.seat_id for r in steady()] == ["s1"] and seen == ["s1"]  # the check itself failed: handed anyway
+    assert [r.seat_id for r in standby()] == ["s1"] and seen == ["s1"]  # the check itself failed: handed anyway
     clock["t"] = 30.0
-    assert [r.seat_id for r in steady()] == ["s1"] and seen == ["s1"]  # handed once: never checked again
-    plain = agent_main._SteadyOfficial(lambda: [_Row("s2")], now=lambda: clock["t"], log=lambda m: None,
-                                       hold_new_s=20.0)             # nothing to check with: the hold alone, as before
+    assert [r.seat_id for r in standby()] == ["s1"] and seen == ["s1"]  # handed once: never checked again
+    plain = agent_main._HotStandby(lambda: [_Row("s2")], now=lambda: clock["t"], log=lambda m: None,
+                                   hold_new_s=20.0)                 # nothing to check with: the hold alone, as before
     assert plain() == []
     clock["t"] = 50.0
     assert [r.seat_id for r in plain()] == ["s2"]
 
 
-def test_a_rejected_official_key_stays_fatal():
-    from altruagent.official import OfficialAgentError as OffErr
-    official = _official(_AuthBackend(401, "invalid_official_agent_key"))
-    agent_main._SteadyOfficial.install(official, log=lambda m: None)
-    assert official.assignments()                                    # the first session works
-    with pytest.raises(OffErr) as exc_info:
-        official.assignments()                                       # the key is revoked: fatal at once, as upstream
-    assert exc_info.value.error_code == "invalid_official_agent_key"
-    forbidden = _official(_AuthBackend(403, "forbidden"))
-    agent_main._SteadyOfficial.install(forbidden, log=lambda m: None)
-    forbidden.assignments()
-    with pytest.raises(OffErr):
-        forbidden.assignments()
-    incomplete = _official(_AuthBackend(403, "registration_incomplete", detail="rules"))
-    agent_main._SteadyOfficial.install(incomplete, log=lambda m: None)
-    incomplete.assignments()
-    with pytest.raises(OffErr):
-        incomplete.assignments()
-    revoked = _official(_AuthBackend(401, "invalid_official_agent_key", detail="Invalid official agent key"))
-    agent_main._SteadyOfficial.install(revoked, log=lambda m: None)
-    revoked.assignments()
-    with pytest.raises(OffErr):
-        revoked.assignments()
-
-
 def test_transient_classification():
+    # what the FIRST authentication waits out (_authenticate); once the runtime runs, the SDK's is_fatal_auth_error
+    # decides about re-authentication failures (the tests above)
     from altruagent.official import OfficialAgentError as OffErr
     assert agent_main._transient(OffErr("x", status_code=429, error_code="rate_limited"))
     assert agent_main._transient(OffErr("x", status_code=503)) and agent_main._transient(OffErr("x", status_code=502))
@@ -396,10 +357,8 @@ def test_transient_classification():
     assert not agent_main._transient(OffErr("x", status_code=401, error_code="invalid_official_agent_key"))
     assert not agent_main._transient(OffErr("no session token in the answer"))          # (status None)
     assert not agent_main._transient(PlatformError("bad request", status_code=400))
-    # review 10-07, as upstream 1372ccc: a failed session mint and a fresh session still refused are temporary ...
+    # review 10-07, as upstream 1372ccc: a failed session mint is temporary ...
     assert agent_main._transient(OffErr("x", status_code=401, error_code="invalid_official_agent_key", detail=MINT_DETAIL))
-    assert agent_main._transient(AuthenticationError("session not accepted", status_code=401,
-                                                     error_code="invalid_agent_session"))
     # ... a refused key, a key the platform names Oracle-hosted, an incomplete registration are not
     assert not agent_main._transient(OffErr("x", status_code=401, error_code="invalid_official_agent_key",
                                             detail="Invalid official agent key"))
@@ -428,7 +387,8 @@ def test_the_first_authentication_waits_out_a_transient_failure(monkeypatch, cap
                                            OffErr("slow down", status_code=429, error_code="rate_limited")]))
     assert slept == [5.0, 10.0, 20.0] and capsys.readouterr().out.count("retrying in") == 3
     assert not agent_main._authenticate(Flaky([OffErr("The Official Agent Key was not accepted.", status_code=401)]))
-    assert slept == [5.0, 10.0, 20.0] and "Could not connect as official tournament agent" in capsys.readouterr().out
+    assert slept == [5.0, 10.0, 20.0] and "Could not connect with your Official Agent Key: The Official Agent Key" \
+        in capsys.readouterr().out
 
 
 def test_a_failed_session_mint_at_start_is_waited_out_not_reported_as_a_bad_key(monkeypatch, capsys):
@@ -446,14 +406,14 @@ def test_a_failed_session_mint_at_start_is_waited_out_not_reported_as_a_bad_key(
 
     assert agent_main._authenticate(_official(backend)) and tries["n"] == 3
     out = capsys.readouterr().out
-    assert slept == [5.0, 10.0] and out.count("could not start an agent session") == 2
-    assert "copy it again" not in out.lower()
+    assert slept == [5.0, 10.0] and out.count("couldn't start an agent session") == 2 and "not your key" in out
+    assert "copy the key again" not in out.lower()
 
     def revoked(request):
         return httpx.Response(401, json={"error": "invalid_official_agent_key", "detail": "Invalid official agent key"})
 
     assert not agent_main._authenticate(_official(revoked))
-    assert slept == [5.0, 10.0] and "Could not connect as official tournament agent: The Official Agent Key was not" \
+    assert slept == [5.0, 10.0] and "Could not connect with your Official Agent Key: The Official Agent Key was not" \
         in capsys.readouterr().out
 
 
@@ -474,7 +434,7 @@ def test_check_tournament_does_not_call_a_failed_session_mint_a_rejected_key(mon
 
     for error, expected in [
         (OffErr("x", status_code=401, error_code="invalid_official_agent_key", detail=MINT_DETAIL),
-         "Official agent authentication failed: the platform could not start an agent session"),
+         "Official agent authentication failed: x"),
         (OffErr("not accepted", status_code=401, error_code="invalid_official_agent_key",
                 detail="Invalid official agent key"), "Official Agent Key rejected: not accepted"),
     ]:
@@ -502,21 +462,11 @@ def test_outage_backoffs_are_capped_at_30s(monkeypatch):
     assert agent_main._authenticate(Down(6))
     assert slept == [5.0, 10.0, 20.0, 30.0, 30.0, 30.0]
 
-    def limited():
-        raise OffErr("slow down", status_code=429, error_code="rate_limited")
 
-    clock = {"t": 0.0}
-    steady = agent_main._SteadyOfficial(limited, now=lambda: clock["t"], log=lambda m: None)
-    pauses = []
-    for _ in range(4):
-        with pytest.raises(PlatformError):
-            steady()
-        pauses.append(steady._resume_at - clock["t"])
-        clock["t"] = steady._resume_at
-    assert pauses == [15.0, 20.0, 30.0, 30.0]
-
-
-def test_tournament_mode_hands_the_sdk_the_steady_client_and_the_knobs(monkeypatch):
+@pytest.mark.parametrize("hold, wrapped", [(None, False), ("20", True)])
+def test_the_event_runtime_hands_the_sdk_both_kinds_the_knobs_and_the_standby_only_when_asked(monkeypatch, hold,
+                                                                                             wrapped):
+    from altruagent.supervisor import ALL_KINDS
     seen = {}
 
     class FakeOfficial:
@@ -536,14 +486,17 @@ def test_tournament_mode_hands_the_sdk_the_steady_client_and_the_knobs(monkeypat
     def fake_forever(client, *, agent_spec, **kw):
         seen.update(client=client, agent_spec=agent_spec, **kw)
 
-    for k in ("ARENA_EXECUTION_ID", "ARENA_SEAT_BUSY_RETRY_S"):
+    for k in ("ARENA_EXECUTION_ID", "ARENA_SEAT_BUSY_RETRY_S", "ARENA_NEW_SEAT_DELAY_S"):
         monkeypatch.delenv(k, raising=False)
+    if hold:
+        monkeypatch.setenv("ARENA_NEW_SEAT_DELAY_S", hold)            # (run_agent.sh: role=standby)
     monkeypatch.setenv("ARENA_DISCOVERY_S", "10")                     # (what _startup / run_agent.sh set)
     monkeypatch.setenv("ARENA_WORKER_COOLDOWN_S", "10")
     monkeypatch.setattr(agent_main, "OfficialAgentClient", lambda *a, **k: official)
     monkeypatch.setattr(agent_main, "run_tournament_forever", fake_forever)
-    assert agent_main.main(["--tournament"]) == 0
-    assert seen["client"] is official and isinstance(official.assignments, agent_main._SteadyOfficial)
+    assert agent_main.main(["--tournament", "--match"]) == 0
+    assert seen["client"] is official and seen["kinds"] == ALL_KINDS
+    assert isinstance(official.assignments, agent_main._HotStandby) == wrapped
     assert seen["poll_interval"] == 10.0 and seen["cooldown_seconds"] == 10.0     # (SDK: 10 s / 60 s)
 
 
@@ -609,12 +562,14 @@ def test_startup_is_loud_about_a_degraded_machine_and_quiet_under_run_agent(monk
                                                     "✗ Damage calculator cannot run (no node found): the heuristic "
                                                     "wins only ~12% against the calculator"]
     env = {"ARENA_RUN_ID": "main@/x"}                                 # run_agent.sh already checked and refuses
-    assert agent_main._startup([], env) is True and env["ALTRUAGENT_CONTROL_URL"] == "https://api.altruagent-game.com"
+    assert agent_main._startup(["--tournament", "--match"], env) is True
+    assert env["ALTRUAGENT_CONTROL_URL"] == "https://api.altruagent-game.com"
     assert "DEGRADED" not in capsys.readouterr().out
     env = {}
-    assert agent_main._startup(["--claim", "seatclaim_FAKE"], env) is True and env == {}   # claim mode: untouched
+    assert agent_main._startup(["--claim", "seatclaim_FAKE"], env) is True and env == {}   # retired: untouched
+    assert agent_main._startup(["--tournament", "--help"], env) is True and env == {}
     monkeypatch.setattr(agent_main, "_local_checks", lambda check_search=True: [(True, "all fine")])
-    assert agent_main._startup([], {"ALTRUAGENT_CONTROL_URL": "x"}) is True
+    assert agent_main._startup(["--match"], {"ALTRUAGENT_CONTROL_URL": "x"}) is True
     assert capsys.readouterr().out.strip() == "Local checks: all fine"
 
 
@@ -628,11 +583,21 @@ def _plain_agent(args, extra_env, timeout=120):
 
 
 def test_plain_python_m_agent_says_loudly_when_it_would_play_degraded():
-    r = _plain_agent([], {"ALTRUAGENT_API_KEY": "sk_agent_FAKE_do_not_use_0000", "ARENA_CALC": "off",
-                          "ARENA_BATTLE": "classic"})
-    assert r.returncode == 1                                         # (the dead control plane: could not authenticate)
+    r = _plain_agent(["--tournament", "--match"], {"ALTRUAGENT_OFFICIAL_AGENT_KEY": "eak_live_FAKE_not_hex",
+                                                   "ARENA_CALC": "off", "ARENA_BATTLE": "classic"})
+    assert r.returncode == 1                                         # (the malformed key: a configuration error)
     assert "WARNING: THIS MACHINE PLAYS DEGRADED" in r.stdout and "WARNING: THIS MACHINE PLAYS DEGRADED" in r.stderr
     assert "damage calculator cannot run (ARENA_CALC=off)" in r.stderr
+    assert "doesn't look like an Official Agent Key" in r.stdout
+    assert "eak_live_FAKE_not_hex" not in r.stdout + r.stderr
+
+
+def test_plain_python_m_agent_without_a_mode_only_prints_the_retirement_notice():
+    from altruagent.notices import PLATFORM_KEY_RETIRED
+    r = _plain_agent([], {"ALTRUAGENT_API_KEY": "sk_agent_FAKE_do_not_use_0000", "ARENA_CALC": "off"})
+    assert r.returncode == 1 and r.stdout.startswith(PLATFORM_KEY_RETIRED), r.stdout + r.stderr
+    assert "python -m agent --tournament --match" in r.stdout
+    assert "DEGRADED" not in r.stdout + r.stderr                     # (nothing runs: no local checks either)
     assert "sk_agent_FAKE_do_not_use_0000" not in r.stdout + r.stderr
 
 
@@ -1707,11 +1672,10 @@ def test_fake_official_control_plane_leases_seats_and_serves_a_werewolf_table(tm
         outage.write_text("auth503")                                  # every session expired + authenticate 503
         time.sleep(0.6)
         with pytest.raises(OfficialAgentError) as down:
-            official.assignments()                                    # the SDK's own client: the fatal error ...
+            official.assignments()                                    # the client raises the failed re-login ...
         assert down.value.status_code == 503
-        agent_main._SteadyOfficial.install(official, log=lambda m: None)
-        with pytest.raises(PlatformError):
-            official.assignments()                                    # ... which the runtime now skips instead
+        from altruagent.official import is_fatal_auth_error
+        assert not is_fatal_auth_error(down.value)                    # ... which the SDK's supervisor waits out
         outage.unlink()
         time.sleep(0.6)
         assert len(official.assignments()) == 2                       # and recovers from

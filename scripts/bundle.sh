@@ -258,18 +258,20 @@ ${WHEELS_NOTE:-  (offline: on a machine with network and the same Python, pip do
                                                    # "OK    battle policy: engine search ..."
   .venv/bin/python scripts/replay_real.py          # the sample match through the agent: 0 failures
 
-The official tournament (the Official Agent Key from the tournament dashboard; it replaces the sk_agent_ key):
+Play (the Official Agent Key from the tournament dashboard's Agent Configuration page, the agent set to Self-hosted;
+every game, test matches and tournament games alike, arrives as an assignment of that key):
   put ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_... in .env (mode 600; see .env.example)
   bash scripts/run_agent.sh check-tournament       # once, contacts the platform: every line must show a check mark
-  bash scripts/run_agent.sh start                  # runs python -m agent --tournament (health lines: mode=tournament)
-A second machine with the same key can be a hot standby (only if the organizers allow it): add ARENA_ROLE=standby to
-its .env. It plays nothing while the primary plays (new seats are left to the primary) and takes a seat over ~30-40 s
-after the primary stops renewing it.
+  bash scripts/run_agent.sh start                  # runs python -m agent --tournament --match (health: mode=tournament)
+Keep it running while the event runs: a tournament game the agent does not connect to within its window (4 minutes,
+Red Alert 4.5) is a loss. A second machine with the same key can be a hot standby: add ARENA_ROLE=standby to its .env.
+It plays nothing while the primary plays (new seats are left to the primary) and takes a seat over ~30-40 s after the
+primary stops renewing it. (The old sk_agent_ keys and Testing claim codes were retired by the platform on 10-06.)
 
-Other runs (an sk_agent_ key, ALTRUAGENT_API_KEY): the same start runs the discovery mode. Health line every 5
-minutes in logs/agent-main.out: agent=up, calc=ok(...), search=ok. Also: stop / status / logs; "run" = foreground;
-systemd: install-systemd. Start through scripts/run_agent.sh (or Docker / systemd): a plain "python -m agent" gets
-no restarts and no log rotation (it does warn loudly when the calculator or the engine search cannot run).
+Health line every 5 minutes in logs/agent-main.out: agent=up, calc=ok(...), search=ok. Also: stop / status / logs;
+"run" = foreground; systemd: install-systemd. Start through scripts/run_agent.sh (or Docker / systemd): a plain
+"python -m agent --tournament --match" gets no restarts and no log rotation (it does warn loudly when the calculator
+or the engine search cannot run).
 
 Docker (the image brings its own Node $NODE_VERSION; this directory's .dockerignore keeps keys and bulk out):
   docker build -f deploy/Dockerfile -t arena-agent .
@@ -284,7 +286,8 @@ if [ -n "$bad_files" ]; then echo "SECRET SCAN: key files in the bundle:" >&2; e
 PATTERN="sk_agent_[A-Za-z0-9_-]{8,}|seatclaim_[A-Za-z0-9_-]{8,}|eak_live_[0-9A-Fa-f]{16,}|sk-(proj-|ant-)?[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ALTRUAGENT_API_KEY=[\"']?[A-Za-z0-9_-]{16,}|ALTRUAGENT_OFFICIAL_AGENT_KEY=[\"']?[A-Za-z0-9_-]{16,}"
 hits="$(grep -rIlE "$PATTERN" "$DEST" --exclude-dir=node_modules --exclude-dir=node 2>/dev/null || true)"
 for f in $hits; do
-  if grep -IoE "$PATTERN" "$f" | grep -vqE '^(ALTRUAGENT_API_KEY=)?sk_agent_your_key_here$'; then
+  # (the placeholders of .env.example are no keys)
+  if grep -IoE "$PATTERN" "$f" | grep -vqE '^((ALTRUAGENT_API_KEY=)?sk_agent_your_key_here|ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_your_key_here)$'; then
     echo "SECRET SCAN: key-like string in ${f#$DEST/}:" >&2
     grep -IoE "$PATTERN" "$f" | sed -E 's/(.{12}).*/\1.../' | sort -u >&2
     fail=1
