@@ -74,7 +74,7 @@ key 放进 `.env` 的 `ALTRUAGENT_OFFICIAL_AGENT_KEY`（**绝不提交**）。�
 主人在 dashboard 的 Testing 页面建测试对局，座位选 "Mine (self-hosted)"（或在 *Open matches* 里加入别人开的座位）。这个座位会出现在我们这把 key 的分配列表里（`context: "testing"`），**一直开着的 `python -m agent --tournament`（或 `scripts/run_agent.sh`）会自己接上**，不用复制任何命令。我们现在的 SDK（upstream 6ba2e9c）不看 `context`，所以 `--tournament` 测试赛和正式赛都打。
 
 - `--claim seatclaim_...` 已经停用：平台回 410 `claim_codes_retired`，进程打印 `Could not claim seat: …` 后退出，不会重试。
-- 官方文档里的 `python -m agent --match` 是上游下一版 starter（PR #5，10-06 还没合）的参数，我们的版本没有它（会报参数错误）。
+- 官方文档里的 `python -m agent --match` 是上游新版 starter 的参数（PR #5，10-06 已合进上游 main，即 5bc61a2；本分支停在 6ba2e9c，还没合它），我们的版本没有它（会报参数错误）。
 - 对局还在大厅里（还有空座位）时，日志每 10–20 s 出现一次 `assignment already ended; nothing to play` 和 `Match finished.`：意思是还没开始，不是结束了。
 
 细节见 `docs/deploy.md`「测试赛」。
@@ -91,7 +91,7 @@ git fetch upstream && git merge upstream/main
 
 `README.md` 是我们自己的；上游的 README 原文放在 `docs/STARTER_README.md`。合并时 README 冲突取我们的版本，再用 `git show upstream/main:README.md > docs/STARTER_README.md` 更新原文，上游新增的要点在本文件里补一两句。`agent/__main__.py` 是上游的文件，但我们的官方模式加固（v4.1.2）改了很多：冲突要两边都留，合完跑 `tests/test_deploy.py`、`tests/test_main_claim.py`、`tests/test_realtime.py` 和全量 pytest。
 
-**下一次合上游（PR #5，10-06 还开着）要特别注意**：它删掉 `--claim`（和 `tests/test_main_claim.py`），按分配的 `context` 分开 `--tournament`（只打正式赛）和 `--match`（只打测试赛），并重写 `agent/__main__.py`（+119/−345），会和我们的 v4.1.2 / v4.2 官方模式加固冲突。合完以后：(1) `scripts/run_agent.sh` 要传 `--tournament --match`，否则测试赛不再自动接；(2) `agent/__main__.py` 里的加固（`_SteadyOfficial`、启动重试、execution id、热备）要逐项手工移植；(3) `.env.example` 冲突取上游的说明行，再补回我们自己加的几行。
+**下一次合上游（PR #5，10-06 已合进上游 main 5bc61a2，比本分支多 9 个提交）要特别注意**：它删掉 `--claim`（和 `tests/test_main_claim.py`），按分配的 `context` 分开 `--tournament`（只打正式赛）和 `--match`（只打测试赛），并重写 `agent/__main__.py`（+119/−345），会和我们的 v4.1.2 / v4.2 / v4.2.2 官方模式加固冲突。合完以后：(1) `scripts/run_agent.sh` 要传 `--tournament --match`，否则测试赛不再自动接；(2) `agent/__main__.py` 里的加固（`_SteadyOfficial`、启动重试、execution id、热备）要逐项手工移植；v4.2.2 的重新登录分类（`_transient` 里的 "Failed to mint agent session" 和「新会话仍 401」）就是上游 1372ccc 的 `is_fatal_auth_error`，合完以后上游的 supervisor 自己会接住这些错误，我们这层留着也无害；(3) `.env.example` 冲突取上游的说明行，再补回我们自己加的几行。PR #5 里还有按座位退避（4cb083a：一个座位连续失败，重试间隔翻倍到 600 s），本分支没有移植：一局被游戏服务器弄丢时，我们每 10–20 s 重试那个座位（每次一个 worker、一次 Official Key 登录），直到平台关掉它（测试赛几分钟，正式赛约 100 s）。协议上 PR #5 不是 10-16 必需的（client / official / auth 只改了提示文字和可选字段）。
 
 ## 安全
 
