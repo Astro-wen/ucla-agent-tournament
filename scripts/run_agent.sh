@@ -56,8 +56,8 @@
 # Knobs (environment): PYTHON, LOG_DIR, LOG_MAX_MB=20, LOG_KEEP=10, HEALTH_EVERY=300, RESTART_DELAY=3,
 # RESTART_MAX_DELAY=60, STOP_TIMEOUT=20, ARENA_LOCK_DIR=/tmp, ARENA_ALLOW_NO_CALC, ARENA_ROLE,
 # ARENA_DISCOVERY_S=10 (the assignment poll), ARENA_WORKER_COOLDOWN_S=10 (a failed seat's first retry; the SDK doubles
-# it per failure in a row, up to 600 s), ARENA_SEAT_BUSY_RETRY_S, ARENA_NEW_SEAT_DELAY_S
-# (agent/__main__.py), ARENA_NODE, ARENA_CALC (agent/pokemon/calc.py), ARENA_BATTLE, ARENA_SHOWDOWN
+# it per failure in a row, up to ARENA_SEAT_BACKOFF_MAX_S=30 here, 600 s in the SDK), ARENA_SEAT_BUSY_RETRY_S,
+# ARENA_NEW_SEAT_DELAY_S (agent/__main__.py), ARENA_NODE, ARENA_CALC (agent/pokemon/calc.py), ARENA_BATTLE, ARENA_SHOWDOWN
 # (agent/pokemon/policy.py, engine.py), ARENA_STATE, ARENA_STATE_DIR (a restarted worker's memory, under
 # LOG_DIR/state by default), ARENA_SEARCH_MAX_PROCS, ARENA_SEARCH_MIN_FREE_MB (the machine's search processes; all in
 # docs/restart_load.md), ARENA_HEALTH_PROBE=0 (a health line never starts a probe search: Docker's HEALTHCHECK).
@@ -737,7 +737,7 @@ case "$CMD" in
     envs=()                   # an already running tmux server would not see this shell's knobs: pass them on (never keys)
     for v in PYTHON PYTHONPATH PATH LOG_DIR LOG_MAX_MB LOG_KEEP HEALTH_EVERY RESTART_DELAY RESTART_MAX_DELAY STOP_TIMEOUT \
              ARENA_NODE ARENA_CALC ARENA_ALLOW_NO_CALC ARENA_BATTLE ARENA_SHOWDOWN ARENA_LOCK_DIR ARENA_REASONING ARENA_RECORD ARENA_RECORD_DIR \
-             ARENA_DISCOVERY_S ARENA_WORKER_COOLDOWN_S ARENA_MODE ARENA_SEAT_BUSY_RETRY_S \
+             ARENA_DISCOVERY_S ARENA_WORKER_COOLDOWN_S ARENA_MODE ARENA_SEAT_BUSY_RETRY_S ARENA_SEAT_BACKOFF_MAX_S \
              ARENA_ROLE ARENA_NEW_SEAT_DELAY_S ARENA_STATE ARENA_STATE_DIR ARENA_SEARCH_MAX_PROCS \
              ARENA_SEARCH_MIN_FREE_MB ARENA_SEARCH_GRACE_S ARENA_SUMMARY ARENA_HEALTH_PROBE; do
       [ -n "${!v+x}" ] && envs+=(-e "$v=${!v}")

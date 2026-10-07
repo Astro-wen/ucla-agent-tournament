@@ -500,6 +500,72 @@ def test_a_session_gone_after_the_end_is_retried_less_and_less_often(capsys, ste
     assert gone == [0, 15, 40]                        # 10 s, then 20 s, then 40 s: the seat left the list meanwhile
 
 
+def test_a_tournament_seat_whose_first_workers_fail_still_connects_inside_its_window():
+    """Review 10-07: upstream's per-seat back-off (4cb083a) doubles a failed seat's cooldown up to 600 s, and only a
+    finished match, seat_busy or the seat leaving the listing resets the count. A tournament seat whose first workers
+    fail before connecting (their grant's sign-in answering 503 agent_session_unavailable or 429: each such worker
+    exits 2, a seat failure) got its 6th worker at 360 s with our 10 s cooldown and poll, past the 240 s connect window
+    (a no-show), and a match whose worker kept crashing waited 160 s, then 320 s, past Werewolf's 120 s and Pokemon's
+    300 s idle clocks. The runtime's tuning (agent.__main__._tournament_tuning) caps the doubling at 30 s."""
+    import agent.__main__ as agent_main
+    import altruagent.supervisor as sup
+    from altruagent.models import OfficialAssignment
+    from altruagent.worker import EXIT_SEAT_BUSY, EXIT_SUCCESS
+
+    row = OfficialAssignment.from_dict({
+        "match_id": "match-1", "seat_id": "seat-1", "game_type": GAME, "seat_position": 0, "seat_count": 2,
+        "match_status": "starting", "seat_status": "pending", "context": "tournament", "tournament_id": "t-1",
+        "tournament_name": "Cup", "round_label": "Swiss round 1 of 6", "connect_deadline_at": "2026-10-16T18:04:00Z"})
+    official = SimpleNamespace(assignments=lambda: [row])
+    opts = agent_main._tournament_options({"ARENA_DISCOVERY_S": "10", "ARENA_WORKER_COOLDOWN_S": "10"})
+    assert opts == {"poll_interval": 10.0, "cooldown_seconds": 10.0}
+    failed = 2                                        # (run_tournament_worker's exit on a temporary sign-in failure)
+    assert failed not in (EXIT_SUCCESS, EXIT_SEAT_BUSY)
+
+    def starts(fail_first: int, *, plays_s: float = 2.0, tuned: bool = True, horizon: float = 3000.0) -> list[float]:
+        """Start times of the seat's workers: the first `fail_first` exit `failed` after `plays_s`, the next one
+        connects and plays on."""
+        clock, out = [0.0], []
+
+        class Proc:
+            def __init__(self, target=None, args=(), daemon=None):
+                self.n, self.pid, self.exitcode = len(out), len(out) + 1, None
+                out.append(clock[0])
+
+            def start(self):
+                pass
+
+            def is_alive(self):
+                if self.exitcode is None and self.n < fail_first and clock[0] >= out[self.n] + plays_s:
+                    self.exitcode = failed
+                return self.exitcode is None
+
+            def join(self, timeout=None):
+                pass
+
+            def terminate(self):
+                self.exitcode = -15
+
+        restore = agent_main._tournament_tuning({})[0] if tuned else (lambda: None)
+        try:
+            state = sup.TournamentState()
+            while clock[0] <= horizon and len(out) <= fail_first:
+                sup.run_tournament_once(official, state, agent_spec="agent.agent:create_agent", now=lambda: clock[0],
+                                        cooldown_seconds=opts["cooldown_seconds"], process_factory=Proc,
+                                        log=lambda m: None)
+                clock[0] += opts["poll_interval"]
+        finally:
+            restore()
+        return out
+
+    assert starts(5, tuned=False) == [0, 20, 50, 100, 190, 360]          # the SDK's 600 s cap: a no-show
+    assert starts(5) == [0, 20, 50, 90, 130, 170]                       # 5 failed workers: the 6th starts at 170 s
+    assert starts(6) == [0, 20, 50, 90, 130, 170, 210]                  # 6: the 7th at 210 s, still inside 240 s
+    mid = starts(6, plays_s=120.0)                                      # one long match, its worker crashing again
+    assert [b - (a + 120) for a, b in zip(mid, mid[1:])] == [10, 20, 30, 30, 30, 30]
+    assert sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS == 600.0                # (the SDK's own value, back after the runtime)
+
+
 # ================================================================ (d) fixed board positions
 def doubles_rows():
     for f in sorted(LOGS.glob("*/*.jsonl")):

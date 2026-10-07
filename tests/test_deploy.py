@@ -66,9 +66,21 @@ def test_python_m_agent_sets_the_10s_knobs_itself(monkeypatch):
     assert agent_main._startup([], env) is True and env == {}           # (the retired platform-key mode: untouched)
 
 
-def test_the_sdks_per_seat_backoff_starts_from_our_10s_cooldown():
+SDK_BACKOFF = [11.0, 21.0, 41.0, 81.0, 161.0, 321.0, 601.0, 601.0]
+
+
+@pytest.mark.parametrize("env, gaps_expected", [
+    (None, SDK_BACKOFF),                                              # the SDK alone (upstream 4cb083a): up to 600 s
+    ({}, [11.0, 21.0, 31.0, 31.0, 31.0, 31.0, 31.0, 31.0]),          # our runtime (_tournament_tuning): up to 30 s
+    ({"ARENA_SEAT_BACKOFF_MAX_S": "600"}, SDK_BACKOFF),               # (the knob gives the SDK's cap back)
+    ({"ARENA_SEAT_BACKOFF_MAX_S": "5"}, [11.0] * 8),                  # below the cooldown: a fixed 10 s, as v4.2 did
+])
+def test_the_sdks_per_seat_backoff_starts_from_our_10s_cooldown_and_stops_at_30s(env, gaps_expected):
     # upstream 4cb083a: a seat whose worker keeps failing waits cooldown, 2x, 4x ... up to 600 s; a finished match
-    # resets it. Our 10 s cooldown only shortens the FIRST retry (one crash = at most one lost battle turn).
+    # resets it. Our 10 s cooldown shortens the FIRST retry (one crash = at most one lost battle turn) and our runtime
+    # caps the doubling at 30 s (review 10-07: at 600 s, 5 failed workers put a tournament seat's 6th start at 360 s,
+    # past its 240 s connect window, and a match whose worker kept crashing waited 160 s, then 320 s)
+    import altruagent.supervisor as sup
     from altruagent.models import OfficialAssignment
     from altruagent.supervisor import TournamentState, run_tournament_once
     from tests.test_supervisor import FakeProcessFactory
@@ -77,22 +89,28 @@ def test_the_sdks_per_seat_backoff_starts_from_our_10s_cooldown():
         def assignments(self):
             return [OfficialAssignment(match_id="m1", seat_id="s1", game_type="werewolf", context="testing")]
 
-    clock, factory, state = {"t": 0.0}, FakeProcessFactory(), TournamentState()
+    sdk_cap = sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS
+    restore = agent_main._tournament_tuning(env)[0] if env is not None else (lambda: None)
+    try:
+        clock, factory, state = {"t": 0.0}, FakeProcessFactory(), TournamentState()
 
-    def tick():
-        run_tournament_once(Official(), state, agent_spec="agent.agent:create_agent", now=lambda: clock["t"],
-                            cooldown_seconds=10.0, process_factory=factory, log=lambda m: None)
+        def tick():
+            run_tournament_once(Official(), state, agent_spec="agent.agent:create_agent", now=lambda: clock["t"],
+                                cooldown_seconds=10.0, process_factory=factory, log=lambda m: None)
 
-    tick()
-    gaps = []
-    for _ in range(8):
-        factory.processes[-1].finish(exitcode=1)                    # the worker fails at once, every time
-        n, failed_at = len(factory.processes), clock["t"]
-        while len(factory.processes) == n:
-            clock["t"] += 1.0                                        # (a 1 s poll: reaped 1 s after the failure)
-            tick()
-        gaps.append(clock["t"] - failed_at)
-    assert gaps == [11.0, 21.0, 41.0, 81.0, 161.0, 321.0, 601.0, 601.0]
+        tick()
+        gaps = []
+        for _ in range(8):
+            factory.processes[-1].finish(exitcode=1)                # the worker fails at once, every time
+            n, failed_at = len(factory.processes), clock["t"]
+            while len(factory.processes) == n:
+                clock["t"] += 1.0                                    # (a 1 s poll: reaped 1 s after the failure)
+                tick()
+            gaps.append(clock["t"] - failed_at)
+    finally:
+        restore()
+    assert gaps == gaps_expected
+    assert sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS == sdk_cap == 600.0  # (given back when the runtime ends)
 
 
 # ---- the event runtime (python -m agent --tournament --match) -------------------------------------------------------
@@ -484,10 +502,12 @@ def test_the_event_runtime_hands_the_sdk_both_kinds_the_knobs_and_the_standby_on
 
     official = FakeOfficial()
 
-    def fake_forever(client, *, agent_spec, **kw):
-        seen.update(client=client, agent_spec=agent_spec, **kw)
+    import altruagent.supervisor as sup
 
-    for k in ("ARENA_EXECUTION_ID", "ARENA_SEAT_BUSY_RETRY_S", "ARENA_NEW_SEAT_DELAY_S"):
+    def fake_forever(client, *, agent_spec, **kw):
+        seen.update(client=client, agent_spec=agent_spec, backoff_max=sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS, **kw)
+
+    for k in ("ARENA_EXECUTION_ID", "ARENA_SEAT_BUSY_RETRY_S", "ARENA_NEW_SEAT_DELAY_S", "ARENA_SEAT_BACKOFF_MAX_S"):
         monkeypatch.delenv(k, raising=False)
     if hold:
         monkeypatch.setenv("ARENA_NEW_SEAT_DELAY_S", hold)            # (run_agent.sh: role=standby)
@@ -499,6 +519,7 @@ def test_the_event_runtime_hands_the_sdk_both_kinds_the_knobs_and_the_standby_on
     assert seen["client"] is official and seen["kinds"] == ALL_KINDS
     assert isinstance(official.assignments, agent_main._HotStandby) == wrapped
     assert seen["poll_interval"] == 10.0 and seen["cooldown_seconds"] == 10.0     # (SDK: 10 s / 60 s)
+    assert seen["backoff_max"] == 30.0 and sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS == 600.0   # (30 s while it ran)
 
 
 def test_the_run_loops_execution_id_is_used_only_from_its_run_loop(monkeypatch, capsys):
@@ -512,22 +533,33 @@ def test_the_run_loops_execution_id_is_used_only_from_its_run_loop(monkeypatch, 
     assert "Ignoring ARENA_EXECUTION_ID" in capsys.readouterr().out and env == {}
     assert agent_main._take_execution_id({"ARENA_EXECUTION_ID": "short", "ARENA_EXECUTION_ID_OWNER": "1"}, 1) is None
     assert agent_main._take_execution_id({}) is None
-    # applied to the SDK's supervisor module for this runtime (new_execution_id, SEAT_BUSY_RETRY_SECONDS), restored after
-    before = (sup.new_execution_id, sup.SEAT_BUSY_RETRY_SECONDS)
+    # applied to the SDK's supervisor module for this runtime (new_execution_id, SEAT_BUSY_RETRY_SECONDS,
+    # SEAT_FAILURE_BACKOFF_MAX_SECONDS), restored after
+    before = (sup.new_execution_id, sup.SEAT_BUSY_RETRY_SECONDS, sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS)
     restore, used = agent_main._tournament_tuning({"ARENA_EXECUTION_ID": eid, "ARENA_SEAT_BUSY_RETRY_S": "12",
+                                                   "ARENA_SEAT_BACKOFF_MAX_S": "45",
                                                    "ARENA_EXECUTION_ID_OWNER": str(os.getppid())})
     try:
         assert used == eid and sup.TournamentState().execution_id == eid and sup.SEAT_BUSY_RETRY_SECONDS == 12.0
+        assert sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS == 45.0
     finally:
         restore()
-    assert (sup.new_execution_id, sup.SEAT_BUSY_RETRY_SECONDS) == before
+    assert (sup.new_execution_id, sup.SEAT_BUSY_RETRY_SECONDS, sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS) == before
     assert sup.TournamentState().execution_id != eid
     restore, fresh = agent_main._tournament_tuning({})               # no run loop: a fresh id, as upstream, but fixed
     try:                                                             # here so the standby's seat check uses it too
         assert fresh != eid and len(fresh) >= 32 and sup.TournamentState().execution_id == fresh
+        assert sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS == agent_main.SEAT_BACKOFF_MAX_S == 30.0     # (the default cap)
     finally:
         restore()
-    assert (sup.new_execution_id, sup.SEAT_BUSY_RETRY_SECONDS) == before
+    assert (sup.new_execution_id, sup.SEAT_BUSY_RETRY_SECONDS, sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS) == before
+    restore, _ = agent_main._tournament_tuning({"ARENA_SEAT_BACKOFF_MAX_S": "soon"})     # a bad value: the default
+    try:
+        assert sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS == 30.0
+        assert "Ignoring ARENA_SEAT_BACKOFF_MAX_S='soon'" in capsys.readouterr().out
+    finally:
+        restore()
+    assert (sup.new_execution_id, sup.SEAT_BUSY_RETRY_SECONDS, sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS) == before
 
 
 # ---- `python -m agent` without run_agent.sh: a control-plane default, and loud about a degraded machine -------------
@@ -1978,6 +2010,19 @@ def test_the_runbook_covers_the_official_tournament_mode_and_holds_no_key():
         assert needle in doc, needle
     for f in (ROOT / "docs" / "deploy.md", ROOT / "deploy" / "Dockerfile", ROOT / ".env.example"):   # (bundled files)
         assert not re.search(r"eak_live_[0-9a-fA-F]{16,}", f.read_text()), f
+
+
+def test_pointers_into_the_runbook_name_sections_it_has():
+    # review 10-07: every bundle's BUNDLE_README.txt and agent/__main__.py pointed at deploy.md sections ("官方正式赛",
+    # "官方模式下看门脚本和 agent 额外做了什么") that the 10-07 rewrite had renamed
+    headings = [x.lstrip("#").strip() for x in (ROOT / "docs" / "deploy.md").read_text().splitlines()
+                if x.startswith("#")]
+    bundle = re.search(r'Runbook: docs/deploy\.md \(the official tournament: section "([^"]+)"\)',
+                       (ROOT / "scripts" / "bundle.sh").read_text())
+    runtime = re.search(r'docs/deploy\.md "([^"]+)"', (ROOT / "agent" / "__main__.py").read_text())
+    assert bundle and runtime
+    for name in (bundle.group(1), runtime.group(1)):
+        assert any(h.startswith(name) for h in headings), name
 
 
 def test_the_runbook_has_no_placeholders_and_requires_the_calculator():

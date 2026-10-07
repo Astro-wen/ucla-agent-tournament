@@ -76,7 +76,7 @@ bash scripts/run_agent.sh start        # 部署：一直开着上面那条，崩
 git fetch upstream && git merge upstream/main
 ```
 
-`README.md` 是我们自己的；上游的 README 原文放在 `docs/STARTER_README.md`。合并时 README 冲突取我们的版本，再用 `git show upstream/main:README.md > docs/STARTER_README.md` 更新原文，上游新增的要点在本文件里补一两句。`agent/agent.py` 永远取我们的（上游的是只走第一个合法动作的占位 agent）。`agent/__main__.py` 以上游为准，我们的加固（`_authenticate` 启动重试、`_tournament_tuning` execution id、`_HotStandby` 热备、`_startup` 本机检查）在它上面手工保留；`.env.example` 取上游的说明行，再补回我们自己的几行。合完跑 `tests/test_deploy.py`、`tests/test_main.py`、`tests/test_main_tournament.py`、`tests/test_realtime.py` 和全量 pytest。10-07 合到上游 5bc61a2（PR #5：event agent、`--tournament` / `--match`、重新登录的暂时性错误不停运行时、按座位退避），记录见 `docs/progress.md`「v4.2.3 合并」。
+`README.md` 是我们自己的；上游的 README 原文放在 `docs/STARTER_README.md`。合并时 README 冲突取我们的版本，再用 `git show upstream/main:README.md > docs/STARTER_README.md` 更新原文，上游新增的要点在本文件里补一两句。`agent/agent.py` 永远取我们的（上游的是只走第一个合法动作的占位 agent）。`agent/__main__.py` 以上游为准，我们的加固（`_authenticate` 启动重试、`_tournament_tuning` execution id 和按座位退避上限 30 s、`_HotStandby` 热备、`_startup` 本机检查）在它上面手工保留；`.env.example` 取上游的说明行，再补回我们自己的几行。合完跑 `tests/test_deploy.py`、`tests/test_main.py`、`tests/test_main_tournament.py`、`tests/test_realtime.py` 和全量 pytest。10-07 合到上游 5bc61a2（PR #5：event agent、`--tournament` / `--match`、重新登录的暂时性错误不停运行时、按座位退避），记录见 `docs/progress.md`「v4.2.3 合并」。
 
 ## 安全
 
