@@ -25,15 +25,17 @@ Retired modes only print a notice pointing to the command above (see
   codes, replaced by the Official Agent Key.
 
 Deployment hardening on top of the starter (none of it edits `altruagent/`;
-see docs/deploy.md "官方模式下看门脚本和 agent 额外做了什么"). The SDK's
+see docs/deploy.md "看门脚本和 agent 在上游运行时之上额外做了什么"). The SDK's
 supervisor itself now keeps the runtime through a temporary sign-in failure
 and backs off a seat whose worker keeps failing (upstream 1372ccc, 4cb083a);
 what is added here:
 
 - supervisor tuning from ARENA_* knobs (`_tournament_options`): a 10 s
   assignment poll and a 10 s base cooldown before a failed seat's next worker
-  (the SDK: 60 s, a lost battle turn after one crash; its per-seat back-off
-  still doubles from there, up to 10 minutes);
+  (the SDK: 60 s, a lost battle turn after one crash); the SDK's per-seat
+  back-off still doubles from there, but only up to 30 s instead of 10
+  minutes (`_tournament_tuning`, ARENA_SEAT_BACKOFF_MAX_S), so a tournament
+  seat whose first workers fail still connects inside its 4 min window;
 - the first authentication waits out a temporary failure (the control plane
   down or rate limiting at the moment the runtime starts, a session the
   platform failed to mint) with a 5/10/20/30 s back-off instead of exiting
@@ -123,9 +125,10 @@ def _tournament_options(env=None) -> dict:
     """Optional run_tournament_forever tuning from the environment: ARENA_DISCOVERY_S = the assignment poll (SDK
     default 10 s), ARENA_WORKER_COOLDOWN_S = the wait before a seat whose worker ended gets a new one (SDK default
     60 s: after a worker crash, e.g. the runner's kill on an invalid action, a whole 55 s battle turn). The SDK doubles
-    that cooldown with each failure of the same seat in a row (up to 10 minutes; a finished match or seat_busy resets
-    it), so 10 s is only the first retry. Unset = the SDK defaults; scripts/run_agent.sh and `python -m agent` itself
-    (`_startup`) set both to 10 s. Bad values are ignored with a message, never fatal."""
+    that cooldown with each failure of the same seat in a row (a finished match or seat_busy resets it) up to a cap
+    that _tournament_tuning sets to 30 s (the SDK: 10 minutes), so 10 s is only the first retry. Unset = the SDK
+    defaults; scripts/run_agent.sh and `python -m agent` itself (`_startup`) set both to 10 s. Bad values are ignored
+    with a message, never fatal."""
     env = os.environ if env is None else env
     out: dict = {}
     for name, key, low, _ in _TOURNAMENT_ENV:
@@ -191,6 +194,17 @@ EXECUTION_ID_ENV = "ARENA_EXECUTION_ID"
 _EXECUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
 SEAT_BUSY_RETRY_ENV = "ARENA_SEAT_BUSY_RETRY_S"
 NEW_SEAT_DELAY_ENV = "ARENA_NEW_SEAT_DELAY_S"          # a hot standby's hold on new seats (see _HotStandby)
+SEAT_BACKOFF_MAX_ENV = "ARENA_SEAT_BACKOFF_MAX_S"
+# The longest wait before a new worker for a seat whose workers keep failing. The SDK doubles a failed seat's cooldown
+# with each failure in a row, up to its SEAT_FAILURE_BACKOFF_MAX_SECONDS (600 s), and only a finished match, seat_busy
+# or the seat leaving the listing resets the count (a worker that played a while before failing does not). Review
+# 10-07 measured at our 10 s cooldown and poll: 5 workers failing before a tournament seat connects (e.g. their grant's
+# sign-in answering 503 agent_session_unavailable or 429; each exits 2, a seat failure) put the 6th start at 360 s,
+# past the 240 s connect window (a no-show), and a match whose worker crashes again and again waited 160 s, then
+# 320 s: longer than Werewolf's 120 s and Pokemon's 300 s idle clocks. Capped at 30 s the starts are 0, 20, 50, 90,
+# 130, 170, 210 s, and a seat whose game the server lost (SESSION_NOT_FOUND until the platform drops it) still costs
+# at most one worker and one sign-in every 30 s (the platform allows 30 sign-ins a minute per address).
+SEAT_BACKOFF_MAX_S = 30.0
 
 
 def _take_execution_id(env=None, parent_pid: int | None = None) -> str | None:
@@ -212,21 +226,27 @@ def _take_execution_id(env=None, parent_pid: int | None = None) -> str | None:
 
 
 def _tournament_tuning(env=None) -> tuple[Callable[[], None], str]:
-    """Apply this runtime's execution id and ARENA_SEAT_BUSY_RETRY_S to the SDK's supervisor module (its module-level
-    name and constant, read when the runtime starts / on every seat_busy; altruagent/ itself is not edited). The id is
-    the run loop's (see _take_execution_id) or, as upstream, a fresh one for this process, fixed here so that the
-    standby's seat check (_HotStandby) uses the very id the runtime's workers use. Returns the function that
-    restores both, and the id."""
+    """Apply this runtime's execution id, ARENA_SEAT_BUSY_RETRY_S and the per-seat back-off cap
+    (ARENA_SEAT_BACKOFF_MAX_S, default SEAT_BACKOFF_MAX_S = 30 s) to the SDK's supervisor module (its module-level name
+    and constants, read when the runtime starts / on every seat_busy / whenever a failed worker is reaped;
+    altruagent/ itself is not edited).
+    The id is the run loop's (see _take_execution_id) or, as upstream, a fresh one for this process, fixed here so
+    that the standby's seat check (_HotStandby) uses the very id the runtime's workers use. Returns the function that
+    restores all three, and the id."""
     env = os.environ if env is None else env
-    saved = (_sdk_supervisor.new_execution_id, _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS)
+    saved = (_sdk_supervisor.new_execution_id, _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS,
+             _sdk_supervisor.SEAT_FAILURE_BACKOFF_MAX_SECONDS)
     execution_id = _take_execution_id(env) or saved[0]()
     _sdk_supervisor.new_execution_id = lambda: execution_id     # (called once per runtime, when it starts)
     retry = _env_number(env, SEAT_BUSY_RETRY_ENV, 5.0)
     if retry is not None:
         _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS = retry
+    cap = _env_number(env, SEAT_BACKOFF_MAX_ENV, 1.0)         # (below the cooldown = a fixed cooldown: the SDK's max())
+    _sdk_supervisor.SEAT_FAILURE_BACKOFF_MAX_SECONDS = SEAT_BACKOFF_MAX_S if cap is None else cap
 
     def restore() -> None:
-        _sdk_supervisor.new_execution_id, _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS = saved
+        (_sdk_supervisor.new_execution_id, _sdk_supervisor.SEAT_BUSY_RETRY_SECONDS,
+         _sdk_supervisor.SEAT_FAILURE_BACKOFF_MAX_SECONDS) = saved
     return restore, execution_id
 
 
