@@ -45,6 +45,8 @@ python -m local.werewolf_platform --games 40      # 狼人杀：用官方 runner
 
 狼人杀措辞（10-06 起）：两个本地引擎默认用 10-05 文档的新说法（`Vote to eliminate PlayerN`、`cause` 是 `vote`、`(eliminated by vote)` / `(killed at night)`、`— PlayerN eliminated by vote`、预言家查验前 `You have not investigated anyone yet.`、结束时 `Game over — WOLVES win`）；`ARENA_WW_WORDING=old` 换回旧说法（lynch）。`ARENA_WW_SAME_NAMES=on`（只用于评测）让我方座位看到所有座位同一个名字，这时 agent 只能读 observation 里按座位写的文字记录（测文字解析那条路）。
 
+狼人杀讨论的节奏（10-06 起，`ARENA_WW_TIMING`，只影响 `local/werewolf_env.py`）：默认 `rounds`，每轮把活着的座位（包括我方）随机排一次、各问一次，最多 6 轮，每轮在窗口时钟上算 20 s。`rt` 照官方 runner 的真实节奏：我方几毫秒就回答，所以每天都是我方在 t = 0 第一个开口；之后别的座位每发一条聊天或 terminate，我方都会被叫醒再问一次（runner 的 `wait_for_update` 就是这样），其余座位每轮算 15 s；轮数用完后我方还没结束发言，就每 5 s 再问一次，直到 120 s 窗口关闭（这记作 `window_close`）。两种节奏下状态里都带 `messaging_seconds_left`。`local/werewolf_platform.py` 新增 `--window`（讨论窗口秒数，平台是 120，调小可以压缩时间跑）、`--think`（替身 bot 每次发言前平均想多少秒，像大模型调用；0 = 立刻回答）和 `--llm llmq`（大模型替身换成 Qwen 的说法）；输出多一行：我方收到的错误码（`WRONG_PHASE_NOOP` 是 runner 在窗口关闭的那一刻给已经结束发言的座位又发了一次 terminate，无害）和「多听一会儿」（`ARENA_WW_LISTEN`，见 `docs/deploy.md`「狼人杀聊天」）的统计。
+
 参照对手：
 - `official_baseline` = 官方 starter 原样 `return state.legal_actions[0]`。在平台上它选秀拿第一张卡；Team Preview 和双打回合返回模板会被服务器拒绝 → 进程被 runner 杀掉 → 平台 300 s 后随机代打。所以这里它 = 首卡选秀 + 随机带人 + 随机出招；狼人杀里 = 白天投最小座位、夜里杀最小座位、不发言。（这是按平台文档的「300 s 随机代打」建模；按实测的 VGC 计时器建模的版本见下面的 `basic`。）
 - `random` = 全随机。
