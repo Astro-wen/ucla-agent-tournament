@@ -25,7 +25,8 @@ assignment until Ctrl+C (`altruagent.supervisor.run_tournament_forever`).
 Deployment hardening on top of the SDK (none of it edits `altruagent/`, see
 docs/deploy.md "官方正式赛"): supervisor tuning from ARENA_* knobs with 10 s
 defaults in both modes; a failed discovery poll or a TRANSIENT re-authentication
-failure (429, 5xx, network) no longer ends the runtime and its running matches
+failure (429, 5xx, network, a session the platform failed to mint or did not
+accept) no longer ends the runtime and its running matches
 (`_SteadyDiscovery`, `_SteadyOfficial`); the official runtime waits out a
 transient failure at start instead of exiting; scripts/run_agent.sh can hand it
 a per-run-loop execution id so a restarted runtime resumes its own seat leases
@@ -52,6 +53,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import os
+import random
 import re
 import sys
 import time
@@ -242,7 +244,7 @@ def _describe_seat(grant: SeatGrant) -> list[str]:
         seat = "Claimed seat"
     match = f"Match: {grant.match_id or 'unknown'}"
     if grant.match_status == "starting":
-        match += " (waiting for the other seats to be claimed)"
+        match += " (waiting for every seat's agent to connect)"
     return [seat, f"Game: {grant.game_type or 'unknown'}", match]
 
 
@@ -286,6 +288,64 @@ class _ProgressGameSession(MCPGameSession):
         return result
 
 
+# Waiting for a match whose open seats are still being filled (the platform's
+# 409 match_not_ready): its own retry_after_seconds, else this, plus jitter so
+# several local seats don't retry in lockstep.
+CLAIM_WAIT_DEFAULT_S = 20.0
+CLAIM_WAIT_JITTER_S = 2.0
+# rate_limited while waiting: the platform allows 30 claim requests a minute.
+CLAIM_RATE_LIMITED_WAIT_S = 30.0
+# The control plane unreachable while waiting: a few spaced retries, then stop.
+CLAIM_NETWORK_WAIT_S = 10.0
+CLAIM_NETWORK_RETRIES = 5
+
+
+class _StoppedBeforeClaim(Exception):
+    """Ctrl+C while waiting to claim: nothing was claimed."""
+
+
+def _claim_with_wait(client: AltruAgentClient) -> None:
+    """Claim the seat, waiting while the match's open seats are being filled.
+
+    ``SeatGrantAuth.login()`` stays a single attempt; this loop decides when to
+    call it again. Every attempt goes through the same client, so the same
+    ``SeatGrantAuth`` and therefore the same claim_key. Waits only on
+    ``match_not_ready`` and ``rate_limited`` (and a few network failures);
+    every other error is raised, as before. Prints nothing secret.
+    """
+    announced = False
+    network_failures = 0
+    while True:
+        try:
+            try:
+                client.login()
+                return
+            except SeatClaimError as exc:
+                if exc.error_code == "match_not_ready":
+                    if not announced:
+                        print(
+                            "Waiting for the match's open seats to be filled — "
+                            "this seat is claimed as soon as the match fills (Ctrl+C to stop)...",
+                            flush=True,
+                        )
+                        announced = True
+                    wait = exc.retry_after_seconds or CLAIM_WAIT_DEFAULT_S
+                    time.sleep(wait + random.uniform(0, CLAIM_WAIT_JITTER_S))
+                    continue
+                if exc.error_code == "rate_limited":
+                    time.sleep(CLAIM_RATE_LIMITED_WAIT_S)
+                    continue
+                raise
+            except PlatformError as exc:
+                if exc.status_code is None and network_failures < CLAIM_NETWORK_RETRIES:
+                    network_failures += 1
+                    time.sleep(CLAIM_NETWORK_WAIT_S)
+                    continue
+                raise
+        except KeyboardInterrupt:
+            raise _StoppedBeforeClaim() from None
+
+
 def _run_claim(claim_token: str, create_agent: Callable) -> int:
     """Claim one Testing seat and play it to completion in this process."""
     try:
@@ -313,7 +373,10 @@ def _run_claim(claim_token: str, create_agent: Callable) -> int:
             return 1
 
         try:
-            client.login()  # the claim itself
+            _claim_with_wait(client)  # the claim itself, waiting for the lobby if needed
+        except _StoppedBeforeClaim:
+            print("\nStopped before the seat was claimed.")
+            return 0
         except AltruAgentError as exc:
             print(f"Could not claim seat: {exc}")
             return 1
@@ -355,35 +418,71 @@ def _run_claim(claim_token: str, create_agent: Callable) -> int:
         client.close()
 
 
+# The platform has answered a failed session mint (its own sign-in service rejecting or rate-limiting the request) with
+# 401 invalid_official_agent_key and a detail starting with this: a temporary platform problem, not a key problem.
+# (Upstream 1372ccc, is_fatal_auth_error; our SDK copy is 6ba2e9c, from before it.)
+_MINT_FAILURE_PREFIX = "Failed to mint agent session"
+
+
+def _mint_failure(exc: BaseException) -> bool:
+    return (getattr(exc, "error_code", None) == "invalid_official_agent_key"
+            and str(getattr(exc, "detail", None) or "").startswith(_MINT_FAILURE_PREFIX))
+
+
+def _fresh_session_refused(exc: BaseException) -> bool:
+    """A plain AuthenticationError (not the key exchange's OfficialAgentError) with 401: the request that followed a
+    SUCCESSFUL re-login still refused the freshly issued session (the SDK retries once after a 401, then raises)."""
+    return (isinstance(exc, AuthenticationError) and not isinstance(exc, OfficialAgentError)
+            and getattr(exc, "status_code", None) == 401)
+
+
 def _transient(exc: BaseException) -> bool:
-    """A control-plane failure that retrying fixes (rate limiting, a 5xx or gateway blip, a timeout, the network),
-    as opposed to one it cannot (a rejected or revoked key: any other 4xx; a malformed answer)."""
+    """A control-plane failure that retrying fixes (rate limiting, a 5xx or gateway blip, a timeout, the network, a
+    session the platform failed to mint or did not accept), as opposed to one it cannot (a rejected or revoked key,
+    an incomplete registration: any other 4xx; a malformed answer)."""
     status = getattr(exc, "status_code", None)
     if getattr(exc, "error_code", None) == "rate_limited" or status in (408, 425, 429):
         return True
     if isinstance(status, int) and status >= 500:
         return True
+    if _mint_failure(exc) or _fresh_session_refused(exc):
+        return True
     return status is None and isinstance(exc, PlatformError)       # could not reach the control plane at all
 
 
-# Listing pauses after the 1st, 2nd, 3rd+ rate-limited re-login in a row. Capped at 30 s: while paused the runtime sees
-# no new seat (a Werewolf seat has 120 s, a team preview 90 s), and one re-login per 30 s is still far gentler than the
-# SDK's own poll (10 s).
+def _auth_text(exc: BaseException) -> str:
+    """An authentication failure as the runtime logs it. For a failed session mint the SDK's own text is the rejected
+    key's ("copy it again"), which must not send the owner to rotate a working key in the middle of the event."""
+    if _mint_failure(exc):
+        return (f"the platform could not start an agent session (HTTP {getattr(exc, 'status_code', None)}: "
+                f"{getattr(exc, 'detail', None)}); a temporary problem on the platform, not the key")
+    if _fresh_session_refused(exc):
+        return f"the control plane did not accept a freshly issued agent session (HTTP 401: {exc})"
+    return str(exc)
+
+
+# Listing pauses after the 1st, 2nd, 3rd+ rate-limited (or 401: a failed session mint, a fresh session refused)
+# re-login in a row. Capped at 30 s: while paused the runtime sees no new seat (a Werewolf seat has 120 s, a team
+# preview 90 s), and one re-login per 30 s is still far gentler than the SDK's own poll (10 s).
 RATE_LIMIT_BACKOFF_S = (15.0, 20.0, 30.0)
 
 
 class _SteadyOfficial:
     """The official client's assignments() as run_tournament_forever calls it, except that a TRANSIENT failure to
-    re-authenticate the agent session (429 rate_limited, a 5xx, a gateway blip, a timeout) no longer ends the runtime.
+    re-authenticate the agent session (429 rate_limited, a 5xx, a gateway blip, a timeout, a 401 "Failed to mint agent
+    session", a fresh session the next request still refuses: `_transient`) no longer ends the runtime.
 
     Upstream defect (reported to the organizers, see docs/deploy.md): assignments() re-authenticates after a 401, and
     OfficialAgentAuth raises OfficialAgentError (an AuthenticationError, not a PlatformError) for ANY non-200 answer
     of /tournament/agent/authenticate; run_tournament_once catches only PlatformError, so one rate-limited or 503
     re-login ends run_tournament_forever, whose finally terminates EVERY running match worker. Here such a failure is
     re-raised as PlatformError: the SDK skips that one listing and keeps every worker. After rate_limited the listing
-    also pauses (RATE_LIMIT_BACKOFF_S) instead of asking again at every poll. A key the platform rejects (any other
-    4xx) stays fatal at once, as upstream intends: the wrapper (run_agent.sh / systemd) restarts the runtime with its
-    back-off. Never answers with an empty list: two empty listings in a row make the SDK stop the running workers.
+    also pauses (RATE_LIMIT_BACKOFF_S) instead of asking again at every poll; so does a 401 one (each try mints a new
+    session). A key the platform rejects (any other 4xx) stays fatal at once, as upstream intends: the wrapper
+    (run_agent.sh / systemd) restarts the runtime with its back-off. Upstream fixed the same defect after our merge
+    point (1372ccc: is_fatal_auth_error, a 10-60 s listing back-off); `_transient` follows its classification except
+    that a 4xx it does not name (e.g. 403 forbidden) and a malformed answer stay fatal here. Never answers with an
+    empty list: two empty listings in a row make the SDK stop the running workers.
 
     `install(official)` puts it in place of the client's own assignments (an instance attribute), so the SDK gets the
     very client object it always got; everything else about the client is untouched.
@@ -407,7 +506,7 @@ class _SteadyOfficial:
         self._now = now
         self._log = log
         self.failures = 0                  # transient re-authentication failures in a row
-        self.rate_limited = 0              # ... of which rate_limited, in a row
+        self.rate_limited = 0              # ... of which rate_limited or 401 (each pauses the listing), in a row
         self._resume_at = 0.0
         self.hold_new_s = max(0.0, float(hold_new_s or 0.0))
         self._grant = grant                # the client's grant(seat_id, execution_id) (standby only)
@@ -432,14 +531,15 @@ class _SteadyOfficial:
             if not _transient(exc):
                 raise                      # a rejected key: fatal, as upstream
             self.failures += 1
-            if exc.error_code == "rate_limited" or exc.status_code == 429:
+            if exc.error_code == "rate_limited" or exc.status_code in (401, 429):
                 self.rate_limited += 1
                 pause = RATE_LIMIT_BACKOFF_S[min(self.rate_limited, len(RATE_LIMIT_BACKOFF_S)) - 1]
                 self._resume_at = self._now() + pause
+            text = _auth_text(exc)
             if self.failures == 1 or self.failures % 30 == 0:
                 self._log(f"[agent] re-authentication failed ({self.failures} in a row; running matches continue, "
-                          f"retrying): {exc}")
-            raise PlatformError(f"transient re-authentication failure: {exc}", status_code=exc.status_code,
+                          f"retrying): {text}")
+            raise PlatformError(f"transient re-authentication failure: {text}", status_code=exc.status_code,
                                 error_code=exc.error_code) from None
         if self.failures:
             self._log(f"[agent] re-authentication recovered after {self.failures} failure(s)")
@@ -497,7 +597,7 @@ _sleep = time.sleep                        # (tests replace it)
 def _authenticate(official) -> bool:
     """The runtime's first authentication. A transient failure (the control plane down or rate limiting at the
     moment the runtime starts, e.g. a restart during an outage) is waited out with a back-off instead of ending the
-    process; a rejected key ends it (False)."""
+    process (so is a 401 "Failed to mint agent session", see `_transient`); a rejected key ends it (False)."""
     attempt = 0
     while True:
         try:
@@ -509,7 +609,8 @@ def _authenticate(official) -> bool:
                 return False
             delay = STARTUP_RETRY_S[min(attempt, len(STARTUP_RETRY_S) - 1)]
             attempt += 1
-            print(f"Could not connect as official tournament agent yet ({exc}); retrying in {delay:.0f}s.", flush=True)
+            print(f"Could not connect as official tournament agent yet ({_auth_text(exc)}); retrying in {delay:.0f}s.",
+                  flush=True)
             _sleep(delay)
 
 
@@ -625,9 +726,9 @@ def _check_tournament(agent_spec: str) -> int:
             official.authenticate()
         except OfficialAgentError as exc:
             ok("Control plane reachable")
-            if exc.status_code in (400, 401):
+            if exc.status_code in (400, 401) and not _mint_failure(exc):
                 return fail(f"Official Agent Key rejected: {exc}")
-            return fail(f"Official agent authentication failed: {exc}")
+            return fail(f"Official agent authentication failed: {_auth_text(exc)}")
         except AltruAgentError as exc:
             return fail(f"Control plane not reachable at {official.control_url}: {exc}")
         ok("Control plane reachable")

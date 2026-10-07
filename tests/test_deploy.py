@@ -129,8 +129,8 @@ class _AuthBackend:
     """A control plane whose agent session expires after the first listing and whose re-authentication then fails
     with `status`/`code` until `recover_at` listings have been asked for (exp20's demo_fatal.py, as a test)."""
 
-    def __init__(self, status: int, code: str | None, recover_at: int = 4):
-        self.status, self.code, self.recover_at = status, code, recover_at
+    def __init__(self, status: int, code: str | None, recover_at: int = 4, detail: str | None = None):
+        self.status, self.code, self.recover_at, self.detail = status, code, recover_at, detail
         self.calls = {"auth": 0, "list": 0}
 
     def __call__(self, request):
@@ -140,7 +140,10 @@ class _AuthBackend:
             self.calls["auth"] += 1
             if self.calls["auth"] == 1 or self.calls["list"] >= self.recover_at:
                 return httpx.Response(200, json={"access_token": f"session-{self.calls['auth']}"})
-            return httpx.Response(self.status, json={"error": self.code} if self.code else {})
+            body = {"error": self.code} if self.code else {}
+            if self.detail:
+                body["detail"] = self.detail
+            return httpx.Response(self.status, json=body)
         if path == "/tournament/agent/assignments":
             self.calls["list"] += 1
             if self.calls["list"] == 1 or (self.calls["list"] > self.recover_at
@@ -159,15 +162,22 @@ def _official(backend):
                                transport=httpx.MockTransport(backend))
 
 
-@pytest.mark.parametrize("status, code", [(429, "rate_limited"), (503, None), (502, None), (500, "internal")])
-def test_a_transient_reauthentication_failure_no_longer_ends_the_runtime_and_its_matches(status, code):
+MINT_DETAIL = "Failed to mint agent session: Request rate limit reached"      # (upstream 1372ccc's wording)
+
+
+@pytest.mark.parametrize("status, code, detail", [(429, "rate_limited", None), (503, None, None), (502, None, None),
+                                                  (500, "internal", None),
+                                                  (503, "agent_session_unavailable", "try again"),
+                                                  (401, "invalid_official_agent_key", MINT_DETAIL)])
+def test_a_transient_reauthentication_failure_no_longer_ends_the_runtime_and_its_matches(status, code, detail):
     # upstream defect (intel-2): assignments() -> 401 -> re-login -> 429 / 5xx raises OfficialAgentError, an
     # AuthenticationError that run_tournament_once does not catch: run_tournament_forever ended and its finally
-    # terminated EVERY running worker. Through _SteadyOfficial the runtime keeps going and keeps its worker.
+    # terminated EVERY running worker. Through _SteadyOfficial the runtime keeps going and keeps its worker. So does a
+    # failed session mint, which the platform has answered with 401 invalid_official_agent_key (review 10-07).
     from altruagent.supervisor import run_tournament_forever
     from tests.test_supervisor import FakeProcessFactory
 
-    backend, factory, log = _AuthBackend(status, code), FakeProcessFactory(), []
+    backend, factory, log = _AuthBackend(status, code, detail=detail), FakeProcessFactory(), []
     clock = {"t": 0.0}
 
     def sleep(s):
@@ -182,8 +192,45 @@ def test_a_transient_reauthentication_failure_no_longer_ends_the_runtime_and_its
     assert not [line for line in log if "no longer assigned" in line]  # never stopped as "unassigned"
     assert any("re-authentication failed (1 in a row; running matches continue" in line for line in log)
     assert any("re-authentication recovered" in line for line in log) and "Assignment discovery recovered." in log
-    if code == "rate_limited":                                       # a rate limit pauses the listing (15, 30 s ...)
+    if code == "rate_limited" or status == 401:                      # these pause the listing (15, 20, 30 s)
         assert backend.calls["auth"] <= 4, backend.calls
+    if status == 401:                                                # not "copy the key again": it is not the key
+        assert not [line for line in log if "copy it again" in line.lower()]
+        assert any("could not start an agent session" in line and "not the key" in line for line in log)
+
+
+def test_a_fresh_session_the_platform_still_refuses_keeps_the_runtime_and_its_matches():
+    # review 10-07 (A6): the re-login succeeds but the retried listing is still 401: the SDK raises a plain
+    # AuthenticationError, which used to end the runtime and terminate every worker (upstream 1372ccc: temporary)
+    import httpx
+
+    from altruagent.supervisor import run_tournament_forever
+    from tests.test_supervisor import FakeProcessFactory
+
+    calls, factory, log, clock = {"auth": 0, "list": 0}, FakeProcessFactory(), [], {"t": 0.0}
+
+    def backend(request):
+        if request.url.path == "/tournament/agent/authenticate":
+            calls["auth"] += 1
+            return httpx.Response(200, json={"access_token": f"session-{calls['auth']}"})
+        calls["list"] += 1
+        if calls["list"] == 1 or calls["list"] >= 6:                 # lists 2-5 (two tries: 2+3, 4+5) refused
+            return httpx.Response(200, json={"assignments": [
+                {"match_id": "m1", "seat_id": "s1", "game_type": "pokemon_vgc_doubles_draft"}]})
+        return httpx.Response(401, json={"error": "invalid_agent_session", "detail": "session not accepted"})
+
+    def sleep(s):
+        clock["t"] += s
+
+    official = _official(backend)
+    agent_main._SteadyOfficial.install(official, now=lambda: clock["t"], log=log.append)
+    run_tournament_forever(official, agent_spec="agent.agent:create_agent", sleep=sleep, now=lambda: clock["t"],
+                           process_factory=factory, log=log.append, max_iterations=10, poll_interval=10.0,
+                           cooldown_seconds=10.0)
+    assert len(factory.processes) == 1 and not [line for line in log if "no longer assigned" in line]
+    assert any("did not accept a freshly issued agent session" in line for line in log)
+    assert "Assignment discovery recovered." in log
+    assert calls["auth"] == 3                                        # paused 15 s, 20 s: not one re-login per poll
 
 
 def test_the_unfixed_sdk_path_still_dies_so_the_wrapper_is_what_keeps_the_matches():
@@ -329,6 +376,16 @@ def test_a_rejected_official_key_stays_fatal():
     forbidden.assignments()
     with pytest.raises(OffErr):
         forbidden.assignments()
+    incomplete = _official(_AuthBackend(403, "registration_incomplete", detail="rules"))
+    agent_main._SteadyOfficial.install(incomplete, log=lambda m: None)
+    incomplete.assignments()
+    with pytest.raises(OffErr):
+        incomplete.assignments()
+    revoked = _official(_AuthBackend(401, "invalid_official_agent_key", detail="Invalid official agent key"))
+    agent_main._SteadyOfficial.install(revoked, log=lambda m: None)
+    revoked.assignments()
+    with pytest.raises(OffErr):
+        revoked.assignments()
 
 
 def test_transient_classification():
@@ -339,6 +396,19 @@ def test_transient_classification():
     assert not agent_main._transient(OffErr("x", status_code=401, error_code="invalid_official_agent_key"))
     assert not agent_main._transient(OffErr("no session token in the answer"))          # (status None)
     assert not agent_main._transient(PlatformError("bad request", status_code=400))
+    # review 10-07, as upstream 1372ccc: a failed session mint and a fresh session still refused are temporary ...
+    assert agent_main._transient(OffErr("x", status_code=401, error_code="invalid_official_agent_key", detail=MINT_DETAIL))
+    assert agent_main._transient(AuthenticationError("session not accepted", status_code=401,
+                                                     error_code="invalid_agent_session"))
+    # ... a refused key, a key the platform names Oracle-hosted, an incomplete registration are not
+    assert not agent_main._transient(OffErr("x", status_code=401, error_code="invalid_official_agent_key",
+                                            detail="Invalid official agent key"))
+    assert not agent_main._transient(OffErr("x", status_code=401, error_code="invalid_official_agent_key",
+                                            detail="This agent is Oracle Hosted; ..."))
+    assert not agent_main._transient(OffErr("x", status_code=403, error_code="registration_incomplete"))
+    assert not agent_main._transient(OffErr("not accepted", status_code=401))
+    assert not agent_main._transient(OffErr("x", status_code=401, error_code="invalid_official_agent_key",
+                                            detail={"not": "a string"}))
 
 
 def test_the_first_authentication_waits_out_a_transient_failure(monkeypatch, capsys):
@@ -359,6 +429,58 @@ def test_the_first_authentication_waits_out_a_transient_failure(monkeypatch, cap
     assert slept == [5.0, 10.0, 20.0] and capsys.readouterr().out.count("retrying in") == 3
     assert not agent_main._authenticate(Flaky([OffErr("The Official Agent Key was not accepted.", status_code=401)]))
     assert slept == [5.0, 10.0, 20.0] and "Could not connect as official tournament agent" in capsys.readouterr().out
+
+
+def test_a_failed_session_mint_at_start_is_waited_out_not_reported_as_a_bad_key(monkeypatch, capsys):
+    # review 10-07 (A7): through the real client, 401 invalid_official_agent_key "Failed to mint agent session" ended
+    # the start after one try with "The Official Agent Key was not accepted. Copy it again ..." (a working key)
+    import httpx
+    slept, tries = [], {"n": 0}
+    monkeypatch.setattr(agent_main, "_sleep", slept.append)
+
+    def backend(request):
+        tries["n"] += 1
+        if tries["n"] <= 2:
+            return httpx.Response(401, json={"error": "invalid_official_agent_key", "detail": MINT_DETAIL})
+        return httpx.Response(200, json={"access_token": "session-1"})
+
+    assert agent_main._authenticate(_official(backend)) and tries["n"] == 3
+    out = capsys.readouterr().out
+    assert slept == [5.0, 10.0] and out.count("could not start an agent session") == 2
+    assert "copy it again" not in out.lower()
+
+    def revoked(request):
+        return httpx.Response(401, json={"error": "invalid_official_agent_key", "detail": "Invalid official agent key"})
+
+    assert not agent_main._authenticate(_official(revoked))
+    assert slept == [5.0, 10.0] and "Could not connect as official tournament agent: The Official Agent Key was not" \
+        in capsys.readouterr().out
+
+
+def test_check_tournament_does_not_call_a_failed_session_mint_a_rejected_key(monkeypatch, capsys):
+    from altruagent.official import OfficialAgentError as OffErr
+
+    class Official:
+        control_url = "https://control.example.test"
+
+        def __init__(self, error):
+            self.error = error
+
+        def authenticate(self):
+            raise self.error
+
+        def close(self):
+            pass
+
+    for error, expected in [
+        (OffErr("x", status_code=401, error_code="invalid_official_agent_key", detail=MINT_DETAIL),
+         "Official agent authentication failed: the platform could not start an agent session"),
+        (OffErr("not accepted", status_code=401, error_code="invalid_official_agent_key",
+                detail="Invalid official agent key"), "Official Agent Key rejected: not accepted"),
+    ]:
+        monkeypatch.setattr(agent_main, "OfficialAgentClient", lambda error=error: Official(error))
+        assert agent_main._check_tournament("agent.agent:create_agent") == 1
+        assert expected in capsys.readouterr().out.splitlines()[-1]
 
 
 def test_outage_backoffs_are_capped_at_30s(monkeypatch):

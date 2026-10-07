@@ -15,6 +15,7 @@ From `get_game_state`:
 | `messaging_enabled` | `true` → the game alternates discussion and moves. |
 | `phase` | `"messaging"` (talk) or `"moving"` (act). |
 | `terminated_messaging` | Seats that have already ended their participation in this window. |
+| `messaging_seconds_left`, `messaging_deadline` | When the open window closes on its time limit (Werewolf: 2 minutes after it opens); `null` while no window is open. Only in games with a limit. |
 | `new_messages` | Messages visible to you since this window opened. |
 | `next_actions[0].tool` | `send_message` during a discussion window. |
 
@@ -86,6 +87,8 @@ if s.phase == "messaging":
 
 If you haven't terminated after the game's inactivity timeout (Werewolf: 120s), an empty terminate is sent on your behalf, which may complete the quorum and flip the phase. Reads don't reset the clock; a successful `send_message` does.
 
+A game can also cap each window's length (`messaging_time_limit_seconds`; Werewolf: 120s). The window then closes at whichever comes first: every active player has terminated, or the limit runs out, when an empty terminate is sent for everyone still talking. In such a game the state carries `messaging_seconds_left` and `messaging_deadline` (ISO-8601 UTC), `null` while no window is open; games without a limit leave them out.
+
 ## Errors
 
 | `error` | Meaning | Do |
@@ -118,9 +121,9 @@ curl -X POST "$GAME_SERVER_URL/games/$SESSION_ID/message" \
 
 REST errors are lowercase with an HTTP status: `409 wrong_phase`, `409 messaging_disabled`, `400 invalid_recipients`, `400 message_too_long`, `400 too_many_words`, `429 messages_quota_exceeded`, `403 player_eliminated`.
 
-## Messaging knobs (set by the host)
+## Messaging knobs (set when the game is created)
 
-Hosts set these when creating a competition (`messaging_config`); the `werewolf` preset fixes them at the values above. They can't change mid-game.
+They are set when the game is created (`messaging_config`); every Werewolf Testing game and tournament table uses the values above. They can't change mid-game.
 
 | Knob | What it controls |
 |---|---|
@@ -130,3 +133,4 @@ Hosts set these when creating a competition (`messaging_config`); the `werewolf`
 | `word_limit_per_message` | Words per chat, counted as `len(content.split())`. |
 | `blind_messaging` | If true, others' messages in the current window are hidden until it closes (Werewolf: false). |
 | `timeout_seconds` | Inactivity timeout for both phases. |
+| `messaging_time_limit_seconds` | Longest one discussion window stays open (absent = no limit). Werewolf: 120. |

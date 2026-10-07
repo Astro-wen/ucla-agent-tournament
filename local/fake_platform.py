@@ -34,7 +34,8 @@ observation that is only {"message": "No pending decision is currently available
 The official tournament (`--official`, local/fake_official.py): the /tournament/agent/* control plane with seat
 execution leases, for `python -m agent --tournament` with a FAKE Official Agent Key (--official-key, or
 FAKE_OFFICIAL_KEY; the default is a fixed local test value). `--werewolf N` adds N 7-seat Werewolf tables (our seat
-over MCP, six local bots), in either mode.
+over MCP, six local bots), in either mode. `--red-alert N` adds N real-time Red Alert matches, one after another
+(local/fake_redalert.py: a scripted world, --ra-seconds long; the MCP tool get_game_config answers too).
 """
 from __future__ import annotations
 
@@ -79,6 +80,11 @@ _SWITCH = re.compile(r"^\|(?:switch|drag|replace)\|(p[12])[ab]: [^|]*\|([^,|]+)"
 
 def _err(code: str, detail: str) -> dict:
     return {"error": code, "detail": detail}
+
+
+def _own_tools(fm) -> bool:
+    """A match that answers the MCP tools itself (`mcp(tool, args)`: Werewolf tables, Red Alert), not FakeMatch."""
+    return callable(getattr(fm, "mcp", None))
 
 
 def _dictify(x) -> dict:
@@ -331,8 +337,10 @@ class FakePlatform:
     def __init__(self, *, concurrent: int, opponent: str, max_matches: int | None, api_key: str, token_ttl: float,
                  seed: int, stats: Path | None, game_server: str, realistic: bool = True, blind_every: int = 25,
                  werewolf: int = 0, max_werewolf: int | None = None, ww_seat: int | None = None,
-                 ww_idle: float = 120.0, ww_think: float = 0.0):
+                 ww_idle: float = 120.0, ww_think: float = 0.0, red_alert: int = 0, ra_seconds: float = 20.0):
         self.concurrent, self.opponent, self.max_matches = concurrent, opponent, max_matches
+        self.red_alert, self.ra_seconds = red_alert, ra_seconds     # Red Alert matches in all, one at a time
+        self._ra_started = 0
         self.api_key, self.token_ttl, self.seed, self.stats_path = api_key, token_ttl, seed, stats
         self.game_server = game_server
         self.realistic, self.blind_every = realistic, blind_every
@@ -425,6 +433,11 @@ class FakePlatform:
         self._start(FakeWerewolfMatch(self, n, self.seed * 100000 + n, seat=self.ww_seat, idle_limit=self.ww_idle,
                                       think_s=self.ww_think))
 
+    def _new_red_alert(self) -> None:
+        from .fake_redalert import FakeRedAlertMatch
+        self._ra_started += 1
+        self._start(FakeRedAlertMatch(self, len(self.order), seconds=self.ra_seconds))
+
     def _start(self, fm) -> None:
         with self.lock:
             self.matches[fm.sid] = fm
@@ -443,7 +456,11 @@ class FakePlatform:
                 if not draining and live_ww < self.werewolf and self._ww_started < self.max_werewolf:
                     self._new_werewolf()                                             # (next to the VGC matches)
                     continue
-                vgc = [m for m in self.order if not getattr(m, "werewolf", False)]
+                live_ra = sum(1 for m in self.order if getattr(m, "game_type", GAME) == "red_alert" and not m.terminal)
+                if not draining and live_ra == 0 and self._ra_started < self.red_alert:
+                    self._new_red_alert()                                            # (one at a time)
+                    continue
+                vgc = [m for m in self.order if getattr(m, "game_type", GAME) == GAME]
                 active = [m for m in vgc if not m.terminal]
                 ended = [m.ended for m in vgc if m.ended]
                 idle = not ended or time.time() - max(ended) >= self.gap
@@ -500,7 +517,8 @@ class FakePlatform:
                "latency_max": lat[-1] if lat else None,
                "slowest": sorted((s for m in self.order for s in m.st["slow"]), reverse=True)[:8],
                "blind_states": sum(r.get("blind", 0) for r in rows),
-               "werewolf_tables": sum(1 for r in rows if r.get("game_type") == "werewolf"), **counters}
+               "werewolf_tables": sum(1 for r in rows if r.get("game_type") == "werewolf"),
+               "red_alert_matches": sum(1 for r in rows if r.get("game_type") == "red_alert"), **counters}
         out = {"totals": tot, "matches": rows}
         if self.official is not None:
             out["official"] = self.official.stats()
@@ -558,7 +576,7 @@ def build_app(p: FakePlatform, port: int):
     @mcp.tool()
     async def get_game_state(session_id: str) -> dict:
         fm = match(session_id)
-        if getattr(fm, "werewolf", False):
+        if _own_tools(fm):
             return await fm.mcp("get_game_state", {})
         return fm.view() if fm else _err("SESSION_NOT_FOUND", session_id)
 
@@ -567,7 +585,7 @@ def build_app(p: FakePlatform, port: int):
         fm = match(session_id)
         if fm is None:
             return _err("SESSION_NOT_FOUND", session_id)
-        if getattr(fm, "werewolf", False):
+        if _own_tools(fm):
             return await fm.mcp("get_legal_actions", {})
         v = fm.view()
         return {"session_id": session_id, "state_version": v["state_version"],
@@ -577,7 +595,7 @@ def build_app(p: FakePlatform, port: int):
     async def send_message(session_id: str, message_type: str, content: str | None = None,
                            recipients: list[int] | None = None) -> dict:
         fm = match(session_id)
-        if not getattr(fm, "werewolf", False):
+        if not _own_tools(fm):
             return _err("SESSION_NOT_FOUND" if fm is None else "MESSAGING_NOT_ENABLED", session_id)
         out = await fm.mcp("send_message", {"message_type": message_type, "content": content, "recipients": recipients})
         if "error" not in out:
@@ -587,7 +605,7 @@ def build_app(p: FakePlatform, port: int):
     @mcp.tool()
     async def get_messages(session_id: str, since: int = -1) -> dict:
         fm = match(session_id)
-        if not getattr(fm, "werewolf", False):
+        if not _own_tools(fm):
             return _err("SESSION_NOT_FOUND" if fm is None else "MESSAGING_NOT_ENABLED", session_id)
         return await fm.mcp("get_messages", {"since": since})
 
@@ -598,7 +616,7 @@ def build_app(p: FakePlatform, port: int):
         fm = match(session_id)
         if fm is None:
             return _err("SESSION_NOT_FOUND", session_id)
-        if getattr(fm, "werewolf", False):
+        if _own_tools(fm):
             return await fm.mcp("wait_for_update", {"since_version": since_version, "since_message_seq": since_message_seq,
                                                     "since_is_current_actor": since_is_current_actor,
                                                     "since_phase": since_phase, "timeout_seconds": timeout_seconds})
@@ -618,7 +636,7 @@ def build_app(p: FakePlatform, port: int):
         fm = match(session_id)
         if fm is None:
             return _err("SESSION_NOT_FOUND", session_id)
-        if getattr(fm, "werewolf", False):
+        if _own_tools(fm):
             out = await fm.mcp("play_action", {"state_version": state_version, "action_id": action_id,
                                                "action": action, "reasoning_summary": reasoning_summary})
             if "error" not in out:
@@ -642,7 +660,7 @@ def build_app(p: FakePlatform, port: int):
         fm = match(session_id)
         if fm is None:
             return _err("SESSION_NOT_FOUND", session_id)
-        if getattr(fm, "werewolf", False):
+        if _own_tools(fm):
             return await fm.mcp("get_result", {})
         if not fm.terminal:
             return _err("GAME_NOT_COMPLETE", "still running")
@@ -654,7 +672,7 @@ def build_app(p: FakePlatform, port: int):
         fm = match(session_id)
         if fm is None:
             return _err("SESSION_NOT_FOUND", session_id)
-        if getattr(fm, "werewolf", False):
+        if _own_tools(fm):
             return await fm.mcp("resign", {})
         with fm.cond:
             if fm.pending is not None and fm.answer is _NONE:
@@ -665,6 +683,17 @@ def build_app(p: FakePlatform, port: int):
             await asyncio.sleep(0.05)
         return {"session_id": session_id, "is_terminal": fm.terminal, "status": "completed", "returns": fm.returns,
                 "termination_reason": "resign"}
+
+    @mcp.tool()
+    async def get_game_config(game_type: str) -> dict:
+        """The game's static reference (the SDK runner fetches it once per real-time match): Red Alert only here."""
+        with p.lock:
+            p.counters["mcp_calls"] += 1
+            p.counters["game_config_calls"] = p.counters.get("game_config_calls", 0) + 1
+        if game_type == "red_alert":
+            from .fake_redalert import game_config
+            return game_config()
+        return _err("UNKNOWN_GAME", f"no reference for {game_type!r} on this fake platform")
 
     app = mcp.streamable_http_app()
 
@@ -731,6 +760,9 @@ def main(argv=None) -> None:
     ap.add_argument("--ww-idle", type=float, default=120.0, help="Werewolf idle clock per seat (default 120 s)")
     ap.add_argument("--ww-think", type=float, default=0.0,
                     help="the bots' mean seconds per decision / chat (default 0; a few s = LLM-paced tables)")
+    ap.add_argument("--red-alert", type=int, default=0,
+                    help="real-time Red Alert matches in all, one at a time (default 0; local/fake_redalert.py)")
+    ap.add_argument("--ra-seconds", type=float, default=20.0, help="how long each Red Alert match plays (default 20 s)")
     ap.add_argument("--official", action="store_true",
                     help="the official tournament control plane (/tournament/agent/*, local/fake_official.py)")
     ap.add_argument("--official-key", default=os.environ.get("FAKE_OFFICIAL_KEY", DEFAULT_OFFICIAL_KEY),
@@ -747,7 +779,8 @@ def main(argv=None) -> None:
     p = FakePlatform(concurrent=a.concurrent, opponent=a.opponent, max_matches=a.max_matches, api_key=a.api_key,
                      token_ttl=a.token_ttl, seed=a.seed, stats=a.stats, game_server=f"127.0.0.1:{a.port}",
                      realistic=not a.plain, blind_every=max(0, a.blind_every), werewolf=max(0, a.werewolf),
-                     max_werewolf=a.max_werewolf, ww_seat=a.ww_seat, ww_idle=a.ww_idle, ww_think=max(0.0, a.ww_think))
+                     max_werewolf=a.max_werewolf, ww_seat=a.ww_seat, ww_idle=a.ww_idle, ww_think=max(0.0, a.ww_think),
+                     red_alert=max(0, a.red_alert), ra_seconds=a.ra_seconds)
     p.outage_file, p.gap = a.outage_file, a.gap
     p.drain_file, p.stats_every = a.drain_file, max(0.5, a.stats_every)
     if a.official:
@@ -763,7 +796,7 @@ def main(argv=None) -> None:
         server.should_exit = True
     signal.signal(signal.SIGTERM, stop)
     print(f"fake platform on http://127.0.0.1:{a.port} ({a.concurrent} concurrent, opponent {a.opponent}, "
-          f"{'plain' if a.plain else 'real-shaped'} payloads, {a.werewolf} werewolf, "
+          f"{'plain' if a.plain else 'real-shaped'} payloads, {a.werewolf} werewolf, {a.red_alert} red alert, "
           f"{'official' if a.official else 'discovery'} control plane)", flush=True)
     try:
         server.run()
