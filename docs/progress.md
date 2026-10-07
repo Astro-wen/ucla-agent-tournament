@@ -214,6 +214,24 @@
   - **没改的**（都是低）：结束了但还留在分配列表里的座位，10 s 冷却下大约每 20 s 起一个 worker、用 key 认证一次（复审用改过的假平台测的；真实平台会不会留、留多久不知道；要改得包住 SDK 回收 worker 的逻辑，不算小改，先记着）；健康行看不出控制面连不上（要新加「最后一次成功连上平台」的记录，比赛日前用 `check-tournament` 和日志里的 `Could not connect …` 代替）。
   - **检查**（树 a3a1271，输出在 `~/wt/_fx_out`）：全量 pytest 1350 个通过（580 s，多了 4 个新测试，其中 systemd 那个在本机真起了一个临时用户单元）；`replay_real.py` 2349 个真实决策 0 失败、0 修补，搜索用上 1296/1296，p99 1755 ms、最慢 2762 ms；`--no-calc` 同样 0 失败，p99 1743 ms、最慢 1987 ms；selfcheck ready（只有没配 key 的警告）。新包 `arena-agent-a3a1271`（46 MB / 416 个文件，密钥扫描干净，`agent/`、`run_agent.sh`（755）、Dockerfile 和工作区相同）：干净环境 selfcheck ready（61 s），包里重放 60 个决策 0 失败，`agent.health` → `idle(probe=1.3s)`，格式不对的 key `--check-tournament` 退出 1。用这个包跑 `rehearsal_official.py`：13 项全过（dry-v42r），状态文件打开的临时副本也 13 项全过（dry-v42rs），数字见 `docs/deploy.md`「官方模式演练」。
 
+### v4.2.1（10-06，分支 `merge/upstream-1005`）：合入上游的实时 SDK，红警整场回答 WAIT（本地对局不变）
+
+修复类版本（`docs/v5_standard.md` 第 1 节），不让 agent 变强，宝可梦、狼人杀的打法不变。起因：上游 10-04/05 给 SDK 加了实时游戏（红警，`red_alert`，平台 10-02 上线），我们合进来以后如果被分到红警，旧的「未知游戏」兜底会每个画面发一个不合法的动作。
+
+- **合上游**（aadfc08，合到 upstream/main 6ba2e9c）：PR #3（6fb86b7 + 9965d2e）让 runner 支持实时游戏——按状态里的 `pacing.mode == "realtime"` 判断（不按游戏名）；`choose_action` 可以回答 `altruagent.WAIT`（「这一刻什么都不发」，runner 等下一个画面再问）；实时游戏里一整批命令被拒（`INVALID_ACTION`）不再结束 worker，而是重新读状态；`RUNTIME_TEMPORARILY_UNAVAILABLE` 1 s 后重试；新增 `DecisionContext.game_config` 和示例 LLM 红警玩家 `examples/llm/redalert.py`。6ba2e9c：`--claim` 碰到测试大厅的对局还没准备好（`match_not_ready`）时按服务器给的时间等待重试。冲突只有两处：`agent/__main__.py` 的 import（我们的 `re` + 上游的 `random`），`README.md` 保留我们的（上游的 README 放到 `docs/STARTER_README.md`）。回合制游戏（宝可梦、狼人杀）在新 runner 里走的路径和以前一样。
+- **红警整场回答 WAIT**（26b2d09，`agent/agent.py`）：合并后的复现：红警画面（没有 `legal_actions` 列表）走到「未知游戏」的安全动作 `{"type": "pass"}`，它不是命令批。旧 runner 下 worker 每个画面崩溃一次（冷却 10 s 再起、再崩），新 runner 下会变成每秒约 5 个被拒的批次，并且每个都录像。现在只要状态是实时的、又不是我们会玩的游戏，就整场回答 `WAIT`：什么都不发，日志只写一行 `real-time game 'red_alert': no policy of ours plays it; answering every view with WAIT …`，第一个画面录一次（以后写红警策略时有真实 payload 可看），`[match-summary]` 行带 `waits=<次数>`。宝可梦、狼人杀的状态没有 `pacing`，不进这条路。代价：红警这一局等于认输（我们没有红警策略）。
+- **模拟平台的红警**（4526660）：`local/fake_redalert.py` + `local/fake_platform.py --red-alert N --ra-seconds S`，按平台形状的实时对局（每 0.2 s 一个画面、`legal_actions` 是字典、只收命令批、`get_game_config` 读 `data/red_alert_config.json`），官方控制面把这个座位列成 `red_alert`。测试：SDK 自己的官方 worker 通过 HTTP 用真客户端把这个座位打到结束（退出码 0、没发过一批命令、只取一次配置）。
+- **文档**（72959b7）：`docs/deploy.md` 新增「测试赛」（`--claim`：等开放座位、等待时的提示、重试、认领前可以 Ctrl+C、先跑 selfcheck）和「被分到红警」；README 加上测试大厅、红警、怎么合上游；HANDOFF 写明这个分支和主人要合什么。
+- **检查**（输出在 `~/wt/_up_out`）：
+  - pytest：合并 + 修复后的树 1587 个全过（542 s）；冻结冠军后的最终树 bfa28d3 也是 1587 个全过（574 s）。新增的测试主要是上游的 `tests/test_realtime.py`、我们的 `tests/strategy/test_realtime_safety.py`（整场红警走 `run_game` 和官方 worker、selfcheck 和 replay_real 读红警录像）和 `tests/test_main_claim.py`。
+  - `replay_real.py`：2349 个真实决策 0 失败、0 修补，搜索用上 1296/1296，决策 p99 1536 ms、最慢 1911 ms；`--no-calc` 同样 0 失败、0 修补，p99 1562 ms、最慢 1807 ms。
+  - 本地对局不变：对冠军打 20 局（seed 171，确定性设置），main 2a20b35 和本分支 72959b7 逐局相同（20/20，比了 280 个决策），两边都是 11 胜，搜索用上 260/260，0 非法、0 计时器代打，最慢决策 1.99 / 2.10 s。
+  - 狼人杀官方 runner 路径（`local.werewolf_platform`，种子 1003，40 局）：本分支和 main 都是 0 报错、0 卡死、0 闲置代打、0 被拒的动作或聊天，我方座位都赢 67/112，最慢决策 19.6 / 16.3 ms，stderr 只有 1 行 `[match-summary]`。
+  - 红警端到端（`~/wt/_up_out/ra_e2e.sh`：从压缩包起整棵进程树 `run_agent.sh` → `python -m agent --tournament` → 每个座位一个 worker，对本地模拟平台的官方控制面、假 key；2 场 45 s 的红警 + 1 场宝可梦 + 1 桌狼人杀，录像打开）：合并前（a3a1271 的包）2 场红警起了 5 次 worker，5 次 `match failed: … not an orders batch: {'type': 'pass'}`，平台收到 5 个不合法的批次。合并后（bfa28d3 的包）每场红警只起 1 个 worker，打到时间结束正常退出：0 次 `match failed`、0 个批次、0 个不合法动作（平台发了 205 / 186 个画面，我们回答了 204 / 185 次 `WAIT`），`get_game_config` 每场取 1 次，录像每场 1 行；同时的宝可梦（14 个决策，赢）和狼人杀照常；0 个 Traceback，key 没进日志，停止后 0 残留。
+  - 新压缩包 `arena-agent-bfa28d3`（46 MB / 416 个文件，密钥扫描干净；`agent/`、`altruagent/`、`data/`、`deploy/`、`run_agent.sh`（755）和工作区相同）：只有 `/usr/bin:/bin` 的干净环境下 selfcheck ready（只有没配 key 的警告；60 个录像决策有 / 没有计算器都 0 被拒，最慢 1.81 / 1.66 s），包里 `replay_real.py` 60 个决策 0 失败、p99 1.75 s，`agent.health` → `idle(probe=1.6s)`。
+  - 从这个包跑 `rehearsal_official.py`（dry-up）：13 项全过，4.4 分钟；宝可梦 7 场、狼人杀 3 桌，109 个决策，0 非法、0 计时器代打、0 竞争错误；kill worker 后 14.3 s 起新 worker、17.3 s 后下一步；kill 运行时 4.2 s / 8.2 s，0 次 seat_busy、0 次新 grant；认证接口 503 的 15 s 里运行时没换、对局没停；热备接管 29.7 s，那一回合没被代打（这一步等了 32.0 s）；非租约持有者 0 步，key 没进日志，停止后 0 残留。数字也记在 `docs/deploy.md`「官方模式演练」。
+- **冻结为冠军**（bfa28d3）：`champion/` = 72959b7 的 `agent/`（`champion/VERSION` = 72959b7）。打法和 v4.2 相同（上面 20 局逐局相同），以前的擂台 / panel 数字可以接着比。
+
 ### 狼人杀改进（09-28，宝可梦不变）
 - 合入 `candidates/r2-ww-seer-and-villager`，加上模拟得出的规则（村民不弃票、集中投票、不假跳；预言家查到狼或快被投出时跳；对跳时投两个跳的人之一；狼只在被点名时对跳、先刀已跳的预言家），聊天只读有限事实并识别注入，狼的私信默认关闭（`ARENA_WW_DM=on` 可开；观战数据流可能暴露私信）。
 - 留出种子 7（没参与调参），每种条件 1000 局、37 种条件：狼 +3.9、村民 +15.9、预言家 +23.7、每座 +7.3 个百分点。**每桌只有我们一个座位时**：每座 +5.4（对 LLM 类 +11.8、对措辞多变的 LLM 替身 +15.2；对简单 bot +0.4~+1.4）。私信开关对胜率无影响。18.5 万局 0 崩溃 / 0 非法 / 0 超时，最慢决策 68 ms。
