@@ -1,34 +1,40 @@
-# 交接：在另一台机器上继续（2026-09-27，09-29、10-03、10-05、10-06、10-07 更新）
+# 交接：在另一台机器上继续（2026-09-27 起，最近一次 10-07 更新）
 
-## 现在到哪了
+## 现在到哪了（10-07）
 
-- **10-03 情报（先读 `docs/competition_brief.md` 开头的「10-03 更新」）**：**红警 `red_alert` 已经能在平台上玩**（实时 1v1，OpenRA，单场和锦标赛都支持；规则 `docs/platform/redalert.md`，数据 `data/red_alert_config.json`）。上游 10-04 的 PR #3 给 SDK 加了实时模式，10-06 合进分支 `merge/upstream-1005`；我们没有红警策略，被分到红警时整场回答 `WAIT`（什么都不发、不崩、只记一行日志，v4.2.1，见 `docs/deploy.md`「被分到红警」）。Guang 回信：狼人杀和宝可梦肯定有，红警 / 王者荣耀 10/6 前公布；Oracle 会提供通用 agent，Replit 可能给 pro 账号。正式比赛用 `python -m agent --tournament` + Official Agent Key（已合并）；v4.1.2 起我们的部署脚本也支持：key 文件里有 eak key 时看门脚本自动跑 `--tournament`，systemd / Docker / 压缩包 / selfcheck 都认（见 `docs/deploy.md`「官方正式赛」）。
-- v5 第 2 轮（深搜、引擎预览）没上位（见 `docs/progress.md`、`docs/v5_standard.md`）。`integrate/v42` 分支上依次提交了 v4.1.2（10-03，官方正式赛部署）、v4.2（10-05，重启接上记忆、整机搜索上限、健康探测、双打模板按位置读、game_type 认写法）和 10-06 的复审修复（看门脚本整个重启后沿用 execution id、systemd 下 `stop` 不再误停、平台故障后的退避最长 30 s，见 `docs/progress.md` v4.2 节最后），v4.2 冻结成冠军（`champion/`）：打法仍是 v4.1.1（本地对局逐局相同），只是更稳。这个分支已快进合进 main（之后又合了狼人杀读聊天 `ww/reading`，冠军冻结在 main 2a20b35）。**上游合并（10-06，分支 `merge/upstream-1005`，基于 main 2a20b35）**：合了 upstream/main 6ba2e9c = 6fb86b7 + 9965d2e（PR #3 红警实时 SDK：`altruagent.WAIT`、实时游戏里整批被拒不再结束 worker、`on_action_result`、`context.game_config`、示例 `examples/llm/redalert.py`）和 6ba2e9c（测试赛等座：`--claim` 遇到 `match_not_ready` 时每约 20 s 重试；当天晚些时候平台把认领码整个停用了，见下一条）。冲突只有两处：`agent/__main__.py` 的 import（我们的 `re` 和上游的 `random` 都留，上游的 `_claim_with_wait` 和我们的官方模式加固都在）和 `README.md`（取我们的；上游 README 原文更新到 `docs/STARTER_README.md`）。合完加了 v4.2.1（被分到红警时整场 `WAIT`，宝可梦 / 狼人杀逐局不变），重新冻结冠军；检查数字见 `docs/progress.md` 的 v4.2.1 节。**主人要做的**：把这个分支合进 main（main 没再动过就是快进：`git merge --ff-only merge/upstream-1005`；`git log main..merge/upstream-1005` 是空的就说明已经合了）。以后再合上游按 `README.md`「同步官方更新」。
-- **10-06 平台停用了旧流程（复审发现，本分支只改了文档）**：测试赛的认领码（`--claim seatclaim_…` → 410 `claim_codes_retired`）和旧的平台 agent（sk key：Yoriko_Red / Apocalypse_Red、发现模式、注册 / 认领 / 公开对局 → 410 `platform_agents_retired`）都不能用了。测试赛和正式赛现在都是 Official Agent Key 的分配：开着 `run_agent.sh`（就是 `python -m agent --tournament`）两种都接，我们的 SDK 不看 `context`。在 Testing 页面建对局、座位选 "Mine (self-hosted)" 就行，见 `docs/deploy.md`「测试赛」（也写了大厅里的座位每 10–20 s 打一次 `assignment already ended` / `Match finished.` 是正常的）。`docs/platform/` 按 10-06 的官方文档 v0.5.0 重新同步：新增 `official-agent.md`，删掉 6 个停用的页面（`scripts/sync_docs.sh` 的列表也改了）。**合并注意**：`ww/platform-1005` 也同步过 `docs/platform/`（10-06 凌晨的版本，还有 `testing-seat-claim.md`），后合进 main 的那个分支在 `docs/platform/` 上会冲突：取本分支（较新）的文件，`git rm` 已停用的页面，合完跑一次 `bash scripts/sync_docs.sh` 确认和线上一致。**下一次合上游（PR #5，10-06 已合进上游 main 5bc61a2，本分支还停在 6ba2e9c）**：`--claim` 被删、`--tournament` 只打正式赛、`--match` 打测试赛，`run_agent.sh` 要改成传 `--tournament --match`，`agent/__main__.py` 的加固要手工移植，见 README「同步官方更新」。PR #5 不是 10-16 必需的（协议没变）。
-- **v4.2.2（10-07 复审修复，本分支）**：每小时一次的重新登录如果碰上平台签发会话失败（401 `invalid_official_agent_key` + `Failed to mint agent session …`，上游 1372ccc 写明平台这样回过），或新会话仍被 401，以前运行时会退出并杀掉所有在打的 worker（启动时还会叫人重新复制 key）；现在照上游的分类当暂时性：worker 照常，查询暂停 15 / 20 / 30 s，日志写明是平台的问题、不是 key。只改了 `agent/__main__.py`，打法不变，重新冻结了冠军。见 `docs/deploy.md`「官方模式下看门脚本和 agent 额外做了什么」和 `docs/progress.md` 的 v4.2.2 节。
+- **冠军 v4.2.3**（`champion/VERSION` 是冻结时的提交，分支 `integrate/v423`，主人快进合进 main）。宝可梦打法和 v4.1.1 逐局相同（本地对冠军 20 局逐局核对过），多出来的都是稳定性和平台适配：
+  - v4.1.2 / v4.2：官方正式赛部署、重启后接上记忆、慢机器和内存下的自我保护（`docs/progress.md` 同名两节）。
+  - 狼人杀身份核对 + 读懂大模型的跳预言家（`ww/reading`，10-03）。
+  - **v4.2.1**：合上游的实时 SDK（红警），被分到红警时整场回答 `WAIT`（不发命令、不崩）；补丁：重新登录时平台签发会话失败不再停运行时（这一条现在由上游 SDK 自己做）。
+  - **v4.2.2**：宝可梦选秀每一手 15 秒时钟（选秀预算 10 秒以内）；最后一手被服务器替选时，那张卡的完整配置也带进对战。
+  - **v4.2.3**：狼人杀新旧两种措辞都认（"lynch" / "eliminate by vote"）、聊天按 1024 字节截断、「多听一会儿」（`ARENA_WW_LISTEN`，默认关）；**合上游 PR #5（event agent 流程）**：`python -m agent --tournament --match`，所有部署工具都跑这条。
+- **10-06/07 平台改版（先读 `docs/competition_brief.md` 最上面的「2026-10-07 更新」）**：每人一个 event agent（UCLA Google 登录，Self-hosted / Oracle-hosted 二选一，我们选 Self-hosted），一把 **Official Agent Key**，测试赛（Testing 页面）和正式赛（Tournaments 页面 "Register my agent"）都作为分配自动送来。正式赛 = 瑞士轮 + 淘汰赛（狼人杀是决赛），每局 4 分钟连接窗口（红警 4.5 分钟），没连上判负。旧的 sk key、发现模式、`--claim` 全部停用（410）。
+- **部署**（`docs/deploy.md`「比赛日手册」）：`scripts/run_agent.sh`（systemd / tmux / Docker / 压缩包都走它）固定跑 `python -m agent --tournament --match`；key 不对、只有停用的 sk key、`ARENA_MODE=discovery`、`--claim` 都拒绝启动并写明原因。我们在上游运行时之上保留的：启动时平台暂时连不上会退避重试、看门脚本重启后沿用 execution id（马上续上自己的座位）、热备、10 s 查询和冷却、本机计算器 / 引擎搜索检查。重新登录的暂时性失败和按座位退避现在由上游 SDK 自己做。
+- **本地验证都过了，但还没在真实平台上跑过一局**（10-06 改版之后）：本地模拟平台（官方控制面，测试赛 / 正式赛两种分配、连接窗口、no-show）上的演练、全量 pytest、真实录像重放等数字见 `docs/progress.md`「v4.2.3 合并」一节。
+- **红警**：正式赛项目，我们没有策略（整场 `WAIT` = 每局认输）。要不要报名红警比赛、要不要现在写一个红警 bot，**等主人决定**。不报名就不会有红警的局。资料：`docs/platform/redalert.md`、`data/red_alert_config.json`。
 
-- **2026-09-27 起在新机器上开发**：Windows 11 Pro + WSL2 Ubuntu 24.04，仓库在 `~/ucla-agent-tournament`。从 Windows 侧改 WSL 里的文件会变成 root 所有，改完要 chown 回来。
-- **冠军 v4.2（`champion/VERSION` 写着冻结时的提交：10-05 冻结在 d14a524，10-06 复审修复后、合狼人杀读聊天后各重新冻结一次；`merge/upstream-1005` 上合上游 + v4.2.1 后又冻结一次，10-07 v4.2.2 重新登录修复后再冻结一次）**：宝可梦打法和 v4.1.1 逐局相同，多的是官方正式赛部署（v4.1.2）、重启 / 负载下的健壮性（v4.2）、狼人杀身份核对和读聊天、红警整场 `WAIT`（v4.2.1），见 `docs/progress.md` 的 v4.1.2、v4.2、狼人杀 v4.x、v4.2.1 几节。打法本身是 v4.1：v4 + 两个真实平台 bug 的修复（平台的 `team` 列出全部 6 只 → 局面重建只用带上场的 4 只；两格回答合起来必须合法），见 `docs/progress.md` 的 v4.1 节。以后的 v5 按 `docs/v5_standard.md`。以下是 v4 本身：
-- **v4_engine_search（09-29）**：v3.2 的选秀和首发不变，对战改成在 Showdown 引擎克隆上的搜索（blend）。对 v3.2 擂台 57.5% / 63.5%（种子 7 / 11），对开源学习型 bot VGC-Bench +8.5 / +15.5 个百分点，对引擎搜索 bot simbot −9（不显著）。需要 pokemon-showdown 模拟器（压缩包自带；checkout 里 `(cd local/js && npm ci)`），`ARENA_BATTLE=classic` 退回 v3.2 打法。备选 `~/exp13/patches/battlefix-final.patch`（和 v4 直接对打持平）。详见 `docs/progress.md`。
-- 真实平台：v2 对 v1 10 局 8 胜 2 负；v3.2 对 v2 20 局 18 胜 2 负。v4 对 v3.2 的真实 A/B：`~/exp7/scripts/ab4-play.sh <session_id>`（v3.2 冻结副本在 `~/ab/v3`）。
-- 外部对手（本地评测）：`simbot`（引擎搜索）和 `vgcbench_sp` / `vgcbench_bc`（VGC-Bench，装在 D 盘 `/mnt/d/altruagent`，所有者要求大文件不放 C 盘）。LLM 花费看 `~/exp7/scripts/llm-spend.sh`（到 09-29 真实 1.04 美元），不要直接加账本的 cost_usd 列。
-- **两个 agent 已注册并认领**：Yoriko_Red（主力）、Apocalypse_Red（陪练）。密钥不在 git 里（本机备份在 `~/.config/altruagent/`）。10-06 起平台停用了这种旧的平台 agent，这两把 sk key 在真实平台上已经不能用（410），比赛和测试都用 Official Agent Key。
-- **赛事情报 09-28 大更新，先读 `docs/competition_brief.md`**：提交窗口改为 10/6–10/13；游戏列表改为宝可梦、红警、王者荣耀、狼人杀（平台上只有宝可梦和狼人杀能玩）；VGC 计时 90 s 预览 / 55 s 每回合 / 420 s 总时间；谁运行 agent 仍未知（按自托管准备）。
+## 下一步（按顺序；1–5 只能主人本人做，会连真实平台）
+
+1. **登录**：UCLA Google 账号登录 <https://platform.altruagent-game.com/tournament>，把报名做完（问卷、Official Rules、agent 名字、公开代码仓库）。
+2. **Agent Configuration 页面**：选 **Self Hosted**，生成 Official Agent Key。
+3. **放进比赛主机的 `.env`**：`ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_…`（`chmod 600 .env`；不要贴到聊天、GitHub、截图里；`.env.example` 的占位行删掉）。然后 `.venv/bin/python scripts/selfcheck.py` 要以 `selfcheck: ready` 结尾。
+4. **`bash scripts/run_agent.sh check-tournament`**：每一行都要是 ✓。
+5. **在比赛主机上常驻**：`bash scripts/run_agent.sh install-systemd && systemctl --user enable --now arena-agent@main && sudo loginctl enable-linger $USER`，`bash scripts/run_agent.sh status` 要显示 `mode=tournament(primary) agent=up calc=ok(...)`。
+6. **Testing 页面建测试赛**（宝可梦、狼人杀各至少一局；座位选 "Mine (self-hosted)"，也可以加入 *Open matches* 里别人的座位）：看日志里 `Match assigned: … (Testing)` → `Match finished.`，打完 `git` 提交新录像（只放 `logs/yoriko/`、`logs/apocalypse/` 这类检查过的目录，见 CLAUDE.md）。第一局真实对局之后，对照 `docs/real_payloads.md` 看新 payload 有没有变。
+7. **Tournaments 页面报名**宝可梦和狼人杀比赛（Register my agent）；红警看主人的决定。
+8. 比赛日（10-16）前一天按 `docs/deploy.md` 的「上线前检查清单」和「比赛日时间表」走一遍；问主办方的问题（热备是否允许、开赛时间、同时几场）见 `docs/competition_brief.md`。
+9. 之后的增强（v5，按 `docs/v5_standard.md`）：v4 对「按均衡出招」的对手偏弱（simbot −9）；选秀模型用混合对手群体重新拟合；多场并发压力测试（`scripts/stress_concurrency.py`，在比赛机器上 N=8）。
+
+## 背景（较早的事实，仍然成立）
+
+- **2026-09-27 起在新机器上开发**：Windows 11 Pro + WSL2 Ubuntu 24.04，仓库在 `~/ucla-agent-tournament`。从 Windows 侧改 WSL 里的文件会变成 root 所有、`.sh` 会丢可执行位，改完要检查（`git diff --summary`）。
+- 打法本身是 v4.1：v4 + 两个真实平台 bug 的修复（平台的 `team` 列出全部 6 只 → 局面重建只用带上场的 4 只；两格回答合起来必须合法），见 `docs/progress.md` 的 v4.1 节。
+- **v4_engine_search（09-29）**：v3.2 的选秀和首发不变，对战改成在 Showdown 引擎克隆上的搜索（blend）。对 v3.2 擂台 57.5% / 63.5%（种子 7 / 11），对开源学习型 bot VGC-Bench +8.5 / +15.5 个百分点，对引擎搜索 bot simbot −9（不显著）。需要 pokemon-showdown 模拟器（压缩包自带；checkout 里 `(cd local/js && npm ci)`），`ARENA_BATTLE=classic` 退回 v3.2 打法。详见 `docs/progress.md`。
+- 真实平台（旧的发现模式时代）：v2 对 v1 10 局 8 胜 2 负；v3.2 对 v2 20 局 18 胜 2 负；v4.1 对 v3.2 20 局 12 胜。录像在 `logs/yoriko/`、`logs/apocalypse/`。
+- 旧的两个平台 agent（Yoriko_Red、Apocalypse_Red，sk key）10-06 起在真实平台上停用（410）。密钥不在 git 里（本机备份在 `~/.config/altruagent/`），只剩本地模拟平台的旧接口用得上。
+- 外部对手（本地评测）：`simbot`（引擎搜索）和 `vgcbench_sp` / `vgcbench_bc`（VGC-Bench，装在 D 盘 `/mnt/d/altruagent`，所有者要求大文件不放 C 盘）。
 - 旧版本对比需要各自的计算器：`champion/agent/js/node_modules` 和 `versions/*/agent/js/node_modules` 是指向 `agent/js/node_modules` 的符号链接（已 gitignore），新机器上要重建，否则旧版会用新 calc.js，擂台测不准。
-- 实验目录（不在 git 里）：`~/exp`（v2）、`~/exp2`（第三轮各方向）、`~/exp3`（v2.1、8 对手面板 panelkit、参数扫描）、`~/exp4`（v3 整合，`MERGE_NOTES.md`）。
-
-## 下一步（按优先级，依据 docs/competition_brief.md）
-
-0. **（10-03 定）先做宝可梦和狼人杀，红警暂缓**（主人决定）。进度核查和 10/3–10/9 计划见 **`docs/status_1003.md`**。最先做的：把 `~/exp21` 里两个复审过的补丁收进 main。两个都已在 `integrate/v42` 分支上提交（v4.1.2 在 10-03、v4.2 在 10-05，基于 main 376048d）：v4.1.2 部署（`patches/deploy-reviewed.patch`）和 v4.2 健壮性（`patches/agent-reviewed.patch`，加上 `~/exp21/final` 里 run_agent.sh / Dockerfile 的集成改动），见 `docs/progress.md` 的 v4.1.2、v4.2 两节；v4.2 提交后紧接着冻结为冠军，10-06 又补了复审修复。这个分支和狼人杀身份交叉检查 + 读懂大模型发言（`ww/reading`）都已合进 main；上游（红警实时 SDK、测试赛等座）已在 `merge/upstream-1005` 合好（见上面「现在到哪了」第 2 条），主人合进 main 即可。之后：真实平台测试（主人在 Testing 页面建对局、座位选 "Mine (self-hosted)"，开着 `run_agent.sh` 自动接；不再用 `--claim`，见 `docs/deploy.md`「测试赛」）。红警的资料留在 `docs/platform/redalert.md`、`data/red_alert_config.json`。
-1. ~~**真实平台 A/B：v4 vs v3.2**~~（09-29 已做：v4.1 20 局 12 胜）（`~/exp7/scripts/ab4-play.sh <id>`；房间在 Human dashboard 创建，需要人登录；同一账号同时只能有一个进行中的房间）。至少 20 局，15 胜以上算明显领先，10 胜以下就停下来对比。再往后：v4 对「按均衡出招」的对手偏弱（simbot −9），下一轮看能不能在不丢 VGC-Bench / 擂台优势的前提下补上，或者和 battlefix 做成按对手切换。
-2. ~~控时与防崩溃~~、~~公开理由~~：v3.1 已完成（见 `docs/progress.md`）。剩下：首次真实对局确认观战页显示公开理由、平台如何扣总时间；传输层断线重连在官方 `altruagent/`（上游），不要改。
-3. **多场并发压力测试**：`scripts/stress_concurrency.py`，在比赛用的机器上跑 N=8。
-4. ~~宝可梦其他格式~~、~~官方示例 agent 基准~~：v3.2 已完成（单打策略 + `local/panel.py`）。剩下：和开源强 bot（foul-play、VGC-Bench 等）对比（无 Node 时的实力已测，见 `docs/deploy.md`）。晋级时除了擂台，再跑一遍 `python -m local.panel`（见 `docs/local_sim.md`）。
-5. **选秀模型换成混合对手群体重新拟合**，并把 4 张新卡加进目录（`python -m local.pool --harvest`）。
-6. **狼人杀**：合并 `candidates/r2-ww-seer-and-villager` 并按模拟结论调整；注意狼人杀可能不计分（技能文档写「Standalone competitions only」），单个座位对投票影响有限，投入要看回报。发言说服需要大模型（Nebius 已不是赞助商，额度来源要重新核对）。
-7. ~~自托管方案~~、~~打包~~、~~无人值守演练~~、~~官方模式部署~~（v4.1.2）：`scripts/run_agent.sh`（systemd / tmux）、`scripts/bundle.sh`、`deploy/Dockerfile`、`scripts/rehearsal.py`、`scripts/rehearsal_official.py`，用法和实测数据见 `docs/deploy.md`（比赛日手册在「官方正式赛」一节）。正式赛 = `.env` 里放 `ALTRUAGENT_OFFICIAL_AGENT_KEY`（`eak_live_…`）后 `run_agent.sh` 自动跑 `python -m agent --tournament`；上游缺陷清单在同一节，由主人报告。剩下：dashboard 上线后主人生成 key 并跑 `bash scripts/run_agent.sh check-tournament`（会连平台）；在真正的美西云主机上 `install-systemd` 并跑一遍 `selfcheck`；Docker 镜像第一次真实构建。无 Node 时对冠军只有 12% 胜率，所以 Node 是硬性要求：压缩包自带固定版本的官方 Node（v22.23.3），镜像同版本；计算器跑不起来时 `selfcheck` 失败、`run_agent.sh` 拒绝启动（`ARENA_ALLOW_NO_CALC=1` 仅供紧急情况）。
-8. **每天只读监控**：上游 starter 提交、altruagent-game.com 更新、平台前端 build id、`/tournaments`、`/config/games`。测试 dashboard 一上线就登录记录规则原文。
-9. **问主办方**（由主人本人发）：问题清单见 `docs/competition_brief.md` 第 7 节。
+- 实验目录（不在 git 里）：`~/exp`（v2）、`~/exp2`（第三轮各方向）、`~/exp3`、`~/exp4`、`~/exp13`（v4）、`~/exp21`（v4.1.2 / v4.2 的审计和补丁）。
 
 ## 新机器准备
 
@@ -41,20 +47,16 @@ cd ucla-agent-tournament
 ./scripts/setup_machine.sh                      # venv + 依赖 + node 包 + 测试 + 真实重放 + 短擂台
 ```
 
-把两个密钥文件拷到仓库根目录（**不要**经过 GitHub 或聊天）：
-- 原 Mac 上的备份位置：`~/.config/altruagent/yoriko_red.env`、`~/.config/altruagent/apocalypse_red.env`
-- 放到新机器仓库根目录，分别命名为 `.env` 和 `.env.apocalypse`
-- 验证：`python scripts/check_connection.py` 显示 `status=claimed`
-- （10-06 起这两把 sk key 在真实平台上已停用，只剩本地模拟平台用得上。真实平台只需要在 `.env` 里放 `ALTRUAGENT_OFFICIAL_AGENT_KEY`（权限 600），用 `bash scripts/run_agent.sh check-tournament` 验证，见 `docs/deploy.md`。）
+真实平台只需要 `.env` 里的 `ALTRUAGENT_OFFICIAL_AGENT_KEY`（权限 600，**不要**经过 GitHub 或聊天传），用 `bash scripts/run_agent.sh check-tournament` 验证（见上面「下一步」和 `docs/deploy.md`）。
 
 ## 在新机器上继续用 Claude
 
 安装 Claude Code，在仓库目录里启动会话。`CLAUDE.md` 会被自动读取（规矩、晋级流程、容易错的事实）。开场说一句：
 
-> 读 docs/HANDOFF.md 和 docs/progress.md，从「下一步」第 1 条继续。
+> 读 docs/HANDOFF.md 和 docs/progress.md，从「下一步」继续。
 
 ## 注意
 
-- **同一个 agent 密钥同一时间只在一台机器上运行 `python -m agent`**，否则两个进程会抢同一局。唯一的例外是官方模式的热备（同一把 eak key 的第二个进程只接主进程放掉的座位，见 `docs/deploy.md`），而且要等主办方同意才开。
+- **一把 Official Agent Key 只跑一个运行时**（官方规则）：两个进程会抢同一局的座位，第二个拿到 `seat_busy`。唯一的例外是我们的热备（另一台机器、key 文件里写 `ARENA_ROLE=standby`，只接主进程放掉的座位，见 `docs/deploy.md`），而且要等主办方同意才开。
 - 原 Mac 上 `.claude/worktrees/` 里还有第二轮的工作区，内容都已推到 `candidates/r2-*` 分支，可以不管。
-- `logs/` 里只有 `yoriko/`、`apocalypse/` 两个目录会进 git；新机器上打的真实对局记完后记得提交。
+- `logs/` 里只有 `yoriko/`、`apocalypse/` 两个目录会进 git；新的真实对局录像检查过（没有密钥）再按同样方式提交。
