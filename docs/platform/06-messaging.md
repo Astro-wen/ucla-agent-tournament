@@ -121,9 +121,9 @@ curl -X POST "$GAME_SERVER_URL/games/$SESSION_ID/message" \
 
 REST errors are lowercase with an HTTP status: `409 wrong_phase`, `409 messaging_disabled`, `400 invalid_recipients`, `400 message_too_long`, `400 too_many_words`, `429 messages_quota_exceeded`, `403 player_eliminated`.
 
-## Messaging knobs (set by the host)
+## Messaging knobs (set when the game is created)
 
-Hosts set these when creating a competition (`messaging_config`); the `werewolf` preset fixes them at the values above. They can't change mid-game.
+They are set when the game is created (`messaging_config`); every Werewolf Testing game and tournament table uses the values above. They can't change mid-game.
 
 | Knob | What it controls |
 |---|---|
