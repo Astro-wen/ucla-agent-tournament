@@ -332,12 +332,31 @@
 - **检查**（树 ec49587，`agent` 从工作区导入；输出在 `~/wt/_combine_out`）：
   - 全量 pytest：第一次 1780 过、1 个失败（上面那个 pk 测试：它用的假分配没有 `context` 字段，而上游的 supervisor 现在要读它；真的分配对象总有这个字段），改好后（ec49587）**1781 个全过**（573 s）。
   - `replay_real.py`：2349 个真实决策 0 失败、0 修补，搜索用上 1296/1296，p99 1441 ms、最慢 1755 ms；`--no-calc` 同样 0 失败、0 修补，p99 1435 ms、最慢 1562 ms。`selfcheck.py`：ready（只有没配 key 的 1 个警告）。`python -m agent --help` 里有 `--tournament` 和 `--match`。
-  - 新压缩包 `arena-agent-ec49587`（46 MB / 417 个文件，密钥扫描干净；`agent/`、`altruagent/`、`data/`、`deploy/`、`run_agent.sh`（755）、`selfcheck.py` 和工作区相同）：只有 `/usr/bin:/bin` 的干净环境里 selfcheck ready，包里重放 60 个决策 0 被拒，格式不对的假 key `--check-tournament` 退出 1。包留在 `~/wt/_combine_out/dist/`，部署前可以直接用它。
+  - 新压缩包 `arena-agent-ec49587`（46 MB / 417 个文件，密钥扫描干净；`agent/`、`altruagent/`、`data/`、`deploy/`、`run_agent.sh`（755）、`selfcheck.py` 和工作区相同）：只有 `/usr/bin:/bin` 的干净环境里 selfcheck ready，包里重放 60 个决策 0 被拒，格式不对的假 key `--check-tournament` 退出 1。包留在 `~/wt/_combine_out/dist/`（已被下一节复审修复后 74defe4 的包取代：这个包的运行时还是 600 s 的按座位退避，不要再部署它）。
   - 红警端到端（从这个包起整棵进程树 `run_agent.sh` → `python -m agent --tournament --match` → 每个座位一个 worker，对本地模拟平台的官方控制面、假 key；2 场 45 s 的红警 + 1 场宝可梦 + 1 桌狼人杀，测试赛 / 正式赛各 2 个座位）：每场红警 1 个 worker、0 次 `match failed`、0 个命令批、0 个不合法动作（平台发了 206 / 188 个画面，我们回答了 205 / 187 次 `WAIT`）；宝可梦赢（14 个决策），狼人杀照常；运行时 0 次重启，4 个座位 4.7–8.7 s 内连上，0 次 no-show，0 个 Traceback，key 没进日志，停止后 0 残留。
   - `rehearsal_official.py`（dry-c1，从这个包跑）：**16 项全过**，4.5 分钟；宝可梦 7 场、狼人杀 3 桌，118 个决策，0 非法、0 计时器代打、0 竞争错误；kill worker 后 13.5 s 起新 worker、16.5 s 后下一步；kill 运行时 3.5 s / 7.6 s，0 次 seat_busy、0 次新 grant；认证接口 503 期间运行时没换、0 个 worker 被停（上游 SDK 自己的 `Could not renew your agent session` 1 行、恢复 1 行）；热备接管 30.8 s，那一回合没被代打（这一步等了 32.6 s）；两种对局各 5 个座位；正式赛座位连上用时中位 4.7 s、最慢 29.6 s（503 那段时间新开的座位，等 SDK 退避），窗口 240 s，0 次 no-show；非租约持有者 0 步，key 没进日志，停止后 0 残留。
   - 本地对局不变：对 main 的冠军打 20 局（seed 171，确定性设置），main 2a20b35 和本分支（agent 是 ec49587 的，冠军换成 main 的）逐局相同（20/20，比了 280 个决策），两边都是 11 胜，搜索用上 260/260，0 退回，0 计时器代打，最慢决策 1.94 / 1.91 s。选秀 15 秒时钟和「最后一手被替选」两处修改在本地模拟器里都不会触发（本地没有选秀时钟），所以没有例外。
   - 狼人杀官方 runner 路径（`local.werewolf_platform`，新措辞，种子 1003，40 局，听关）：本分支 0 报错、0 卡死、0 闲置代打、0 被拒，最慢决策 6.0 ms，我方赢 67/112，216 张票 0 弃票，233 条聊天（另有 117 次 `WRONG_PHASE_NOOP`，就是 runner 在讨论窗口里重复发 terminate 的无害竞态）；main 用它自己的模拟器同样 0 报错、赢 67/112。
 - **没做 / 留给主人的**：真实平台上还没跑过（10-06 改版后）：主人按 HANDOFF「下一步」登录、选 Self Hosted、生成 key、`check-tournament`、建一局 Testing。`CLAUDE.md`「容易错的事实」里有几行已经过时（`python -m agent` 的参数、红警 SDK、一把 key 一台机器），这次没改（规矩：`CLAUDE.md` 只由主人改），建议的写法在交接报告里。长时间演练 `rehearsal.py`（几个小时、注入故障）换成官方控制面后还没重跑。红警打不打等主人决定。`tests/strategy/test_engine_search.py::test_engine_modes_answer_legal_moves[extra1]` 有 1.5 s 的时间预算，机器很忙时可能偶尔失败（v4.2.1 补丁那次见过一次），这次没出现。
+
+### v4.2.3 复审修复（10-07，分支 `integrate/v423`，本地对局不变）
+
+10-07 对上面「v4.2.3 合并」做了一次对抗式复审（结论：修完再发），找到 1 个中等问题（代码）和 4 个低问题（文档）。修复是 3 个提交：fc81fa3（文档）、8859053（运行时 + 测试 + 文档）、74defe4（冠军重新冻结，`champion/VERSION` = 8859053）。每一条修之前都先在合并分支上复现过。
+
+- **按座位退避的上限从 600 s 改成 30 s**（中，`agent/__main__.py`）。名词：**按座位退避** = 同一个座位的 worker 连续失败时，下一个 worker 等得越来越久（上游 4cb083a，随 PR #5 合进来）。上游从冷却（我们设的 10 s）起每次翻倍，最多 600 s，只有打完一局、遇到 `seat_busy` 或座位从分配里消失才清零（worker 先打了一阵再失败也不清零）。复审用真实的 supervisor 加假时钟测到，修复前我在 dba7285 上用同一个脚本复现了同样的数字：
+  - 正式赛座位开头 5 个 worker 都在拿座位时登录失败（平台回 503 `agent_session_unavailable` 或 429，worker 以退出码 2 结束，算失败），第 6 个 worker 要到 **360 s** 才起，超过 240 s 连接窗口，就是缺席判负（main 以前的固定 10 s 冷却是 100 s）；
+  - 一局里 worker 反复崩溃时，间隔是 10、20、40、80、160、320 s，后两次超过狼人杀 120 s、宝可梦 300 s 的超时代打。
+
+  现在 `_tournament_tuning` 在运行时期间把 SDK 的 `SEAT_FAILURE_BACKOFF_MAX_SECONDS` 设成 30 s（`ARENA_SEAT_BACKOFF_MAX_S` 可调，运行时结束后还原，`altruagent/` 不改）：worker 在 0、20、50、90、130、170、210 s 起，连续失败 6 次仍在窗口内；一局里的间隔变成 10、20、30、30… s；被游戏服务器弄丢的局（`SESSION_NOT_FOUND`，直到平台关掉它）也最多每 30 s 起一个 worker、登录一次（平台限每个地址每分钟 30 次登录）。新测试：`tests/test_deploy.py` 的退避测试按 4 种设置参数化（SDK 本身 600 s；我们的 30 s；旋钮改回 600 s；低于冷却 = 固定 10 s），`main()` 跑起来时上限是 30 s、结束后还原成 600 s；`tests/strategy/test_platform_1005.py` 用真实的正式赛分配形状测上面两组时间表。
+- **重新登录时查分配的暂停没改，只改了文档**（低）：上游按 10 / 20 / 40 / 60 s 暂停（我们以前 30 s 封顶）。复审测到 90 s 的登录故障里新开的正式赛座位 121 s 接上（窗口 240 s），但故障持续约 190 s 以上时，故障一开始就出现的座位会错过窗口。官方 `official-agent.md` 对 503 写明的就是这个节奏（10、20、40 s，之后每 60 s），所以按官方来。`docs/deploy.md` 原来写「正式赛的连接窗口是 4 分钟，来得及」，现在写清只对短故障成立，以及要改的话怎么改（`_tournament_tuning` 里设 `AUTH_RETRY_MAX_SECONDS`），由主人决定；HANDOFF 同样补了一句。
+- **文档**（低）：每个压缩包的 `BUNDLE_README.txt` 和 `agent/__main__.py` 的说明指向 deploy.md 里 10-07 已经改名的小节（「官方正式赛」「官方模式下看门脚本和 agent 额外做了什么」），已改成现在的名字，并加了一个测试检查这两处指向的小节确实存在；`docs/competition_brief.md` 的同一个指向也改了，正文里旧的 `--claim` 步骤标上「10-06 起停用」；`docs/入门指南.md`（README 的第一个链接）按 10-07 的流程重写名词表（Official Agent Key、分配、座位授权、瑞士轮 + 淘汰赛 / 狼人杀决赛、4 分钟连接窗口、输了 0 分）、第 1 步和第 7 步、「我们现在在哪」。
+- **检查**（树 74defe4，`agent` 从工作区导入；输出在 `~/wt/_fix423_out`）：
+  - 全量 pytest **1786 个全过**（564 s；比合并时的 1781 多 5 个新测试）。
+  - `replay_real.py`：2349 个真实决策 0 失败、0 修补，搜索用上 1296/1296，p99 1477 ms、最慢 1798 ms；`--no-calc` 同样 0 失败、0 修补，p99 1467 ms、最慢 1569 ms。`selfcheck.py`：ready（只有没配 key 的 1 个警告）。`python -m agent --help` 有 `--tournament` 和 `--match`、没有 `--claim`。
+  - 新压缩包 `arena-agent-74defe4`（46 MB / 417 个文件，密钥扫描干净；`agent/`、`altruagent/`、`data/`、`deploy/`、`run_agent.sh`（755）、`selfcheck.py` 和工作区相同；`BUNDLE_README.txt` 指向「比赛日手册」）：只有 `/usr/bin:/bin` 的干净环境里 selfcheck ready，包里重放 60 个决策 0 被拒，格式不对的假 key `--check-tournament` 退出 1。**部署用这个包**（`~/wt/_fix423_out/dist/`；之后只改了文档），或者重新出包。
+  - `rehearsal_official.py`（dry-f1，从这个包跑）：**16 项全过**，4.9 分钟；宝可梦 7 场、狼人杀 3 桌，118 个决策，0 非法、0 计时器代打、0 竞争错误；kill worker 后 13.5 s 起新 worker、16.5 s 后下一步（日志 `retrying that seat in 10s`）；kill 运行时 3.4 s / 6.4 s，0 次 seat_busy、0 次新 grant；认证接口 503 的 15 s 里运行时没换、0 个 worker 被停（`Could not renew` 1 行、恢复 1 行）；热备接管 32.6 s，那一回合没被代打（这一步等了 33.8 s）；两种对局各 5 个座位，正式赛座位连上用时中位 5.2 s、最慢 33.3 s（窗口 240 s），0 次 no-show；非租约持有者 0 步，key 没进日志，停止后 0 残留。
+  - 红警端到端（同一个包的整棵进程树，本地模拟平台的官方控制面）：2 场红警各 1 个 worker，回答了 207 / 190 次 `WAIT`，0 个命令批、0 个不合法动作、0 次 `match failed`；宝可梦赢（15 个决策），狼人杀照常；运行时 0 次重启，4 个座位 4.7–7.1 s 内连上，0 次 no-show，0 个 Traceback，key 没进日志，0 残留。
+  - 没有重跑对冠军的 20 局逐局核对和狼人杀 runner 的 40 局：这次 `agent/` 只改了 `__main__.py`（运行时的一个上限和说明文字），决策代码一行没动（`git diff dba7285 -- agent/` 只有这个文件）。
 
 ### 狼人杀改进（09-28，宝可梦不变）
 - 合入 `candidates/r2-ww-seer-and-villager`，加上模拟得出的规则（村民不弃票、集中投票、不假跳；预言家查到狼或快被投出时跳；对跳时投两个跳的人之一；狼只在被点名时对跳、先刀已跳的预言家），聊天只读有限事实并识别注入，狼的私信默认关闭（`ARENA_WW_DM=on` 可开；观战数据流可能暴露私信）。

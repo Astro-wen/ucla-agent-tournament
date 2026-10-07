@@ -10,7 +10,7 @@
   - **v4.2.3**：狼人杀新旧两种措辞都认（"lynch" / "eliminate by vote"）、聊天按 1024 字节截断、「多听一会儿」（`ARENA_WW_LISTEN`，默认关）；**合上游 PR #5（event agent 流程）**：`python -m agent --tournament --match`，所有部署工具都跑这条。
 - **10-06/07 平台改版（先读 `docs/competition_brief.md` 最上面的「2026-10-07 更新」）**：每人一个 event agent（UCLA Google 登录，Self-hosted / Oracle-hosted 二选一，我们选 Self-hosted），一把 **Official Agent Key**，测试赛（Testing 页面）和正式赛（Tournaments 页面 "Register my agent"）都作为分配自动送来。正式赛 = 瑞士轮 + 淘汰赛（狼人杀是决赛），每局 4 分钟连接窗口（红警 4.5 分钟），没连上判负。旧的 sk key、发现模式、`--claim` 全部停用（410）。
 - **部署**（`docs/deploy.md`「比赛日手册」）：`scripts/run_agent.sh`（systemd / tmux / Docker / 压缩包都走它）固定跑 `python -m agent --tournament --match`；key 不对、只有停用的 sk key、`ARENA_MODE=discovery`、`--claim` 都拒绝启动并写明原因。我们在上游运行时之上保留的：启动时平台暂时连不上会退避重试、看门脚本重启后沿用 execution id（马上续上自己的座位）、热备、10 s 查询和冷却、本机计算器 / 引擎搜索检查。重新登录的暂时性失败和按座位退避现在由上游 SDK 自己做；按座位退避的上限我们从上游的 600 s 改成 30 s（10-07 复审：600 s 时，开头几个 worker 登录失败的正式赛座位会错过 4 分钟连接窗口）。重新登录失败时查分配按官方建议暂停 10 / 20 / 40 / 60 s：登录故障持续约 190 s 以上时，故障一开始就出现的新正式赛座位会错过窗口（短故障没事，见 `docs/deploy.md`）。
-- **本地验证都过了，但还没在真实平台上跑过一局**（10-06 改版之后）：本地模拟平台（官方控制面，测试赛 / 正式赛两种分配、连接窗口、no-show）上的演练、全量 pytest、真实录像重放等数字见 `docs/progress.md`「v4.2.3 合并」一节。
+- **本地验证都过了，但还没在真实平台上跑过一局**（10-06 改版之后）：本地模拟平台（官方控制面，测试赛 / 正式赛两种分配、连接窗口、no-show）上的演练、全量 pytest、真实录像重放等数字见 `docs/progress.md`「v4.2.3 合并」和「v4.2.3 复审修复」两节。部署用 `~/wt/_fix423_out/dist/arena-agent-74defe4.tar.gz` 或新出的包（`_combine_out` 里 ec49587 的旧包还是 600 s 的按座位退避，不要用）。
 - **红警**：正式赛项目，我们没有策略（整场 `WAIT` = 每局认输）。要不要报名红警比赛、要不要现在写一个红警 bot，**等主人决定**。不报名就不会有红警的局。资料：`docs/platform/redalert.md`、`data/red_alert_config.json`。
 
 ## 下一步（按顺序；1–5 只能主人本人做，会连真实平台）
