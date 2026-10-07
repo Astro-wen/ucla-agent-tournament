@@ -6,7 +6,7 @@
 - **看门脚本**：`scripts/run_agent.sh`，负责崩溃重启、日志轮转、健康行、干净停止。
 - **计算器**：`agent/js/calc.js`，用 Node 跑的精确伤害计算。**引擎搜索**：`agent/js/search.js`，在 Showdown 引擎副本上试打每一步（默认对战策略）。
 - **worker**：每场对局（每个座位）一个独立子进程。
-- **官方模式 / 发现模式**：官方模式 = `--tournament` + Official Agent Key，只打正式赛分配；发现模式 = 不带参数 + `sk_agent_` key，打平台普通对局（陪练、测试赛）。
+- **官方模式 / 发现模式**：官方模式 = `--tournament` + Official Agent Key，打平台分给这把 key 的所有分配：10-06 起测试赛也是分配，我们的 SDK 不分 `context`，测试赛和正式赛都打（见「测试赛」）；发现模式 = 不带参数 + `sk_agent_` key，打平台普通对局。**发现模式 10-06 起在真实平台上停用**（旧的平台 agent 账号、登录和公开对局都返回 410 `platform_agents_retired`），只在本地模拟平台上还能用。
 - **分配（assignment）**：平台告诉我们「你在哪场比赛的哪个座位」。**座位租约（lease）**：平台记录「此刻哪个进程在控制这个座位」，每次续约管 30 s。**execution id**：运行时的随机身份号，租约记在它名下（同一台机器上同一个 `--name` 和 `LOG_DIR` 的看门脚本，重启多少次都用同一个）。
 - **热备（hot standby）**：另一台机器上用同一把 key 跑的第二个进程；主进程在时它只等待，主进程停止续约后约 30–45 s 自动接管座位。
 
@@ -49,7 +49,7 @@ bash scripts/run_agent.sh status                # 健康行必须有 mode=tourna
                                                 # search=idle(probe=…s)（真跑了一次搜索），开打后 search=ok(used=…)
 ```
 
-**模式怎么定**（每次启动的第一行日志和每条健康行都写着 `mode=`）：命令行 `--tournament`（或 `-- --tournament`）> key 文件里的 `ARENA_MODE=tournament|discovery` > 自动：**只要设了 `ALTRUAGENT_OFFICIAL_AGENT_KEY` 就是官方模式**。所以 `.env` 里 sk key 和 eak key 同时存在时，比赛日不会悄悄跑成发现模式（那样一场正式对局都接不到）。要用 Yoriko_Red 打陪练，用 `.env.apocalypse` 之类只放 sk key 的文件，或在该文件里写 `ARENA_MODE=discovery`。官方模式下 eak key 格式不对（不是 `eak_live_` + 64 位十六进制）就拒绝启动（退出码 2），日志只写原因、不写 key。
+**模式怎么定**（每次启动的第一行日志和每条健康行都写着 `mode=`）：命令行 `--tournament`（或 `-- --tournament`）> key 文件里的 `ARENA_MODE=tournament|discovery` > 自动：**只要设了 `ALTRUAGENT_OFFICIAL_AGENT_KEY` 就是官方模式**。所以 `.env` 里 sk key 和 eak key 同时存在时，比赛日不会悄悄跑成发现模式（那样一场正式对局都接不到）。（以前用 Yoriko_Red 打陪练是用 `.env.apocalypse` 之类只放 sk key 的文件，或在该文件里写 `ARENA_MODE=discovery`；10-06 起平台停用了 sk key，真实平台上的陪练和测试都改用 eak key 的测试赛，见「测试赛」。）官方模式下 eak key 格式不对（不是 `eak_live_` + 64 位十六进制）就拒绝启动（退出码 2），日志只写原因、不写 key。
 
 Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）即自动官方模式；一次性检查 `docker run --rm --env-file arena.keys arena-agent check-tournament`（见 `deploy/Dockerfile` 顶部）。
 
@@ -79,7 +79,7 @@ Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）即自�
   以前的做法（dry-r5 实测）是 20 s 后直接把座位交给 SDK：SDK 的 worker 撞到 `seat_busy` 就退出、35 s 后才重试，每次重试都起一个新 worker、用同一把 key 新认证一次（主进程也用这把 key，认证多了可能触发限流）；20 s 让座再叠加 35 s 重试，接管用了 68.8 s，那一回合被计时器代打了 1 次。已经交给 SDK 的座位不会再被藏起来（否则分配列表偶尔漏一次，SDK 就会把在打的 worker 当成「不再分配」停掉）。`ARENA_SEAT_BUSY_RETRY_S`（35 s）现在只影响主进程这一侧（例如主进程换了新 execution id、座位还被热备占着），一般不用动。
 - **OOM 不再停掉整个服务**（deploy-3）：systemd 单元加了 `OOMPolicy=continue`；引擎搜索进程（`oom_score_adj` 800）和计算器进程（500）是内核优先杀的对象，它们被杀后由 worker 自己重启（期间退回经典打法 / 启发式），不会连累 worker 和主进程。
 - **Node 子进程拿不到任何密钥**（robust-8）：计算器和搜索进程只继承 PATH、HOME、LANG、TZ、TMPDIR、NODE_OPTIONS、ARENA_SHOWDOWN 和 NODE_PATH。
-- **被分到红警（`red_alert`）也不出事**（v4.2.1，10-06）：红警是实时游戏（没有回合，`pacing.mode == "realtime"`），上游 10-04 起 SDK 支持（`altruagent.WAIT`、整批命令被拒不再结束 worker）。我们没有红警策略：worker 整场回答 `WAIT`（这一刻什么都不发），runner 等下一个画面再问，对局结束后 worker 正常退出。日志只有一行 `real-time game 'red_alert': no policy of ours plays it; answering every view with WAIT …`，第一个画面录一次（以后写红警策略时有真实 payload 可看），退出时 `[match-summary] … game=red_alert … waits=<次数>`。同时在打的宝可梦 / 狼人杀不受影响，`selfcheck`、`replay_real.py`、健康行碰到红警录像也照常。代价：这一局等于认输（被拆家，或 10 分钟双方都没下过命令时按击杀 / 资产判）。以前（合上游之前）会对每个画面发一个不合法的 `{"type": "pass"}`：旧 runner 下 worker 崩溃、冷却 10 s 后再起、再崩，新 runner 下变成每秒约 5 个被拒的命令并逐个录像。
+- **被分到红警（`red_alert`）也不出事**（v4.2.1，10-06）：红警是实时游戏（没有回合，`pacing.mode == "realtime"`），上游 10-04 起 SDK 支持（`altruagent.WAIT`、整批命令被拒不再结束 worker）。我们没有红警策略：worker 整场回答 `WAIT`（这一刻什么都不发），runner 等下一个画面再问，对局结束后 worker 正常退出。日志只有一行 `real-time game 'red_alert': no policy of ours plays it; answering every view with WAIT …`，第一个画面录一次（以后写红警策略时有真实 payload 可看），退出时 `[match-summary] … game=red_alert … waits=<次数>`。同时在打的宝可梦 / 狼人杀不受影响，`selfcheck`、`replay_real.py`、健康行碰到红警录像也照常。代价：这一局等于认输（被拆家，或 10 分钟双方都没下过命令时按击杀 / 资产判）。以前（合上游之前）会对每个画面发一个不合法的 `{"type": "pass"}`：旧 runner 下 worker 崩溃、冷却 10 s 后再起、再崩，新 runner 下变成每秒约 5 个被拒的命令并逐个录像。**这条只在实时模式下成立**：官方文档写着运营方可以把红警服务器切到「5 秒窗口」模式（`pacing.mode == "windows"`，每个窗口发一批命令）。那种状态不算实时，runner 不接受 `WAIT`（会当成决策错误），我们的兜底又会发上面那个不合法的 `{"type": "pass"}`，于是又回到旧的样子：worker 以 `match failed` 退出、冷却 10 s 后重起、再退出，整场如此（10-06 复审用脚本构造的窗口模式状态复现过）。这一局本来就认输，代价只是日志里多些 `match failed` 和 worker 启动，同时在打的宝可梦 / 狼人杀不受影响；官方文档说目前是实时模式（窗口模式是运营方的备用开关），遇到了也不用处理。
 
 ### 上游缺陷（请主人报告给主办方；我们这边已经绕开）
 
@@ -92,6 +92,8 @@ Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）即自�
 6. （观察，不算缺陷）狼人杀讨论阶段，runner 在我们 terminate 之后每来一条新聊天就再发一次 terminate（服务端幂等）；真实平台上如果每次都算一次调用，量不小。
 7. **GameAPI 令牌过期时偶尔不重新登录**：MCP 调用碰到 401 时，mcp 库有时把它包成 `BrokenResourceError` 而不是 `HTTPStatusError`，`mcp_transport.call_tool` 认不出是 401，就不做「重新登录再试一次」，直接抛 `MCPToolError`，worker 退出（本地模拟平台上令牌 2 s 过期的测试约 1/7 次复现，09-30 修复前的 40309a0 上同样）。影响：该座位 worker 重启，约 10–15 s 不能出手（冷却已调到 10 s）。
 8. （观察，和热备有关）同一把 key 的两个运行时没有主次：新座位给最先 `grant` 的那个，SDK 自己的接管要等租约过期（30 s）再加 `SEAT_BUSY_RETRY_SECONDS`（35 s）。我们让热备先把新座位让给主进程（`ARENA_NEW_SEAT_DELAY_S`），再每 10 s 用 `grant` 检查一次（接管 ≈ 租约过期 + ≤ 10 s）；可以顺便问主办方是否允许热备、有没有官方的交接方式。
+9. **`GAME_NOT_STARTED` 不在 runner 的「重读再试」列表里**（10-06 复审，没改）：官方 `07-errors.md` 把它列为「重读状态后重试」，但 `altruagent/runner.py` 的 `_RACE_ERROR_CODES` 里没有它。服务器要是在开局门期间（等所有座位的 agent 连上）对我们的出手或聊天回了它，worker 就以 `match failed … GAME_NOT_STARTED` 退出（退出码 1），10 s 冷却后重新拿座位；运行时和别的对局不受影响。按文档写的开局门（开局前我们永远不是当前行动者，狼人杀从夜里开始），runner 根本不会出手，所以这种情况不会发生，我们没去改 SDK。可以直接贴的英文：
+   > `altruagent/runner.py`'s `_RACE_ERROR_CODES` does not include `GAME_NOT_STARTED`, although 07-errors.md lists it under "Retry after re-reading". If the server ever answers a move or a chat with it (for example a gated state that still says `is_current_actor`, or a gated Werewolf state in phase `messaging`), the worker ends with "match failed" and the seat is re-granted after the cooldown. Suggested fix: treat it like the other race codes, with a short sleep before re-reading so a contradictory state cannot cause a tight `get_game_state` loop.
 
 ## 一次性准备（A. 自托管，git checkout）
 
@@ -101,10 +103,10 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.lock      # 锁定版本的 29 个运行依赖；开发机再 pip install -e ".[dev]"（-e 可编辑安装，不要去掉 -e）
 (cd agent/js && npm ci --omit=dev)              # 计算器的 node_modules，按 package-lock.json 精确安装
 (cd local/js && npm ci)                         # 引擎搜索用的 pokemon-showdown（按 local/js/package-lock.json，约 200 MB）
-cp .env.example .env && chmod 600 .env          # 官方赛：填 ALTRUAGENT_OFFICIAL_AGENT_KEY；陪练 / 测试赛：填 ALTRUAGENT_API_KEY
+cp .env.example .env && chmod 600 .env          # 填 ALTRUAGENT_OFFICIAL_AGENT_KEY（正式赛和测试赛都用它；sk key 10-06 起停用）
 .venv/bin/python scripts/selfcheck.py           # 必须以 "selfcheck: ready" 结尾，并有 "OK    damage calculator answers: node v…"
                                                 # 和 "OK    battle policy: engine search (…), simulator loads in …"
-bash scripts/run_agent.sh check-tournament      # 官方赛（会连平台）；陪练 key 用 .venv/bin/python scripts/check_connection.py
+bash scripts/run_agent.sh check-tournament      # 会连真实平台（主人执行），每行都应是 ✓
 ```
 
 （云主机上也可以不 clone，直接用 B 的压缩包自托管：它自带 node、计算器和裁剪过的模拟器，步骤见 B。）
@@ -137,7 +139,7 @@ bash scripts/run_agent.sh stop   # 停止
 
 **3）后台进程**：`bash scripts/run_agent.sh start` / `stop` / `restart` / `status` / `logs`（`logs` = tail -F 日志）。官方模式也可以显式写 `start --tournament`。
 
-第二个 agent（陪练 Apocalypse_Red）：密钥放 `.env.apocalypse`，所有命令加 `--name apocalypse`。注意官方 SDK 在 agent 进程里还会读仓库根目录的 `.env`（不覆盖已有变量），所以看门脚本启动前也把根目录 `.env` 里的计算器开关（`ARENA_CALC` / `ARENA_NODE` / `ARENA_ALLOW_NO_CALC` / `ARENA_BATTLE`）算进去检查；模式只看该名字自己的 key 文件（根目录 `.env` 里的 eak key 不会把 apocalypse 变成官方模式）。
+第二个 agent（陪练 Apocalypse_Red；10-06 起平台停用了 sk key，真实平台上这段已经用不上，留给本地模拟平台）：密钥放 `.env.apocalypse`，所有命令加 `--name apocalypse`。注意官方 SDK 在 agent 进程里还会读仓库根目录的 `.env`（不覆盖已有变量），所以看门脚本启动前也把根目录 `.env` 里的计算器开关（`ARENA_CALC` / `ARENA_NODE` / `ARENA_ALLOW_NO_CALC` / `ARENA_BATTLE`）算进去检查；模式只看该名字自己的 key 文件（根目录 `.env` 里的 eak key 不会把 apocalypse 变成官方模式）。
 
 ### 看门脚本做了什么
 
@@ -314,29 +316,18 @@ python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-* --out /tmp/of
 
 **正式比赛（09-29 上游新增，10-03 核对）不用 join**：在锦标赛 dashboard 生成 Official Agent Key（`eak_live_...`），写进 `.env` 的 `ALTRUAGENT_OFFICIAL_AGENT_KEY`；平台直接把正式对局分配给我们注册的 tournament agent，`python -m agent --tournament` 自己查询分配，每一场自动接上（见 `docs/STARTER_README.md` 的 Official tournament 一节）。v4.1.2 起看门脚本、systemd、Docker、压缩包和 `selfcheck` 都支持这个模式：key 文件里有 eak key 时 `run_agent.sh` 自动跑 `python -m agent --tournament`；连平台的检查用 `bash scripts/run_agent.sh check-tournament`（就是 `python -m agent --check-tournament`，每行都要 ✓）。完整步骤见上面「官方正式赛（`--tournament`）：比赛日手册」。不经看门脚本直接跑 `python -m agent --tournament` 也能打，但没有崩溃重启和日志轮转。
 
-发现模式下（sk key，平台上的普通测试锦标赛），不带 `--tournament` 的 `python -m agent` **不会自动加入锦标赛**，它只打已分配的对局。如果需要自己入座：
+报名锦标赛由主人在 dashboard 的 Tournaments 页面按「Register my agent」完成，agent 自己不用 join。旧的发现模式入座方式（sk key、不带 `--tournament` 的 `python -m agent`、SDK 的 `join_tournament`）**10-06 起在真实平台上停用**：注册 / 登录 / 公开对局接口返回 410 `platform_agents_retired`，MCP 的 `list_sessions` / `join_session` / `get_tournament` 返回 `TOOL_REMOVED`（`docs/platform/07-errors.md`「Retired routes and tools」）。
 
-```bash
-.venv/bin/python -c "
-from altruagent import AltruAgentClient; c = AltruAgentClient(); print(c.join_tournament('<tournament_id>'))"
-```
+## 测试赛（10-06 起：座位就是分配，`--claim` 停用）
 
-（确切的 SDK 调用以 `altruagent/client.py` 的 `join_tournament` 为准。）之后 agent 会看到子对局并自动开打。测试座位（`--claim seatclaim_...`）是一次性的，只在终端里手动跑，不放进看门脚本（脚本会拒绝），见下一节。
+10-06 平台停用了测试赛的认领码（`seatclaim_…`）：测试座位现在和正式赛一样，是 Official Agent Key 的**分配**，只是带 `context: "testing"`（官方协议见 `docs/platform/official-agent.md`）。
 
-## 测试赛（`--claim`：在 dashboard 上建的测试对局）
-
-测试阶段在 tournament dashboard 上建测试对局，每个座位有一条一次性的认领命令。在仓库根目录（或解开的压缩包目录）的终端里运行，**一个进程只打一个座位**（自对弈：每个座位开一个终端）。不需要 API key，只要 `.env` 里有 `ALTRUAGENT_CONTROL_URL`（`.env.example` 已经写好）：
-
-```bash
-.venv/bin/python -m agent --claim seatclaim_...    # 或 --claim -（隐藏输入，token 不进 shell 历史）
-```
-
-- **开放座位（10-05 上游新增，「等座」）**：测试对局可以留开放座位，其他参赛者在 dashboard 的 *Open matches* 里加入；加入的座位同样给一条 `--claim` 命令，用法一样。座位还没坐满时，进程先打印一行
-  `Waiting for the match's open seats to be filled — this seat is claimed as soon as the match fills (Ctrl+C to stop)...`
-  然后自己每约 20 s 重试一次（平台给的 `retry_after_seconds`，再加 0–2 s 随机，免得几个座位同时重试；每次用同一个 claim key），坐满就认领开打。**等的时候座位还没被认领**：按 Ctrl+C 打印 `Stopped before the seat was claimed.`，这条命令以后还能用。等待中被限流（`rate_limited`）就停 30 s 再试；连不上平台时每 10 s 重试，5 次还不行就退出（`Could not claim seat: …`）。token 无效、过期、座位已被认领、对局不能再认领，都会立刻退出，不等。
-- **认领之后**：打印 `Claimed seat 1/2`、`Game: …`、`Match: …`（对局还在等各座位的 agent 连上时后面带 `(waiting for every seat's agent to connect)`）、`Connecting to GameAPI...`，连上后 `Connected. Playing — press Ctrl+C to stop.`，之后每换一个阶段一行（`Phase: draft` …），打完打印 `Match finished (termination_reason=…) after N decision(s).` 和比分，进程退出。**认领后不要停进程**：座位绑定这个进程，停了就不能再认领（只能重建测试对局）。agent 在认领**之前**创建，所以 agent 本身启动失败不会浪费座位。
-- claim 模式不跑 `python -m agent` 启动时的本机检查（计算器 / 引擎搜索，DEGRADED 横幅只在发现模式和官方模式打），所以先在同一个目录跑一次 `.venv/bin/python scripts/selfcheck.py`，看到 `selfcheck: ready` 再认领。
-- token 只用一次、只在内存里，不要写进 `.env`；不要放进看门脚本、systemd 或 Docker。
+- **怎么打**：主人在 dashboard 的 Testing 页面（`/tournament/dashboard/testing`）建测试对局，座位选 "Mine (self-hosted)"，或在 *Open matches* 里加入别人开的座位。然后照正式赛那样开着看门脚本（systemd 或 `bash scripts/run_agent.sh start`；不经看门脚本就 `.venv/bin/python -m agent --tournament`），它每 10 s 查一次分配，自己接上，不用复制任何命令。自对弈（两个座位都选自己的）也是同一个进程，每个座位一个 worker。先跑一次 `selfcheck.py` 看到 `selfcheck: ready`、`check-tournament` 每行 ✓。
+- **我们的 SDK 不分测试赛和正式赛**：upstream 6ba2e9c 的 `run_tournament_once` 不看分配的 `context`，`--tournament` 两种都打。所以比赛日（10-16）如果还有没打完的测试对局挂在分配里，也会和正式赛一起打（多占一个 worker 和对应的内存）；测试对局打完就离开分配列表，比赛前别留着没打完的。
+- **官方文档里的 `--match`**：那是上游下一版 starter（PR #5，10-06 还没合）的参数：`--match` 只打测试赛、`--tournament` 只打正式赛、`--tournament --match` 都打。我们现在的版本没有 `--match`（会报参数错误）。合 PR #5 之后，看门脚本要传 `--tournament --match` 才能继续接测试赛（见 README「同步官方更新」）。
+- **`--claim` 现在会怎样**：平台回 410 `claim_codes_retired`，进程打印 `Could not claim seat: Seat claim failed (HTTP 410, claim_codes_retired).` 后退出（退出码 1），不重试，也不占任何座位。看门脚本仍然拒绝 `--claim`。
+- **还没开打的座位每 10–20 s 起一个短命 worker，是正常的**：对局还在大厅里时（分配的 `match_status` 是 `lobby` / `pending`，比如开放座位还没人加入），平台对 `grant` 回 409 `assignment_not_grantable`，「还没准备好」和「已经结束」是同一个代码。SDK 的 worker 把它当成已结束：日志 `[match … seat=…] assignment already ended; nothing to play`，接着运行时打 `Match finished.`，冷却 10 s、再等下一次查询后重来。所以**同一个座位反复出现 `Match assigned` / `Starting match...` / `assignment already ended; nothing to play` / `Match finished.`，意思是对局还在大厅里，不是结束了**。每一轮起一个新进程、加载一遍 agent（约 1–2 s CPU）、用 key 认证一次；对局一准备好，下一个 worker 在约 20–30 s 内连上（正式赛的连接窗口默认 4 分钟，来得及）。这是 SDK 原有的行为，main 上一样（10-06 复审用真 worker、假时钟测过：60 s 里起 4 次 worker，每次退出码 0）。
+- 测试对局不计分、没有连接期限：漏掉不算输，只是别的座位在等你（红警测试对局两边 15 分钟内没到齐就无结果结束）。
 - 红警测试对局：我们的 agent 整场只回答 `WAIT`（见上面「被分到红警」），不要用它测红警。
 
 ## 每局都在录

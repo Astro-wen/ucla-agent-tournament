@@ -44,9 +44,9 @@ tests/strategy/       # 我们的离线测试（按平台文档里的真实 payl
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q                       # 官方 SDK 测试 + 我们的 tests/strategy
-cp .env.example .env            # 填 ALTRUAGENT_API_KEY（见下）
-python scripts/check_connection.py
-python -m agent                 # 自动发现分配给我们的对局并全部并发开打
+cp .env.example .env            # 填 ALTRUAGENT_OFFICIAL_AGENT_KEY（见下「正式比赛和测试赛」）
+python -m agent --check-tournament
+python -m agent --tournament    # 一直开着：平台分给我们的测试赛和正式赛对局都自动接，每场一个 worker
 
 # 本地打 baseline（需要 node）
 (cd local/js && npm install)
@@ -54,37 +54,30 @@ python -m local.eval_pokemon --games 300
 python -m local.eval_werewolf --games 2000
 ```
 
-### 注册 agent（每人手动做一次，不要让 AI 代做）
+### 旧的平台 agent（`sk_agent_` key）：10-06 起停用
 
-```bash
-curl -X POST https://api.altruagent-game.com/auth/agent/signup \
-  -H "Content-Type: application/json" \
-  -d '{"name": "<唯一名字>", "description": "..."}'
-```
+以前的做法是用 `POST /auth/agent/signup` 注册 agent、拿 `sk_agent_` key、由人类认领（Yoriko_Red、Apocalypse_Red 就是这样来的），再用不带参数的 `python -m agent`（「发现模式」）打平台对局。**平台 10-06 把这些都停了**：注册、登录、认领和公开对局的接口都返回 HTTP 410 `platform_agents_retired`，MCP 的 `list_sessions` / `join_session` 返回 `TOOL_REMOVED`。现在每个参赛者只有一个 event agent，测试赛和正式赛都用下面的 Official Agent Key。发现模式只在本地模拟平台上还能用。
 
-返回的 `api_key` 放进 `.env`（**绝不提交**），`claim_token` 用于在 <https://agent-acp.vercel.app/human/signup> 注册人类账号后认领 agent。
-认领前任何加入对局都会 `AGENT_UNCLAIMED`。
+### 正式比赛和测试赛（官方模式）
 
-### 正式比赛（官方模式，09-29 上游新增）
-
-正式比赛的对局**不走**上面的 `sk_agent` key 发现模式。要在比赛开始前用一把 **Official Agent Key**（`eak_live_...`，在 tournament dashboard 上生成）运行：
+两种对局都用一把 **Official Agent Key**（`eak_live_...`，在 tournament dashboard 的 Agent Configuration 页面生成），平台把对局作为「分配」（assignment）发给我们：
 
 ```bash
 python -m agent --check-tournament   # 检查 key 和连接，每行都应是 ✓
 python -m agent --tournament         # 比赛前启动并一直开着，自动接平台分给我们的每一场
 ```
 
-key 放进 `.env` 的 `ALTRUAGENT_OFFICIAL_AGENT_KEY`（**绝不提交**）。上游完整说明见 `docs/STARTER_README.md`；我们的部署方式见 `docs/deploy.md`。
+key 放进 `.env` 的 `ALTRUAGENT_OFFICIAL_AGENT_KEY`（**绝不提交**）。上游完整说明见 `docs/STARTER_README.md`，官方协议见 `docs/platform/official-agent.md`；我们的部署方式见 `docs/deploy.md`。
 
-### 测试赛（`--claim`；10-05 上游新增「等开放座位」）
+### 测试赛（10-06 起：座位就是分配，`--claim` 停用）
 
-在 tournament dashboard 上建测试对局（或在 *Open matches* 里加入别人开的座位），复制座位的命令，在仓库根目录运行：
+主人在 dashboard 的 Testing 页面建测试对局，座位选 "Mine (self-hosted)"（或在 *Open matches* 里加入别人开的座位）。这个座位会出现在我们这把 key 的分配列表里（`context: "testing"`），**一直开着的 `python -m agent --tournament`（或 `scripts/run_agent.sh`）会自己接上**，不用复制任何命令。我们现在的 SDK（upstream 6ba2e9c）不看 `context`，所以 `--tournament` 测试赛和正式赛都打。
 
-```bash
-python -m agent --claim seatclaim_...   # 或 --claim -（隐藏输入），一个进程只打一个座位
-```
+- `--claim seatclaim_...` 已经停用：平台回 410 `claim_codes_retired`，进程打印 `Could not claim seat: …` 后退出，不会重试。
+- 官方文档里的 `python -m agent --match` 是上游下一版 starter（PR #5，10-06 还没合）的参数，我们的版本没有它（会报参数错误）。
+- 对局还在大厅里（还有空座位）时，日志每 10–20 s 出现一次 `assignment already ended; nothing to play` 和 `Match finished.`：意思是还没开始，不是结束了。
 
-对局还有空座位时会打印 `Waiting for the match's open seats to be filled ...` 并自己每 ~20 s 重试（用同一个 claim key），座位坐满就认领开打；等待时按 Ctrl+C 不会占用座位。细节见 `docs/deploy.md`「测试赛」。
+细节见 `docs/deploy.md`「测试赛」。
 
 ### 红警（实时游戏；10-04 上游 SDK 支持，我们暂不打）
 
@@ -97,6 +90,8 @@ git fetch upstream && git merge upstream/main
 ```
 
 `README.md` 是我们自己的；上游的 README 原文放在 `docs/STARTER_README.md`。合并时 README 冲突取我们的版本，再用 `git show upstream/main:README.md > docs/STARTER_README.md` 更新原文，上游新增的要点在本文件里补一两句。`agent/__main__.py` 是上游的文件，但我们的官方模式加固（v4.1.2）改了很多：冲突要两边都留，合完跑 `tests/test_deploy.py`、`tests/test_main_claim.py`、`tests/test_realtime.py` 和全量 pytest。
+
+**下一次合上游（PR #5，10-06 还开着）要特别注意**：它删掉 `--claim`（和 `tests/test_main_claim.py`），按分配的 `context` 分开 `--tournament`（只打正式赛）和 `--match`（只打测试赛），并重写 `agent/__main__.py`（+119/−345），会和我们的 v4.1.2 / v4.2 官方模式加固冲突。合完以后：(1) `scripts/run_agent.sh` 要传 `--tournament --match`，否则测试赛不再自动接；(2) `agent/__main__.py` 里的加固（`_SteadyOfficial`、启动重试、execution id、热备）要逐项手工移植；(3) `.env.example` 冲突取上游的说明行，再补回我们自己加的几行。
 
 ## 安全
 
