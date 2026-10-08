@@ -433,18 +433,28 @@ def test_platform_stand_in_with_slow_seats_and_listening(monkeypatch):
     assert all(out["listen_s"][i] < 8.0 - 1.0 for i in ours)
 
 
-# ---------------------------------------------------------------- off (the default): listening code never runs
+def test_listening_is_on_by_default(monkeypatch):
+    """v4.3 (10-08): on by default. Against the red team's framing wolves our agent answered 0 of 1007 frames under
+    the official runner's timing; listening measured +3 villager / +5 seer points there and +0.2 / +0.5 against the
+    stand-ins (docs/progress.md "v4.3")."""
+    monkeypatch.delenv(A.LISTEN_ENV, raising=False)
+    assert A.LISTEN_DEFAULT == "on" and listen_enabled() and create_agent().listen is True
+    monkeypatch.setenv(A.LISTEN_ENV, "off")
+    assert create_agent().listen is False
+
+
+# ---------------------------------------------------------------- switched off: listening code never runs
 @pytest.fixture
 def tripwire(monkeypatch):
-    """With the switch unset, every listening entry point (the frame walk, the read loop, the hold and clock rules)
+    """With ARENA_WW_LISTEN=off, every listening entry point (the frame walk, the read loop, the hold and clock rules)
     is replaced by a tripwire that records the call and raises."""
-    monkeypatch.delenv(A.LISTEN_ENV, raising=False)
+    monkeypatch.setenv(A.LISTEN_ENV, "off")
     calls = []
 
     def trip(name):
         def f(*_a, **_kw):
             calls.append(name)
-            raise AssertionError(f"listening code reached with {A.LISTEN_ENV} unset: {name}")
+            raise AssertionError(f"listening code reached with {A.LISTEN_ENV}=off: {name}")
         return f
     monkeypatch.setattr(A, "_runner_game", trip("_runner_game"))
     for name in ("_listen", "_listen_wait", "_may_hold"):
@@ -452,7 +462,7 @@ def tripwire(monkeypatch):
     return calls
 
 
-def test_off_by_default_never_reaches_listening_through_the_runner(tripwire):
+def test_off_never_reaches_listening_through_the_runner(tripwire):
     sg = ScriptedGame(_game(), 3, [_ev_chat(1, "Is the Seer here? Please speak up before we vote.", 5),
                                    _ev_chat(2, "I am the Seer. Player3 is a wolf.", 20), _ev_others_done(40)])
     c = create_agent()
@@ -465,7 +475,7 @@ def test_off_by_default_never_reaches_listening_through_the_runner(tripwire):
 
 
 @pytest.mark.parametrize("timing", ["rounds", "rt"])
-def test_off_by_default_never_reaches_listening_in_the_simulator(tripwire, timing):
+def test_off_never_reaches_listening_in_the_simulator(tripwire, timing):
     for g in range(6):
         ours = {g % 7, (g + 3) % 7}
         seats = [we.ContestantSeat(create_agent) if i in ours else LLMQwenSeat() for i in range(7)]
@@ -477,7 +487,7 @@ def test_off_by_default_never_reaches_listening_in_the_simulator(tripwire, timin
     assert tripwire == []
 
 
-def test_off_by_default_never_reaches_listening_on_the_platform_stand_in(tripwire, monkeypatch):
+def test_off_never_reaches_listening_on_the_platform_stand_in(tripwire, monkeypatch):
     monkeypatch.setenv("ARENA_RECORD", "0")
     agents, ours = [], [1, 4]
     for i in range(7):

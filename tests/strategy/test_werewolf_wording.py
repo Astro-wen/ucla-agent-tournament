@@ -267,7 +267,7 @@ def test_an_1100_character_message_never_leaves_our_agent():
 def test_over_long_chats_through_the_real_runner_are_never_rejected():
     agents = [_LongTalker() for _ in range(3)] + [create_agent()] + [SeatAgent(LLMSeat(), random.Random(i))
                                                                     for i in range(3)]
-    out = play_table(agents, seed=7, idle_limit=120.0, timeout=60.0)
+    out = play_table(agents, seed=7, idle_limit=120.0, timeout=60.0, window_limit=10.0)   # (listening: see test_werewolf_eval)
     assert out["terminal"] and not out["hung"] and not out["errors"]
     assert not [v for v in out["log"]["violations"] if v[0] < 4]
     assert all(len(m["content"]) <= 1024 for m in out["messages"])

@@ -199,3 +199,16 @@ def test_a_claimant_whose_named_wolf_flipped_wolf_is_believed_over_the_other():
                dead=[(2, "wolf", "vote", 1)], votes=[(1, {0: 2, 1: 2, 2: 1, 3: 2, 4: 2, 5: 1, 6: 2}, 2)],
                msgs=[(1, "I am the Seer. Player2 is a wolf.", 1), (5, "I am the Seer. Player1 is a wolf.", 1)])
     assert WerewolfPolicy().act(st)["action_id"] == "5"
+
+
+def test_wolf_votes_its_ally_in_the_allys_claim_fight_and_says_it_like_a_villager():
+    """talker / chaos: in a claim fight between our wolf's ally and the true seer, our wolf voted the true seer; the
+    reveal then exposed the ally and our wolf with it. Now it votes the ally, in the villagers' claim-fight words."""
+    msgs = [(1, "I am the Seer. Player5 is a WOLF."), (5, "I am the Seer. Player1 is a WOLF and is lying.")]
+    st = state(WOLF, "day_vote", [0, 1, 2, 4, 5, 6], me=3, msgs=msgs)
+    assert WerewolfPolicy().act(st)["action_id"] == "5"
+    chat = WerewolfPolicy().chat(st | {"phase": "messaging"})
+    want = "Two Seer claims: Player1 and Player5. One is lying. I vote Player5; the reveal will show who lied."
+    assert [m["content"] for m in chat] == [want]
+    villager = state("Your role: VILLAGER", "day_vote", [0, 1, 2, 4, 5, 6], me=3, msgs=msgs)
+    assert [m["content"] for m in WerewolfPolicy().chat(villager | {"phase": "messaging"})] == [want]

@@ -773,7 +773,8 @@ def test_the_example_llm_agent_on_nebius_runs_through_the_platform_stand_in(tmp_
 
     c = client(tmp_path, FakeNebius(answer=quiet))
     agents = [LLMAgent(ls.NebiusProvider(c), log=lambda s: None) for _ in range(2)] + [create_agent() for _ in range(5)]
-    out = play_table(agents, seed=3, idle_limit=120.0, timeout=60.0)
+    # (a time-compressed 8 s window: our five seats listen, by default since v4.3, until a quiet spell of 1/5 window)
+    out = play_table(agents, seed=3, idle_limit=120.0, timeout=60.0, window_limit=8.0)
     assert out["terminal"] and not out["hung"] and not out["errors"]
     assert not [v for v in out["log"]["violations"] if v[0] < 2] and not [a for a in out["log"]["auto"] if a[0] < 2]
     assert c.stats.calls > 0 and c.stats.refused == c.stats.errors == 0
