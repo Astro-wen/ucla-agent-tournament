@@ -218,10 +218,12 @@ class RedAlertPolicy:
         self._prev_tick = v.tick
         if v.game_s - self._last_status >= STATUS_EVERY_S:
             self._last_status = v.game_s
+            a = self.army
             log.info("[ra] t=%.0fs cash=%d ore=%d pow=%+d harv=%d bld=%d army=%d K=%d D=%d assets=%d phase=%s "
-                     "state=%s batches=%d rej=%d", v.game_s, v.cash, v.ore, v.surplus, v.unit_count.get("harv", 0),
-                     len(v.buildings), v.army_value, v.kills, v.deaths, v.assets, self.tag, self.army.state,
-                     self.batches, self.ledger.rejected)
+                     "state=%s home/main/reinf=%d/%d/%d enemy=%.0f veh=%.2f rush=%s batches=%d rej=%d", v.game_s,
+                     v.cash, v.ore, v.surplus, v.unit_count.get("harv", 0), len(v.buildings), v.army_value, v.kills,
+                     v.deaths, v.assets, self.tag, a.state, len(a.home), len(a.main), len(a.reinf), a.enemy_army(v),
+                     a.enemy_vehicle_share(), a.rush, self.batches, self.ledger.rejected)
 
     def summary(self) -> dict:
         ms = sorted(self.ms)

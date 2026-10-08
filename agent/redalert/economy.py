@@ -7,11 +7,13 @@ from .orders import Cand
 from .world import POWER_DOWNABLE, PRODUCTION, dist
 
 # Plan steps: (role, how many of that role we want in total). Roles resolve through available_production.
-OPENING_A = [("power", 1), ("proc", 1), ("barracks", 1), ("proc", 2), ("power", 2), ("weap", 1), ("fix", 1),
+# The barracks comes right after the first power plant (12 s before the refinery): the first rifleman scouts the enemy
+# base early enough to see an infantry rush coming (local simulator: proc-first saw it too late on shadowfiend-ii).
+OPENING_A = [("power", 1), ("barracks", 1), ("proc", 1), ("proc", 2), ("power", 2), ("weap", 1), ("fix", 1),
              ("power", 3)]
-OPENING_B_ALLIES = [("power", 1), ("proc", 1), ("barracks", 1), ("weap", 1), ("power", 2), ("proc", 2), ("fix", 1),
+OPENING_B_ALLIES = [("power", 1), ("barracks", 1), ("proc", 1), ("weap", 1), ("power", 2), ("proc", 2), ("fix", 1),
                     ("power", 3), ("weap", 2), ("proc", 3), ("power", 4)]
-OPENING_B_SOVIET = [("power", 1), ("proc", 1), ("barracks", 1), ("weap", 1), ("power", 2), ("fix", 1), ("proc", 2),
+OPENING_B_SOVIET = [("power", 1), ("barracks", 1), ("proc", 1), ("weap", 1), ("power", 2), ("fix", 1), ("proc", 2),
                     ("power", 3), ("weap", 2), ("proc", 3), ("power", 4)]
 ROLES = {"power": ("powr", "apwr"), "proc": ("proc",), "barracks": ("tent", "barr"), "weap": ("weap",),
          "fix": ("fix",), "dome": ("dome",)}
@@ -28,7 +30,9 @@ class Economy:
         self.blocked: dict[str, int] = {}     # item -> tick until which it is not planned (placement failures)
         self.tried_at: dict[str, list] = {}   # item -> placement hints already refused
         self.deploy_moves = 0
+        self.deploy_fails_seen = 0
         self.deploy_spot = None
+        self.old_base = None                  # where our construction yard stood (a new MCV unfolds near it)
         self.powered_down: set[int] = set()
         self.late_defenses = 0
         self.lost_fact_at = None
@@ -61,6 +65,9 @@ class Economy:
             rich = v.starting_cash >= pol.p.rich_cash_opening
             self.plan = OPENING_A if not rich else (OPENING_B_SOVIET if v.side == "soviet" else OPENING_B_ALLIES)
             pol.opening = "B" if rich else "A"
+        if v.fact is not None:
+            self.old_base = (v.fact["x"] + 1, v.fact["y"] + 1)
+            self.deploy_spot = None
         self._deploy(v, out)
         self._place(v, out)
         self._reserve(v)
@@ -81,21 +88,58 @@ class Economy:
         mcv = mcvs[0]
         if led.is_pending(("deploy",)):
             return
-        if led.deploy_invalid > self.deploy_moves:
-            # no room to unfold here: move a few cells toward the map centre (then sideways) and try again
+        pos = (mcv["x"], mcv["y"])
+        rebuilt = len(v.buildings) > 0 or v.game_s > 60   # a new MCV after losing the yard: the base is crowded
+        failed = led.deploy_invalid > self.deploy_fails_seen
+        if self.deploy_spot is None and (failed or (rebuilt and not self.deploy_moves)):
+            self.deploy_fails_seen = led.deploy_invalid
             self.deploy_moves += 1
-            st = v.st
-            centre = ((st.bx0 + st.bx1) // 2, (st.by0 + st.by1) // 2)
-            dirs = [centre, (mcv["x"] + 4, mcv["y"]), (mcv["x"], mcv["y"] + 4), (mcv["x"] - 4, mcv["y"]),
-                    (mcv["x"], mcv["y"] - 4)]
-            target = st.step_toward((mcv["x"], mcv["y"]), dirs[(self.deploy_moves - 1) % len(dirs)], 3)
-            self.deploy_spot = target
-            out.append(Cand({"cmd": "move", "units": [mcv["id"]], "to": list(target)}, key=("deploy",), urgent=True,
-                            sig=("move", target)))
-            return
-        if self.deploy_spot is not None and dist((mcv["x"], mcv["y"]), self.deploy_spot) > 1.5 and not mcv["idle"]:
-            return                                       # still driving to the new spot
+            target = self._deploy_spot(v, pos)
+            if target is not None and dist(target, pos) > 0.5:
+                self.deploy_spot = target
+                out.append(Cand({"cmd": "move", "units": [mcv["id"]], "to": list(target)}, key=("deploy",),
+                                urgent=True, sig=("move", target)))
+                return
+        if self.deploy_spot is not None:
+            if dist(pos, self.deploy_spot) > 0.5 and not mcv["idle"]:
+                return                                   # still driving to the clear spot
+            if dist(pos, self.deploy_spot) > 1.5 and mcv["idle"]:
+                out.append(Cand({"cmd": "move", "units": [mcv["id"]], "to": list(self.deploy_spot)},
+                                key=("deploy",), urgent=True, sig=("move", self.deploy_spot)))
+                return
+            self.deploy_spot = None
         out.append(Cand({"cmd": "deploy", "units": [mcv["id"]]}, key=("deploy",), urgent=True, sig=("deploy",)))
+
+    def _deploy_spot(self, v, pos):
+        """A cell where the MCV can unfold (the yard covers x-1..x+1, y-1..y+2): clear buildable ground with a free
+        cell around it, no building or ore, away from the spots already refused; the nearest one to the old base
+        (else to the MCV). Without the map picture: 4 cells toward the map centre."""
+        st = v.st
+        tried = set(self.tried_at.get("__deploy__", []))
+        if not st.grid_ok:
+            centre = ((st.bx0 + st.bx1) // 2, (st.by0 + st.by1) // 2)
+            return st.step_toward(pos, centre, 4)
+        occ = self._occupied(v)
+        anchor = self.old_base or pos
+        best = None
+        for r in range(0, 14):
+            for dy in range(-r, r + 1):
+                for dx in range(-r, r + 1):
+                    if max(abs(dx), abs(dy)) != r:
+                        continue
+                    x, y = int(pos[0]) + dx, int(pos[1]) + dy
+                    if (x, y) in tried:
+                        continue
+                    if self._fits(v, occ, x - 1, y - 1, 3, 4, gap=1):
+                        d = dist((x, y), anchor) + 0.5 * dist((x, y), pos)
+                        if best is None or d < best[0]:
+                            best = (d, (x, y))
+            if best is not None and r >= 3:
+                break
+        if best is None:
+            return None
+        self.tried_at.setdefault("__deploy__", []).append(best[1])
+        return best[1]
 
     # ---- placing finished buildings ----
     def _place(self, v, out) -> None:
@@ -202,13 +246,15 @@ class Economy:
 
     # ---- money kept for the current key building in the opening ----
     def _reserve(self, v) -> None:
+        """A small buffer so the key building of the opening never stalls. Production is paid as it progresses, so
+        holding its whole remaining cost would leave money idle (seen in the simulator: ~2000 unspent for 100 s)."""
         self.reserve = 0
         if v.game_s > 330 or self.pol.army.threatened:
             return
         rules = v.st.rules
         for it in v.queue_items("Building"):
             if it["item"] in ECO_KEY and not it["ready"]:
-                self.reserve = int(rules.cost(it["item"]) * (1.0 - it["progress"]))
+                self.reserve = min(400, int(rules.cost(it["item"]) * (1.0 - it["progress"])))
                 return
 
     # ---- the Building queue ----
@@ -242,6 +288,9 @@ class Economy:
                     continue                              # not buildable yet: look further down the plan
         if choice is None:
             choice = self._midgame(v)
+        if (pol.army.rush or pol.army.defense_first(v)) and choice not in (None, "powr", "apwr", "tent", "barr", "proc") \
+                and v.money < 1500:
+            choice = None                                 # an early rush: the money goes to rifles and towers
         if v.remaining < 60:                              # only what finishes before the end
             if choice is not None and rules.build_time(choice) > v.remaining - 5:
                 choice = None
@@ -275,7 +324,8 @@ class Economy:
             return self.role_item(v, "fix")
         if procs < 3 and v.game_s >= 200 and (harv >= procs + 1 or v.money > 2500):
             return self.role_item(v, "proc")
-        if self.role_count(v, "weap") < min(2, p.max_weaps) and v.game_s >= 240 and v.money > 1500 and harv >= 3:
+        if self.role_count(v, "weap") < min(2, p.max_weaps) and v.game_s >= 240 and v.money > 2000 and harv >= 3 \
+                and v.army_value >= 3000:
             return self.role_item(v, "weap")
         if procs < p.max_procs and v.game_s >= 420 and v.money > 3000:
             return self.role_item(v, "proc")

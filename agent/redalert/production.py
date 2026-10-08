@@ -41,29 +41,41 @@ class Production:
         soviet = v.side == "soviet"
         threatened = army.threatened or army.rush
         late = v.remaining < 75
+        inf_heavy = army.infantry_heavy(v)
+        e_inf = army.enemy_inf_count(v, 90)
+        idle_money = False                             # rifles only soak up money nothing else is using
         if late:
             target = n + 10
         elif army.rush:
-            target = int(p.rush_infantry)
+            target = max(int(p.rush_infantry), min(40, int(1.1 * e_inf) + 4))
+        elif inf_heavy:
+            target = max(int(p.max_infantry), min(30, int(0.9 * e_inf) + 6))
         elif army.threatened:
             target = max(int(p.home_infantry) + 4, 10)
-        elif v.game_s < 240:
-            target = 5 if soviet else 4
-        elif v.money - self.pol.econ.reserve > 1500:
-            target = int(p.max_infantry)
         else:
-            target = 5 if soviet else 4
+            target = int(p.max_infantry)
+            if army.scout_lost_early and v.game_s < 240:
+                target = max(target, int(p.early_infantry))
+            idle_money = n >= (5 if soviet else 4) and not army.defense_first(v)
         if n >= target:
             return
+        if not threatened and not late and v.have.get("weap") and v.game_s >= 240:
+            # once tanks can be built, infantry stays a share of the army (more of it against an infantry army)
+            inf_val = sum(rules.cost(u["type"]) for u in alive)
+            veh_val = sum(rules.cost(u["type"]) for u in v.units if u["type"] in ("1tnk", "2tnk", "3tnk", "4tnk",
+                                                                                     "jeep", "apc", "ftrk"))
+            cap = 0.65 if inf_heavy else 0.4
+            if inf_val > cap * (inf_val + veh_val) + 400:
+                return
         veh_share = army.enemy_vehicle_share()
         if late:
             item = "e1"
-        elif n == 0 or (v.game_s < 240 and not threatened and e1 < 3):
+        elif n == 0 or (not threatened and e1 < 3) or (veh_share < 0.2 and v.game_s < 240):
             item = "e1"
         else:
             want_e3 = 0.6 if veh_share > 0.5 else (0.35 if veh_share > 0.15 else 0.2)
-            if army.rush and veh_share < 0.2:
-                want_e3 = 0.1
+            if inf_heavy or (army.rush and veh_share < 0.2):
+                want_e3 = 0.1 if veh_share < 0.2 else 0.2
             item = "e3" if e3 < want_e3 * (e1 + e3 + 1) else "e1"
             if item == "e1" and soviet and "e2" in v.avail and army.enemy_infantry_share() > 0.6 and n % 3 == 2:
                 item = "e2"
@@ -73,13 +85,15 @@ class Production:
                 return
         cost = rules.cost(item)
         spend = v.money - (0 if threatened else self.pol.econ.reserve)
+        if idle_money:
+            spend -= 300 if not v.have.get("weap") else 600
         if late:
             if rules.build_time(item) > v.remaining - 5 or spend < cost:
                 return
         elif spend < cost:
             return
         count = 1
-        if threatened or late:
+        if threatened or late or inf_heavy:
             count = max(1, min(3, target - n, spend // max(1, cost)))
         out.append(Cand({"cmd": "train", "item": item, "count": int(count)}, key=("train", item), urgent=threatened,
                         base=v.in_prod.get(item, 0)))
@@ -99,6 +113,9 @@ class Production:
         army = self.pol.army
         threatened = army.threatened
         reserve = 0 if (threatened or item in ("harv", "mcv")) else self.pol.econ.reserve
+        if item not in ("harv", "mcv") and (army.rush or (army.infantry_heavy(v) and
+                                                          army.enemy_army(v) > 0.8 * v.army_value)):
+            reserve += 400                             # rifles (and towers) first against an infantry army
         spend = v.money - reserve
         if items and spend < 2 * cost:
             return                                     # a second item only when money is plentiful

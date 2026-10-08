@@ -293,8 +293,9 @@ class Static:
 
         def at(k):
             return self.path[max(0, min(n - 1, k))]
-        self.guard = at(min(6, n // 5))
-        self.rally = at(min(10, n // 4))
+        # home guard and the attack group's gathering point a few cells apart, both covering the base's front
+        self.guard = at(min(5, n // 6))
+        self.rally = at(min(8, n // 4))
         self.picket = at(min(max(12, int(n * 0.45)), n - 8))
         self.staging = at(n - 1 - min(18, n // 3))
         self.waypoints = [at(k) for k in range(min(10, n // 4) + 12, n - 1, 12)]
@@ -431,6 +432,7 @@ class View:
         self.deaths = _int(m.get("deaths_cost"))
         self.assets = _int(m.get("assets_value"))
         self.army_value = _int(m.get("army_value"))
+        self.buildings_killed = _int(m.get("buildings_killed"))
         # own units
         self.units: list[dict] = []
         self.unit_by_id: dict[int, dict] = {}

@@ -20,7 +20,8 @@ DEFAULTS: dict[str, float] = {
     "late_defenses": 4,             # towers built at home once the economy is up and cash floats
     # army
     "home_infantry": 6,             # infantry kept at home; the rest joins the attack groups
-    "max_infantry": 14,
+    "max_infantry": 20,
+    "early_infantry": 36,           # infantry cap before 4:00 when our scout was killed early (an army at home)
     "rush_infantry": 22,            # infantry cap while an early rush is on
     "attack_min_units": 5,
     "attack_min_value": 4000,
