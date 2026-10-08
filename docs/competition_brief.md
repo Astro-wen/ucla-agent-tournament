@@ -2,7 +2,7 @@
 
 # 2026-10-08 更新：正式规则、截止时刻、比赛日日程
 
-来源（都是一手来源，CONFIRMED）：平台的正式规则 **Official Rules（Version 2026-10-06）**，全文存在 `docs/official_rules_2026-10-06.md`（下面的「§」是它的节号）；官网 altruagent-game.com 的日程和报名页（10-08 只读）；平台实时技能文档（10-08 刷新进 `docs/platform/`）。全程没登录。
+来源（都是一手来源，CONFIRMED）：平台的正式规则 **Official Rules（Version 2026-10-06）**，全文存在 `docs/official_rules_2026-10-06.md`（下面的「§」是它的节号）；官网 altruagent-game.com 的日程和报名页（10-08 只读）；平台实时技能文档（10-08 刷新进 `docs/platform/`；16:08 UTC 再拉一次，10 个主题和 SKILL.md 逐字节相同，没有新增或下线的主题）。全程没登录。
 
 **名词**
 - **提交截止（Submission Deadline）**：交作品的最后时刻，过了就不能再改。
