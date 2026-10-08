@@ -19,8 +19,8 @@
 # the engine search loads; nothing else of local/), docs/deploy.md and docs/restart_load.md (the runbook bundle.sh
 # ships), pyproject.toml requirements.lock .env.example .gitignore .gitattributes .dockerignore GAMES.md NOTICE, one
 # recorded real match (both seats, the one bundle.sh picks) for selfcheck's replay, PUBLIC_README.md as README.md, and
-# the tests whose imports and paths are all inside the export, minus NON_ISOLATED_TESTS (they fail outside this
-# repository). Not exported: this script, CLAUDE.md, the other docs, local/ code, champion/, versions/, examples/,
+# the tests whose imports and paths are all inside the export (and whose imported test modules are exported too),
+# minus NON_ISOLATED_TESTS (they fail outside this repository). Not exported: this script, CLAUDE.md, the other docs, local/ code, champion/, versions/, examples/,
 # the other scripts, recordings, history.
 #
 # The scan (any finding = NOT READY): key files (.env*, *.pem, *.key, id_rsa ...); key-like strings (Official Agent
@@ -85,7 +85,7 @@ BAD_FILES_FIND=( \( -name '.env' -o -name '.env.*' ! -name '.env.example' -o -na
 
 mask() { sed -E 's/^(.{10}).*/\1.../'; }
 
-scan_tree() {   # DIR -> prints findings, returns their number (capped at 250) through SCAN_FINDINGS
+scan_tree() {   # DIR -> prints findings and leaves their number in SCAN_FINDINGS
   local d="$1" n=0 f line hit
   SCAN_FINDINGS=0
   while IFS= read -r f; do
