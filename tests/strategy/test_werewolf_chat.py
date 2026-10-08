@@ -246,6 +246,10 @@ def test_wolf_counter_claims_after_being_accused_and_never_chats_after_terminate
                     msgs=[(3, m1.content), (1, "I am the Seer. Player3 is a wolf.")])
     m2 = c.choose_message(_gs(accused), ctx())
     assert isinstance(m2, SendMessage) and m2.content.startswith("I am the Seer. Player1 is a WOLF")
+    # (the next state shows the counter-claim delivered, as the server's does: a state without it would mean it did
+    # not land, and since v4.2.4 it would be sent again, see test_resend_after_hiccup.py)
+    accused = state("Your role: WOLF\nYour fellow wolves: Player5", "day_vote", [], me=3, phase="messaging",
+                    msgs=[(3, m1.content), (1, "I am the Seer. Player3 is a wolf."), (3, m2.content)])
     assert c.choose_message(_gs(accused), ctx()) is TERMINATE_MESSAGING
     later = dict(accused)
     later["new_messages"] = accused["new_messages"] + [

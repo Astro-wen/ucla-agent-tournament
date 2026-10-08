@@ -25,10 +25,13 @@ Retired modes only print a notice pointing to the command above (see
   codes, replaced by the Official Agent Key.
 
 Deployment hardening on top of the starter (none of it edits `altruagent/`;
-see docs/deploy.md "看门脚本和 agent 在上游运行时之上额外做了什么"). The SDK's
-supervisor itself now keeps the runtime through a temporary sign-in failure
-and backs off a seat whose worker keeps failing (upstream 1372ccc, 4cb083a);
-what is added here:
+see docs/deploy.md "看门脚本和 agent 在上游运行时之上额外做了什么"). The SDK
+itself now keeps the runtime through a temporary sign-in failure and an
+incomplete registration (updated Official Rules), backs off a seat whose
+worker keeps failing, retries a game's temporary failures inside the game
+(up to 90 s, never resending a move) and replaces a worker that never reached
+its game at once while the connect window is open (upstream 1372ccc, 4cb083a,
+PR #7); what is added here:
 
 - supervisor tuning from ARENA_* knobs (`_tournament_options`): a 10 s
   assignment poll and a 10 s base cooldown before a failed seat's next worker
@@ -39,7 +42,9 @@ what is added here:
 - the first authentication waits out a temporary failure (the control plane
   down or rate limiting at the moment the runtime starts, a session the
   platform failed to mint) with a 5/10/20/30 s back-off instead of exiting
-  (`_authenticate`); a refused key still ends the process at once;
+  (`_authenticate`); an incomplete registration starts the runtime anyway
+  (the SDK's supervisor says what to do and keeps checking, as upstream's
+  start); a refused key still ends the process at once;
 - scripts/run_agent.sh can hand the runtime a per-run-loop execution id, so a
   restarted runtime resumes its own seat leases at once
   (`_take_execution_id`, `_tournament_tuning`);
@@ -76,7 +81,7 @@ from altruagent.agent_loader import DEFAULT_AGENT_SPEC
 from altruagent.agent_loader import load_agent_factory as _load_agent_factory
 from altruagent.errors import AltruAgentError, AuthenticationError, ConfigurationError, PlatformError
 from altruagent.notices import AGENT_GUIDE_URL, CLAIM_CODES_RETIRED_NOTICE, PLATFORM_KEY_RETIRED_NOTICE
-from altruagent.official import OfficialAgentClient, OfficialAgentError, is_fatal_auth_error
+from altruagent.official import OfficialAgentClient, OfficialAgentError, is_fatal_auth_error, is_registration_incomplete
 from altruagent.runner import _resolve_decision_fn
 from altruagent.supervisor import ALL_KINDS, TESTING, TOURNAMENT, WAITING_MESSAGE, run_tournament_forever
 
@@ -152,9 +157,10 @@ def _mint_failure(exc: BaseException) -> bool:
 
 def _transient(exc: BaseException) -> bool:
     """A failure of the FIRST authentication that waiting fixes: rate limiting, a 5xx or gateway blip, a timeout, the
-    network, a session the platform failed to mint. Anything else (a rejected or revoked key, an incomplete
-    registration, any other 4xx, an answer without a status) ends the start at once, as upstream's start does; once
-    the runtime runs, the SDK's supervisor classifies re-authentication failures itself (is_fatal_auth_error)."""
+    network, a session the platform failed to mint. An incomplete registration is not one of these but does not end
+    the start either (see _authenticate); anything else (a rejected or revoked key, any other 4xx, an answer without a
+    status) ends the start at once, as upstream's start does. Once the runtime runs, the SDK's supervisor classifies
+    re-authentication failures itself (is_fatal_auth_error, is_registration_incomplete)."""
     status = getattr(exc, "status_code", None)
     if getattr(exc, "error_code", None) == "rate_limited" or status in (408, 425, 429):
         return True
@@ -170,16 +176,23 @@ _sleep = time.sleep                        # (tests replace it)
 
 
 def _authenticate(official) -> bool:
-    """The runtime's first authentication. A transient failure (the control plane down or rate limiting at the
-    moment the runtime starts, e.g. a restart during an outage) is waited out with a back-off instead of ending the
-    process (upstream's start exits at once; scripts/run_agent.sh would then restart it, noisily); a refused key ends
-    it (False)."""
+    """The runtime's first authentication; True = go on and run. A transient failure (the control plane down or rate
+    limiting at the moment the runtime starts, e.g. a restart during an outage) is waited out with a back-off instead
+    of ending the process (upstream's start exits at once; scripts/run_agent.sh would then restart it, noisily). An
+    incomplete registration (403 registration_incomplete, e.g. updated Official Rules to accept again) does not end it
+    either, as upstream's start since PR #7: the key is fine and only the contestant can finish the registration, so
+    the runtime starts without a session and the SDK's supervisor says what to do at its first poll (then at most
+    every 5 minutes), checks again every 30 s and plays as soon as it is done (a restart loop in run_agent.sh would
+    only add noise). A refused key ends it (False)."""
     attempt = 0
     while True:
         try:
             official.authenticate()
+            print("Connected with your Official Agent Key.")
             return True
         except AltruAgentError as exc:
+            if is_registration_incomplete(exc):
+                return True
             if not _transient(exc):
                 print(f"Could not connect with your Official Agent Key: {exc}")
                 return False
@@ -196,14 +209,22 @@ SEAT_BUSY_RETRY_ENV = "ARENA_SEAT_BUSY_RETRY_S"
 NEW_SEAT_DELAY_ENV = "ARENA_NEW_SEAT_DELAY_S"          # a hot standby's hold on new seats (see _HotStandby)
 SEAT_BACKOFF_MAX_ENV = "ARENA_SEAT_BACKOFF_MAX_S"
 # The longest wait before a new worker for a seat whose workers keep failing. The SDK doubles a failed seat's cooldown
-# with each failure in a row, up to its SEAT_FAILURE_BACKOFF_MAX_SECONDS (600 s), and only a finished match, seat_busy
-# or the seat leaving the listing resets the count (a worker that played a while before failing does not). Review
-# 10-07 measured at our 10 s cooldown and poll: 5 workers failing before a tournament seat connects (e.g. their grant's
-# sign-in answering 503 agent_session_unavailable or 429; each exits 2, a seat failure) put the 6th start at 360 s,
-# past the 240 s connect window (a no-show), and a match whose worker crashes again and again waited 160 s, then
-# 320 s: longer than Werewolf's 120 s and Pokemon's 300 s idle clocks. Capped at 30 s the starts are 0, 20, 50, 90,
-# 130, 170, 210 s, and a seat whose game the server lost (SESSION_NOT_FOUND until the platform drops it) still costs
-# at most one worker and one sign-in every 30 s (the platform allows 30 sign-ins a minute per address).
+# with each failure in a row, up to its SEAT_FAILURE_BACKOFF_MAX_SECONDS (600 s); a finished match, seat_busy or the
+# seat leaving the listing resets the count. Review 10-07 measured at our 10 s cooldown and poll (SDK 5bc61a2): 5
+# workers failing before a tournament seat connects put the 6th start at 360 s, past the 240 s connect window (a
+# no-show), and a match whose worker crashes again and again waited 160 s, then 320 s: longer than Werewolf's 120 s
+# idle clock and a Pokemon decision's 50 s. Capped at 30 s the starts are 0, 20, 50, 90, 130, 170, 210 s, and a seat
+# whose game the server lost (SESSION_NOT_FOUND until the platform drops it) still costs at most one worker and one
+# sign-in every 30 s (the platform allows 30 sign-ins a minute per address).
+# Since PR #7 (SDK 951f4f7) the SDK handles the commonest pre-connect failures itself: a temporary grant failure is
+# retried inside the worker for 60 s, and a worker that never reached its game for a temporary reason
+# (EXIT_NOT_CONNECTED) is replaced in the same poll, without counting, while the connect window is open (at least
+# 5 minutes). The cap still bounds every other failure (an agent or platform error before or during the game: exit 1
+# / 2 / a kill). The same constant is now also the SDK's "long run" threshold: a worker that ran at least this long
+# before failing (any exit but EXIT_NOT_CONNECTED) starts a new count, i.e. waits the 10 s base cooldown again. At 30 s
+# that means a worker that played for 30 s or more and then crashed is back after 10 s each time (with 600 s it was
+# 10, 20, 30 s): a few seconds less lost in a live match, the same one sign-in per worker (the supervisor hands its
+# session to each worker), and a deterministic crash still costs only one worker per ~40 s.
 SEAT_BACKOFF_MAX_S = 30.0
 
 
@@ -360,7 +381,6 @@ def _run_tournament(agent_spec: str, kinds: frozenset[str] = ALL_KINDS) -> int:
     try:
         if not _authenticate(official):
             return 1
-        print("Connected with your Official Agent Key.")
         print(PLAYING_MESSAGES[kinds])
         print(f"{WAITING_MESSAGE} (Press Ctrl+C to stop.)", flush=True)
         hold = _env_number(os.environ, NEW_SEAT_DELAY_ENV, 0.0) or 0.0
