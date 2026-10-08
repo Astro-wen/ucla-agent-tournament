@@ -709,13 +709,12 @@ class World:
             skipped = list(check.get("failed") or [])
             failed = skipped + refused
             total = accepted + len(refused)
-            if accepted == 0 and total > 0:
-                status, reason = "rejected", refused[0]["reason"]
-            elif failed:
-                status, reason = "partial", failed[0]["reason"]
+            if accepted == 0 and total > 0:          # the engine refused every command it was sent
+                status, reason, detail = "rejected", refused[0]["reason"], refused[0].get("detail")
+            elif failed:                              # reason (and detail) of the first failed entry
+                status, reason, detail = "partial", failed[0]["reason"], failed[0].get("detail")
             else:
-                status, reason = "ok", "ok"
-            detail = refused[0].get("detail") if refused else None
+                status, reason, detail = "ok", "ok", None
             self.verdicts.append((seat, batch, index, status, reason, detail,
                                   [{k: v for k, v in f.items() if k != "detail"} for f in failed], accepted))
 
