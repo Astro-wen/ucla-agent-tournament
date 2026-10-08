@@ -5,7 +5,7 @@ speed-control turns; the singles memory) as it answers a battle decision. The sa
 the runner re-reads the state and asks again after a move it could not send (SDK PR #7) or after a race error, and a
 restarted worker re-asks the one its predecessor died on (agent/matchstate.py). The second ask must start from the
 memory of the first, or the move that never landed counts as played (turn 1: Fake Out "not fresh" any more; a Protect
-"twice in a row", never). Since v4.2.2 a second ask restored that memory only under the same state_version and only in
+"twice in a row", never). Since v4.2 a second ask restored that memory only under the same state_version and only in
 doubles; now:
 
   * the decision point is the battle's position (`policy.decision_point`: turn, forced slots, both sides' actives, the
