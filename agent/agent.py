@@ -90,9 +90,12 @@ LISTEN_POLL = 1 / 24       # the longest single wait while listening (5 s of 120
 LISTEN_FOLLOWUPS = 1       # chats a day after the opening ones, with listening on
 LISTEN_MIN_WAIT_S = 0.25   # a wait answered at once with nothing new is followed by this pause (no busy loop)
 _ON = {"1", "on", "true", "yes", "enable", "enabled"}
-# Errors on a sent move that mean the server did not take it (on_action_result): the decision had closed or moved on
-# (the runner's race codes, pokemon.md section 8), or the game's engine was busy. A 5xx may have landed: not listed.
-REFUSED_MOVE = frozenset({"STALE_STATE", "NOT_YOUR_TURN", "WRONG_PHASE", "RUNTIME_TEMPORARILY_UNAVAILABLE"})
+# Errors on a sent move that mean the server did not take THIS send (on_action_result): the runner's race codes
+# (pokemon.md section 8). For a first send of a decision point the decision had closed (the move timer played for us);
+# after an earlier send of the same point that got no answer, they can also mean that send landed (NOT_YOUR_TURN:
+# already submitted; STALE_STATE: the version moved), which PokemonPolicy.undelivered tells apart. Not listed: a 5xx
+# and RUNTIME_TEMPORARILY_UNAVAILABLE (turn-based: a transient error the runner treats as "may have landed").
+REFUSED_MOVE = frozenset({"STALE_STATE", "NOT_YOUR_TURN", "WRONG_PHASE"})
 
 
 def listen_enabled(env=None) -> bool:
@@ -862,17 +865,21 @@ class Contestant:
     def on_action_result(self, result, context) -> None:
         """The runner's report on each move it sent (altruagent.runner: the play_action answer, or {"error": code, ...}
         when the runner recovered from an error). A Pokemon move the server refused (REFUSED_MOVE: a race such as
-        STALE_STATE / NOT_YOUR_TURN, i.e. the decision had closed and the move timer played for us, or a busy engine)
-        never landed, so what its decision wrote about our action (Protect chains, last actions) goes back
-        (PokemonPolicy.undelivered), and the saved match state with it (a restarted worker resumes from that).
-        Any other error (a 5xx: the move may have landed) and a send that failed without an answer are left to the
-        re-read state: the same decision point again restores that memory (PokemonPolicy._same_decision). Never raises:
-        the runner ends the match on an exception here."""
+        STALE_STATE / NOT_YOUR_TURN, i.e. the decision had closed and the move timer played for us) never landed, so
+        what its decision wrote about our action (Protect chains, last actions) goes back (PokemonPolicy.undelivered,
+        which keeps it when an earlier unanswered send of the same point may have landed), and the saved match state
+        with it (a restarted worker resumes from that). Only when the policy itself answered that decision: on any
+        other path (busy, overrun, crash, fallback) the memory does not describe the move sent, and on the busy path
+        it still belongs to an earlier decision. Any other error (a 5xx, a busy engine: the move may have landed) and a
+        send that failed without an answer are left to the re-read state: the same decision point again restores that
+        memory (PokemonPolicy._same_decision). Never raises: the runner ends the match on an exception here."""
         try:
             if not isinstance(result, dict) or result.get("error") not in REFUSED_MOVE or self._family != "pokemon":
                 return
             if self._busy is not None and self._busy.is_alive():
                 return                                    # an overrun policy call still owns the memory
+            if str((self.last_decision or {}).get("path") or "").split("+")[0] not in ("policy", "repaired"):
+                return                                    # the policy did not answer the refused decision
             if not self.pk.undelivered():
                 return
             self.refused_moves += 1

@@ -11,7 +11,9 @@ doubles; now:
   * the decision point is the battle's position (`policy.decision_point`: turn, forced slots, both sides' actives, the
     battle events in the protocol log), whatever the state_version, in doubles and singles;
   * a move the server refused (Contestant.on_action_result: STALE_STATE / NOT_YOUR_TURN, the decision closed and the
-    move timer played for us; a busy engine) is rolled back out of that memory, and out of the saved match state;
+    move timer played for us) is rolled back out of that memory, and out of the saved match state, unless an earlier
+    send of the same point got no answer (it may have landed: then the refusal is our own move, kept as played) or
+    the policy did not answer that decision (busy, overrun, fallback);
   * a battle or team-preview budget stays inside the platform's own countdown (`observation.clock`, live doc 10-08)
     when the state is read late (the Showdown timer line is as old as the request).
 
@@ -19,6 +21,7 @@ Driven through the real altruagent.runner.run_game with a scripted game session 
 (logs/yoriko, logs/apocalypse), classic battle policy (tests/conftest.py)."""
 import copy
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -28,7 +31,7 @@ from altruagent.runner import run_game
 
 from agent import matchstate
 from agent import timecontrol as tc
-from agent.agent import Contestant
+from agent.agent import REFUSED_MOVE, Contestant
 from agent.pokemon import drafter as drafter_mod
 from agent.pokemon import preview as preview_matrix
 from agent.pokemon import singles as singles_mod
@@ -199,7 +202,7 @@ def first_protect(rows) -> int:
     raise AssertionError("no Protect in this match")
 
 
-@pytest.mark.parametrize("code", ["STALE_STATE", "NOT_YOUR_TURN", "RUNTIME_TEMPORARILY_UNAVAILABLE"])
+@pytest.mark.parametrize("code", ["STALE_STATE", "NOT_YOUR_TURN", "WRONG_PHASE"])
 def test_a_refused_move_is_not_remembered_as_played(code, store):
     """Our Protect is refused (STALE_STATE / NOT_YOUR_TURN: the decision had closed and the move timer played a random
     choice for us); the runner reports it (on_action_result) and the next state is the next turn. That decision does
@@ -249,9 +252,11 @@ def test_a_refused_move_is_not_remembered_as_played(code, store):
     assert "refused_moves=1" in c.summary_line()
 
 
-def test_a_refused_move_then_the_same_decision_again_restores_all_of_it(store):
-    """A busy engine refuses the move and the re-read is the same decision (still ours): it is decided from exactly
-    the memory of its first ask (the partial rollback is undone by the full restore of `_same_decision`)."""
+@pytest.mark.parametrize("code", ["WRONG_PHASE", "RUNTIME_TEMPORARILY_UNAVAILABLE"])
+def test_a_refused_move_then_the_same_decision_again_restores_all_of_it(code, store):
+    """The move is refused (a race, or a busy engine: a transient error, not rolled back) and the re-read is the same
+    decision (still ours): it is decided from exactly the memory of its first ask (a partial rollback is undone by the
+    full restore of `_same_decision`)."""
     rows = raws(FAKE_OUT)
     k = next(i for i, r in enumerate(rows) if r.get("phase") == "moving")
     once, _ = through_runner(rows[:k + 1])
@@ -262,15 +267,14 @@ def test_a_refused_move_then_the_same_decision_again_restores_all_of_it(store):
     game.queue_state(GameState.from_mcp_state(rows[k]), GameState.from_mcp_state(bumped(rows[k], 1)),
                      GameState.from_mcp_state({**rows[k], "is_terminal": True, "is_current_actor": False,
                                                "legal_actions": None, "status": "completed"}))
-    game.queue_play_action(MCPToolError("RUNTIME_TEMPORARILY_UNAVAILABLE: busy", status_code=None,
-                                        error_code="RUNTIME_TEMPORARILY_UNAVAILABLE"),
+    game.queue_play_action(MCPToolError(f"{code}: refused", status_code=None, error_code=code),
                            {"accepted": True, "status": "in_progress"})
     game.queue_result(result_dict())
     c = Contestant()
     run_game(game, ctx_of(rows[0]), c, sleep=lambda s: None, log=lambda m: None)
     calls = [sent(x) for x in game.play_action_calls]
     assert calls[-1] == calls[-2] == once[-1] and moves([once[-1]], "fakeout")
-    assert c.refused_moves == 1 and c.pk.redecided == 1
+    assert c.refused_moves == (1 if code in REFUSED_MOVE else 0) and c.pk.redecided == 1
 
 
 def test_other_errors_and_landed_moves_keep_the_memory(store):
@@ -283,9 +287,15 @@ def test_other_errors_and_landed_moves_keep_the_memory(store):
         c.choose_action(GameState.from_mcp_state(r), ctx_of(r))
     after = {m: copy.deepcopy(getattr(c.pk, m)) for m in MEM}
     for result in ({"error": "INTERNAL_ERROR", "detail": "500"}, {"accepted": True, "status": "in_progress"},
+                   {"error": "RUNTIME_TEMPORARILY_UNAVAILABLE", "detail": "busy"},
                    {"error": None}, {"error": ["x"]}, None, "STALE_STATE", 3):
         c.on_action_result(result, ctx_of(rows[k]))
     assert {m: getattr(c.pk, m) for m in MEM} == after and c.refused_moves == 0
+    for path in ("fallback", "overrun", "crash", "busy", None):     # the policy did not answer the refused decision
+        c.last_decision = {**c.last_decision, "path": path}
+        c.on_action_result({"error": "STALE_STATE"}, ctx_of(rows[k]))
+        assert {m: getattr(c.pk, m) for m in MEM} == after and c.refused_moves == 0, path
+    c.last_decision = {**c.last_decision, "path": "policy"}
     c.pk._asked = None                                       # the latest decision was no battle decision
     c.on_action_result({"error": "STALE_STATE"}, ctx_of(rows[k]))
     assert {m: getattr(c.pk, m) for m in MEM} == after and c.refused_moves == 0
@@ -293,6 +303,83 @@ def test_other_errors_and_landed_moves_keep_the_memory(store):
     ww._family = "werewolf"
     ww.on_action_result({"error": "STALE_STATE"}, ctx_of(rows[k]))
     assert ww.refused_moves == 0
+
+
+def _send_error(e: str) -> MCPToolError:
+    if e.isdigit():                                          # a gateway error: no MCP code, the runner just re-reads
+        return MCPToolError(f"MCP request failed with HTTP {e}", status_code=int(e))
+    return MCPToolError(f"{e}: refused", status_code=None, error_code=e)
+
+
+@pytest.mark.parametrize("errors,landed_kept,rollbacks", [
+    (("504", "NOT_YOUR_TURN"), True, 0),             # the 504'd send landed: the resend is "already submitted"
+    (("504", "STALE_STATE"), True, 0),               # ... or "wrong version" (the landed move moved it)
+    (("WRONG_PHASE", "504", "NOT_YOUR_TURN"), True, 1),   # a refusal first, then an unanswered send that landed
+    (("WRONG_PHASE", "NOT_YOUR_TURN"), False, 2),    # refused every time: the timer played for us
+])
+def test_a_resend_refused_after_an_unanswered_send_keeps_that_move(errors, landed_kept, rollbacks, store):
+    """Our Protect is sent and the answer is lost (HTTP 504: no MCP code, so no on_action_result), but the server
+    applies the move a moment later; the runner's re-read is served before that (same state, still our decision), so
+    the same point is decided again and sent again, and that send is refused BECAUSE the first one landed. The next
+    turn must remember the Protect (else it Protects twice in a row, which fails 2 times in 3), as before v4.2.5. A
+    refusal of the previous ask of the point (the server answered) does not count as an unanswered send."""
+    rows = raws(PROTECT)
+    k = first_protect(rows)
+    ref = Contestant()
+    for r in rows[:k + 1]:
+        ref.choose_action(GameState.from_mcp_state(r), ctx_of(r))
+    landed = {m: copy.deepcopy(getattr(ref.pk, m)) for m in MEM}
+    c = Contestant()
+    for r in rows[:k]:
+        c.choose_action(GameState.from_mcp_state(r), ctx_of(r))
+    before = {m: copy.deepcopy(getattr(c.pk, m)) for m in MEM}
+    seen: list = []
+    real = c.pk._track_conditions
+    c.pk._track_conditions = lambda obs: (seen.append({m: copy.deepcopy(getattr(c.pk, m)) for m in MEM}), real(obs))
+    game = Game(session_id=rows[k]["session_id"])
+    game.queue_state(*[GameState.from_mcp_state(rows[k]) for _ in errors], GameState.from_mcp_state(rows[k + 1]),
+                     GameState.from_mcp_state({**rows[k + 1], "is_terminal": True, "is_current_actor": False,
+                                               "legal_actions": None, "status": "completed"}))
+    game.queue_play_action(*[_send_error(e) for e in errors], {"accepted": True, "status": "in_progress"})
+    game.queue_result(result_dict())
+    run_game(game, ctx_of(rows[k]), c, sleep=lambda s: None, log=lambda m: None)
+    calls = [sent(x) for x in game.play_action_calls]
+    assert len(calls) == len(errors) + 1 and len(set(calls[:-1])) == 1 and moves(calls[:1], *STALL)
+    assert all(s == before for s in seen[:len(errors)])     # every ask of the point: the memory from before it
+    nxt = seen[len(errors)]
+    if landed_kept:
+        assert nxt == landed
+    else:
+        assert nxt["last_move"] == {} and nxt["last_protect"] == before["last_protect"] != landed["last_protect"]
+        for m in ("prev_active", "prev_opp", "opp_prev_active", "cond_set"):
+            assert nxt[m] == landed[m], m
+    assert c.refused_moves == rollbacks and c.pk.redecided == len(errors) - 1
+
+
+def test_a_refusal_on_the_busy_path_leaves_the_previous_decision_alone(store):
+    """Decision k (our Protect) lands. Decision k+1 is answered by the busy path (an earlier overrun policy call is
+    still running, so the policy is not asked and its latest point is still k's); k+1's fallback is refused after that
+    call finished. Nothing rolls back: k's Protect was played."""
+    rows = raws(PROTECT)
+    k = first_protect(rows)
+    c = Contestant()
+    c.watchdog = True
+    for r in rows[:k + 1]:
+        c.choose_action(GameState.from_mcp_state(r), ctx_of(r))
+    after_k = {m: copy.deepcopy(getattr(c.pk, m)) for m in MEM}
+    assert any(mv in STALL for _, mv in after_k["last_move"].values())
+    hold = threading.Event()
+    busy = threading.Thread(target=hold.wait, daemon=True)
+    busy.start()
+    c._busy = busy
+    try:
+        c.choose_action(GameState.from_mcp_state(rows[k + 1]), ctx_of(rows[k + 1]))
+    finally:
+        hold.set()
+        busy.join()
+    assert c.last_decision["path"] == "busy"
+    c.on_action_result({"error": "STALE_STATE", "detail": "x"}, ctx_of(rows[k + 1]))
+    assert {m: getattr(c.pk, m) for m in MEM} == after_k and c.refused_moves == 0
 
 
 # ---- a restarted worker re-asked the decision its predecessor died on -------------------------------------------------
