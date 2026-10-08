@@ -30,6 +30,7 @@ PASSABLE = frozenset(".,=$*S_")
 BUILDABLE = frozenset(".,=S_")
 ORE = frozenset("$*")
 DEFAULT_COST = 500
+COVER_STEP = 10                 # spacing of the map-wide search points (units see 4-5 cells around them)
 # Built-in fallbacks when the reference is missing (game_config None and no local copy).
 FALLBACK_ITEMS = {
     "powr": (300, 100, 7.2, "Building", (2, 3)), "apwr": (500, 200, 12.0, "Building", (3, 3)),
@@ -224,6 +225,7 @@ class Static:
         self.waypoints: list[tuple[int, int]] = []
         self.rally = self.guard = self.picket = self.staging = None
         self.sweep: list[tuple[int, int]] = []
+        self._coverage: list[tuple[int, int]] | None = None
 
     # ---- map picture -----------------------------------------------------------------------------------------------
     def _load_layout(self, lay) -> None:
@@ -376,6 +378,61 @@ class Static:
             if all(dist(c, p) > 4 for p in out):
                 out.append(c)
         return out
+
+    def coverage(self) -> list[tuple[int, int]]:
+        """Search points over the whole map, one every COVER_STEP cells (edges and corners included) on ground our
+        units can reach from our spawn, computed on first use: where HUNT looks once the sweep points showed
+        nothing (a base built away from both spawns)."""
+        if self._coverage is not None:
+            return self._coverage
+        reach = self._reachable(self.my_spawn) if (self.grid_ok and self.my_spawn is not None) else None
+        pts: list[tuple[int, int]] = []
+        half = COVER_STEP // 2
+        y = self.by0 + half
+        while y <= self.by1 + half:
+            x = self.bx0 + half
+            while x <= self.bx1 + half:
+                c = self.clamp((x, y))
+                if reach is not None:
+                    c = self._nearest_in(c, reach)
+                if c is not None and all(dist(c, p) > half for p in pts):
+                    pts.append(c)
+                x += COVER_STEP
+            y += COVER_STEP
+        self._coverage = pts
+        return pts
+
+    def _reachable(self, start) -> set | None:
+        """Cells reachable from `start` (8 directions, no corner cutting), as y * width + x keys."""
+        s = self._nearest_passable(start)
+        if s is None:
+            return None
+        w = self.width
+        seen = {s[1] * w + s[0]}
+        q = deque([s])
+        steps = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
+        while q:
+            x, y = q.popleft()
+            for dx, dy in steps:
+                nx, ny = x + dx, y + dy
+                k = ny * w + nx
+                if k in seen or not self.can_pass(nx, ny):
+                    continue
+                if dx and dy and not (self.can_pass(x + dx, y) and self.can_pass(x, y + dy)):
+                    continue
+                seen.add(k)
+                q.append((nx, ny))
+        return seen
+
+    def _nearest_in(self, c, reach: set) -> tuple[int, int] | None:
+        w = self.width
+        for r in range(0, COVER_STEP // 2 + 1):
+            for dy in range(-r, r + 1):
+                for dx in range(-r, r + 1):
+                    if max(abs(dx), abs(dy)) == r and (c[1] + dy) * w + (c[0] + dx) in reach \
+                            and self.in_bounds((c[0] + dx, c[1] + dy)):
+                        return c[0] + dx, c[1] + dy
+        return None
 
     def step_toward(self, a, b, k: float) -> tuple[int, int]:
         d = dist(a, b)

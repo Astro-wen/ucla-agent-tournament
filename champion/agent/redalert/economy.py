@@ -20,6 +20,17 @@ ROLES = {"power": ("powr", "apwr"), "proc": ("proc",), "barracks": ("tent", "bar
 ANTI_INFANTRY_DEF = ("pbox", "ftur", "hbox")
 ANTI_VEHICLE_DEF = ("tsla", "gun", "ftur", "pbox")
 ECO_KEY = frozenset({"proc", "weap", "fix"})
+POWER = ("powr", "apwr")
+TOWERS = frozenset({"pbox", "hbox", "gun", "ftur", "tsla", "agun", "sam", "gap"})
+# Harvester emergency (every harvester lost while a refinery stands): after this long at zero harvesters (a new
+# refinery's free harvester takes a moment to appear), with at least this much of the match left.
+EMERGENCY_AFTER_TICKS = 5 * 25
+EMERGENCY_MIN_REMAINING_S = 90
+SELL_MIN_REMAINING_S = 300      # selling loses half the building's value (assets): only with time to earn it back
+SELL_GAP_TICKS = 5 * 25         # one sale at a time: its refund shows before the next is considered
+MAX_SELLS = 3                   # per emergency
+LOW_POWER_SLOWDOWN = 3.0        # production runs at a third of the speed on low power (OpenRA LowPowerModifier)
+POWER_CANCEL_S = 20.0           # low power: cancel the building in progress if it would take longer than this
 
 
 class Economy:
@@ -38,6 +49,14 @@ class Economy:
         self.powered_down: set[int] = set()
         self.late_defenses = 0
         self.lost_fact_at = None
+        self.emergency = False                # every harvester lost (harv_emergency)
+        self.emergencies = 0
+        self.harv_seen = False
+        self.harv_zero_since = None
+        self.sold: dict[int, int] = {}        # building id -> tick we sold it
+        self.sells = 0                        # sales in the current emergency
+        self.sales = 0                        # whole match
+        self.power_cancels = 0
 
     # ---- helpers ----
     def role_count(self, v, role: str) -> int:
@@ -70,6 +89,7 @@ class Economy:
         if v.fact is not None:
             self.old_base = (v.fact["x"] + 1, v.fact["y"] + 1)
             self.deploy_spot = None
+        self.harv_emergency(v)
         self._deploy(v, out)
         self._place(v, out)
         self._reserve(v)
@@ -80,6 +100,76 @@ class Economy:
         self._power_down(v, out)
         if allow:
             self._upkeep(v, out)
+
+    # ---- every harvester lost ----
+    def harv_emergency(self, v) -> bool:
+        """True while a refinery stands but no harvester is left (after EMERGENCY_AFTER_TICKS): no income at all, so
+        the next harvester comes before anything else (production._harvester_first) and nothing new is started."""
+        harv = v.unit_count.get("harv", 0)
+        if harv > 0:
+            self.harv_seen = True
+        on = False
+        if harv == 0 and self.harv_seen and v.have.get("proc", 0) > 0 and v.remaining > EMERGENCY_MIN_REMAINING_S:
+            if self.harv_zero_since is None:
+                self.harv_zero_since = v.tick
+            on = v.tick - self.harv_zero_since >= EMERGENCY_AFTER_TICKS
+        else:
+            self.harv_zero_since = None
+        if on and not self.emergency:
+            self.emergencies += 1
+            self.sells = 0
+            self.pol.log_event(f"every harvester lost at {v.game_s:.0f}s (money {v.money}): a harvester first")
+        elif self.emergency and not on:
+            self.pol.log_event(f"harvester emergency over at {v.game_s:.0f}s (sold {self.sells})")
+        self.emergency = on
+        return on
+
+    def sell_spare(self, v, out, short: float) -> None:
+        """Sell one building we can spare (never the yard, the last refinery, power plant, barracks or war factory,
+        the depot), the one whose refund (half its value) best covers `short`. Towers only when the base is quiet."""
+        if v.remaining < SELL_MIN_REMAINING_S or self.sells >= MAX_SELLS:
+            return
+        if any(v.tick - t < SELL_GAP_TICKS for t in self.sold.values()):
+            return
+        b = self._spare(v, short)
+        if b is None:
+            return
+        self.sold[b["id"]] = v.tick
+        self.sells += 1
+        self.sales += 1
+        self.pol.log_event(f"selling {b['type']} {b['id']} at {v.game_s:.0f}s for the harvester (short {short:.0f})")
+        out.append(Cand({"cmd": "sell", "building": b["id"]}, key=("sell", b["id"]), urgent=True))
+
+    def _spare(self, v, short: float):
+        rules = v.st.rules
+        blds = [b for b in v.buildings if b["id"] not in self.sold]
+        n = {}
+        for b in blds:
+            n[b["type"]] = n.get(b["type"], 0) + 1
+        quiet = not self.pol.army.threatened
+        groups = [
+            [b for b in blds if b["type"] == "silo" and v.ore <= 0],
+            [b for b in blds if b["type"] == "dome"],
+            [b for b in blds if b["type"] in ("tent", "barr") and n.get("tent", 0) + n.get("barr", 0) > 1],
+            [b for b in blds if b["type"] in TOWERS and quiet],
+            [b for b in blds if b["type"] == "weap" and n.get("weap", 0) > 1],
+            # a refinery without harvesters earns nothing: one of several can go (the others take the new harvester)
+            [b for b in blds if b["type"] == "proc" and n.get("proc", 0) > 1],
+            [b for b in blds if b["type"] in POWER and n.get("powr", 0) + n.get("apwr", 0) > 1
+             and v.surplus - rules.power(b["type"]) >= 0],
+        ]
+
+        def refund(b):
+            return 0.5 * rules.cost(b["type"]) * max(0.0, b["hp"]) / 100.0
+        for g in groups:
+            if g:
+                # the smallest refund that covers the shortfall, else the biggest one
+                cover = [b for b in g if refund(b) >= short]
+                pick = min(cover, key=lambda b: (refund(b), b["id"])) if cover else \
+                    max(g, key=lambda b: (refund(b), -b["id"]))
+                if refund(pick) >= 50:
+                    return pick
+        return None
 
     # ---- the MCV ----
     def _deploy(self, v, out) -> None:
@@ -256,16 +346,49 @@ class Economy:
         """A small buffer so the key building of the opening never stalls. Production is paid as it progresses, so
         holding its whole remaining cost would leave money idle (seen in the simulator: ~2000 unspent for 100 s)."""
         self.reserve = 0
-        if v.game_s > 330 or self.pol.army.threatened:
+        if self.pol.army.threatened:
             return
         rules = v.st.rules
+        if v.surplus < 0:
+            # low power: the power plant being built comes first (up to 300 kept for it)
+            for it in v.queue_items("Building"):
+                if it["item"] in POWER and not it["ready"]:
+                    self.reserve = min(300, int(rules.cost(it["item"]) * (1.0 - it["progress"])))
+                    return
+        if v.game_s > 330:
+            return
         for it in v.queue_items("Building"):
             if it["item"] in ECO_KEY and not it["ready"]:
                 self.reserve = min(400, int(rules.cost(it["item"]) * (1.0 - it["progress"])))
                 return
 
     # ---- the Building queue ----
+    def _power_first(self, v, out) -> bool:
+        """Low power (a power plant lost) while the Building queue works on something else: production runs at a
+        third of the speed until that item is done, so cancel it (the refund is full) when it would take longer than
+        POWER_CANCEL_S; the next view builds the power plant. True when a cancel went out."""
+        if v.surplus >= 0 or not v.buildings or any(it in POWER for _q, it in v.ready):
+            return False
+        if self._power_item(v) is None or v.tick < self.full_until:
+            return False                                 # no power plant can come now (none to build, no room)
+        head = next((it for it in v.queue_items("Building") if not it["ready"]), None)
+        if head is None or head["item"] in POWER:
+            return False
+        rules = v.st.rules
+        left_s = (1.0 - head["progress"]) * rules.build_time(head["item"]) * LOW_POWER_SLOWDOWN
+        if left_s <= POWER_CANCEL_S or self.pol.ledger.is_pending(("cancel", head["item"])):
+            return False
+        self.power_cancels += 1
+        self.pol.log_event(f"low power at {v.game_s:.0f}s: cancelling {head['item']} "
+                           f"({head['progress']:.0%} done) for a power plant")
+        out.append(Cand({"cmd": "cancel", "item": head["item"]}, key=("cancel", head["item"]), urgent=True))
+        return True
+
     def _building_queue(self, v, out) -> None:
+        if self.emergency and v.surplus >= 0:
+            return                                       # every credit goes to the new harvester
+        if self._power_first(v, out):
+            return
         if self.busy(v, "Building") or v.tick < self.full_until:
             return
         item = self._next_building(v)
@@ -343,6 +466,8 @@ class Economy:
         if self.busy(v, "Defense") or v.tick < self.full_until:
             return
         army = self.pol.army
+        if self.emergency and not army.threatened:
+            return
         rules = v.st.rules
         item = None
         if v.capacity > 0 and v.ore > 0.8 * v.capacity and "silo" in v.avail and v.have.get("silo", 0) < 4:
@@ -407,11 +532,16 @@ class Economy:
             if led.is_pending(key):
                 continue
             if b["repairing"]:
-                if v.cash < p.repair_stop_cash and b["type"] != "fact":
+                # (the same money as the start test below: cash alone flipped it on and off every 2 s while the ore
+                # in the refineries kept cash + ore above the start threshold)
+                if (v.money < p.repair_stop_cash or self.emergency) and b["type"] != "fact":
                     out.append(Cand({"cmd": "repair", "building": b["id"], "on": False}, key=key))
                     n += 1
                 continue
-            if (b["hp"] < p.repair_below and v.money > p.repair_min_cash) or (b["type"] == "fact" and b["hp"] < 50):
+            if b["id"] in self.sold:
+                continue
+            if (b["hp"] < p.repair_below and v.money > p.repair_min_cash and not self.emergency) or \
+                    (b["type"] == "fact" and b["hp"] < 50):
                 out.append(Cand({"cmd": "repair", "building": b["id"], "on": True}, key=key))
                 n += 1
         for b in v.buildings:
