@@ -63,7 +63,7 @@ Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）；一�
 
 | PDT | 北京时间 | 做什么 | 看什么 |
 |---|---|---|---|
-| 10-13 截止前（建议白天） | 10-14 凌晨–上午 | 最后一次合进 `main` 并推送。比赛机部署**截止时 `main` 上最新的那个提交**，不用 tag（规则第 8 节：比赛版本就是截止时默认分支上最新的提交）：`git switch main && git pull --ff-only origin main`，记下 `git rev-parse HEAD`（截止后 `main` 不会再动，它就是比赛版本）。用压缩包时从这个提交**重新打包**：`bash scripts/bundle.sh`，包里的 `COMMIT` 文件必须是同一个提交号、没有 `built with uncommitted changes`。然后 `python -m pytest -q`、`selfcheck.py`、`check-tournament` | 全绿、每行 ✓；`git status` 干净；提交号 = GitHub 上 `main` 的最新提交 |
+| 10-13 截止前（建议白天） | 10-14 凌晨–上午 | 最后一次合进 `main` 并推送。比赛机部署**截止时 `main` 上最新的那个提交**，不用 tag（规则第 8 节：比赛版本就是截止时默认分支上最新的提交）：`git switch main && git pull --ff-only origin main`，记下 `git rev-parse HEAD`（截止后 `main` 不会再动，它就是比赛版本）。用压缩包时从这个提交**重新打包**：`bash scripts/bundle.sh`，包里的 `COMMIT` 文件必须是同一个提交号、没有 `built with uncommitted changes`。然后 `python -m pytest -q`、`selfcheck.py`、`check-tournament`。**如果按方案 C 交一个单独的公开仓库**（这个开发仓库保持私有）：先在开发仓库里 `bash scripts/publish_sync.sh --commit <main 的提交> --out <目录>`（结尾必须是 `READY`），把导出的内容提交、推送到公开仓库；比赛机从**公开仓库的全新 clone** 部署它 `main` 上最新的提交（不要从开发仓库部署），上面这些检查在那个 clone 里做；dashboard 上登记的提交号（有这个栏的话）也是公开仓库的提交号 | 全绿、每行 ✓；`git status` 干净；提交号 = GitHub 上（参赛的那个仓库）`main` 的最新提交；方案 C：公开仓库最新提交的树哈希（`git rev-parse HEAD^{tree}`）= `publish_sync.sh` 打印的树哈希 |
 | **10-13 23:59** | **10-14 14:59** | **提交截止（2026-10-14T06:59Z）**。之后到成绩公布后至少 30 天，**不往参赛仓库推任何东西**（不提交、不改历史、不改回私有、不删仓库），不换版本；测试赛关闭；Agent Configuration 也不能再切回 Self Hosted | — |
 | 10-14 – 10-15 | | 比赛机保持截止提交；可以在本地测（不改提交的版本）。把截止提交号和比赛机配置（去掉 key 的 `.env`、systemd 单元）记到仓库以外的地方 | `grep 'deployed:' logs/agent-main.out` 的最后一行 = 截止提交号 |
 | 10-16 7:00 | 10-16 22:00 | 确认只有计划中的机器在跑这把 key（主机；热备只在主办方同意后）；`free -m`、`df -h` | 内存 ≥ 1.2 GB × 预计并发场数；磁盘 ≥ 3 GB（日志上限约 2 GB） |
@@ -396,7 +396,7 @@ python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-* --out /tmp/of
 
 ## 上线前检查清单
 
-- [ ] 比赛机部署的是**截止时 `main` 上最新的提交**（不是 tag）：`git rev-parse HEAD` 和 GitHub 上 `main` 一致、`git status` 干净；用压缩包时它是从这个提交重新打的，`COMMIT` 文件是同一个提交号、没有 `built with uncommitted changes`；`python -m pytest -q` 全绿；`python scripts/replay_real.py` 和 `--no-calc` 0 失败
+- [ ] 比赛机部署的是**截止时参赛仓库 `main` 上最新的提交**（不是 tag；方案 C 时是公开仓库的全新 clone，不是开发仓库）：`git rev-parse HEAD` 和 GitHub 上 `main` 一致、`git status` 干净；用压缩包时它是从这个提交重新打的，`COMMIT` 文件是同一个提交号、没有 `built with uncommitted changes`；`python -m pytest -q` 全绿；`python scripts/replay_real.py` 和 `--no-calc` 0 失败
 - [ ] 启动日志里 `deployed: commit <截止提交号> …` 没有 `uncommitted changes`；`settings:` 行只有看门脚本自己设的 `ARENA_DISCOVERY_S` / `ARENA_WORKER_COOLDOWN_S` / `ARENA_RECORD_DIR`（和 `ARENA_LOCK_DIR` 之类本机路径），没有别的 `ARENA_*`
 - [ ] 已加入 Discord 并打开通知；10:00 PDT 前看过 dashboard 没有待同意的规则；`logs/manual-actions.txt` 的写法会用；管运维的人不开观战页
 - [ ] `.venv/bin/python scripts/selfcheck.py` → `selfcheck: ready`，且有 `OK    damage calculator answers`、`OK    battle policy: engine search` 和 `OK    Official Agent Key configured … (python -m agent --tournament --match …)`
