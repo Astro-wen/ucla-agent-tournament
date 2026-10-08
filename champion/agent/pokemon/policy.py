@@ -552,11 +552,15 @@ class PokemonPolicy:
         self._degraded_logged = -DEGRADED_WINDOW
         self.last_search_brief: dict | None = None
         self._battle_warm = False                # the engine was started at this policy's first battle decision
-        # The doubles decision last answered and the per-battle memory as it was before that answer: a second ask of
-        # the same decision (the runner re-asks after a race error; a restarted worker re-asks the one its predecessor
-        # died on) starts from the same memory (`_same_decision`).
+        # The battle decision point last answered (`decision_point`) and the per-battle memory as it was before that
+        # answer: a second ask of the same point (the runner re-reads and asks again after a move it could not send or a
+        # race error; a restarted worker re-asks the one its predecessor died on) starts from the same memory
+        # (`_same_decision`), and a move the server refused is rolled back (`undelivered`). `_asked`: the point of this
+        # policy's latest act() call (None when that was no battle decision); `redecided`: points asked again.
         self._decision_key: tuple | None = None
         self._decision_mem: dict | None = None
+        self._asked: tuple | None = None
+        self.redecided = 0
 
     def _warm_calc(self) -> None:
         """Pay the node + @smogon/calc start-up before the first battle decision (the draft, teambuild and team
@@ -653,7 +657,7 @@ class PokemonPolicy:
     MATCH_MEMORY = ("cards", "opp_cards", "draft_pool", "me", "game_type", "opp_roster", "lineup_prior", "seen_foes",
                     "prev_active", "prev_opp", "opp_prev_active", "last_protect", "last_move", "cond_set",
                     "_active_sets", "_entry_fallen", "singles_prev", "_decision_key", "_decision_mem",
-                    "search_stats", "lookahead_skipped", "search_slow", "search_lite", "_lite_fast")
+                    "search_stats", "lookahead_skipped", "search_slow", "search_lite", "_lite_fast", "redecided")
 
     def export_memory(self) -> dict:
         """The match memory (MATCH_MEMORY, the sets seen beyond the card catalog, recent diagnostics) for
@@ -681,6 +685,7 @@ class PokemonPolicy:
 
     # ---- dispatch ------------------------------------------------------
     def act(self, st: dict) -> dict:
+        self._asked = None                      # (set again by a battle decision's `_same_decision`)
         obs = st.get("observation") or {}
         if not isinstance(obs, dict):
             raise TypeError(f"observation is a {type(obs).__name__}, not a dict")
@@ -922,6 +927,7 @@ class PokemonPolicy:
         self.cond_set.clear()
         self.seen_foes = []
         self.lineup_prior = None
+        self._decision_key = self._decision_mem = None      # (a decision point of the last battle never comes back)
 
     def _preview_matrix(self, obs: dict, session_id: str) -> dict | None:
         fmt = to_id(obs.get("battle_format") or "")
@@ -1298,6 +1304,7 @@ class PokemonPolicy:
     def _singles(self, st: dict, obs: dict) -> dict:
         """Singles: agent/pokemon/singles.py (sets per format, one-turn payoff table with the foe's replies, switching,
         KO races); the v3 stand-alone scorer below when it is off, fails or the calculator is unavailable."""
+        self._same_decision(st, obs)             # singles.decide writes its memory (singles_prev) when it answers
         if USE_SINGLES:
             try:
                 from . import singles
@@ -1373,25 +1380,55 @@ class PokemonPolicy:
             log.warning("singles damage table failed; using the heuristic", exc_info=True)
             return None
 
-    _TURN_MEMORY = ("prev_active", "prev_opp", "opp_prev_active", "last_protect", "last_move", "cond_set")
+    # The per-battle memory a battle decision writes as it answers, for the next decision to read: who was on the field
+    # (Fake Out freshness), our last actions (Protect chains), the speed-control start turns, the singles memory.
+    _TURN_MEMORY = ("prev_active", "prev_opp", "opp_prev_active", "last_protect", "last_move", "cond_set",
+                    "singles_prev")
 
     def _same_decision(self, st: dict, obs: dict) -> None:
-        """Make a doubles decision idempotent: the end of `_doubles` updates the per-battle memory (who was on the
-        field: Fake Out freshness; last actions: Protect chains), so a second ask of the same decision would read the
-        memory its first ask left and could answer differently (turn 1: Fake Out dropped). The same decision (session,
-        state_version, turn, forced slots) restores the memory from before its first ask; any other decision
-        snapshots it. Never raises."""
+        """Make a battle decision idempotent. `_doubles` / singles.decide update the per-battle memory (_TURN_MEMORY)
+        with the move they answer, so a second ask of the same decision point would read the memory its first ask left,
+        as if that move had been played (turn 1: Fake Out dropped; Protect: "twice in a row", never). That happens when
+        the move did not land: the runner re-reads the state and asks again after a move it could not send (SDK PR #7)
+        or a race error, and a restarted worker re-asks the one its predecessor died on (agent/matchstate.py saves this
+        snapshot with the rest of the match memory). The same point (`decision_point`: the battle's position, whatever
+        the state_version) restores the memory from before its first ask; any other point snapshots it. Never raises."""
         try:
-            key = (st.get("session_id"), st.get("state_version"), obs.get("turn"),
-                   tuple(bool(_forced(obs, i)) for i in (0, 1)))
+            key = decision_point(st, obs)
+            self._asked = key
             if key == self._decision_key and self._decision_mem is not None:
                 for k, v in self._decision_mem.items():
                     setattr(self, k, copy.deepcopy(v))
+                self.redecided += 1
+                log.info("battle decision point asked again (turn %s, version %s): memory from before its first ask",
+                         obs.get("turn"), st.get("state_version"))
             else:
                 self._decision_key = key
                 self._decision_mem = {k: copy.deepcopy(getattr(self, k)) for k in self._TURN_MEMORY}
         except Exception:
             log.debug("decision memory snapshot failed", exc_info=True)
+
+    def undelivered(self) -> bool:
+        """The move of this policy's latest decision did not land (the server refused it: Contestant.on_action_result).
+        If that was a battle decision, what the memory says about OUR action goes back: the Protect turns as before it,
+        and the last action of every slot it chose for is unknown (a normal decision: both slots; a forced switch: as
+        before it), because the move timer played a random choice for us (STALE_STATE / NOT_YOUR_TURN: the decision
+        closed). What the decision saw stays (who was on the field, speed-control turns): that turn happened. The same
+        point asked again restores all of its memory anyway (`_same_decision`). True when something was rolled back.
+        Never raises."""
+        try:
+            if self._asked is None or self._asked != self._decision_key or self._decision_mem is None:
+                return False
+            mem = self._decision_mem
+            forced = self._asked[2] if len(self._asked) > 2 and isinstance(self._asked[2], tuple) else (False, False)
+            self.last_protect = copy.deepcopy(mem.get("last_protect", {}))
+            self.last_move = copy.deepcopy(mem.get("last_move", {})) if any(forced) else {}
+            if isinstance(self.singles_prev, dict) and "protect" in self.singles_prev:
+                self.singles_prev["protect"] = None
+            return True
+        except Exception:
+            log.debug("decision memory rollback failed", exc_info=True)
+            return False
 
     def _doubles(self, st: dict, obs: dict) -> dict:
         t0 = time.monotonic()
@@ -2073,6 +2110,49 @@ def _battle_kind(st: dict, obs: dict) -> str | None:
 def _forced(obs: dict, i: int) -> bool:
     fs = obs.get("force_switch")
     return bool(fs[i]) if isinstance(fs, list) and i < len(fs) else bool(fs)
+
+
+# Protocol lines that mean the battle moved (a move, a switch-in, a faint, damage, a new turn). Their count tells apart
+# two decision points of one battle turn that force the same slot (our own U-turn, then a faint later that turn); timer
+# and chat lines (|inactive|, |c|) can arrive while a decision waits and are not counted.
+_EVENT_TAGS = frozenset({"move", "switch", "drag", "replace", "faint", "-damage", "-heal", "turn", "cant", "swap",
+                         "detailschange", "-formechange"})
+
+
+def _mon_point(m) -> tuple | None:
+    if not isinstance(m, dict) or not m.get("species"):
+        return None
+    try:
+        hp = m.get("current_hp_fraction")
+        hp = None if hp is None else float(hp)
+    except (TypeError, ValueError):
+        hp = None
+    return to_id(str(m["species"])), hp, bool(m.get("fainted"))
+
+
+def decision_point(st: dict, obs: dict) -> tuple:
+    """Which battle decision a state asks for: the session, the battle turn, the forced slots, both sides' actives
+    (species, HP, fainted) and how many battle events the protocol log holds. A re-read of an unanswered decision gives
+    the same point; any later decision of the battle gives another (a new turn, or within a turn something happened).
+    The state_version is left out (when the turn is known): it moves with our decisions, not with the battle, so the
+    same point under another version is still the decision whose move did not land. Never raises."""
+    try:
+        turn = obs.get("turn")
+        lines = obs.get("protocol_log")
+        events = None
+        if isinstance(lines, list):
+            events = sum(1 for x in lines if isinstance(x, str) and x[:1] == "|" and x.split("|", 2)[1] in _EVENT_TAGS)
+        sides = []
+        for key in ("active_pokemon", "opponent_active_pokemon"):
+            mons = obs.get(key)
+            mons = mons if isinstance(mons, list) else [mons]
+            sides.append(tuple(_mon_point(m) for m in mons[:2]))
+        point = (st.get("session_id"), turn, tuple(bool(_forced(obs, i)) for i in (0, 1)), sides[0], sides[1], events)
+        if not isinstance(turn, int) or isinstance(turn, bool):
+            point += (st.get("state_version"),)        # no battle turn to go by: only the same version is the same
+        return point
+    except Exception:
+        return ("?", st.get("session_id"), st.get("state_version"), obs.get("turn"))
 
 
 def _status_value(mid: str, hp: float, turn: int, obs: dict) -> float:
