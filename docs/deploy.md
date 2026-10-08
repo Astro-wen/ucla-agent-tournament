@@ -112,6 +112,8 @@ Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）；一�
 
 ### 上游缺陷（请主人报告给主办方；我们这边已经绕开）
 
+（另：一个疑似平台问题由主人私下报告主办方，仓库里不写细节；规则第 7 节要求疑似漏洞私下报告。）
+
 1. **重新认证一次失败就杀掉所有对局**：`altruagent/official.py` 的 `OfficialAgentAuth.login` 对 `/tournament/agent/authenticate` 的任何非 200 都抛 `OfficialAgentError`（`AuthenticationError` 的子类），而 `supervisor.run_tournament_once` 只捕获 `PlatformError`。一次 429 / 502 / 503 就让 `run_tournament_forever` 退出并终止所有 worker。**上游已在 10-06 修复**（1372ccc，随 PR #5 合进上游 main 5bc61a2：`is_fatal_auth_error`，只有 key 被拒和报名没完成才退出，其余暂停 10–60 s 再查），10-07 合进本仓库，我们自己的绕法（`_SteadyOfficial`）已删掉；这条不用再报。当初准备的英文：
    > In the official tournament runtime, a single transient failure of `POST /tournament/agent/authenticate` during re-authentication (429 rate_limited, 502, 503) ends `run_tournament_forever` and its `finally` terminates every running match worker: `OfficialAgentAuth.login` raises `OfficialAgentError` (an `AuthenticationError`) for any non-200 answer, and `run_tournament_once` only catches `PlatformError`. Suggested fix: raise `PlatformError` for 429/5xx/network errors in `login` (or treat them like `PlatformError` in `run_tournament_once`), and keep only a rejected key fatal.
 2. **每个 worker 各自认证一次**：一个运行时 = 1 + 座位数个 agent session；开赛时同时分到多场会集中打认证接口（限流阈值未知）。worker 第一次拿座位时认证失败 = 该座位 worker 退出，等冷却后重来。**上游 PR #7 已修**（v4.2.4 合进来）：supervisor 把自己的 agent session 交给 worker（过期了 worker 才自己登录），拿座位的暂时故障在 worker 里重试 60 s，再由 supervisor 在连接窗口内立刻重来；这条不用再报。
@@ -379,7 +381,7 @@ python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-* --out /tmp/of
 
 开关是环境变量 `ARENA_REASONING`（启动前设置；用看门脚本时写进 `.env`）：
 - 不设或 `safe`：上面的默认行为。
-- `detail`：预览写两只首发，对战写本回合选的招式、目标、换人（从不写别的选项）。只有在主办方确认观战要等双方都出手后才显示时再用，否则对手可能先看到我们的守住或换人。
+- `detail`：预览写两只首发，对战写本回合选的招式、目标、换人（从不写别的选项）。比赛不用它：公开理由按「对手也能看到」处理，写出选择就等于亮底牌。
 - `off`（或 `0`）：完全不附理由，发给平台的内容与加这个功能之前一模一样。
 
 ## 狼人杀聊天
@@ -387,8 +389,8 @@ python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-* --out /tmp/of
 - 说的话全部来自固定模板（`agent/werewolf/policy.py`），发出前再过一遍 `chat_guard`：狼从不在公开聊天里提队友的座位、不说自己是狼、不提夜里的计划；村民从不假跳预言家；只有预言家决定跳的时候才公开查验结果；私信只可能是狼发给活着的队友。
 - 别人的聊天一律当作不可信的文字：只从里面读「谁跳了预言家、说谁是狼 / 好人、说谁可疑 / 要投谁」这几类事实，权重有上限；像「ignore previous instructions」「[SYSTEM]」「moderator:」这种想给大家下指令的消息整条不读，发送者可疑度略加。能读懂随意的写法：p3、player 3、seat #3、显示名、「3 is wolf」「im seer」「sus」，全角字符也行；引号里转述别人的话不算。
 - 同一个讨论窗口里，我们一旦发了 terminate（或平台把我们列进 `terminated_messaging`），之后只会再发 terminate，不会再发聊天；同一句话一天只发一次。
-- 私信默认**关闭**。简报确认不需要登录的观战接口 `/games/{id}/spectate` 会显示每条聊天的收件人，SSE 消息事件还可能带私信内容：狼给队友发一条私信，观众（包括其他参赛者）就能看出两匹狼是谁、当晚刀谁。两匹狼按同一份公开记录算出同一个夜刀目标，不靠私信也不会分票；本地评测里单座位时私信没有可测出的收益。
-- 只有设了环境变量 `ARENA_WW_DM=on`（启动 `python -m agent` 前设置；`1` / `true` / `yes` 也行）才会打开：狼白天第一条消息私信队友夜刀目标（「Tonight: PlayerN.」，两匹狼座位小的那个说了算）。只有主办方确认观战看不到私信的收件人和内容时再打开。无论开不开，队友（座位更小的那匹狼）发来的夜刀私信我们都会照着刀。
+- 私信默认**关闭**：两匹狼按同一份公开记录算出同一个夜刀目标，不靠私信也不会分票；本地评测里单座位时私信没有可测出的收益（`docs/progress.md`）。
+- 只有设了环境变量 `ARENA_WW_DM=on`（启动 `python -m agent` 前设置；`1` / `true` / `yes` 也行）才会打开：狼白天第一条消息私信队友夜刀目标（「Tonight: PlayerN.」，两匹狼座位小的那个说了算）。比赛不开（`README.md`「Settings used in competition」写的是 off；比赛中改它算改配置，要主办方授权）。无论开不开，队友（座位更小的那匹狼）发来的夜刀私信我们都会照着刀。
 - 收件人不合法的私信直接丢掉，绝不会改成公开发送。
 - 「多听一会儿」（环境变量 `ARENA_WW_LISTEN`，默认**关闭**，`on` 打开）：打开后，我方开场发言之后不马上结束发言，而是继续读讨论窗口（用 runner 自己的连接做只读的 `wait_for_update`，读不算「活动」），出现值得回应的话（比如有人跳预言家说我们是狼）就补一条回应，每天最多 1 条；其他座位都结束了、24 s 没人说话、或离窗口关闭只剩 15 s 时结束发言（120 s 窗口下的数，按窗口长度的 1/5 和 1/8 算）。为此它要在调用栈里找到 SDK `run_game` 的 `game` 变量：SDK 改了形状就找不到，这时自动退回「不听」（已测，不会有异常传给 runner）。关闭时和不带这个功能的版本逐个决策相同。本地只在一种模拟节奏下看到每座约 +0.6 个百分点的小收益，真 runner 替身上胜负没变，所以默认关（数字见 `docs/progress.md`）。
 

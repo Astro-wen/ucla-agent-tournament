@@ -285,8 +285,8 @@ def test_wolf_dm_goes_to_the_living_ally_and_the_lower_seat_decides(monkeypatch)
 
 
 def test_wolf_dms_are_off_by_default(monkeypatch):
-    """Review finding: the spectate feed shows DM recipients, so a wolf-to-wolf DM names both wolves. DMs go out only
-    with ARENA_WW_DM=on."""
+    """Wolf-to-wolf DMs are off by default (both wolves derive the same kill target from the public record); they go
+    out only with ARENA_WW_DM=on."""
     monkeypatch.delenv(P.DM_ENV, raising=False)
     assert not P.dm_enabled()
     st = state("Your role: WOLF\nYour fellow wolves: Player5", "day_vote", [], me=3, phase="messaging")
