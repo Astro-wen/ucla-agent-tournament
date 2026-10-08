@@ -180,6 +180,26 @@ def finalize(cands: list[Cand], view, ledger, *, urgent_only: bool = False) -> t
     return out, kept, dropped
 
 
+def fragile(order: dict) -> bool:
+    """An order the platform may refuse because the world moved between our view and its check (a target out of
+    sight, a building no longer ready, one or two units that just died)."""
+    cmd = order.get("cmd")
+    if cmd in ("attack", "place", "cancel", "guard", "enter_transport", "repair", "rally", "set_primary",
+               "power_toggle", "sell"):
+        return True                                  # (a building order: the building may have just been destroyed)
+    return cmd in UNIT_CMDS and len(order.get("units") or []) <= 2
+
+
+def anchor(view) -> dict | None:
+    """An order that is valid on any live state and costs no engine command: power on a building that is not powered
+    down (`ok already_on`). Sent along with a batch of fragile orders so the batch is never refused as a whole."""
+    blds = [b for b in view.buildings if not b.get("powered_down")]
+    if not blds:
+        return None
+    b = max(blds, key=lambda b: (b["type"] == "fact", b["hp"], -b["id"]))
+    return {"cmd": "power_toggle", "building": b["id"], "on": True}
+
+
 def noop(view) -> dict | None:
     """A batch member that is always valid and changes nothing (windows mode needs one valid order per window):
     re-set a unit's current stance, else a power-on of a building that is not powered down (`ok already_on`)."""

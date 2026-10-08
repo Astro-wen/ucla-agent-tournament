@@ -646,10 +646,15 @@ def test_the_llm_like_bot_makes_refused_orders_and_the_runner_keeps_going():
     assert a["batches_per_s"] < 0.25                                  # one batch every 5-10 s
 
 
-def test_our_deployed_agent_plays_a_match_on_the_sim():
+def test_our_deployed_agent_plays_a_match_on_the_sim(monkeypatch):
+    monkeypatch.setenv("ARENA_RA", "off")                           # the bot's off switch: WAIT at every view
     row = play_match(make_factory("ours")(1), make_bot("idle", 2), seed=3, map_id="sidestep", max_minutes=1)
     assert row["result_a"] == "draw" and row["reason"] == "time_limit"
     assert row["a"]["error"] is None and row["a"]["batches"] == 0 and row["a"]["decisions"] > 100
+    monkeypatch.delenv("ARENA_RA")                                  # the bot (agent/redalert): it builds a base
+    row = play_match(make_factory("ours")(1), make_bot("idle", 2), seed=3, map_id="sidestep", max_minutes=1)
+    assert row["result_a"] == "win" and row["reason"] == "time_limit"   # (more assets than an undeployed MCV)
+    assert row["a"]["error"] is None and row["a"]["batches"] >= 5 and row["a"]["invalid_actions"] == 0
 
 
 def test_realtime_clock_runs_at_the_speed_factor():
@@ -679,9 +684,12 @@ def test_wait_only_agents_never_send_and_bots_wait_before_the_start():
     assert bot.choose_action(st, None) is WAIT
 
 
-def test_fake_platform_red_alert_match_against_a_rusher_over_mcp(tmp_path, monkeypatch):
-    """local/fake_platform.py --official --red-alert 1 --ra-opponent rusher: our deployed agent (WAIT) through the
-    SDK's official worker over HTTP / MCP loses its seat by victory to the scripted rusher on the simulator."""
+@pytest.mark.parametrize("bot", ["off", "on"])
+def test_fake_platform_red_alert_match_against_a_rusher_over_mcp(tmp_path, monkeypatch, bot):
+    """local/fake_platform.py --official --red-alert 1 --ra-opponent rusher: our deployed agent through the SDK's
+    official worker over HTTP / MCP. With ARENA_RA=off (WAIT) it loses its seat by victory to the scripted rusher on
+    the simulator; with the bot (agent/redalert) it plays: batches, no refused batch, the match ends normally."""
+    monkeypatch.setenv("ARENA_RA", bot)
     import os
     import signal
     import socket
@@ -728,8 +736,12 @@ def test_fake_platform_red_alert_match_against_a_rusher_over_mcp(tmp_path, monke
                 break
             time.sleep(0.3)
         ra = next(m for m in st["matches"] if m["game_type"] == "red_alert")
-        assert ra["terminal"] and ra["reason"] == "victory" and ra["win"] is False and not ra["opponent_error"]
-        assert ra["batches"] == 0 and ra["opponent_military"]["kills_cost"] >= 2000
+        if bot == "off":
+            assert ra["terminal"] and ra["reason"] == "victory" and ra["win"] is False and not ra["opponent_error"]
+            assert ra["batches"] == 0 and ra["opponent_military"]["kills_cost"] >= 2000
+        else:
+            assert ra["terminal"] and not ra["error"] and not ra["opponent_error"]
+            assert ra["batches"] >= 20 and ra["invalid_actions"] == 0
     finally:
         proc.send_signal(signal.SIGTERM)
         try:
@@ -763,18 +775,24 @@ def test_windows_mode_one_batch_per_window_and_window_versions():
     assert srv.play_action(0, 1, order)["error"] == "STALE_STATE"                         # > 24 windows old
 
 
-def test_windows_mode_matches_bots_send_noops_and_a_wait_agent_dies():
+def test_windows_mode_matches_bots_send_noops_and_a_wait_agent_dies(monkeypatch):
     row = play_match(make_bot("rusher", 1), make_bot("turtle", 2), seed=6, map_id="sidestep", max_minutes=3,
                      pacing="windows")
     assert row["a"]["error"] is None and row["b"]["error"] is None and row["a"]["batches"] > 10
     assert row["a"]["batches_per_s"] <= 0.2 + 1e-9                  # one batch per 5-second window at most
-    # The deployed agent of v4.2.3 keys its Red Alert path on pacing.mode == "realtime": in windows mode it sends the
-    # generic safe action ({"type": "pass"}), the batch is INVALID_ACTION, and the runner (turn-based there) stops
-    # the seat with a DecisionError, as docs/redalert_design.md section 2.13 predicts.
+    # The deployed agent of v4.2.3 (and ARENA_RA=off since) keys its Red Alert path on pacing.mode == "realtime": in
+    # windows mode it sends the generic safe action ({"type": "pass"}), the batch is INVALID_ACTION, and the runner
+    # (turn-based there) stops the seat with a DecisionError, as docs/redalert_design.md section 2.13 predicts.
+    monkeypatch.setenv("ARENA_RA", "off")
     row = play_match(make_factory("ours")(1), make_bot("idle", 2), seed=6, map_id="sidestep", max_minutes=1,
                      pacing="windows")
     assert row["a"]["error"] and row["a"]["error"].startswith("DecisionError")
     assert row["a"]["invalid_actions"] == 1
+    # The bot (agent/redalert) routes by game type and answers every window with a valid batch (a no-op if need be).
+    monkeypatch.delenv("ARENA_RA")
+    row = play_match(make_factory("ours")(1), make_bot("idle", 2), seed=6, map_id="sidestep", max_minutes=1,
+                     pacing="windows")
+    assert row["a"]["error"] is None and row["a"]["invalid_actions"] == 0 and row["a"]["batches"] >= 10
 
 
 def test_queued_and_starting_phases_come_before_waiting_for_agents():

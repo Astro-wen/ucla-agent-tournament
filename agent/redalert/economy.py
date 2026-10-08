@@ -33,6 +33,8 @@ class Economy:
         self.deploy_fails_seen = 0
         self.deploy_spot = None
         self.old_base = None                  # where our construction yard stood (a new MCV unfolds near it)
+        self.cancels: list = []               # (tick, item) cancelled after failed placements
+        self.full_until = -10 ** 9            # no new buildings before this tick (the base is full)
         self.powered_down: set[int] = set()
         self.late_defenses = 0
         self.lost_fact_at = None
@@ -145,14 +147,19 @@ class Economy:
     def _place(self, v, out) -> None:
         led = self.pol.ledger
         for q, item in v.ready:
-            if led.is_pending(("place", item)):
-                continue
+            if led.is_pending(("place", item)) or led.is_pending(("cancel", item)):
+                continue                                 # (a cancelled item still shows ready until it is applied)
             fails = led.place_invalid.get(item, 0)
             if fails >= 3:
-                # no room for it: cancel (refund) and do not plan it for 60 s
+                # no room for it: cancel (refund) and do not plan it for 60 s; two different items in 3 minutes = the
+                # base is full: no new building for 2 minutes
                 led.place_invalid[item] = 0
                 self.tried_at.pop(item, None)
                 self.blocked[item] = v.tick + 60 * 25
+                self.cancels = [(t, i) for t, i in self.cancels if v.tick - t < 180 * 25] + [(v.tick, item)]
+                if len({i for _t, i in self.cancels}) >= 2 and v.tick >= self.full_until:
+                    self.full_until = v.tick + 120 * 25
+                    self.pol.log_event(f"no room to place buildings at {v.game_s:.0f}s: none planned for 2 minutes")
                 if not led.is_pending(("cancel", item)):
                     out.append(Cand({"cmd": "cancel", "item": item}, key=("cancel", item), urgent=True))
                 continue
@@ -259,7 +266,7 @@ class Economy:
 
     # ---- the Building queue ----
     def _building_queue(self, v, out) -> None:
-        if self.busy(v, "Building"):
+        if self.busy(v, "Building") or v.tick < self.full_until:
             return
         item = self._next_building(v)
         if item is None:
@@ -333,7 +340,7 @@ class Economy:
 
     # ---- the Defense queue: early towers, silos, late towers ----
     def _defense_queue(self, v, out) -> None:
-        if self.busy(v, "Defense"):
+        if self.busy(v, "Defense") or v.tick < self.full_until:
             return
         army = self.pol.army
         rules = v.st.rules

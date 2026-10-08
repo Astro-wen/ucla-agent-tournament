@@ -1011,17 +1011,20 @@ def _is_red_alert(state, context) -> bool:
 
 def _ra_noop(raw: dict):
     """Windows mode's last resort when the bot could not answer: one harmless order that is valid on any live state
-    (re-set a unit's stance, else power on a building), or WAIT when there is nothing at all to name."""
+    (power on a building that is not powered down: `ok already_on`, no engine command; else re-set a unit's stance),
+    or WAIT when there is nothing at all to name."""
     try:
         obs = raw.get("observation") if isinstance(raw.get("observation"), dict) else {}
+        for b in obs.get("buildings") or []:
+            if isinstance(b, dict) and isinstance(b.get("id"), int) and not isinstance(b.get("id"), bool) \
+                    and not b.get("powered_down"):
+                return {"type": "orders", "orders": [{"cmd": "power_toggle", "building": b["id"], "on": True}]}
         for u in obs.get("units") or []:
-            if isinstance(u, dict) and isinstance(u.get("id"), int) and not u.get("wreck"):
+            if isinstance(u, dict) and isinstance(u.get("id"), int) and not isinstance(u.get("id"), bool) \
+                    and not u.get("wreck"):
                 st = u.get("stance") if u.get("stance") in ("hold_fire", "return_fire", "defend",
                                                             "attack_anything") else "defend"
                 return {"type": "orders", "orders": [{"cmd": "set_stance", "units": [u["id"]], "stance": st}]}
-        for b in obs.get("buildings") or []:
-            if isinstance(b, dict) and isinstance(b.get("id"), int) and not b.get("powered_down"):
-                return {"type": "orders", "orders": [{"cmd": "power_toggle", "building": b["id"], "on": True}]}
     except Exception:
         pass
     return WAIT

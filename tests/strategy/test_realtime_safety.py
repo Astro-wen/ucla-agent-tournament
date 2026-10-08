@@ -1,10 +1,12 @@
-"""A real-time game we have no policy for (Red Alert, `pacing.mode == "realtime"`) assigned to our deployed agent.
+"""Red Alert with the bot switched off (ARENA_RA=off): a real-time game our deployed agent does not play.
 
 Upstream's real-time runner (altruagent/runner.py, PR #3) lets choose_action answer altruagent.WAIT and no longer stops on
-a refused batch in real time. Before this, our Contestant answered a Red Alert view with the generic safe action, which
+a refused batch in real time. Before v4.2, our Contestant answered a Red Alert view with the generic safe action, which
 is no order batch at all ({"type": "pass"}: the state lists no legal actions), at every view (~5 a second), recording
-every state. Now it answers WAIT for the whole match: nothing is sent, the runner waits for the next view, the match
-ends normally, one log line, one recorded state. The fixtures are upstream's (tests/test_realtime.py)."""
+every state. With ARENA_RA=off (v4.2-v4.2.3 behaviour, kept as the one-switch fallback since the rule-based bot of
+v4.3, agent/redalert/) it answers WAIT for the whole match: nothing is sent, the runner waits for the next view, the
+match ends normally, one log line, one recorded state. The bot itself is tested in tests/redalert/. The fixtures are
+upstream's (tests/test_realtime.py)."""
 from __future__ import annotations
 
 import importlib.util
@@ -29,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[2]
 @pytest.fixture(autouse=True)
 def _no_recording(monkeypatch):
     monkeypatch.setenv("ARENA_RECORD", "0")             # (the deployed agent's default is on: logs/<session>.jsonl)
+    monkeypatch.setenv("ARENA_RA", "off")               # the bot's off switch: every test here is the WAIT path
 
 
 def _match(views: int) -> RealtimeFakeGame:

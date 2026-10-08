@@ -21,7 +21,7 @@ from . import safe
 from .army import Army
 from .economy import Economy
 from .ledger import Ledger
-from .orders import finalize, noop
+from .orders import MAX_ORDERS, Cand, anchor, finalize, fragile, noop
 from .params import load as load_params
 from .production import Production
 from .world import Static, View
@@ -61,6 +61,7 @@ class RedAlertPolicy:
         self.waits = 0
         self.dropped = 0
         self.noops = 0
+        self.anchors = 0
         self.first: dict[str, float] = {}
         self.max_army = 0
         self.low_power_s = 0.0
@@ -126,7 +127,7 @@ class RedAlertPolicy:
     def _noop(self):
         try:
             if self.view is not None:
-                o = noop(self.view)
+                o = anchor(self.view) or noop(self.view)
                 if o is not None:
                     return [o]
         except Exception as e:                              # noqa: BLE001
@@ -177,6 +178,15 @@ class RedAlertPolicy:
             self.tag = self.army.tag
         orders, kept, dropped = finalize(cands, v, self.ledger, urgent_only=not allow)
         self.dropped += dropped
+        if orders and (v.windows or all(fragile(o) for o in orders)) and len(orders) < MAX_ORDERS:
+            # a batch the world could invalidate as a whole before the runner checks it (in windows mode that would
+            # end the seat): add an order that is always valid and costs no engine command
+            a = anchor(v)
+            if a is not None and not any(o.get("cmd") == "power_toggle" and o.get("building") == a["building"]
+                                         for o in orders):
+                orders.append(a)
+                kept.append(Cand(a))
+                self.anchors += 1
         new = self.ledger.take_new_reasons()
         if new:
             for r in new:
@@ -233,6 +243,7 @@ class RedAlertPolicy:
             "first_weap_s": self.first.get("weap"), "first_fix_s": self.first.get("fix"), "max_army": self.max_army,
             "K": v.kills if v else None, "D": v.deaths if v else None, "assets": v.assets if v else None,
             "batches": self.batches, "orders": self.orders_sent, "waits": self.waits, "noops": self.noops,
+            "anchors": self.anchors,
             "rejected": dict(self.ledger.reasons), "lost": self.ledger.lost,
             "invalid_action": self.ledger.invalid_actions, "errors": dict(self.ledger.errors),
             "ms_p50": round(ms[len(ms) // 2], 2) if ms else None,
@@ -250,6 +261,6 @@ class RedAlertPolicy:
                 f"first_weap_s={s['first_weap_s']} first_fix_s={s['first_fix_s']} max_army={s['max_army']} "
                 f"K={s['K']} D={s['D']} assets={s['assets']} game_s={s['game_s']} batches={s['batches']} "
                 f"orders={s['orders']} rejected={rej} lost={s['lost']} invalid_action={s['invalid_action']} "
-                f"waits={s['waits']} noops={s['noops']} ms_p50={s['ms_p50']} ms_p99={s['ms_p99']} "
+                f"waits={s['waits']} noops={s['noops']} anchors={s['anchors']} ms_p50={s['ms_p50']} ms_p99={s['ms_p99']} "
                 f"exceptions={s['exceptions']} safe_mode={s['safe_mode']} low_power_s={s['low_power_s']} "
                 f"waves={s['army']['waves']}")
