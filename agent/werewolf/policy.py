@@ -35,6 +35,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import lru_cache
 
+from . import infer
 from .state import ChatFacts, RoleCheck, View, normalize, parse, read_chat
 
 ABSTAIN = "7"
@@ -52,6 +53,16 @@ PRESSURE = 2            # distinct living seats pressing the seer today that mak
 DM_ENV = "ARENA_WW_DM"
 _ON = {"1", "on", "true", "yes", "enable", "enabled"}
 _CLAIMED_SEER = "remove the claimed seer"
+
+
+EXP_ENV = "ARENA_WW_EXP"     # TEMP (red-team experiments): comma list of switches; removed before shipping
+_EXP_OVERRIDE = None         # TEMP: a set of switches that replaces the environment (per-spec experiment wrappers)
+
+
+def _exp(name: str) -> bool:
+    if _EXP_OVERRIDE is not None:
+        return name in _EXP_OVERRIDE
+    return name in {x.strip() for x in str(os.environ.get(EXP_ENV, "")).split(",")}
 
 
 def dm_enabled() -> bool:
@@ -74,6 +85,7 @@ class Claims:
     liars: set[int] = field(default_factory=set)
     trusted: int | None = None                                   # the one claimer the table should follow
     reactive: set[int] = field(default_factory=set)              # claimed only after being named wolf by a claimer
+    day: dict[int, int] = field(default_factory=dict)            # claimer -> the day of its first claim (if known)
 
     def trusted_wolves(self, alive) -> list[int]:
         if self.trusted is None:
@@ -186,6 +198,8 @@ class WerewolfPolicy:
             if sender not in c.wolves:
                 c.wolves[sender], c.clears[sender] = set(), set()
                 c.order.append(sender)
+                if isinstance(_day, int):
+                    c.day[sender] = _day
                 if sender in named_by_claimer:
                     c.reactive.add(sender)
             c.wolves[sender] |= f.wolves
@@ -262,10 +276,12 @@ class WerewolfPolicy:
             for t in c.trusted_clears():
                 score[t] += TRUSTED_CLEAR
         else:
+            cn = _exp("cn")
             for s in live_claimers:       # contested: at least one of them is lying
                 score[s] += CONTESTED + (REACTIVE if s in c.reactive else 0.0)
                 for t in c.wolves.get(s, ()):
-                    score[t] += CONTESTED_NAMED
+                    if not (cn and t in live_claimers):
+                        score[t] += CONTESTED_NAMED
         return {s: score[s] for s in v.alive}
 
     @staticmethod
@@ -399,31 +415,72 @@ class WerewolfPolicy:
             return (min(targets) if targets else None), "default"
         return min(pool, key=lambda s: (sus[s], s)), "remove the most trusted villager"
 
+    @classmethod
+    def posterior(cls, v: View, private: bool = True):
+        """P(wolf), P(seer) per seat from agent/werewolf/infer.py (None: no deal fits, or it failed)."""
+        try:
+            c = cls.claims(v, private=private)
+            acc = [(day, sender, t) for _seq, sender, f, day in _chats(v)
+                   if isinstance(day, int) and not f.injection and not f.claim and sender not in c.wolves
+                   for t in (f.wolves | f.sus)]
+            return infer.posterior(v, c, acc, private)
+        except Exception:
+            return None
+
+    @classmethod
+    def _converge(cls, v: View, cands: list[int]) -> int:
+        """Of several seats we are sure are wolves (in our order of preference), the one the table is already pushing:
+        another candidate replaces the first only with strictly more distinct speakers naming it today. Voting our own
+        first choice while the table votes another sure wolf splits the vote and gives the wolves a free day."""
+        best, top = cands[0], cls.pressure_on(v, cands[0])
+        for s in cands[1:]:
+            p = cls.pressure_on(v, s)
+            if p > top:
+                best, top = s, p
+        return best
+
+    @staticmethod
+    def seer_wolves(v: View) -> list[int]:
+        """Living wolves the seer knows: its checked wolves first, then the ones it deduced (seer_knowledge)."""
+        wolves, _ = WerewolfPolicy.seer_knowledge(v)
+        return sorted(wolves, key=lambda s: (v.investigations.get(s) != "wolf", s))
+
     def _day_vote(self, v: View, targets: list[int]) -> tuple[int | None, str]:
         if v.role == "seer":
             wolves, clears = self.seer_knowledge(v)
-            known = [s for s in wolves if s in targets]
+            known = [s for s in self.seer_wolves(v) if s in targets]
             if known:
-                return min(known), "seer result: wolf"
+                return self._converge(v, known), "seer result: wolf"
             c = self.claims(v, private=True)
-            liars = [s for s in sorted(c.liars) if s in targets]
+            liars = [s for s in sorted(c.liars) if s in targets and s not in clears]   # a cleared bluffer is no wolf
             if liars:
                 return liars[0], "fake seer claim"
             sus = self.suspicion(v, exclude=set(clears))
             pool = [t for t in targets if t not in clears] or targets
+            post = self.posterior(v) if _exp("bayes") and (v.votes or c.order) else None
+            if post:
+                return max(pool, key=lambda s: (round(post[0][s], 3), round(sus.get(s, 0.0), 3), -s)), "most likely wolf"
             return self._top(sus, pool), "highest suspicion among unread seats"
         if v.role == "wolf":
             return self._wolf_vote(v, targets)
         c = self.claims(v, private=True)
         known = [t for t in c.trusted_wolves(v.alive) if t in targets]
         if known:
-            return known[0], "follow the seer: named wolf"
+            if c.trusted is not None and v.dead.get(c.trusted) == "seer":
+                known += [s for s in sorted(c.liars) if s in targets and s not in known and s != c.trusted]
+            return self._converge(v, known), "follow the seer: named wolf"
         sus = self.suspicion(v)
         live = [s for s in c.live(v) if s in targets]
+        post = self.posterior(v) if (_exp("bayes") or _exp("bayesc")) and (v.votes or c.order) else None
         if c.trusted is None and len(live) >= 2:
+            if post:
+                return max(live, key=lambda s: (round(post[0][s], 3), round(sus.get(s, 0.0), 3), -s)), \
+                    "counter-claim: the likelier wolf of the claimants"
             return self._top(sus, live), "counter-claim: vote one of the claimants"
         cleared = c.trusted_clears()
         pool = [t for t in targets if t not in cleared] or targets
+        if post and _exp("bayes"):
+            return max(pool, key=lambda s: (round(post[0][s], 3), round(sus.get(s, 0.0), 3), -s)), "most likely wolf"
         pick = self._top(sus, pool)
         return pick, "highest public suspicion (never abstain — stall rule favors wolves)"
 
@@ -436,8 +493,26 @@ class WerewolfPolicy:
             rivals = [s for s in live if s in pool]
             if rivals:
                 return min(rivals), "claim fight"
+        ally = self._doomed_ally(v, c, targets)
+        if ally is not None:
+            return ally, "the table follows the seer onto my ally: vote with it"
         sus = self.suspicion(v, exclude=set(v.allies))
         return self._top(sus, pool), "vote with the table"
+
+    def _doomed_ally(self, v: View, c: Claims, targets: list[int]) -> int | None:
+        """The ally a trusted seer claim names (and not me) when the table will vote it out anyway (EXP bus / busd)."""
+        if not (_exp("bus") or _exp("busd")) or c.trusted is None or c.trusted in (v.me, *v.allies):
+            return None
+        named = c.wolves.get(c.trusted, set())
+        if v.me in named:
+            return None
+        allies = [a for a in v.allies if a in named and a in targets and a in v.alive]
+        if not allies:
+            return None
+        a = allies[0]
+        if _exp("busd") and v.dead.get(c.trusted) != "seer" and self.pressure_on(v, a) < 2:
+            return None
+        return a
 
     def fallback(self, st: dict) -> dict:
         legal = self._legal(st)
@@ -498,8 +573,9 @@ class WerewolfPolicy:
         return out
 
     def _seer_chat(self, v: View, c: Claims):
-        wolves, clears = self.seer_knowledge(v)
-        fakes = [s for s in c.order if s in c.liars and s in v.alive and s != v.me]
+        _, clears = self.seer_knowledge(v)
+        wolves = self.seer_wolves(v)
+        fakes = [s for s in c.order if s in c.liars and s in v.alive and s != v.me and s not in clears]
         clear_txt = " ".join(f"Player{x} is clear." for x in clears[:3])
         if wolves:
             w = wolves[0]
@@ -536,12 +612,29 @@ class WerewolfPolicy:
             return None
         accusers = [s for s in c.order if s in v.alive and s != v.me and v.me in c.wolves.get(s, set())]
         if not accusers:
+            if _exp("busfollow"):
+                others = [s for s in v.alive if s != v.me]
+                ally = self._doomed_ally(v, c, others)
+                if ally is not None:
+                    return "bus", {"content": f"Following the Seer (Player{c.trusted}): I vote Player{ally}. "
+                                              f"Everyone vote Player{ally} so we do not split.", "recipients": []}
             return None
         a = accusers[0]
+        if _exp("denyw"):
+            return "deny", self._deny(a)
         return "counter", {"content": f"I am the Seer. Player{a} is a WOLF and is lying about being Seer. Vote Player{a}.",
                            "recipients": []}
 
+    @staticmethod
+    def _deny(a: int) -> dict:
+        return {"content": f"Player{a} is lying: I am not a wolf, so Player{a} is a fake Seer. Vote Player{a}.",
+                "recipients": []}
+
     def _villager_chat(self, v: View, c: Claims):
+        if _exp("deny") and v.role == "villager":
+            framers = [s for s in c.order if s in v.alive and s != v.me and v.me in c.wolves.get(s, set())]
+            if framers:
+                return "deny", self._deny(framers[0])
         known = c.trusted_wolves(v.alive)
         if known and c.trusted != v.me:
             return "follow", {"content": f"Following the Seer (Player{c.trusted}): I vote Player{known[0]}. "
@@ -564,7 +657,7 @@ class WerewolfPolicy:
             sus = self.suspicion(v, exclude=set(self.seer_knowledge(v)[1]))
         else:
             sus = self.suspicion(v)
-        if pick is not None and sus.get(pick, 0) > 0:
+        if pick is not None and ((sus.get(pick, 0) > 0 and not _exp("fab")) or (_exp("fab") and v.votes)):
             return {"content": f"My read from the vote record: Player{pick} is most suspicious. "
                                f"I'll vote Player{pick} unless someone has better info.", "recipients": []}
         if pick is not None:
@@ -581,6 +674,7 @@ _SELF_WOLF = re.compile(r"(?i)\b(?:i am|i'm|im|we are|we're|us)\s+(?:a\s+|the\s+
                         r"\bally\b|\ballies\b|\btonight\b|\bkill")
 _SEER_CLAIM_OUT = re.compile(r"(?i)\b(?:i am|i'm|im)\s+(?:the\s+)?(?:real\s+|true\s+)?seer\b")
 _RESULT_OUT = re.compile(r"(?i)player\d+\s+is\s+(?:a\s+)?(?:wolf|clear|villager)")
+_BUS_OUT = re.compile(r"Following the Seer \(Player\d\): I vote Player\d\. Everyone vote Player\d so we do not split\.")
 _WORD_CAP = 50
 _CHAR_CAP = 1024        # MESSAGE_TOO_LONG over 1024 characters (werewolf.md §8); counted in UTF-8 bytes, which is
 #                         never fewer than the characters or UTF-16 units the server might count
@@ -604,7 +698,8 @@ def chat_guard(msg, v: View, topic: str):
         if _SELF_WOLF.search(text):
             return None
         mentioned = {int(x) for x in re.findall(r"(?i)player(\d+)", text)}
-        if mentioned & set(v.allies) or re.search(rf"(?i)player{v.me}\s+is\s+(?:a\s+)?wolf", text):
+        bus = topic == "bus" and _BUS_OUT.fullmatch(text)       # following the seer onto a doomed ally, villager words
+        if (mentioned & set(v.allies) and not bus) or re.search(rf"(?i)player{v.me}\s+is\s+(?:a\s+)?wolf", text):
             return None
         if _SEER_CLAIM_OUT.search(text) and topic != "counter":
             return None
