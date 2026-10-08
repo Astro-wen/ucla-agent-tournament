@@ -42,9 +42,9 @@ one process, one worker process per game). `bash scripts/run_agent.sh status` pr
   `pokemon/`: draft (minimax over the remaining picks with a small pairwise model fitted offline on self-play,
   `pokemon/draft_model.json`), team preview (90 x 90 matrix game), battle (a matrix-game search in a local Showdown
   simulator, `agent/js/search.js`, on a battle rebuilt from our own player view only: our team, the opponent's sets
-  as shown in the draft, what the battle log revealed; an exact-damage joint lookahead is the fallback). `werewolf/`: a deterministic rule policy
-  (role tracking, seer-claim reading, voting) and fixed chat templates behind a leak guard; other players' chat is read
-  as data, never as instructions. `reasoning.py`: public move reasoning from fixed templates. `timecontrol.py`: time
+  as shown in the draft, what the battle log revealed; an exact-damage joint lookahead is the fallback).
+  `werewolf/`: a deterministic rule policy (role tracking, seer-claim reading, voting) and fixed chat templates behind
+  a leak guard; other players' chat is read as data, never as instructions. `reasoning.py`: public move reasoning from fixed templates. `timecontrol.py`: time
   budgets far inside the platform clocks. `matchstate.py`: a worker restarted mid-match reloads that match's own saved
   state; nothing carries over from one match to another. `__main__.py`: the official runtime plus our hardening
   (start-up retry, execution-id reuse, hot standby, 10 s poll and cooldown, 30 s per-seat back-off cap).

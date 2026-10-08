@@ -2,6 +2,8 @@
 
 ## 现在到哪了（10-08）
 
+- **提交截止：2026-10-13 23:59 PDT（2026-10-14T06:59Z，北京时间 10-14 14:59）。从这一刻到成绩公布后至少 30 天，参赛仓库一律不推送**（不提交、不改历史、不改回私有、不删仓库；Official Rules 第 8 节，全文 `docs/official_rules_2026-10-06.md`）。截止后的笔记、录像、日志放在仓库以外；上游 SDK 再更新，要主办方书面授权才能合。下面「下一步」里要提交东西的步骤只能在截止前做。比赛版本 = 截止时 `main` 上最新的提交，比赛机部署的就是它（`docs/deploy.md`「截止和比赛日时间表」）。CLAUDE.md 里的同一条规则（和 INVALID_ACTION 那条里过时的「300 s」）写成了补丁，等主人确认后再加。
+- **合规（10-08，分支 `compliance/rules-1008`，基于 `integrate/v424`，等主人合进 main）**：`README.md` 最上面加了规则第 8 节要求的英文说明（是什么、比赛版本、怎么运行、组件、比赛用的设置、记录、没放进仓库的组件）；`docs/platform/` 刷新到 10-08 的实时文档；`docs/competition_brief.md` 最上面加「2026-10-08 更新」（规则要点、截止和冻结、10-16 日程、要问主办方的问题）；`docs/deploy.md` 比赛日手册改成绝对时间，加了「比赛进行中的规矩」（人动手要主办方授权、运维不看观战、规则更新马上同意、换 key 后 restart 并通知主办方、手动操作记进 `logs/manual-actions.txt`）；`run_agent.sh` 默认保留 40 × 50 MB 日志，每次启动记下部署的完整提交号和 `ARENA_*` 设置，压缩包带 `COMMIT` 文件。`agent/` 没动。检查数字见 `docs/progress.md`「v4.2.4 合规」。**部署用这个分支出的包**（它会在日志里写出提交号）；截止前 main 定下来以后再从 main 重新打一次。
 - **v4.2.4（10-08，分支 `integrate/v424`，等主人合进 main）**：合上游 PR #7（局内重试 90 s、40 s 发现断线、Official Rules 更新后不再停运行时、拿座位的暂时故障在连接窗口内立刻重来、key 被拒后不开新局），我们的狼人杀发言没送到时不计数、重新决定；宝可梦打法不变（本地对冠军 20 局逐局相同）。数字见 `docs/progress.md`「v4.2.4」。部署用 `~/wt/_v424_out/dist/arena-agent-dc907f2.tar.gz`（下面 74defe4 的包是 PR #7 之前的运行时）。
 - **冠军 v4.2.3**（`champion/VERSION` 是冻结时的提交，分支 `integrate/v423`，主人快进合进 main）。宝可梦打法和 v4.1.1 逐局相同（本地对冠军 20 局逐局核对过），多出来的都是稳定性和平台适配：
   - v4.1.2 / v4.2：官方正式赛部署、重启后接上记忆、慢机器和内存下的自我保护（`docs/progress.md` 同名两节）。
@@ -21,9 +23,9 @@
 3. **放进比赛主机的 `.env`**：`ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_…`（`chmod 600 .env`；不要贴到聊天、GitHub、截图里；`.env.example` 的占位行删掉）。然后 `.venv/bin/python scripts/selfcheck.py` 要以 `selfcheck: ready` 结尾。
 4. **`bash scripts/run_agent.sh check-tournament`**：每一行都要是 ✓。
 5. **在比赛主机上常驻**：`bash scripts/run_agent.sh install-systemd && systemctl --user enable --now arena-agent@main && sudo loginctl enable-linger $USER`，`bash scripts/run_agent.sh status` 要显示 `mode=tournament(primary) agent=up calc=ok(...)`。
-6. **Testing 页面建测试赛**（宝可梦、狼人杀各至少一局；座位选 "Mine (self-hosted)"，也可以加入 *Open matches* 里别人的座位）：看日志里 `Match assigned: … (Testing)` → `Match finished.`，打完 `git` 提交新录像（只放 `logs/yoriko/`、`logs/apocalypse/` 这类检查过的目录，见 CLAUDE.md）。第一局真实对局之后，对照 `docs/real_payloads.md` 看新 payload 有没有变。
+6. **Testing 页面建测试赛**（宝可梦、狼人杀各至少一局；座位选 "Mine (self-hosted)"，也可以加入 *Open matches* 里别人的座位）：看日志里 `Match assigned: … (Testing)` → `Match finished.`。测试赛在提交截止时关闭，要在 10-13 23:59 PDT 前打完；想提交新录像（只放 `logs/yoriko/`、`logs/apocalypse/` 这类检查过的目录，见 CLAUDE.md）也只能在截止前，截止后录像留在本机。第一局真实对局之后，对照 `docs/real_payloads.md` 看新 payload 有没有变。
 7. **Tournaments 页面报名**宝可梦和狼人杀比赛（Register my agent）；红警看主人的决定。
-8. 比赛日（10-16）前一天按 `docs/deploy.md` 的「上线前检查清单」和「比赛日时间表」走一遍；问主办方的问题（热备是否允许、开赛时间、同时几场）见 `docs/competition_brief.md`。
+8. **截止前**（最晚 10-13 23:59 PDT）：最终分支快进进 `main` 并推送，仓库按规则第 8 节公开；比赛机部署截止时 `main` 的最新提交、从它重新打包（`docs/deploy.md`「截止和比赛日时间表」第一行）。比赛日（10-16）前一天按「上线前检查清单」和同一张时间表走一遍；问主办方的问题（提交号填在哪、热备、开赛时间、同时几场）见 `docs/competition_brief.md`「2026-10-08 更新」D 节。
 9. 之后的增强（v5，按 `docs/v5_standard.md`）：v4 对「按均衡出招」的对手偏弱（simbot −9）；选秀模型用混合对手群体重新拟合；多场并发压力测试（`scripts/stress_concurrency.py`，在比赛机器上 N=8）。
 
 ## 背景（较早的事实，仍然成立）
