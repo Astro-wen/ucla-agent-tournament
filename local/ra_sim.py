@@ -190,6 +190,10 @@ class Player:
         self.peak_army = 0
         self.kills_this_step: list[str] = []
         self.storage_full = False
+        self.low_power_ticks = 0           # metrics: ticks spent on low power
+        self.ready_tick: dict[str, int] = {}   # queue -> tick its head building became ready
+        self.place_delays: list[int] = []  # ticks from ready to placed, per building
+        self.placed = 0
 
     def resources(self) -> int:
         return self.cash + self.ore
@@ -215,7 +219,15 @@ class Player:
 class World:
     def __init__(self, rules: Rules | None = None, map_id: str = "sidestep", seed: int = 0, *,
                  starting_cash: int = 5000, countries: tuple[str, str] | None = None, swap_spawns: bool | None = None,
-                 starting_units: str = "none", explored_map: bool = False, apply_delay_ticks: tuple = (5, 10)):
+                 starting_units: str = "none", explored_map: bool = False, apply_delay_ticks: tuple = (5, 10),
+                 default_stance: str = DEFAULT_STANCE, place_limit: int | None = None):
+        """`default_stance`: new actors' stance (OpenRA gives a human player's units `defend`, a bot player's
+        `attack_anything`; which one the platform's agent seats get is not documented). `place_limit`: a test
+        switch, every `place` after that many placed buildings per seat is `invalid` (no room)."""
+        if default_stance not in STANCES:
+            raise ValueError(f"default_stance must be one of {STANCES}")
+        self.default_stance = default_stance
+        self.place_limit = place_limit
         self.rules = rules or default_rules()
         self.seed = seed
         self.rng = random.Random(f"world:{seed}")
@@ -319,6 +331,7 @@ class World:
         x = min(max(x, self.bx0 + 0.5), self.bx1 + 0.5)
         y = min(max(y, self.by0 + 0.5), self.by1 + 0.5)
         a = Actor(self._new_id(), seat, typ, self.rules, x, y, self.tick)
+        a.stance = self.default_stance
         self.actors[a.id] = a
         if typ == "harv":
             a.hstate = "seek"
@@ -329,6 +342,7 @@ class World:
 
     def _add_building(self, seat: int, typ: str, x: int, y: int, event: bool = True) -> Actor:
         a = Actor(self._new_id(), seat, typ, self.rules, x, y, self.tick)
+        a.stance = self.default_stance
         self.actors[a.id] = a
         for yy in range(y, y + a.h):
             for xx in range(x, x + a.w):
@@ -454,6 +468,7 @@ class World:
                     head.progress = 1.0
                     head.done = True
                     if self.rules.is_building(head.name):
+                        p.ready_tick[q] = self.tick
                         self._event(seat, "production_ready", type=head.name, queue=q)
                     else:
                         self._finish_unit(seat, head)
@@ -757,10 +772,14 @@ class World:
                 return [{"unit": None, "reason": "not_ready", "detail": f"{item} is not ready to place"}], 0
             at = order.get("at")
             at = tuple(at) if at is not None else None
-            spot = self.find_spot(seat, item, at)
+            spot = None if (self.place_limit is not None and p.placed >= self.place_limit) else \
+                self.find_spot(seat, item, at)
             if spot is None:
                 return [{"unit": None, "reason": "invalid", "detail": f"no free cell near your base for {item}"}], 0
             items.pop(0)
+            p.placed += 1
+            if q in p.ready_tick:
+                p.place_delays.append(self.tick - p.ready_tick.pop(q))
             self._add_building(seat, item, spot[0], spot[1])
             return [], 1
         if cmd == "cancel":
@@ -900,6 +919,9 @@ class World:
         self._apply_due()
         self._tick_production()
         self._update_power()
+        for p in self.players:
+            if p.low_power:
+                p.low_power_ticks += STEP
         buckets = self._buckets()
         self._tick_units(buckets)
         self._tick_combat(buckets)
@@ -1491,3 +1513,8 @@ class World:
                            "\"orders\": [<1-20 orders>]}); formats and examples: get_game_config('red_alert')"
                            ".order_schema",
         }
+
+
+if __name__ == "__main__":                 # `python -m local.ra_sim ...` is the match CLI (local/ra_platform.py)
+    from local.ra_platform import main
+    main()

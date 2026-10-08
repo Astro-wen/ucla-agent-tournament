@@ -23,6 +23,11 @@ Two clocks:
   the state it was based on (a fixed think + network delay). The same seeds and the same deterministic agents give
   the same match.
 - realtime: a view every 0.2 s / speed of wall time, whatever the agents do (thinking time costs game time, scaled).
+
+Options for rarer platform situations: `pacing="windows"` (the operator's 5-second windows, section 5 "Windows mode":
+state_version is the window index, one batch per window, a second one is NOT_YOUR_TURN, states up to 24 windows old;
+the runner then treats the game as turn-based, so WAIT and INVALID_ACTION are fatal there), and `queued_s` /
+`starting_s` (the `queued` phase with a queue_position, then `starting`, before waiting_for_agents).
 """
 from __future__ import annotations
 
@@ -49,6 +54,7 @@ NO_AGENTS_S = 300.0
 IDLE_S = 600.0
 SPIN_CALLS = 12
 SETTLED_KEPT, PROBLEM_ROWS = 5, 10
+TICKS_PER_WINDOW, STALE_WINDOWS = 125, 24          # windows mode (get_game_config realtime.windows_mode)
 LIMITS = {"max_orders_per_batch": MAX_ORDERS, "max_units_per_order": 50, "max_train_count": 10,
           "min_batch_interval_s": MIN_BATCH_INTERVAL_S, "stale_seconds": 120}
 
@@ -77,6 +83,7 @@ class Seat:
         self.settled: list[dict] = []
         self.calls_this_view = 0
         self.wait_gen = -1
+        self.window_sent = None            # windows mode: the window this seat already sent its batch in
         self.resigned = False
         self.invalid_details: list[str] = []
         self.st = {"views": 0, "waits": 0, "batches": 0, "orders": 0, "commands": 0, "invalid_actions": 0,
@@ -89,9 +96,14 @@ class MatchServer:
                  speed: float = 1.0, max_minutes: float = 20.0, idle_s: float = IDLE_S,
                  auto_start_s: float = AUTO_START_S, no_agents_s: float = NO_AGENTS_S, session_id: str | None = None,
                  latency_ticks: int = 0, lost_rate: float = 0.0, lockstep_timeout_s: float = 10.0,
-                 start_tick: int = 25, match_rules: dict | None = None):
+                 start_tick: int = 25, match_rules: dict | None = None, pacing: str = "realtime",
+                 queued_s: float = 0.0, starting_s: float = 0.0):
         if clock not in ("lockstep", "realtime"):
             raise ValueError("clock must be lockstep or realtime")
+        if pacing not in ("realtime", "windows"):
+            raise ValueError("pacing must be realtime or windows")
+        self.pacing = pacing
+        self.queued_s, self.starting_s = float(queued_s), float(starting_s)
         self.world = world
         self.clock, self.speed = clock, max(0.01, float(speed))
         self.max_minutes = float(max_minutes)
@@ -105,7 +117,7 @@ class MatchServer:
         names = names or agent_ids
         self.seats = [Seat(i, agent_ids[i], names[i]) for i in (0, 1)]
         self.cv = threading.Condition()
-        self.phase = "waiting_for_agents"
+        self.phase = "queued" if self.queued_s > 0 else "starting" if self.starting_s > 0 else "waiting_for_agents"
         self.start_tick = int(start_tick)
         self.end_tick = self.start_tick + int(self.max_minutes * 60 * TICKS_PER_SECOND)
         self.created_wall = time.monotonic()
@@ -127,8 +139,17 @@ class MatchServer:
 
     # ---- the clock -----------------------------------------------------------------------------------------------
     def run(self) -> None:
-        """The world thread: wait for the check-ins, then advance until the match ends."""
+        """The world thread: the queue and the engine start (if modelled), the check-ins, then advance until the
+        match ends."""
         with self.cv:
+            for phase, secs, nxt in (("queued", self.queued_s, "starting"),
+                                     ("starting", self.starting_s, "waiting_for_agents")):
+                if self.phase == phase:
+                    end = time.monotonic() + secs
+                    while time.monotonic() < end and not self.stopping.is_set():
+                        self.cv.wait(max(0.0, min(0.05, end - time.monotonic())))
+                    self.phase = nxt if (nxt != "starting" or self.starting_s > 0) else "waiting_for_agents"
+                    self.cv.notify_all()
             while self.phase == "waiting_for_agents" and not self.stopping.is_set():
                 now = time.monotonic()
                 ins = [s for s in self.seats if s.checked_in]
@@ -290,6 +311,20 @@ class MatchServer:
             self.views_built += 1
         return json.loads(hit[1]), json.loads(hit[2])
 
+    def _window(self) -> int:
+        """Windows mode: the current window's index (1-based)."""
+        return max(0, self.world.tick - self.start_tick) // TICKS_PER_WINDOW + 1
+
+    def _version(self) -> int:
+        if not (self.phase == "playing" or (self.terminal and self.started_wall is not None)):
+            return 0
+        return self._window() if self.pacing == "windows" else self.world.tick
+
+    def _current(self, s: Seat) -> bool:
+        if self.phase != "playing" or s.in_flight:
+            return False
+        return not (self.pacing == "windows" and s.window_sent == self._window())
+
     def _pacing_ms(self, s: Seat) -> int:
         if self.clock == "lockstep":
             left = s.last_accept_tick + STEP - self.world.tick
@@ -301,29 +336,43 @@ class MatchServer:
         w = self.world
         s = self.seats[seat]
         playing = self.phase == "playing"
-        version = w.tick if (playing or (self.terminal and self.started_wall is not None)) else 0
         game_s = max(0, w.tick - self.start_tick) / TICKS_PER_SECOND if self.started_wall else 0.0
+        if self.pacing == "windows":
+            pacing = {"mode": "windows", "window_seconds": TICKS_PER_WINDOW / TICKS_PER_SECOND,
+                      "ticks_per_window": TICKS_PER_WINDOW, "stale_windows": STALE_WINDOWS}
+        else:
+            pacing = {"mode": "realtime", "min_batch_interval_s": MIN_BATCH_INTERVAL_S, "stale_seconds": 120,
+                      "next_batch_allowed_in_ms": self._pacing_ms(s)}
+        window = None
+        if self.pacing == "windows" and self.started_wall is not None:
+            i = self._window()
+            ends = self.start_tick + i * TICKS_PER_WINDOW
+            window = {"index": i, "started_at_tick": ends - TICKS_PER_WINDOW, "ends_at_tick": ends,
+                      "seconds_left": round(max(0, ends - w.tick) / TICKS_PER_SECOND, 1),
+                      "batch_sent": s.window_sent == i}
         out = {
             "session_id": self.session_id, "game_type": GAME, "runtime_adapter": "openra",
             "status": "completed" if self.terminal else "in_progress", "phase": self.phase,
-            "state_version": version, "is_current_actor": playing and not s.in_flight,
+            "state_version": self._version(), "is_current_actor": self._current(s),
             "is_terminal": self.terminal, "your_seat": f"Multi{seat}",
             "players": [{"seat": f"Multi{x.n}", "agent_id": x.agent_id, "name": x.name,
                          "faction": w.players[x.n].country if self.started_wall else None,
                          "checked_in": x.checked_in} for x in self.seats],
-            "pacing": {"mode": "realtime", "min_batch_interval_s": MIN_BATCH_INTERVAL_S, "stale_seconds": 120,
-                       "next_batch_allowed_in_ms": self._pacing_ms(s)},
-            "limits": dict(LIMITS),
+            "pacing": pacing, "limits": dict(LIMITS),
             "time": {"max_minutes": self.max_minutes, "game_seconds": round(game_s, 1),
                      "remaining_seconds": round(max(0.0, self.max_minutes * 60 - game_s), 1)},
-            "match_rules": dict(self.match_rules), "queue_position": None,
+            "match_rules": dict(self.match_rules), "queue_position": 1 if self.phase == "queued" else None,
             "map": {"id": w.map_id, "width": w.width, "height": w.height, "bounds": list(w.bounds),
                     "layout": f"get_game_config('red_alert').rules.maps.{w.map_id}.layout"},
-            "window": None, "observation": None,
+            "window": window, "observation": None,
             "last_orders": copy.deepcopy(self._public(s.last_orders)),
             "recent_order_problems": self._problems(s),
         }
-        if self.phase == "waiting_for_agents":
+        if self.phase in ("queued", "starting"):
+            out["hint"] = ("Waiting for a free game-server slot" if self.phase == "queued" else
+                           "The engine is starting") + "; call wait_for_update."
+            out["next_actions"] = [{"tool": "wait_for_update", "hint": "returns when the phase changes"}]
+        elif self.phase == "waiting_for_agents":
             missing = [x.n for x in self.seats if not x.checked_in]
             out["waiting_for_players"] = missing
             out["hint"] = "Waiting for the other agent to check in; call wait_for_update."
@@ -332,8 +381,12 @@ class MatchServer:
             obs, la = self._obs(seat)
             out["observation"] = obs
             out["legal_actions"] = la
-            out["hint"] = "The game is running: send orders with play_action, or wait_for_update for the next view."
-            out["next_actions"] = [{"tool": "play_action", "hint": "send a batch of 1-20 orders"}]
+            if out["is_current_actor"] or self.pacing != "windows":
+                out["hint"] = "The game is running: send orders with play_action, or wait_for_update for the next view."
+                out["next_actions"] = [{"tool": "play_action", "hint": "send a batch of 1-20 orders"}]
+            else:
+                out["hint"] = "Your batch for this window is in; wait_for_update(since_version=<window>)."
+                out["next_actions"] = [{"tool": "wait_for_update", "hint": "returns when the next window opens"}]
         if self.terminal:
             if self.started_wall is not None:
                 out["observation"], _ = self._obs(seat)
@@ -388,9 +441,8 @@ class MatchServer:
             self.cv.notify_all()
             try:
                 while not self.stopping.is_set():
-                    playing = self.phase == "playing"
-                    ver = self.world.tick if playing or self.terminal else 0
-                    cur = playing and not s.in_flight
+                    ver = self._version()
+                    cur = self._current(s)
                     if (self.terminal or ver != since_version or (since_phase is not None and self.phase != since_phase)
                             or (since_is_current_actor is not None and bool(cur) != bool(since_is_current_actor))):
                         break
@@ -450,6 +502,9 @@ class MatchServer:
             if s.in_flight:
                 return self._count(s, _err("NOT_YOUR_TURN", "Your previous play_action is still being answered",
                                            "get_game_state"))
+            if self.pacing == "windows" and s.window_sent == self._window():
+                return self._count(s, _err("NOT_YOUR_TURN", "One batch per window: this window's batch is in",
+                                           "wait_for_update", "wait_for_update(since_version=<window>)"))
             if action is None and action_id is not None:
                 return self._invalid(s, "Red Alert has no action ids: send action={\"type\": \"orders\", ...}")
             orders = action.get("orders") if isinstance(action, dict) and action.get("type") == "orders" else None
@@ -462,22 +517,26 @@ class MatchServer:
                 return self._count(s, _err("STALE_STATE", stale, "get_game_state"))
             s.in_flight = True
             try:
-                held = self._hold(s, state_version)
-                if held is not None:
-                    return self._count(s, held)
+                if self.pacing != "windows":
+                    held = self._hold(s, state_version)
+                    if held is not None:
+                        return self._count(s, held)
                 return self._accept(s, state_version, orders, reasoning_summary)
             finally:
                 s.in_flight = False
                 self.cv.notify_all()
 
     def _stale(self, sv) -> str | None:
-        t = self.world.tick
         if not isinstance(sv, int) or isinstance(sv, bool):
-            return "state_version must be the tick of the state you acted on"
-        if sv > t:
-            return f"state_version {sv} is in the future (now {t})"
-        if sv < t - STALE_TICKS:
-            return f"state_version {sv} is more than {STALE_TICKS} ticks old (now {t})"
+            return "state_version must be the version of the state you acted on"
+        if self.pacing == "windows":
+            now, limit, unit = self._window(), STALE_WINDOWS, "windows"
+        else:
+            now, limit, unit = self.world.tick, STALE_TICKS, "ticks"
+        if sv > now:
+            return f"state_version {sv} is in the future (now {now})"
+        if sv < now - limit:
+            return f"state_version {sv} is more than {limit} {unit} old (now {now})"
         return None
 
     def _hold(self, s: Seat, sv: int) -> dict | None:
@@ -562,6 +621,8 @@ class MatchServer:
         else:
             self._settle(s, rec)
         s.last_accept_tick, s.last_accept_wall = w.tick, time.monotonic()
+        if self.pacing == "windows":
+            s.window_sent = self._window()
         s.st["batches"] += 1
         s.st["orders"] += len(orders)
         s.st["commands"] += commands
@@ -570,9 +631,12 @@ class MatchServer:
         if reasoning:
             s.st["reasoning"] += 1
         acc = sum(1 for r in answer_rows if r["status"] in ("pending", "ok"))
+        gap_ms = 200
+        if self.pacing == "windows":
+            gap_ms = int((self.start_tick + self._window() * TICKS_PER_WINDOW - w.tick) * 1000 / TICKS_PER_SECOND)
         return {"accepted": True, "session_id": self.session_id, "status": "in_progress", "state_version": sv,
                 "pending": left > 0, "applied_at_tick": None, "accepted_orders": acc,
-                "rejected_orders": len(answer_rows) - acc, "next_batch_allowed_in_ms": 200, "results": answer_rows,
+                "rejected_orders": len(answer_rows) - acc, "next_batch_allowed_in_ms": gap_ms, "results": answer_rows,
                 "hint": f"Orders sent at tick {w.tick}; the engine applies them in a moment. Read the new state and "
                         "act again.",
                 "next_actions": [{"tool": "get_game_state",

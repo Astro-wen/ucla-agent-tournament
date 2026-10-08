@@ -738,6 +738,95 @@ def test_fake_platform_red_alert_match_against_a_rusher_over_mcp(tmp_path, monke
             proc.kill()
 
 
+def test_windows_mode_one_batch_per_window_and_window_versions():
+    w = mk()
+    srv = started(w, pacing="windows")
+    st = srv.state(0)
+    assert st["pacing"]["mode"] == "windows" and st["state_version"] == 1 and st["window"]["index"] == 1
+    assert st["is_current_actor"] is True
+    order = {"type": "orders", "orders": [{"cmd": "stop", "units": [mcv(w, 0).id]}]}
+    assert srv.play_action(0, 0, {"type": "pass"})["error"] == "INVALID_ACTION"           # does not use the window
+    assert srv.play_action(0, 1, order)["accepted"]
+    st = srv.state(0)
+    assert st["is_current_actor"] is False and st["window"]["batch_sent"] is True
+    assert srv.play_action(0, 1, order)["error"] == "NOT_YOUR_TURN"
+    with srv.cv:
+        for _ in range(25):                                         # one window = 125 ticks
+            srv._advance()
+    st = srv.state(0)
+    assert st["state_version"] == 2 and st["is_current_actor"] is True
+    assert srv.play_action(0, 3, order)["error"] == "STALE_STATE"                         # the future
+    assert srv.play_action(0, 1, order)["accepted"]                                       # a window old is fine
+    with srv.cv:
+        for _ in range(25 * 26):
+            srv._advance()
+    assert srv.play_action(0, 1, order)["error"] == "STALE_STATE"                         # > 24 windows old
+
+
+def test_windows_mode_matches_bots_send_noops_and_a_wait_agent_dies():
+    row = play_match(make_bot("rusher", 1), make_bot("turtle", 2), seed=6, map_id="sidestep", max_minutes=3,
+                     pacing="windows")
+    assert row["a"]["error"] is None and row["b"]["error"] is None and row["a"]["batches"] > 10
+    assert row["a"]["batches_per_s"] <= 0.2 + 1e-9                  # one batch per 5-second window at most
+    # The deployed agent of v4.2.3 keys its Red Alert path on pacing.mode == "realtime": in windows mode it sends the
+    # generic safe action ({"type": "pass"}), the batch is INVALID_ACTION, and the runner (turn-based there) stops
+    # the seat with a DecisionError, as docs/redalert_design.md section 2.13 predicts.
+    row = play_match(make_factory("ours")(1), make_bot("idle", 2), seed=6, map_id="sidestep", max_minutes=1,
+                     pacing="windows")
+    assert row["a"]["error"] and row["a"]["error"].startswith("DecisionError")
+    assert row["a"]["invalid_actions"] == 1
+
+
+def test_queued_and_starting_phases_come_before_waiting_for_agents():
+    srv = MatchServer(mk(), queued_s=0.3, starting_s=0.3)
+    st = srv.get_game_state(0)
+    assert st["phase"] == "queued" and st["queue_position"] == 1 and st["state_version"] == 0
+    t = threading.Thread(target=srv.run, daemon=True)
+    t.start()
+    st = srv.wait_for_update(0, 0, False, "queued", 5)
+    assert st["phase"] == "starting" and st["queue_position"] is None
+    st = srv.wait_for_update(0, 0, False, "starting", 5)
+    assert st["phase"] == "waiting_for_agents" and st["waiting_for_players"] == [1]
+    srv.get_game_state(1)
+    assert srv.wait_for_update(0, 0, False, "waiting_for_agents", 5)["phase"] == "playing"
+    srv.stop()
+
+
+def test_place_limit_switch_and_default_stance():
+    w = mk(place_limit=1, default_stance="attack_anything")
+    deploy(w)
+    assert all(a.stance == "attack_anything" for a in w.actors.values() if a.owner == 0)
+    build_place(w, 0, "powr")
+    send(w, 0, {"cmd": "build", "item": "powr"})
+    assert until_ready(w, 0, "powr")
+    send(w, 0, {"cmd": "place", "item": "powr"})
+    assert verdicts(w)[0][3:5] == ("rejected", "invalid")
+    e1 = w._spawn_unit(0, "e1", 30.5, 30.5, event=False)
+    assert e1.stance == "attack_anything" and w.observation(0)["units"][-1]["stance"] == "attack_anything"
+    with pytest.raises(ValueError):
+        mk(default_stance="berserk")
+
+
+def test_rows_carry_low_power_and_placement_metrics():
+    row = play_match(make_bot("llm", 7), make_bot("turtle", 8), seed=9, map_id="trapped", max_minutes=6)
+    for s in ("a", "b"):
+        x = row[s]
+        assert {"p99_ms", "low_power_s", "place_delay_max_s", "place_delay_mean_s", "unplaced"} <= set(x)
+        assert x["p99_ms"] <= x["slowest_ms"]
+    assert row["b"]["place_delay_max_s"] <= 1.0                      # the turtle places at once
+    assert row["a"]["place_delay_max_s"] >= row["b"]["place_delay_max_s"]   # the LLM-like bot dawdles
+
+
+def test_cli_cycles_opponents():
+    from io import StringIO
+    import contextlib
+    buf = StringIO()
+    with contextlib.redirect_stdout(buf):
+        platform_main(["--a", "rusher", "--b", "idle,turtle", "--games", "2", "--max-minutes", "0.5"])
+    text = buf.getvalue()
+    assert "vs idle:" in text and "vs turtle:" in text and "   vs idle: " in text
+
+
 def test_limits_constants_match_the_doc():
     assert ra_server.MAX_ORDERS == 20 and ra_server.MAX_COMMANDS == 200 and ra_server.STALE_TICKS == 3000
     assert ra_server.MIN_BATCH_INTERVAL_S == 0.2 and ra_server.IDLE_S == 600

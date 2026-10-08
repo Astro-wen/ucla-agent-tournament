@@ -8,7 +8,11 @@ runner as any agent. Deterministic for a given seed and the same views.
              attack_anything, so they shoot buildings too), then keeps reinforcing
     llm      an "LLM-like" slow player: acts every 5-10 s of game time, follows the primer build order, makes the
              mistakes LLM agents make (placing too early, untrainable items, dead ids, cells outside the bounds,
-             unknown fields, the same build twice), and attacks with legal_actions.attack_now
+             unknown fields, the same build twice, forgetting to place a finished building), and attacks with
+             legal_actions.attack_now
+
+In windows mode (pacing.mode "windows", where the runner is turn-based and WAIT is fatal) every bot sends a valid
+no-op batch when it has nothing to do.
 
 Use `make_bot(style, seed)` (local/ra_platform.py's factories use it).
 """
@@ -47,10 +51,20 @@ class Base:
             return WAIT
         la = raw.get("legal_actions") or {}
         orders = [o for o in self.decide(raw, obs, la) if o][:20]
+        if not orders and (raw.get("pacing") or {}).get("mode") == "windows":
+            orders = self.noop(obs)            # windows mode is turn-based for the runner: WAIT would be fatal
         if not orders:
             return WAIT
         self.batches += 1
         return {"type": "orders", "orders": orders}
+
+    @staticmethod
+    def noop(obs) -> list:
+        """A batch that changes nothing but is valid (redalert.md section 5: an idempotent power_toggle is `ok`)."""
+        for b in obs.get("buildings") or []:
+            return [{"cmd": "power_toggle", "building": b["id"], "on": True}]
+        units = [u["id"] for u in obs.get("units") or [] if not u.get("wreck")]
+        return [{"cmd": "stop", "units": units[:1]}] if units else []
 
     def on_action_result(self, result, context):
         if result.get("error") == "INVALID_ACTION":
@@ -240,6 +254,7 @@ class LLMLikeBot(Base):
     """Acts every 5-10 s of game time with a short batch; about one batch in six carries a typical mistake."""
     style = "llm"
     MISTAKE_RATE = 0.17
+    FORGET_PLACE = 0.25
 
     def __init__(self, seed: int = 0):
         super().__init__(seed)
@@ -252,6 +267,8 @@ class LLMLikeBot(Base):
             return []
         self.next_tick = tick + int(self.rng.uniform(5, 10) * 25)
         out = self.basics(obs, la)
+        if self.rng.random() < self.FORGET_PLACE:            # forgets to place what is ready, this time
+            out = [o for o in out if o.get("cmd") != "place"]
         soviet = self.side(obs) == "soviet"
         bar = "barr" if soviet else "tent"
         plan = [("powr", 1), (bar, 1), ("proc", 1), ("weap", 1), ("powr", 2), ("proc", 2), ("powr", 3)]
