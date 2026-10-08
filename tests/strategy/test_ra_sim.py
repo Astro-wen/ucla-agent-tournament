@@ -728,13 +728,16 @@ def test_fake_platform_red_alert_match_against_a_rusher_over_mcp(tmp_path, monke
                                                            game_type="red_alert", agent_spec="agent.agent:create_agent",
                                                            execution_id="exec-R-" + "q" * 40))
         assert code == 0
-        deadline = time.monotonic() + 10
+        # The platform closes the match after the world thread stops (up to 5 s) and writes its stats every 0.5 s:
+        # allow for a busy machine (10 s was once not enough during a full pytest next to other heavy jobs).
+        deadline = time.monotonic() + 40
         st = {}
         while time.monotonic() < deadline:
             st = json.loads(stats.read_text()) if stats.exists() else {}
             if (st.get("totals") or {}).get("matches_done"):
                 break
             time.sleep(0.3)
+        assert (st.get("totals") or {}).get("matches_done"), f"the fake platform never closed the match: {st}"
         ra = next(m for m in st["matches"] if m["game_type"] == "red_alert")
         if bot == "off":
             assert ra["terminal"] and ra["reason"] == "victory" and ra["win"] is False and not ra["opponent_error"]
