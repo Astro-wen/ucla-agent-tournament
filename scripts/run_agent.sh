@@ -48,12 +48,18 @@
 # Files under LOG_DIR (default logs/, ignored by git): agent-NAME.out (+ .1 ... .LOG_KEEP, rotated at LOG_MAX_MB),
 # agent-NAME.pid (the run loop), agent-NAME.state (the agent process and the loop's helpers), agent-NAME.lock,
 # agent-NAME.execid (the loop's execution id with the boot, key hash and run it belongs to; 0600).
+# Records (Official Rules section 9: keep them until 30 days after final results): the defaults keep 41 files of
+# 50 MB (about 2 GB) of the log, far more than an event day writes (a few KB per match), so nothing of the event is
+# rotated away; every start logs the deployed commit (`deployed: commit <full id> (git checkout)`, or the bundle's
+# COMMIT file) and every ARENA_* setting in effect (`settings: ...`; never a key, never the loop's internal ids), and
+# logs the commit again when an agent restart finds other code. The per-match recordings (<session>.jsonl) are never
+# rotated or removed by this script.
 # ARENA_ALLOW_NO_CALC=1 alone is enough when node cannot run: the engine search needs the same node, so the start
 # then goes on with the classic battle policy (ARENA_BATTLE=classic for the agent), loudly. A simulator that is
 # missing while node works still refuses (ARENA_BATTLE=classic is the switch for that).
 # A LOG_DIR that cannot be written (read-only mount, another user's directory) refuses with exit 2 and says so.
 # Agent recordings go to LOG_DIR unless ARENA_RECORD_DIR is set.
-# Knobs (environment): PYTHON, LOG_DIR, LOG_MAX_MB=20, LOG_KEEP=10, HEALTH_EVERY=300, RESTART_DELAY=3,
+# Knobs (environment): PYTHON, LOG_DIR, LOG_MAX_MB=50, LOG_KEEP=40, HEALTH_EVERY=300, RESTART_DELAY=3,
 # RESTART_MAX_DELAY=60, STOP_TIMEOUT=20, ARENA_LOCK_DIR=/tmp, ARENA_ALLOW_NO_CALC, ARENA_ROLE,
 # ARENA_DISCOVERY_S=10 (the assignment poll), ARENA_WORKER_COOLDOWN_S=10 (a failed seat's first retry; the SDK doubles
 # it per failure in a row, up to ARENA_SEAT_BACKOFF_MAX_S=30 here, 600 s in the SDK), ARENA_SEAT_BUSY_RETRY_S,
@@ -72,8 +78,8 @@ if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${
 fi
 
 LOG_DIR="${LOG_DIR:-logs}"
-LOG_MAX_MB="${LOG_MAX_MB:-20}"
-LOG_KEEP="${LOG_KEEP:-10}"
+LOG_MAX_MB="${LOG_MAX_MB:-50}"                       # (an event day is a few MB: see "Records" in the header)
+LOG_KEEP="${LOG_KEEP:-40}"
 HEALTH_EVERY="${HEALTH_EVERY:-300}"
 [[ "$HEALTH_EVERY" =~ ^[1-9][0-9]*$ ]] || HEALTH_EVERY=300
 RESTART_DELAY="${RESTART_DELAY:-3}"
@@ -130,7 +136,7 @@ EXECID_FILE="$LOG_DIR/agent-$NAME.execid"
 LOG_ABS="$(cd "$LOG_DIR" 2>/dev/null && pwd)" || LOG_ABS="$LOG_DIR"
 RUN_ID="$NAME@$LOG_ABS"                              # ARENA_RUN_ID of the loop, its helpers and the agent
 START_KNOBS='^(ARENA_CALC|ARENA_NODE|ARENA_ALLOW_NO_CALC|ARENA_BATTLE|ARENA_SHOWDOWN)$'   # what the start checks read
-MODE=""; MODE_WHY=""; MODE_RETIRED=""; ROLE=""; CALC_GOOD=1
+MODE=""; MODE_WHY=""; MODE_RETIRED=""; ROLE=""; CALC_GOOD=1; DEPLOYED=""
 OFFICIAL_KEY_RE='^eak_live_[0-9a-f]{64}$'            # altruagent/official.py _KEY_PATTERN
 
 now() { printf '%(%s)T' -1; }
@@ -182,6 +188,33 @@ key_hash() {      # of the Official Agent Key
   [ -n "$k" ] || { echo none; return; }
   if command -v sha256sum >/dev/null; then printf '%s' "$k" | sha256sum | cut -c1-10
   else printf '%s' "$k" | shasum -a 256 | cut -c1-10; fi
+}
+
+deployed_version() {   # the code this loop runs, for the log (Official Rules section 9: the deployed commit): the
+  local c line2 dirty=""  # checkout's full commit id, or the COMMIT file scripts/bundle.sh writes into a bundle
+  if [ -e "$ROOT/.git" ] && command -v git >/dev/null; then   # (only ROOT's own repository, never one around it)
+    c="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)"
+    if [[ "$c" =~ ^[0-9a-f]{40}$ ]]; then
+      git -C "$ROOT" diff --quiet --no-ext-diff HEAD -- 2>/dev/null || dirty=", with uncommitted changes"
+      echo "commit $c (git checkout$dirty)"; return 0
+    fi
+  fi
+  if [ -f "$ROOT/COMMIT" ]; then
+    c="$(head -n 1 "$ROOT/COMMIT" 2>/dev/null | tr -cd '[:print:]' | cut -c1-200)"
+    line2="$(sed -n 2p "$ROOT/COMMIT" 2>/dev/null | tr -cd '[:print:]' | cut -c1-200)"
+    echo "${c:-unknown} (${line2:-bundle})"; return 0
+  fi
+  echo "unknown (no git checkout and no COMMIT file in $ROOT)"
+}
+
+arena_settings() {   # every ARENA_* setting the agent gets (none holds a key), on one line; the loop's own ids are left
+  local v val out=""   # out (ARENA_EXECUTION_ID is never logged)
+  while IFS= read -r v; do
+    case "$v" in ARENA_EXECUTION_ID|ARENA_EXECUTION_ID_OWNER|ARENA_RUN_ID) continue ;; esac
+    val="${!v}"; val="${val//[$'\n\r\t']/ }"
+    out+="${out:+ }$v=${val:0:200}"
+  done < <(compgen -e | grep '^ARENA_' | LC_ALL=C sort)
+  echo "${out:-none}"
 }
 
 node_status() {   # cheap mirror of agent/pokemon/calc.py _node_bin() for the health line (the start runs a real calc)
@@ -405,7 +438,7 @@ sys.exit(0 if good else 1)' 2>&1)"; rc=$?
 }
 
 preflight() {     # 0 = go; everything it prints lands in the log
-  local ok=0 perm free_k k
+  local ok=0 perm free_k k st
   if [ -f "$ENV_FILE" ]; then
     perm="$(stat -c %a "$ENV_FILE" 2>/dev/null || echo 600)"
     case "$perm" in *00) ;; *) say "WARNING: $ENV_FILE is readable by other users (mode $perm): chmod 600 $ENV_FILE" ;; esac
@@ -439,6 +472,11 @@ preflight() {     # 0 = go; everything it prints lands in the log
   free_k="$(df -Pk "$LOG_DIR" 2>/dev/null | awk 'NR==2 { print $4 }')"
   [ -n "$free_k" ] && [ "$free_k" -lt 1048576 ] && say "WARNING: less than 1 GB free under $LOG_DIR"
   say "mode $MODE ($MODE_WHY), control plane $ALTRUAGENT_CONTROL_URL, key #$(key_hash), python $("$PYTHON" -c 'import sys; print(sys.version.split()[0])' 2>/dev/null), recording ${ARENA_RECORD:-1} (dir ${ARENA_RECORD_DIR:-logs}), reasoning ${ARENA_REASONING:-safe}, assignment poll ${ARENA_DISCOVERY_S}s, worker cooldown ${ARENA_WORKER_COOLDOWN_S}s"
+  DEPLOYED="$(deployed_version)"
+  say "deployed: $DEPLOYED"
+  st="$(arena_settings)"
+  if [ "$st" = none ]; then say "settings: no ARENA_* set (all at their defaults)"
+  else say "settings: $st (every other ARENA_* at its default)"; fi
   return $ok
 }
 
@@ -591,8 +629,12 @@ cmd_run() {
   launch=("$PYTHON" -u -m agent)
   [ "$KIND_ARGS" = 1 ] || launch+=(--tournament --match)   # test matches and tournament games, one process
   launch+=(${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"})
-  local fast=0 delay started code t sleeper
+  local fast=0 delay started code t sleeper ver
   while [ "$STOPPING" != 1 ]; do
+    if [ "$RESTARTS" -gt 0 ]; then                    # (code pulled or unpacked under a running loop: say so)
+      ver="$(deployed_version)"
+      [ "$ver" != "$DEPLOYED" ] && { DEPLOYED="$ver"; say "deployed: $ver (changed since the agent last started)"; }
+    fi
     started="$(now)"
     # The execution id goes to the agent's environment only (never argv, the log or the state file), just for the
     # spawn: python drops it from its own environment and honours it only when its parent is this loop.

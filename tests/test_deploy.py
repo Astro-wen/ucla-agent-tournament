@@ -1149,6 +1149,20 @@ def _run_bg(run_env, env=None):
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
 
+def _git(cwd, *args) -> str:
+    """git in a throwaway test repository (its own identity, no signing: never our repository's settings)."""
+    return subprocess.run(["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid",
+                           "-c", "commit.gpgsign=false", *args], cwd=cwd, capture_output=True, text=True,
+                          check=True).stdout.strip()
+
+
+def _copy_run_agent(root: Path) -> Path:
+    """A checkout / bundle directory holding only scripts/run_agent.sh (its ROOT is `root`)."""
+    (root / "scripts").mkdir(parents=True)
+    shutil.copy2(RUN_AGENT, root / "scripts" / "run_agent.sh")
+    return root / "scripts" / "run_agent.sh"
+
+
 @needs_linux
 def test_run_agent_restarts_rotates_locks_and_stops_clean(run_env):
     logs = run_env["logs"]
@@ -1187,6 +1201,84 @@ def test_run_agent_backs_off_a_crash_loop_and_refuses_claim_mode(run_env):
     r = subprocess.run(["bash", str(RUN_AGENT), "run", "--", "--claim", "seatclaim_x"], env=run_env["env"],
                        capture_output=True, text=True)
     assert r.returncode == 2 and "claim codes (--claim) were retired" in r.stderr
+
+
+@needs_linux
+def test_run_agent_keeps_a_whole_event_day_of_log_by_default(run_env):
+    # Official Rules section 9: records are kept until 30 days after the results. The defaults keep 41 files of 50 MB
+    # (an event day writes a few KB per match); with a tiny rotation size the default LOG_KEEP still holds every line
+    # this run wrote, its start lines included.
+    env = dict(run_env["env"], LOG_MAX_BYTES="2000")
+    env.pop("LOG_KEEP")
+    env.pop("LOG_MAX_MB", None)
+    run_env["mode"].write_text("spam")                              # ~33 KB of output: about 16 rotations
+    r = _ra(run_env, "start", env=env)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _wait(lambda: "line 300 ." in _log(run_env, "unit"), timeout=20), _log(run_env, "unit")[-500:]
+    rotated = [p.name for p in run_env["logs"].glob("agent-unit.out.*") if p.suffix[1:].isdigit()]
+    assert 10 <= len(rotated) <= 40, sorted(rotated)
+    text = _log(run_env, "unit")
+    assert "(rotated at 50 MB, 40 kept)" in text
+    assert "[run_agent] start name=unit" in text and "line 1 ." in text and "deployed: " in text
+    assert _ra(run_env, "stop", env=env).returncode == 0
+
+
+@needs_linux
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_run_agent_logs_the_deployed_commit_and_every_arena_setting(run_env):
+    # Official Rules section 9 (the deployed commit and configuration): every start names the checkout's full commit
+    # id, says when tracked files differ from it, and lists every ARENA_* setting; never the key or the loop's ids
+    root = run_env["tmp"] / "checkout"
+    script = _copy_run_agent(root)
+    (root / "README.md").write_text("x\n")
+    _git(root, "init", "-q")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "x")
+    sha = _git(root, "rev-parse", "HEAD")
+    env = dict(run_env["env"], ARENA_WW_DM="on")
+
+    def ra(*args):
+        return subprocess.run(["bash", str(script), *args, "--env", str(run_env["envf"])], env=env,
+                              capture_output=True, text=True, timeout=90)
+
+    r = ra("start")
+    assert r.returncode == 0, r.stdout + r.stderr
+    log = _log(run_env, "unit")
+    assert f"[run_agent] deployed: commit {sha} (git checkout)\n" in log
+    settings = next(line for line in log.splitlines() if "[run_agent] settings: " in line)
+    assert "ARENA_WW_DM=on" in settings and "ARENA_DISCOVERY_S=10" in settings and "ARENA_WORKER_COOLDOWN_S=10" in settings
+    assert f"ARENA_RECORD_DIR={run_env['logs']} " in settings and settings.endswith("(every other ARENA_* at its default)")
+    assert "ARENA_RUN_ID" not in settings and "ARENA_EXECUTION_ID" not in settings
+    assert run_env["key"] not in log
+    assert ra("stop").returncode == 0
+    (root / "README.md").write_text("changed\n")                   # a tracked file differs from the commit: said so
+    assert ra("start").returncode == 0
+    assert f"[run_agent] deployed: commit {sha} (git checkout, with uncommitted changes)\n" in _log(run_env, "unit")
+    assert ra("stop").returncode == 0
+
+
+@needs_linux
+def test_run_agent_logs_a_bundles_commit_file_and_a_change_under_a_running_loop(run_env):
+    root = run_env["tmp"] / "bundle"                               # no .git: the COMMIT file scripts/bundle.sh writes
+    script = _copy_run_agent(root)
+    old, new = "0123456789abcdef" * 2 + "01234567", "fedcba9876543210" * 2 + "76543210"
+    (root / "COMMIT").write_text(f"commit {old}\nbundle arena-agent-0123456, built 2026-10-13T20:00Z\n")
+    r = subprocess.run(["bash", str(script), "start", "--env", str(run_env["envf"])], env=run_env["env"],
+                       capture_output=True, text=True, timeout=90)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert f"deployed: commit {old} (bundle arena-agent-0123456, built 2026-10-13T20:00Z)\n" in _log(run_env, "unit")
+    first = int(_state(run_env["logs"], "unit")["child"])
+    (root / "COMMIT").write_text(f"commit {new}\nbundle arena-agent-fedcba9, built 2026-10-13T21:00Z\n")
+    os.kill(first, signal.SIGKILL)                                  # the agent restarts on other code: logged
+    assert _wait(lambda: f"deployed: commit {new} (bundle arena-agent-fedcba9, built 2026-10-13T21:00Z) (changed "
+                         "since the agent last started)" in _log(run_env, "unit"), timeout=20), _log(run_env, "unit")
+    r = subprocess.run(["bash", str(script), "stop", "--env", str(run_env["envf"])], env=run_env["env"],
+                       capture_output=True, text=True, timeout=90)
+    assert r.returncode == 0
+    (root / "COMMIT").unlink()                                      # neither: says so, still starts
+    r = subprocess.run(["bash", str(script), "start", "--env", str(run_env["envf"])], env=run_env["env"],
+                       capture_output=True, text=True, timeout=90)
+    assert r.returncode == 0 and f"deployed: unknown (no git checkout and no COMMIT file in {root})" in _log(run_env, "unit")
 
 
 @needs_linux
@@ -1953,10 +2045,33 @@ def test_bundle_leaves_env_files_out_and_its_secret_scan_blocks_keys(tmp_path):
     assert not [n for n in names if "/node/" in n]
     readme = _bundle_file(tmp_path / "dist", "BUNDLE_README.txt")
     assert "NO node binary is included" in readme and "--init" not in readme and "must end with" in readme
+    assert f"{top}/COMMIT" in names                                 # (not a git checkout: says so, never a guess)
+    assert _bundle_file(tmp_path / "dist", "/COMMIT").startswith(f"commit unknown (not built from a git checkout)\nbundle {top}, built ")
     (root / "agent" / "leak.py").write_text('KEY = "sk_agent_REALLOOKINGKEY123456"\n')
     r = _bundle(root, tmp_path / "dist2", "--no-node")
     assert r.returncode != 0 and "SECRET SCAN" in r.stderr and "REALLOOKINGKEY123456" not in r.stderr
     assert not (tmp_path / "dist2").exists() or not list((tmp_path / "dist2").glob("*.tar.gz"))
+
+
+@needs_linux
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_bundle_names_the_full_commit_it_was_built_from(tmp_path):
+    # Official Rules sections 8 and 9: the deployed version must be identifiable. The bundle's COMMIT file (logged by
+    # run_agent.sh at every start) holds the full commit id, and says so when tracked files differed from it.
+    root = _mini_checkout(tmp_path / "checkout")
+    _git(root, "init", "-q")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "x")
+    sha = _git(root, "rev-parse", "HEAD")
+    r = _bundle(root, tmp_path / "dist", "--no-node")
+    assert r.returncode == 0, r.stdout + r.stderr
+    commit = _bundle_file(tmp_path / "dist", "/COMMIT").splitlines()
+    assert commit[0] == f"commit {sha}" and commit[1].startswith(f"bundle arena-agent-{sha[:7]}, built "), commit
+    assert f"Source: commit {sha} (also in COMMIT" in _bundle_file(tmp_path / "dist", "BUNDLE_README.txt")
+    (root / "README.md").write_text("changed\n")
+    r = _bundle(root, tmp_path / "dist2", "--no-node")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _bundle_file(tmp_path / "dist2", "/COMMIT").splitlines()[0] == f"commit {sha} (built with uncommitted changes)"
 
 
 @needs_linux

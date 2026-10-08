@@ -156,7 +156,7 @@ bash scripts/run_agent.sh stop   # 停止
 - **LOG_DIR 写不进去是错误，不是「已在运行」**（deploy-6）：`LOG_DIR`（默认 `logs/`）不可写（只读挂载、别的用户的目录）时直接报 `ERROR: LOG_DIR … is not writable`、退出码 2（以前误报「已在运行」并以 3 退出，systemd 不会重试）。agent 的对局录像默认也写到 `LOG_DIR`（`ARENA_RECORD_DIR` 可改），写失败时每场打一条 WARNING，不再悄悄丢掉。
 - **崩溃重启**：`python -m agent` 退出就重启，间隔 3 s；1 分钟内连续退出则翻倍退避（3→6→12…最多 60 s），避免密钥错误时狂刷登录。重启前把上一轮残留的 worker 和 Node 进程整组杀掉，不会有两个进程抢同一个座位。退避期间的 sleep 不持有任何锁，退避中 `restart` 也能马上起来。
 - **单场恢复更快**：设置 `ARENA_DISCOVERY_S=10`（查分配间隔）、`ARENA_WORKER_COOLDOWN_S=10`（座位的 worker 失败后第一次重试；上游再按连续失败次数翻倍，agent 把上限从上游的 600 s 改成 30 s，`ARENA_SEAT_BACKOFF_MAX_S`）。上游默认冷却 60 s，会丢掉一个 55 s 的对战回合；现在约 20 s。
-- **日志**：`logs/agent-NAME.out`，每行带时间戳，满 20 MB 轮转、保留 10 个（`LOG_MAX_MB`、`LOG_KEEP`）。`logs/` 整个在 .gitignore 里，**不要提交 `logs/*.out`**。
+- **日志**：`logs/agent-NAME.out`，每行带时间戳，满 50 MB 轮转、保留 40 个（`LOG_MAX_MB`、`LOG_KEEP`；10-08 起，以前是 20 MB × 10）。一场对局只写几 KB，所以整个比赛日的日志都不会被轮转删掉（规则第 9 节要求记录保存到成绩公布后至少 30 天）；上限约 2 GB，磁盘要留够。每局的录像 `logs/<session_id>.jsonl` 看门脚本从不删。`logs/` 整个在 .gitignore 里，**不要提交 `logs/*.out`**。
 - **健康行**：每 5 分钟（`HEALTH_EVERY`）写一行 `[health]`，也可随时 `bash scripts/run_agent.sh health`：
 
   ```
@@ -168,6 +168,7 @@ bash scripts/run_agent.sh stop   # 停止
 - **干净停止**：`stop`（或 systemd stop、tmux 里 Ctrl-C）向 agent 整个进程组发 SIGTERM，20 s 内不退就 SIGKILL；不认输、不再调用平台。实测 0.6 s 停完。看门脚本自己被 SIGKILL / OOM 杀掉时，它的健康循环 5 s 内自行退出，日志写入进程在最后一个写端关闭后退出，下一次 `start` / `stop` 会清理残留的 agent 和这两个辅助进程（测试覆盖：`kill -9` 看门脚本后 `stop`，本测试的进程一个不剩）。
 - **pid 文件不盲信**：`start` / `stop` 只认命令行是 `run_agent.sh run` 且环境里 `ARENA_RUN_ID=<NAME>@<LOG_DIR>` 对得上的进程；pid 文件过期、pid 被别的进程复用时，既不会误报「已在运行」，也不会去杀别人的进程。
 - 启动自检写进日志：模式和它跑的命令、密钥是否设置（不打印密钥）、`.env` 权限、计算器（真算一次）、磁盘空间。
+- **每次启动记下部署的版本和设置**（10-08 起，规则第 9 节要求能把比赛对局对应到提交的版本和配置）：`deployed: commit <完整 40 位提交号> (git checkout)`（工作区有没提交的改动时加 `, with uncommitted changes`；压缩包读它的 `COMMIT` 文件：`deployed: commit … (bundle arena-agent-…, built …)`），和一行 `settings: ARENA_…=… …`（所有设了的 `ARENA_*`，不含 key 和看门脚本内部的 id）。agent 重启时如果代码变了（有人在运行中 `git pull` 或换了包），再记一行 `deployed: … (changed since the agent last started)`。比赛日 `grep 'deployed:\|settings:' logs/agent-main.out` 就能看到当时跑的是哪个提交。
 
 不经看门脚本直接跑 `python -m agent --tournament --match`（例如在终端里按上游 README 跑）：没设 `ALTRUAGENT_CONTROL_URL` 时默认用 `https://api.altruagent-game.com`（上游直接报错退出）；启动时检查数据文件、计算器和引擎搜索，**有问题就在 stdout 和 stderr 各打一个 `WARNING: THIS MACHINE PLAYS DEGRADED` 横幅**（不拒绝启动：能打总比不在线强），一切正常时打一行 `Local checks: …`；`--check-tournament` 把这几项作为最前面的 ✓/✗ 行。不带 `--tournament` / `--match` / `--check-tournament`（以前的发现模式）或带 `--claim` 只打印上游的停用说明，不做任何检查。
 
@@ -179,7 +180,7 @@ bash scripts/run_agent.sh stop   # 停止
 bash scripts/bundle.sh     # -> dist/arena-agent-<版本>.tar.gz（46 MB，解开约 130 MB，其中 node 119 MB）+ .sha256
 ```
 
-包里有：`agent/`（含选秀模型 `draft_model.json`）、`altruagent/`、`data/`、计算器的 `node_modules`（纯 JS，随包带上）、引擎搜索用的裁剪版 `pokemon-showdown`（MIT，8 MB，放在 `agent/js/node_modules`；出包前用包里的 node 真加载一次）、**官方 Node v22.23.3 Linux x64（`node/bin/node` + LICENSE + VERSION.txt）**、`requirements.lock`、`scripts/run_agent.sh`、`selfcheck.py`、`check_connection.py`、`replay_real.py`、`deploy/`（Dockerfile、systemd 单元）、本文件、**一整场真实对局的两个座位**（两个录像目录里都有、带选秀的最大那场，给 selfcheck 和 replay_real 重放：60 个决策，其中 46 个对战决策；以前只带两个 12 行的小录像）、包自己的 `.dockerignore`、`SHA256SUMS`、`BUNDLE_README.txt`（写了平台要求、官方模式三步、离线安装、不要 `pip install .`）。
+包里有：`agent/`（含选秀模型 `draft_model.json`）、`altruagent/`、`data/`、计算器的 `node_modules`（纯 JS，随包带上）、引擎搜索用的裁剪版 `pokemon-showdown`（MIT，8 MB，放在 `agent/js/node_modules`；出包前用包里的 node 真加载一次）、**官方 Node v22.23.3 Linux x64（`node/bin/node` + LICENSE + VERSION.txt）**、`requirements.lock`、`scripts/run_agent.sh`、`selfcheck.py`、`check_connection.py`、`replay_real.py`、`deploy/`（Dockerfile、systemd 单元）、本文件、**一整场真实对局的两个座位**（两个录像目录里都有、带选秀的最大那场，给 selfcheck 和 replay_real 重放：60 个决策，其中 46 个对战决策；以前只带两个 12 行的小录像）、包自己的 `.dockerignore`、`SHA256SUMS`、`BUNDLE_README.txt`（写了平台要求、官方模式三步、离线安装、不要 `pip install .`）、`COMMIT`（打包时的完整提交号；工作区有没提交的改动时写 `built with uncommitted changes`，**比赛用的包必须没有这句**；看门脚本每次启动把它写进日志）。
 
 - Node 从 `https://nodejs.org/dist/v22.23.3/` 下载（缓存在 `~/.cache/arena-agent/`），SHA-256 必须等于 `bundle.sh` 里写死的值（取自该版本的 SHASUMS256.txt），不符就不出包；出包前还用包里的 node 和包里的 node_modules 真算一次伤害。对方机器上默认用包里的 node（`ARENA_NODE` 可指定别的）。
 - **没有任何密钥**：只按白名单拷文件，`.env*` 一律不进包，打包后再扫描一遍（`sk_agent_…`、`seatclaim_…`、**`eak_live_…`（Official Agent Key）**、`sk-…`、私钥、`ALTRUAGENT_API_KEY=` / `ALTRUAGENT_OFFICIAL_AGENT_KEY=` 后跟真实值），有就拒绝出包。
@@ -406,4 +407,4 @@ python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-* --out /tmp/of
 | 日志 `resumed match … after a worker restart` | 正常：worker 重启后从状态文件接上了这局的记忆（v4.2）。频繁出现说明 worker 在反复崩，按上面「stopped with an error」处理 |
 | "ERROR: LOG_DIR … is not writable" | 把 `LOG_DIR` 指到可写目录（systemd：单元里加 `Environment=LOG_DIR=…`，或修目录权限），systemd 会自己重试 |
 | `restarts` 一直涨 | 看日志里 `exited with code` 前的报错；网络问题先 `curl -sI https://api.altruagent-game.com` |
-| 磁盘满 | 删旧的 `logs/agent-*.out.N` 和不需要的 `logs/rehearsal/` |
+| 磁盘满 | 先删和比赛无关的（`logs/rehearsal/`、`logs/panel/`、旧的本地演练输出）。比赛的日志和录像（`logs/agent-*.out*`、`logs/*.jsonl`）要保存到成绩公布后至少 30 天（规则第 9 节）：先拷到别的盘再删本机的 |
