@@ -160,7 +160,7 @@ class Item:
         self.name, self.queue, self.cost = name, queue, cost
         self.ticks = None                  # set when production starts
         self.progress = 0.0
-        self.paid = 0.0
+        self.paid = 0                      # credits (integers, like the engine)
         self.done = False
         self.paused = False
 
@@ -170,8 +170,8 @@ class Player:
         self.seat = seat
         self.country = country
         self.side = SIDES.get(country, "allies")
-        self.cash = float(cash)
-        self.ore = 0.0
+        self.cash = int(cash)
+        self.ore = 0
         self.queues: dict[str, list[Item]] = {q: [] for q in QUEUES}
         self.primary: dict[str, int] = {}
         self.power_provided = 0
@@ -191,24 +191,25 @@ class Player:
         self.kills_this_step: list[str] = []
         self.storage_full = False
 
-    def resources(self) -> float:
+    def resources(self) -> int:
         return self.cash + self.ore
 
-    def take(self, amount: float) -> bool:
+    def take(self, amount: int) -> bool:
         """OpenRA PlayerResources.TakeCash: stored ore first ("spend ore before cash"), then cash; False (nothing
         taken) if short."""
+        amount = int(amount)
         if amount <= 0:
             return True
-        if self.cash + self.ore + 1e-9 < amount:
+        if self.cash + self.ore < amount:
             return False
         self.ore -= amount
         if self.ore < 0:
             self.cash += self.ore
-            self.ore = 0.0
+            self.ore = 0
         return True
 
-    def refund(self, amount: float) -> None:
-        self.cash += amount
+    def refund(self, amount: int) -> None:
+        self.cash += int(amount)
 
 
 class World:
@@ -443,12 +444,11 @@ class World:
                     head.ticks = self._build_ticks(seat, head.name)
                 rate = STEP / head.ticks / (LOW_POWER_MODIFIER if p.low_power else 1)
                 dprog = min(rate, 1.0 - head.progress)
-                cost_now = head.cost * (head.progress + dprog) - head.paid
-                if head.progress + dprog >= 1.0 - 1e-9:
-                    cost_now = head.cost - head.paid
+                finish = head.progress + dprog >= 1.0 - 1e-9
+                cost_now = (head.cost if finish else int(head.cost * (head.progress + dprog))) - head.paid
                 if cost_now > 0 and not p.take(cost_now):
                     continue                   # no money: the item stalls (OpenRA: production waits)
-                head.paid += max(0.0, cost_now)
+                head.paid += max(0, cost_now)
                 head.progress += dprog
                 if head.progress >= 1.0 - 1e-9:
                     head.progress = 1.0
@@ -1050,8 +1050,8 @@ class World:
             a.htick += STEP
             cap = self.capacity(seat)
             while a.htick >= BALE_UNLOAD_TICKS and a.cargo > 0:
-                per = a.cargo_value / a.cargo
-                if p.ore + per > cap + 1e-9:
+                per = a.cargo_value // a.cargo if a.cargo > 1 else a.cargo_value
+                if p.ore + per > cap:
                     p.storage_full = True
                     return                                 # storage full: the harvester waits with its load
                 a.htick -= BALE_UNLOAD_TICKS
@@ -1252,7 +1252,7 @@ class World:
                 continue
             if a.sell_tick is not None and self.tick >= a.sell_tick:
                 p = self.players[a.owner]
-                p.refund(a.cost * SELL_REFUND * a.hp / a.max_hp)
+                p.refund(int(a.cost * SELL_REFUND * a.hp / a.max_hp))
                 self._remove(a)
                 self._event(a.owner, "building_sold", id=a.id, type=a.type)
                 self._spawn_unit(a.owner, "e1", a.x + a.w / 2.0, a.y + a.h + 0.5)
@@ -1266,7 +1266,7 @@ class World:
                 if a.repair_tick >= REPAIR_INTERVAL_TICKS:
                     a.repair_tick -= REPAIR_INTERVAL_TICKS
                     step_hp = min(REPAIR_STEP_HP, a.max_hp - a.hp)
-                    cost = a.cost * REPAIR_COST_PERCENT / 100.0 * step_hp / a.max_hp
+                    cost = max(1, int(round(a.cost * REPAIR_COST_PERCENT / 100.0 * step_hp / a.max_hp)))
                     if self.players[a.owner].take(cost):
                         a.hp = min(a.max_hp, a.hp + step_hp)
 

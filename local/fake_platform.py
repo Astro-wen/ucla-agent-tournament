@@ -38,7 +38,8 @@ The official tournament (`--official`, local/fake_official.py): the /tournament/
 execution leases, for `python -m agent --tournament` with a FAKE Official Agent Key (--official-key, or
 FAKE_OFFICIAL_KEY; the default is a fixed local test value). `--werewolf N` adds N 7-seat Werewolf tables (our seat
 over MCP, six local bots), in either mode. `--red-alert N` adds N real-time Red Alert matches, one after another
-(local/fake_redalert.py: a scripted world, --ra-seconds long; the MCP tool get_game_config answers too).
+(local/fake_redalert.py: the local simulator, --ra-seconds of game time at --ra-speed, a scripted --ra-opponent in
+the other seat; the MCP tool get_game_config answers too).
 """
 from __future__ import annotations
 
@@ -352,9 +353,11 @@ class FakePlatform:
     def __init__(self, *, concurrent: int, opponent: str, max_matches: int | None, api_key: str, token_ttl: float,
                  seed: int, stats: Path | None, game_server: str, realistic: bool = True, blind_every: int = 25,
                  werewolf: int = 0, max_werewolf: int | None = None, ww_seat: int | None = None,
-                 ww_idle: float = 120.0, ww_think: float = 0.0, red_alert: int = 0, ra_seconds: float = 20.0):
+                 ww_idle: float = 120.0, ww_think: float = 0.0, red_alert: int = 0, ra_seconds: float = 20.0,
+                 ra_opponent: str = "idle", ra_speed: float = 1.0):
         self.concurrent, self.opponent, self.max_matches = concurrent, opponent, max_matches
         self.red_alert, self.ra_seconds = red_alert, ra_seconds     # Red Alert matches in all, one at a time
+        self.ra_opponent, self.ra_speed = ra_opponent, ra_speed
         self._ra_started = 0
         self.api_key, self.token_ttl, self.seed, self.stats_path = api_key, token_ttl, seed, stats
         self.game_server = game_server
@@ -452,7 +455,8 @@ class FakePlatform:
     def _new_red_alert(self) -> None:
         from .fake_redalert import FakeRedAlertMatch
         self._ra_started += 1
-        self._start(FakeRedAlertMatch(self, len(self.order), seconds=self.ra_seconds))
+        self._start(FakeRedAlertMatch(self, len(self.order), seconds=self.ra_seconds, opponent=self.ra_opponent,
+                                      speed=self.ra_speed))
 
     def _start(self, fm) -> None:
         with self.lock:
@@ -780,7 +784,12 @@ def main(argv=None) -> None:
                     help="the bots' mean seconds per decision / chat (default 0; a few s = LLM-paced tables)")
     ap.add_argument("--red-alert", type=int, default=0,
                     help="real-time Red Alert matches in all, one at a time (default 0; local/fake_redalert.py)")
-    ap.add_argument("--ra-seconds", type=float, default=20.0, help="how long each Red Alert match plays (default 20 s)")
+    ap.add_argument("--ra-seconds", type=float, default=20.0,
+                    help="game seconds each Red Alert match plays before its time limit (default 20)")
+    ap.add_argument("--ra-opponent", choices=("idle", "turtle", "rusher", "llm"), default="idle",
+                    help="the scripted bot in the other Red Alert seat (local/ra_bots.py; default idle)")
+    ap.add_argument("--ra-speed", type=float, default=1.0,
+                    help="Red Alert game seconds per wall second (default 1, the platform's pace)")
     ap.add_argument("--official", action="store_true",
                     help="the official tournament control plane (/tournament/agent/*, local/fake_official.py)")
     ap.add_argument("--official-key", default=os.environ.get("FAKE_OFFICIAL_KEY", DEFAULT_OFFICIAL_KEY),
@@ -804,7 +813,8 @@ def main(argv=None) -> None:
                      token_ttl=a.token_ttl, seed=a.seed, stats=a.stats, game_server=f"127.0.0.1:{a.port}",
                      realistic=not a.plain, blind_every=max(0, a.blind_every), werewolf=max(0, a.werewolf),
                      max_werewolf=a.max_werewolf, ww_seat=a.ww_seat, ww_idle=a.ww_idle, ww_think=max(0.0, a.ww_think),
-                     red_alert=max(0, a.red_alert), ra_seconds=a.ra_seconds)
+                     red_alert=max(0, a.red_alert), ra_seconds=a.ra_seconds, ra_opponent=a.ra_opponent,
+                     ra_speed=a.ra_speed)
     p.outage_file, p.gap = a.outage_file, a.gap
     p.drain_file, p.stats_every = a.drain_file, max(0.5, a.stats_every)
     if a.official:
