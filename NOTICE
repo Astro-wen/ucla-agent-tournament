@@ -1,0 +1,42 @@
+Third-party material in or used by this repository
+==================================================
+
+Our own code is © 2026 the entrant, all rights reserved (see README.md). The components below are not ours and keep
+their own licenses.
+
+Pokémon Showdown data (data/pokedex.json, data/moves.json, downloaded from play.pokemonshowdown.com by
+scripts/fetch_showdown_data.sh in the development repository; data/items.json, data/abilities.json and
+data/singles_sets.json, generated from the pokemon-showdown npm package)
+  MIT License. Copyright (c) 2011-2026 Guangcong Luo and other contributors, https://pokemonshowdown.com/
+  https://github.com/smogon/pokemon-showdown
+
+pokemon-showdown (npm package, version pinned in local/js/package-lock.json; not stored in this repository, installed
+with npm ci; the bundle built by scripts/bundle.sh ships a trimmed copy together with its LICENSE file)
+  MIT License. Copyright (c) 2011-2026 Guangcong Luo and other contributors.
+  Its runtime dependencies: ts-chacha20 (MIT) and sql-template-strings (ISC).
+  https://github.com/smogon/pokemon-showdown
+
+@smogon/calc (npm package, version pinned in agent/js/package-lock.json; not stored in this repository, installed
+with npm ci)
+  MIT License (as declared by the package). Smogon's damage calculator.
+  https://github.com/smogon/damage-calc
+
+Node.js (not stored in this repository; scripts/bundle.sh downloads the official linux-x64 build, checks its pinned
+SHA-256 and ships it with its LICENSE file; deploy/Dockerfile uses the official node image)
+  MIT License for Node.js itself; the bundled third-party parts are listed in its LICENSE file.
+  Copyright Node.js contributors. https://nodejs.org/
+
+AltruAgent starter (altruagent/, GAMES.md and the upstream tests under tests/)
+  The organizers' official starter kit and SDK, from
+  https://github.com/UCLA-Trustworthy-AI-Lab/altruagent-starter (merged unmodified; last merged upstream commit
+  951f4f74b008c6aa7f40bec09e741aa67d3c45cc, PR #7). The upstream repository carries no license file; all rights in
+  it remain with its authors, and it is included here only as the SDK the organizers provide to contestants.
+
+Platform game data (data/vgc_cards.json, data/vgc_pools.json, data/red_alert_config.json, data/search_probe.json and
+the recorded match under logs/)
+  Game data received from the AltruAgent platform while playing (draft cards and pools, the Red Alert configuration
+  served by get_game_config, our own recorded states). Red Alert on the platform runs on OpenRA (GPL-3.0); no OpenRA
+  code is included here, only the unit and map parameters the platform serves to players.
+
+Python dependencies (requirements.lock: httpx, python-dotenv, mcp and their dependencies) are installed from PyPI and
+are not stored in this repository; each keeps its own license.
