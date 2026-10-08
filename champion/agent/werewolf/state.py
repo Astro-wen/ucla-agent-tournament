@@ -258,14 +258,31 @@ class RoleCheck:
 
 
 # ---------------------------------------------------------------- chat
-MAX_CHAT_CHARS = 600            # the platform caps chat at 50 words; anything longer is not read past this
+MAX_CHAT_CHARS = 1100           # the platform caps chat at 1024 characters (50 words, but a hyphen-packed "word" can be
+#                                 long); anything longer is not read past this
 # Quoted passages: double, curly, guillemet and low-9 quotes, and single quotes ('...' / ‘...’) whose opening quote
 # does not follow a letter and whose closing quote is not followed by one, so apostrophes ("I'm", "p3's") never
 # open or close a quote; an apostrophe between two letters inside the quote is kept ('I'm the seer').
 _QUOTED = re.compile(r"\"[^\"]{0,300}\"|“[^”]{0,300}”|«[^»]{0,300}»|„[^“”]{0,300}[“”]"
                      r"|(?<!\w)'(?:[^'\n]|(?<=\w)'(?=\w)){1,300}'(?!\w)"
                      r"|‘(?:[^’\n]|(?<=\w)’(?=\w)){1,300}’(?!\w)")
-_SEAT_TOKEN = re.compile(r"(?:\b(?:player|plyr|p|seat|agent|no\.?)\s*[#_\-]?\s*|#\s*)([0-6])\b")
+_SEAT_TOKEN = re.compile(r"(?:\b(?:player|plyr|plyer|palyer|playr|pleyer|p|seat|agent|no\.?)\s*[#_\-]?\s*|#\s*)"
+                         r"(?:\(\s*)?0*([0-6])(?:\s*\))?(?!\w)")    # also "Player05", "Plyer5", "Player(5)"
+_SEAT_WORD = re.compile(r"\b(?:player|seat)\s+(zero|one|two|three|four|five|six)\b")      # "player five"
+_NUM_WORDS = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
+# Surface noise normalised before reading (red-team chaos, 10-08): markdown emphasis ("**I am the Seer.**",
+# "**Player3**"), words packed with hyphens to fit the 50-word cap ("I-am-the-seer-and-I-investigated-Player3"),
+# arrows ("checked Player3 -> wolf") and a few common misspellings.
+_MARKUP = re.compile(r"\*+|`+|_{2,}|~{2,}")
+_HYPHEN_WORDS = re.compile(r"(?<=[a-z0-9])-(?=[a-z0-9])")
+_ARROW = re.compile(r"\s*(?:->|=>|→|⇒|⟶)\s*")
+_TYPOS = {"teh": "the", "wolff": "wolf", "woolf": "wolf", "wolfe": "wolf", "werwolf": "werewolf",
+          "vilager": "villager", "villlager": "villager", "villiger": "villager", "villagr": "villager",
+          "seeer": "seer", "voet": "vote"}
+_TYPO_RE = re.compile(r"\b(?:" + "|".join(_TYPOS) + r")\b")
+# A seer quoting its own result ('My result: "Player3 is a wolf"') speaks in its own voice: that quote is kept.
+_OWN_QUOTE = re.compile(r"((?:\bmy\s+(?:seer\s+)?|(?:^|[.!?:]\s*)(?:seer\s+)?)(?:results?|checks?|findings?|visions?|"
+                        r"readings?)\s*(?:is|was|are|were)?\s*[:=\-—–]?\s*)[\"“«„]([^\"”»“]{1,200})[\"”»“]")
 _W = r"(?:wolf|wolves|werewolf|werewolves|ww|wolfie)"
 _P = r"player([0-6])"
 _ADV = r"(?:(?:definitely|def|prob|probably|clearly|obviously|surely|totally|for sure|100%|confirmed|actually)\s+)?"
@@ -303,7 +320,10 @@ _CHAT_CLAIM = [
     re.compile(r"(?:^|[.!?;:,]\s*|\b(?:hi|hey|hello|ok|okay|yes|yep|yeah|so|alright|well|guys|fine)\s*,?\s*)"
                r"(?:(?:the\s+)?(?:real|true|actual)\s+)?seer\s+here\b(?!\s*\?)"),
     re.compile(r"\bas\s+(?:the\s+)?seer,?\s+i\b"),
+    re.compile(r"\bas\s+(?:the\s+)?(?:real\s+|true\s+|actual\s+)?seer\s*(?:[:—–]|-\s)"),      # "As the seer: P3 is a wolf"
 ]
+# "My role is seer" (not "if my role is seer", not "my role is seer?")
+_CLAIM_ROLE = re.compile(r"\bmy\s+(?:role|card|identity)\s+(?:is|=|:)\s*(?:the\s+|a\s+)?seer\b(?!\s*\?)")
 _CHECK = re.compile(r"\bi\s+(?:have\s+|'ve\s+|’ve\s+)?(?:checked|investigated|inspected|scanned|peeked\s+at|looked\s+at)"
                     r"\s+player([0-6])\b(?!\s*['’]s\b)([^.!?]{0,60})")
 _VERDICT = re.compile(r"\b(?:wolf|werewolf|villager|clear|cleared|clean|innocent|town)\b")
@@ -326,8 +346,15 @@ _IS = r"\s*(?:is|=|was|['’]s|:)\s+"
 _CLEAR_PHRASE = r"(?:" + _DET + _CLEARW + r"|not\s+(?:a\s+|an\s+)?" + _W2 + r")"
 _TURNED = (r"\s+(?:turned\s+out\s+to\s+be|came\s+back(?:\s+as)?|showed\s+up\s+as|"
            r"(?:was|is)\s+revealed\s+(?:as|to\s+be)|proved\s+to\s+be|tested\s+as|reads?\s+as)\s+")
+_TEAM_W = r"on\s+(?:the\s+)?(?:wol(?:f|ves)|werewol(?:f|ves)|evil|bad)\s+(?:team|side)"
+_TEAM_C = r"on\s+(?:the\s+)?(?:village|villagers?|town|good)\s+(?:team|side)"
 _DIRECT = [   # (pattern with group "s" = the seat or seats, verdict)
-    (re.compile(r"(?P<s>player[0-6])" + _IS + _ADV2 + _DET + _W2 + _END), "wolf"),
+    (re.compile(r"(?P<s>player[0-6])" + _IS + _ADV2 + _DET + r"(?:(?:evil|sneaky|lying|filthy|dirty)\s+)?" + _W2 + _END),
+     "wolf"),
+    (re.compile(r"(?P<s>player[0-6])\s*(?:is|was|['’]s)\s+" + _ADV2 + _TEAM_W + _END), "wolf"),
+    (re.compile(r"(?P<s>player[0-6])\s*(?:is|was|['’]s)\s+" + _ADV2 + _TEAM_C + _END), "clear"),
+    (re.compile(r"\bi\s+(?:(?:have|'ve|’ve|had|just|also|already)\s+)*cleared\s+(?P<s>" + _SEATS + r")\b(?!\s*['’]s\b)"),
+     "clear"),
     (re.compile(r"(?P<s>player[0-6])" + _IS + _ADV2 + _CLEAR_PHRASE + _END), "clear"),
     (re.compile(r"(?P<s>player[0-6])\s+(?:isn['’]t|wasn['’]t)\s+" + _ADV2 + r"(?:a\s+|an\s+)?" + _W2 + _END), "clear"),
     (re.compile(r"(?P<s>" + _LIST + r")\s+(?:are|were|['’]re)\s+" + _ADV2 + r"(?:(?:both|all)\s+)?(?:the\s+)?"
@@ -437,7 +464,10 @@ _CLAIM_AFTER_VERDICT = re.compile(r"\bplayer[0-6]" + _IS + _ADV2 + _DET + r"(?:"
                                   r"investigated|inspected)\s+(?:them|him|her)"
                                   r"(?=\s*(?:(?:last\s+night|yesterday|tonight)\s*)?(?:$|[.!?]))")
 # "Seer claim: Player5 is a wolf" / "Seer claim: I am the seer" (not "Seer claim: none yet", "Seer claim - anyone?")
-_CLAIM_OPEN = re.compile(r"(?:^|[.!?]\s*)(?:hard\s+)?seer\s+claim\s*[:\-—–]\s*(?:player[0-6]" + _IS + _ADV2 + _DET
+# Also "Seer claim. Result: Player5: wolf", "Seer result: Player5 is a wolf", "Claiming seer: ..." (a verdict on a seat
+# must follow; "Seer results?" is a question).
+_CLAIM_OPEN = re.compile(r"(?:^|[.!?]\s*)(?:hard\s+)?(?:seer\s+(?:claim|results?|checks?|readings?)|claiming\s+seer)"
+                         r"\s*[:\-—–.!]\s*(?:(?:my\s+|the\s+)?results?\s*[:\-—–]?\s*)?(?:player[0-6]" + _IS + _ADV2 + _DET
                          + r"(?:" + _W2 + r"|" + _CLEARW + r"|not\s+(?:a\s+|an\s+)?" + _W2 + r")\b|"
                          r"i\s*(?:am|['’]m|m)\s+(?:the\s+)?(?:real\s+|true\s+)?seer\b)")
 _TERM = re.compile(r"[.!?]")
@@ -445,9 +475,10 @@ _TERM = re.compile(r"[.!?]")
 
 def _claims_seer(t: str) -> bool:
     """Does normalized text `t` claim seer in the sender's own voice?"""
-    for m in _CLAIM_IAM.finditer(t):
-        if not _NOT_OWN_VOICE.search(t[max(0, m.start() - 40):m.start()]):
-            return True
+    for rx in (_CLAIM_IAM, _CLAIM_ROLE):
+        for m in rx.finditer(t):
+            if not _NOT_OWN_VOICE.search(t[max(0, m.start() - 40):m.start()]):
+                return True
     if any(p.search(t) for p in _CHAT_CLAIM):
         return True
     for m in _CHECK.finditer(t):
@@ -607,12 +638,40 @@ def normalize(text, names: dict[int, str] | None = None) -> str:
     if not isinstance(text, str):
         return ""
     t = unicodedata.normalize("NFKC", text[:MAX_CHAT_CHARS]).casefold()
+    t = _MARKUP.sub("", t)
+    t = _OWN_QUOTE.sub(lambda m: f"{m.group(1)}{m.group(2)}. ", t)
     t = _QUOTED.sub(" ", t)
     for seat, name in sorted((names or {}).items(), key=lambda x: -len(str(x[1]))):
         n = str(name).casefold().strip()
         if len(n) >= 3 and not re.fullmatch(r"(?:player|seat|agent)?\s*\d+", n) and not _NAME_STOP.search(n):
             t = re.sub(r"(?<![\w])" + re.escape(n) + r"(?![\w])", f"player{seat}", t)
+    t = _HYPHEN_WORDS.sub(" ", t)
+    t = _ARROW.sub(" : ", t)
+    t = _TYPO_RE.sub(lambda m: _TYPOS[m.group(0)], t)
+    t = _SEAT_WORD.sub(lambda m: f"player{_NUM_WORDS[m.group(1)]}", t)
     return _SEAT_TOKEN.sub(lambda m: f"player{m.group(1)}", t)
+
+
+def _self_claim(t: str, sender: int) -> bool:
+    """The sender claims seer in the third person ("Player2 is the seer (that's me)", sent by Player2)."""
+    for m in re.finditer(rf"\bplayer{sender}\s+(?:is|=|:)\s+(?:the\s+)?(?:real\s+|true\s+|actual\s+)?seer\b", t):
+        start, _ = _sentence(t, m.start())
+        if not (_question(t, m.end()) or _hedged(t[start:m.start()])):
+            return True
+    return False
+
+
+# Verdict words read only inside a seer claim ("I am the Seer. Player5 is bad / scum."): as table talk they are opinions.
+_CLAIM_ONLY_W = re.compile(r"(?P<s>player[0-6])" + _IS + _ADV2 + r"(?:a\s+)?(?:scum|scummy|bad|evil)" + _END)
+
+
+def _claim_only_wolves(t: str) -> set[int]:
+    out = set()
+    for m in _CLAIM_ONLY_W.finditer(t):
+        start, _ = _sentence(t, m.start())
+        if not (_question(t, m.end()) or _hedged(t[start:m.start()])):
+            out.add(int(m.group("s")[6:]))
+    return out
 
 
 def read_chat(text, sender: int | None = None, names: dict[int, str] | None = None) -> ChatFacts:
@@ -623,7 +682,7 @@ def read_chat(text, sender: int | None = None, names: dict[int, str] | None = No
         f.injection = True
         return f
     t = normalize(text, names)
-    f.claim = _claims_seer(t)
+    f.claim = _claims_seer(t) or (isinstance(sender, int) and _self_claim(t, sender))
     for p in _CHAT_ACCUSE:
         f.wolves |= {int(x) for x in p.findall(t)}
     for p in _CHAT_CLEAR:
@@ -633,7 +692,9 @@ def read_chat(text, sender: int | None = None, names: dict[int, str] | None = No
     wolves, clears = _verdicts(t)
     f.wolves |= wolves
     f.clears |= clears
-    f.clears -= f.wolves                             # "p3 is not a wolf ... p3 is a wolf": the accusation wins
+    if f.claim:
+        f.wolves |= _claim_only_wolves(t)
+    f.clears -= f.wolves                            # "p3 is not a wolf ... p3 is a wolf": the accusation wins
     if isinstance(sender, int):
         for s in (f.wolves, f.clears, f.sus):
             s.discard(sender)
