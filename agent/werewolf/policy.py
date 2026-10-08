@@ -347,6 +347,10 @@ class WerewolfPolicy:
         # Most suspicious first; then the most influential; then the seat the
         # default (lowest-seat) lynch/kill order reaches last, i.e. the one the
         # table would otherwise never resolve.
+        post = self.posterior(v) if _exp("ibayes") else None
+        if post:
+            return max(pool, key=lambda s: (round(post[0][s], 3), round(sus.get(s, 0.0), 3), min(influence[s], 3.0), s)), \
+                "investigate the likeliest wolf the table is not already lynching"
         pick = max(pool, key=lambda s: (round(sus.get(s, 0.0), 3), min(influence[s], 3.0), s))
         return pick, "investigate a likely wolf the table is not already lynching"
 
@@ -413,7 +417,36 @@ class WerewolfPolicy:
         pool = [t for t in targets if t in sus]
         if not pool:
             return (min(targets) if targets else None), "default"
+        if _exp("kbayes"):
+            post = self.posterior(v, private=True)
+            if post:
+                ps = {t: post[1][t] for t in pool}
+                best = max(pool, key=lambda s: (round(ps[s], 3), -sus[s], -s))
+                if ps[best] >= 0.4:
+                    return best, "remove the likeliest hidden seer"
+        if _exp("killheat"):
+            heat = self._heat(v, wolfset)
+            return min(pool, key=lambda s: (-heat.get(s, 0.0), sus[s], s)), "remove the loudest accuser"
         return min(pool, key=lambda s: (sus[s], s)), "remove the most trusted villager"
+
+    @staticmethod
+    def _heat(v: View, wolfset: set) -> dict[int, float]:
+        """Public pressure each seat has put on the wolves: votes for one of them (1 each) and chats naming one of them
+        wolf / suspicious / vote-worthy (0.5 per day)."""
+        heat: dict[int, float] = defaultdict(float)
+        for _day, ballots, _elim in v.votes:
+            for voter, tgt in ballots.items():
+                if tgt in wolfset:
+                    heat[voter] += 1.0
+        seen = set()
+        for _seq, sender, f, day in _chats(v):
+            if f.injection:
+                continue
+            for t in (f.wolves | f.sus) & wolfset:
+                if (sender, day, t) not in seen:
+                    seen.add((sender, day, t))
+                    heat[sender] += 0.5
+        return heat
 
     @classmethod
     def posterior(cls, v: View, private: bool = True):
@@ -491,17 +524,43 @@ class WerewolfPolicy:
         live = [s for s in c.order if s in v.alive and s not in c.liars]
         if any(s in wolfset for s in live):                          # a claim fight involving one of us
             rivals = [s for s in live if s in pool]
+            mine = [s for s in live if s in v.allies and s in targets]
+            if rivals and mine and v.me not in live and (_exp("fightbus") or _exp("fightbus2")):
+                # my ally's fake claim against the real seer: once the table has picked a side, vote with it
+                a, r = mine[0], min(rivals)
+                pa, pr = self.pressure_on(v, a), self.pressure_on(v, r)
+                if _exp("fightbus2") or pa >= pr + 1:
+                    if pa > pr or _exp("fightbus2"):
+                        return a, "claim fight: the table goes for my ally"
+                return r, "claim fight"
             if rivals:
                 return min(rivals), "claim fight"
         ally = self._doomed_ally(v, c, targets)
         if ally is not None:
             return ally, "the table follows the seer onto my ally: vote with it"
         sus = self.suspicion(v, exclude=set(v.allies))
+        if _exp("wbayes") and pool and (v.votes or c.order):
+            post = self.posterior(v, private=False)          # the village's view: vote where it is heading
+            if post:
+                return max(pool, key=lambda t: (round(post[0][t], 3), round(sus.get(t, 0.0), 3), -t)), \
+                    "vote the village's likeliest wolf"
+        if _exp("wbandwagon") and pool:
+            press = {t: self.pressure_on(v, t) for t in pool}
+            top = max(press.values())
+            if top >= 2:
+                return max(pool, key=lambda t: (press[t], sus.get(t, 0.0), -t)), "join the table's bandwagon"
         return self._top(sus, pool), "vote with the table"
 
     def _doomed_ally(self, v: View, c: Claims, targets: list[int]) -> int | None:
-        """The ally a trusted seer claim names (and not me) when the table will vote it out anyway (EXP bus / busd)."""
-        if not (_exp("bus") or _exp("busd")) or c.trusted is None or c.trusted in (v.me, *v.allies):
+        """The ally a trusted seer claim names (and not me) when the table will vote it out anyway (EXP bus / busd);
+        bus2: also an ally exposed as a fake seer; bus3: also an ally at least 3 other seats push today."""
+        live_allies = [a for a in v.allies if a in targets and a in v.alive]
+        if live_allies and (_exp("bus2") or _exp("bus3")):
+            a = live_allies[0]
+            if a in c.liars or (_exp("bus3") and self.pressure_on(v, a) >= 3):
+                return a
+        if not (_exp("bus") or _exp("busd") or _exp("bus2") or _exp("bus3")) or c.trusted is None \
+                or c.trusted in (v.me, *v.allies):
             return None
         named = c.wolves.get(c.trusted, set())
         if v.me in named:
@@ -533,6 +592,7 @@ class WerewolfPolicy:
             if v.day != self._said_day:
                 self._said_day, self._topics = v.day, set()
             out = []
+            first = not self._topics
             for topic, msg in self._plan(v):
                 if topic in self._topics:
                     continue
@@ -540,9 +600,41 @@ class WerewolfPolicy:
                 msg = chat_guard(msg, v, topic)
                 if msg is not None:
                     out.append(msg)
+            if not out and not first and _exp("pad"):
+                pad = self._pad(v)
+                if pad is not None:
+                    out.append(pad)
             return out
         except Exception:
             return []
+
+    _PADS = ("Current vote: Player{p}. Waiting for more info before the vote.",
+             "Still Player{p} for now. Seer, speak up if you have a check.",
+             "Last call before the vote: Player{p}.")
+
+    def _pad(self, v: View):
+        """A short vote update that keeps our part of the discussion open (EXP pad): asked again at the next chat, we
+        can still answer a late claim or accusation. Only after another living seat chatted since our last message,
+        at most len(_PADS) a day, always leaving one of the 5 chats for an answer."""
+        if v.me not in v.alive or v.day is None:
+            return None
+        mine = [i for i, (_seq, sender, _f, day) in enumerate(_chats(v)) if sender == v.me and day == v.day]
+        if not mine or len(mine) >= 4:
+            return None
+        rows = list(_chats(v))
+        last = mine[-1]
+        if not any(sender != v.me and sender in v.alive and day == v.day for _seq, sender, _f, day in rows[last + 1:]):
+            return None
+        n = sum(1 for t in self._topics if t.startswith("pad"))
+        if n >= len(self._PADS):
+            return None
+        others = [s for s in v.alive if s != v.me]
+        pick = self._day_vote(v, others)[0] if others else None
+        if pick is None:
+            return None
+        topic = f"pad{n}"
+        self._topics.add(topic)
+        return chat_guard({"content": self._PADS[n].format(p=pick), "recipients": []}, v, topic)
 
     def _plan(self, v: View):
         """(topic, message) candidates in priority order; the first call of a day also gets the opening line."""
@@ -615,7 +707,7 @@ class WerewolfPolicy:
             if _exp("busfollow"):
                 others = [s for s in v.alive if s != v.me]
                 ally = self._doomed_ally(v, c, others)
-                if ally is not None:
+                if ally is not None and c.trusted is not None and ally in c.wolves.get(c.trusted, ()):
                     return "bus", {"content": f"Following the Seer (Player{c.trusted}): I vote Player{ally}. "
                                               f"Everyone vote Player{ally} so we do not split.", "recipients": []}
             return None
@@ -631,10 +723,15 @@ class WerewolfPolicy:
                 "recipients": []}
 
     def _villager_chat(self, v: View, c: Claims):
-        if _exp("deny") and v.role == "villager":
+        if (_exp("deny") or _exp("vclaim")) and v.role == "villager":
             framers = [s for s in c.order if s in v.alive and s != v.me and v.me in c.wolves.get(s, set())]
             if framers:
-                return "deny", self._deny(framers[0])
+                f = framers[0]
+                if _exp("vclaim") and v.me not in c.order and all(s in framers for s in c.order):
+                    return "vclaim", {"content": f"I am the Seer. Player{f} is lying about being Seer, so Player{f} is "
+                                                 f"a WOLF. Vote Player{f}.", "recipients": []}
+                if _exp("deny"):
+                    return "deny", self._deny(f)
         known = c.trusted_wolves(v.alive)
         if known and c.trusted != v.me:
             return "follow", {"content": f"Following the Seer (Player{c.trusted}): I vote Player{known[0]}. "
@@ -704,6 +801,8 @@ def chat_guard(msg, v: View, topic: str):
         if _SEER_CLAIM_OUT.search(text) and topic != "counter":
             return None
     elif v.role == "villager":
+        if topic == "vclaim" and _exp("vclaim"):
+            return {"content": text, "recipients": []}
         if _SEER_CLAIM_OUT.search(text) or (_RESULT_OUT.search(text) and topic != "follow"):
             return None                                 # villagers never fake-claim or report "results"
     elif v.role == "seer" and topic != "claim":
