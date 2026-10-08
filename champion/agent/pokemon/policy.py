@@ -557,9 +557,14 @@ class PokemonPolicy:
         # race error; a restarted worker re-asks the one its predecessor died on) starts from the same memory
         # (`_same_decision`), and a move the server refused is rolled back (`undelivered`). `_asked`: the point of this
         # policy's latest act() call (None when that was no battle decision); `redecided`: points asked again.
+        # `_refused`: the point whose latest ask the server refused (cleared at every ask); `_unsure`: a point asked
+        # again with no refusal of its previous ask, i.e. a send of it had no answer (a 5xx, a timeout, a dead worker)
+        # and may have landed, so a later refusal there may be our own landed move: nothing is rolled back.
         self._decision_key: tuple | None = None
         self._decision_mem: dict | None = None
         self._asked: tuple | None = None
+        self._refused: tuple | None = None
+        self._unsure: tuple | None = None
         self.redecided = 0
 
     def _warm_calc(self) -> None:
@@ -928,6 +933,7 @@ class PokemonPolicy:
         self.seen_foes = []
         self.lineup_prior = None
         self._decision_key = self._decision_mem = None      # (a decision point of the last battle never comes back)
+        self._refused = self._unsure = None
 
     def _preview_matrix(self, obs: dict, session_id: str) -> dict | None:
         fmt = to_id(obs.get("battle_format") or "")
@@ -1392,7 +1398,9 @@ class PokemonPolicy:
         the move did not land: the runner re-reads the state and asks again after a move it could not send (SDK PR #7)
         or a race error, and a restarted worker re-asks the one its predecessor died on (agent/matchstate.py saves this
         snapshot with the rest of the match memory). The same point (`decision_point`: the battle's position, whatever
-        the state_version) restores the memory from before its first ask; any other point snapshots it. Never raises."""
+        the state_version) restores the memory from before its first ask; any other point snapshots it. A point asked
+        again whose previous ask was not refused (`undelivered`) is marked `_unsure`: that send had no answer and may
+        have landed. Never raises."""
         try:
             key = decision_point(st, obs)
             self._asked = key
@@ -1400,25 +1408,35 @@ class PokemonPolicy:
                 for k, v in self._decision_mem.items():
                     setattr(self, k, copy.deepcopy(v))
                 self.redecided += 1
+                if self._refused != key:
+                    self._unsure = key
                 log.info("battle decision point asked again (turn %s, version %s): memory from before its first ask",
                          obs.get("turn"), st.get("state_version"))
             else:
                 self._decision_key = key
                 self._decision_mem = {k: copy.deepcopy(getattr(self, k)) for k in self._TURN_MEMORY}
+                self._unsure = None
+            self._refused = None                # (this ask has not been refused yet)
         except Exception:
             log.debug("decision memory snapshot failed", exc_info=True)
 
     def undelivered(self) -> bool:
-        """The move of this policy's latest decision did not land (the server refused it: Contestant.on_action_result).
-        If that was a battle decision, what the memory says about OUR action goes back: the Protect turns as before it,
-        and the last action of every slot it chose for is unknown (a normal decision: both slots; a forced switch: as
-        before it), because the move timer played a random choice for us (STALE_STATE / NOT_YOUR_TURN: the decision
-        closed). What the decision saw stays (who was on the field, speed-control turns): that turn happened. The same
-        point asked again restores all of its memory anyway (`_same_decision`). True when something was rolled back.
-        Never raises."""
+        """The server refused the move of this policy's latest decision (Contestant.on_action_result). If that was a
+        battle decision, what the memory says about OUR action goes back: the Protect turns as before it, and the last
+        action of every slot it chose for is unknown (a normal decision: both slots; a forced switch: as before it),
+        because the move timer played a random choice for us (STALE_STATE / NOT_YOUR_TURN: the decision closed). What
+        the decision saw stays (who was on the field, speed-control turns): that turn happened. The same point asked
+        again restores all of its memory anyway (`_same_decision`). Not when the point is `_unsure`: an earlier send of
+        it had no answer, and the refusal may be because that send landed (NOT_YOUR_TURN: already submitted;
+        STALE_STATE: the version moved with it), so the move stays remembered as played (as before v4.2.5; forgetting
+        a landed Protect would Protect twice in a row). True when something was rolled back. Never raises."""
         try:
             if self._asked is None or self._asked != self._decision_key or self._decision_mem is None:
                 return False
+            if self._asked == self._unsure:
+                log.info("refused move at a decision point an earlier unanswered send may have taken: kept as played")
+                return False
+            self._refused = self._asked
             mem = self._decision_mem
             forced = self._asked[2] if len(self._asked) > 2 and isinstance(self._asked[2], tuple) else (False, False)
             self.last_protect = copy.deepcopy(mem.get("last_protect", {}))
