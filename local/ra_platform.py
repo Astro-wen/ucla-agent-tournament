@@ -32,6 +32,7 @@ import importlib
 import inspect
 import json
 import os
+import random
 import statistics
 import sys
 import threading
@@ -41,7 +42,7 @@ from pathlib import Path
 from altruagent.models import DecisionContext
 from altruagent.runner import run_game
 
-from .ra_rules import Rules
+from .ra_rules import COUNTRIES, SIDES, Rules
 from .ra_server import MatchServer, SeatSession
 from .ra_sim import TICKS_PER_SECOND, World
 
@@ -219,7 +220,14 @@ def _one(job: dict) -> dict:
     os.environ["ARENA_RECORD"] = "0"
     fa, fb = make_factory(job["a"]), make_factory(job["b"])
     seed = job["seed"]
+    countries = None
+    if job.get("a_side") in ("allies", "soviet"):            # A's country from that side, B's from any (by seed)
+        rng = random.Random(f"countries:{seed}")
+        ca = rng.choice([c for c in COUNTRIES if SIDES[c] == job["a_side"]])
+        cb = rng.choice(COUNTRIES)
+        countries = (ca, cb) if job["a_seat"] == 0 else (cb, ca)
     row = play_match(fa(seed * 2 + 1), fb(seed * 2 + 2), seed=seed, map_id=job["map"], a_seat=job["a_seat"],
+                     countries=countries,
                      clock=job["clock"], speed=job["speed"], max_minutes=job["max_minutes"],
                      starting_cash=job["cash"], latency_ticks=job["latency_ticks"], lost_rate=job["lost_rate"],
                      names=(job["a"].split(":")[-1], job["b"].split(":")[-1]), pacing=job["pacing"],
@@ -255,6 +263,8 @@ def main(argv=None) -> None:
     ap.add_argument("--fault-rate", type=float, default=0.0,
                     help="share of game calls that fail like a flaky connection (HTTP 502 / 429; a play_action "
                          "before or after it was applied), which the runner rides out (SDK PR #7)")
+    ap.add_argument("--a-side", choices=("any", "allies", "soviet"), default="any",
+                    help="side A's faction (its country drawn from that side by seed; default any: both random)")
     ap.add_argument("--jobs", type=int, default=1, help="games in parallel processes (default 1)")
     ap.add_argument("--json", type=Path, default=None, help="write all rows here")
     ap.add_argument("--quiet", action="store_true")
@@ -266,7 +276,8 @@ def main(argv=None) -> None:
     jobs = [{"a": a.a, "b": opponents[g % len(opponents)], "seed": a.seed * 1000 + g, "map": maps[g % len(maps)],
              "a_seat": 0 if a.no_swap else g % 2, "clock": a.clock, "speed": a.speed, "max_minutes": a.max_minutes,
              "cash": a.cash, "latency_ticks": a.latency_ticks, "lost_rate": a.lost_rate, "pacing": a.pacing,
-             "stance": a.default_stance, "place_limit": a.place_limit, "fault_rate": a.fault_rate}
+             "stance": a.default_stance, "place_limit": a.place_limit, "fault_rate": a.fault_rate,
+             "a_side": a.a_side}
             for g in range(a.games)]
     if a.jobs > 1:
         from concurrent.futures import ProcessPoolExecutor
