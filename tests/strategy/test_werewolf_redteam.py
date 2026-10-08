@@ -110,6 +110,48 @@ def test_seer_and_the_villagers_following_it_vote_the_same_sure_wolf():
     assert WerewolfPolicy().act(follower)["action_id"] == "1"
 
 
+SEER2 = "Your role: SEER\nYour investigations: Player2 is wolf, Player6 is wolf"
+DEAD2 = [(5, "villager", "night_kill", 2)]
+ALIVE2 = [0, 1, 2, 3, 4, 6]
+
+
+def test_seer_calls_and_votes_the_lowest_wolf_and_villagers_vote_its_call():
+    """heuristic tables with three of our seats (10-08): a copy of us following yesterday's claim pushed Player6; our
+    seer called "Everyone vote Player2" but then voted Player6 (one seat had pushed it), and the villager copies voted
+    Player6 too: the vote split (4 lost games in 4000, none won). One seat is no table: the seer calls and votes the
+    lowest wolf, and villagers following a living seer vote what it calls."""
+    follow = (4, "Following the Seer (Player3): I vote Player6. Everyone vote Player6 so we do not split.")
+    pol = WerewolfPolicy()
+    talk = state(SEER2, "day_vote", [], me=3, day=3, alive=ALIVE2, dead=DEAD2, phase="messaging", msgs=[follow])
+    claim = pol.chat(talk)[0]["content"]
+    assert claim.startswith("I am the Seer. Player2 is a WOLF. Player6 is a WOLF.")
+    assert claim.endswith("Everyone vote Player2 today.")
+    msgs = [follow, (3, claim)]
+    assert pol.act(state(SEER2, "day_vote", [0, 1, 2, 4, 6], me=3, day=3, alive=ALIVE2, dead=DEAD2, msgs=msgs)
+                   )["action_id"] == "2"
+    villager = state("Your role: VILLAGER", "day_vote", [0, 1, 2, 3, 6], me=4, day=3, alive=ALIVE2, dead=DEAD2,
+                     msgs=msgs)
+    assert WerewolfPolicy().act(villager)["action_id"] == "2"
+
+
+def test_seer_calls_the_wolf_the_table_is_clearly_on_and_keeps_its_call():
+    """Two seats already push Player6 when the seer speaks: it calls Player6, and votes it after one seat argues for
+    Player2 (without the call it would start from the lowest wolf); a restarted worker keeps the call."""
+    pushes = [(4, "vote Player6"), (0, "Player6 is a wolf")]
+    pol = WerewolfPolicy()
+    talk = state(SEER2, "day_vote", [], me=3, day=3, alive=ALIVE2, dead=DEAD2, phase="messaging", msgs=pushes)
+    claim = pol.chat(talk)[0]["content"]
+    assert claim.startswith("I am the Seer. Player6 is a WOLF. Player2 is a WOLF.")
+    assert claim.endswith("Everyone vote Player6 today.")
+    vote = state(SEER2, "day_vote", [0, 1, 2, 4, 6], me=3, day=3, alive=ALIVE2, dead=DEAD2,
+                 msgs=pushes + [(3, claim), (1, "vote Player2")])
+    assert pol.act(vote)["action_id"] == "6"
+    restarted = WerewolfPolicy()                       # the call is match memory
+    restarted.import_memory(pol.export_memory())
+    assert restarted.act(vote)["action_id"] == "6"
+    assert WerewolfPolicy().act(vote)["action_id"] == "2"     # (no call: the lowest, the table is not clearly elsewhere)
+
+
 def test_villager_joins_the_table_on_the_other_sure_wolf():
     """wolfpack split: a dead revealed seer named Player1; Player5 is an exposed fake seer. Both are sure wolves; the
     table votes Player5. Voting Player1 alone split the vote (no elimination) in 36 of 44 such days."""
