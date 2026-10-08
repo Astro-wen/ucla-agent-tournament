@@ -14,9 +14,13 @@ after 120 s in Werewolf). So everything here is defensive:
     deterministic);
   * structured actions are checked against the server's own template before we
     send them, and chat is clipped to the platform limits;
-  * a real-time game (`pacing.mode == "realtime"`: Red Alert) we have no policy
-    for is answered with altruagent.WAIT for its whole match: nothing is sent,
-    the runner waits for the next view (no guessed order batches, no crash);
+  * Red Alert (`red_alert`, real time) is played by our rule-based bot
+    (agent/redalert/, no LLM): each view is answered with a locally validated
+    order batch or altruagent.WAIT, every play_action answer reaches it through
+    on_action_result, and it never raises; ARENA_RA=off restores the old
+    behaviour (WAIT for the whole match). Any other real-time game
+    (`pacing.mode == "realtime"`) we have no policy for is answered with WAIT
+    for its whole match: nothing is sent, the runner waits for the next view;
   * a doubles turn is also checked as a pair (Showdown's rule: never the same
     switch-in twice, no `pass` while a switch-in is still free for that slot)
     right before it goes to the runner, whatever path produced it (policy,
@@ -50,7 +54,7 @@ import threading
 import time
 from pathlib import Path
 
-from altruagent import TERMINATE_MESSAGING, WAIT, DecisionContext, GameState, LegalAction, SendMessage
+from altruagent import TERMINATE_MESSAGING, WAIT, DecisionContext, GameState, LegalAction, SendMessage, WithReasoning
 
 from . import matchstate, reasoning, timecontrol
 from .fallback import (action_template, doubles_from_template, doubles_problems, gives_up, is_template, joint_problems,
@@ -83,6 +87,14 @@ LISTEN_POLL = 1 / 24       # the longest single wait while listening (5 s of 120
 LISTEN_FOLLOWUPS = 1       # chats a day after the opening ones, with listening on
 LISTEN_MIN_WAIT_S = 0.25   # a wait answered at once with nothing new is followed by this pause (no busy loop)
 _ON = {"1", "on", "true", "yes", "enable", "enabled"}
+RA_ENV = "ARENA_RA"              # Red Alert bot: on (default) | off (WAIT for the whole match, as before v4.3)
+_OFF = {"0", "off", "false", "no", "none", "disable", "disabled", "wait"}
+
+
+def ra_enabled(env=None) -> bool:
+    """ARENA_RA: the rule-based Red Alert bot plays (default) unless it is off / 0 / false / no / wait."""
+    env = os.environ if env is None else env
+    return str(env.get(RA_ENV) or "on").strip().lower() not in _OFF
 
 
 def listen_enabled(env=None) -> bool:
@@ -226,10 +238,14 @@ class Contestant:
         self.doubles_turns = 0                        # doubles battle decisions (the engine search's share of them)
         self.waits = 0                                # real-time views answered with WAIT (no policy for the game)
         self._summarized = False
+        self.ra_on = ra_enabled()                     # ARENA_RA: the Red Alert bot plays (else WAIT, as before)
+        self._ra = None                               # this match's RedAlertPolicy (agent/redalert), made lazily
 
     # ---- moves -----------------------------------------------------------
     def choose_action(self, state: GameState, context: DecisionContext):
         """Never raises; always answers within the decision's hard deadline (see the module docstring)."""
+        if self.ra_on and _is_red_alert(state, context):
+            return self._red_alert(state, context)
         if _realtime(state):
             out = self._realtime_wait(state, context)
             if out is not None:
@@ -298,6 +314,59 @@ class Contestant:
         except Exception:
             log.debug("real-time wait bookkeeping failed", exc_info=True)
         return WAIT
+
+    def _red_alert(self, state: GameState, context: DecisionContext):
+        """A Red Alert view, answered by this match's rule-based bot (agent/redalert): an order batch (with a short
+        public phase tag as reasoning_summary unless ARENA_REASONING=off) or WAIT. In the operator's windows mode
+        (turn-based for the runner, where WAIT and INVALID_ACTION are fatal) the bot always answers a valid batch,
+        a harmless no-op when there is nothing to do. Runs inline (no watchdog thread: the bot is fast and
+        deterministic, about 1-10 ms a view). States are recorded sparsely (the first view, then about one every 10
+        game seconds, plus views with an exception or a new refusal reason), never every view. Never raises."""
+        t0 = time.monotonic()
+        raw = getattr(state, "raw", None)
+        raw = raw if isinstance(raw, dict) else {}
+        pacing = raw.get("pacing")
+        windows = isinstance(pacing, dict) and pacing.get("mode") == "windows"
+        out = WAIT
+        text = None
+        try:
+            self._bind(state, context, "", "red_alert")
+            if self._ra is None:
+                from .redalert import RedAlertPolicy
+                self._ra = RedAlertPolicy()
+                log.warning("red_alert: the rule-based bot plays this match (ARENA_RA=off: WAIT only)")
+            orders, tag = self._ra.decide(raw, getattr(context, "game_config", None))
+            self.decisions += 1
+            if orders:
+                out = {"type": "orders", "orders": orders}
+                if tag and self.reasoning_mode != reasoning.OFF:
+                    text = reasoning.sanitize(tag)
+                    if text and not reasoning.leaks(text, "red_alert"):
+                        out = WithReasoning(out, text)
+                    else:
+                        text = None
+            self._path = "red-alert"
+            self.last_decision = {"kind": "realtime", "budget": 0.0, "source": "red_alert", "path": self._path,
+                                  "ms": round(1000 * (time.monotonic() - t0), 2)}
+            self.last_reasoning = text
+            if self._ra.want_record:
+                record("action", context, state, out, text, extra={"decision": self.last_decision})
+        except Exception:
+            log.exception("red_alert decision failed; answering WAIT")
+            out, text = WAIT, None
+        if out is WAIT and windows:
+            out = _ra_noop(raw)
+        return out
+
+    def on_action_result(self, result, context) -> None:
+        """The runner's hook after every play_action (and every refusal it recovered from): the Red Alert bot learns
+        its verdicts from it. Nothing for the other games. Never raises (the runner kills the match on an exception
+        here)."""
+        try:
+            if self._ra is not None and self._game == "red_alert":
+                self._ra.on_result(result)
+        except Exception:
+            log.debug("on_action_result failed", exc_info=True)
 
     def _choose_action(self, state: GameState, context: DecisionContext, game: str, dl, family: str = ""):
         raw = _raw_with_legal(state)
@@ -731,6 +800,7 @@ class Contestant:
         self.overruns = self.fallbacks = self.joint_repairs = self.decisions = self._resumes = self.doubles_turns = 0
         self.waits = 0
         self.resumed, self._summarized = None, False
+        self._ra = None
 
     def _export(self, family: str, raw) -> dict:
         chat = {"day": None if self._chat_day is _UNSET else self._chat_day, "has_day": self._chat_day is not _UNSET,
@@ -799,6 +869,12 @@ class Contestant:
         ss = self.pk.search_stats
         head = f"[match-summary] session={c['session'] or '?'} game={self._game or '?'} decisions={self.decisions}"
         resumed = f"at {self.resumed}" if self.resumed is not None else "no"
+        if self._game == "red_alert" and self._ra is not None:
+            try:
+                ra = self._ra.summary_text()
+            except Exception:
+                ra = "summary unavailable"
+            return f"{head} {ra}"
         if self._family != "pokemon":
             waits = f" waits={self.waits}" if self.waits else ""        # (a real-time game answered with WAIT)
             ls = self.listen_stats
@@ -907,6 +983,51 @@ def _realtime(state) -> bool:
         return isinstance(pacing, dict) and pacing.get("mode") == "realtime"
     except Exception:
         return False
+
+
+_RA_NAMES = {"red_alert", "redalert", "red_alert_1v1", "ra", "openra", "openra_ra"}
+
+
+def _is_red_alert(state, context) -> bool:
+    """A Red Alert decision: its game type says so (any spelling: "red_alert", "Red Alert", "red-alert", "redalert"),
+    or, with no known game type, a real-time / windows-mode state shaped like Red Alert's (an observation with
+    `available_production` or `economy`). Pokemon and Werewolf never match. Never raises."""
+    try:
+        raw = getattr(state, "raw", None)
+        raw = raw if isinstance(raw, dict) else {}
+        for name in (getattr(context, "game_type", None), getattr(state, "game_name", None), raw.get("game_type")):
+            g = re.sub(r"[\s-]+", "_", str(name or "").strip().lower())
+            if g in _RA_NAMES:
+                return True
+            if g and g not in ("unknown", "none"):
+                return False
+        pacing = raw.get("pacing")
+        obs = raw.get("observation")
+        return isinstance(pacing, dict) and pacing.get("mode") in ("realtime", "windows") and \
+            isinstance(obs, dict) and ("available_production" in obs or "economy" in obs)
+    except Exception:
+        return False
+
+
+def _ra_noop(raw: dict):
+    """Windows mode's last resort when the bot could not answer: one harmless order that is valid on any live state
+    (power on a building that is not powered down: `ok already_on`, no engine command; else re-set a unit's stance),
+    or WAIT when there is nothing at all to name."""
+    try:
+        obs = raw.get("observation") if isinstance(raw.get("observation"), dict) else {}
+        for b in obs.get("buildings") or []:
+            if isinstance(b, dict) and isinstance(b.get("id"), int) and not isinstance(b.get("id"), bool) \
+                    and not b.get("powered_down"):
+                return {"type": "orders", "orders": [{"cmd": "power_toggle", "building": b["id"], "on": True}]}
+        for u in obs.get("units") or []:
+            if isinstance(u, dict) and isinstance(u.get("id"), int) and not isinstance(u.get("id"), bool) \
+                    and not u.get("wreck"):
+                st = u.get("stance") if u.get("stance") in ("hold_fire", "return_fire", "defend",
+                                                            "attack_anything") else "defend"
+                return {"type": "orders", "orders": [{"cmd": "set_stance", "units": [u["id"]], "stance": st}]}
+    except Exception:
+        pass
+    return WAIT
 
 
 def _seat_of(context, raw) -> int | None:
