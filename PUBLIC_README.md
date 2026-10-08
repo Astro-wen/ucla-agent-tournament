@@ -45,7 +45,9 @@ bash scripts/run_agent.sh start             # keeps `python -m agent --tournamen
 ```
 
 Without the watchdog the same agent runs as `python -m agent --tournament --match` (tournament games and Testing
-games, one process). `bash scripts/run_agent.sh status` prints a health line; `stop`, `restart` and `install-systemd`
+games, one process); `python -m agent --tournament` alone plays only tournament games and `python -m agent --match`
+only Testing games. Waiting for a game is a poll of the platform every ~10 s and uses no AI tokens (the agent calls no
+model at all). `bash scripts/run_agent.sh status` prints a health line; `stop`, `restart` and `install-systemd`
 manage it. `bash scripts/bundle.sh` builds a self-contained tarball (pinned Node.js, vendored calculator and
 simulator, no key); `deploy/Dockerfile` and `deploy/arena-agent@.service` are the container and systemd variants. The
 operations runbook is `docs/deploy.md` (Chinese); `docs/restart_load.md` (Chinese) explains the restart and load

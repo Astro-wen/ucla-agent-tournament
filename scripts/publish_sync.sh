@@ -74,11 +74,11 @@ done
 # ---- the scan ------------------------------------------------------------------------------------------------------
 KEY_RE='eak_live_[0-9A-Fa-f]{16,}|sk_agent_[A-Za-z0-9_-]{8,}|seatclaim_[A-Za-z0-9_-]{8,}|sk-(proj-|ant-|live-)?[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|xox[abprs]-[A-Za-z0-9-]{10,}|hf_[A-Za-z0-9]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}|(ALTRUAGENT_OFFICIAL_AGENT_KEY|ALTRUAGENT_API_KEY|OPENAI_API_KEY|NEBIUS_API_KEY|ANTHROPIC_API_KEY|GITHUB_TOKEN)=["'\'']?[A-Za-z0-9_-]{12,}'
 # placeholders and the tests' fakes (a match equal to one of these whole is not a finding)
-KEY_ALLOW_RE='^((ALTRUAGENT_OFFICIAL_AGENT_KEY=)?eak_live_your_key_here|(ALTRUAGENT_API_KEY=)?sk_agent_(your_key_here|test[A-Za-z0-9_]*|FAKE[A-Za-z0-9_-]*|old_platform_key|wrong_kind|OTHERKEY[0-9]*|REALLOOKINGKEY[0-9]*|REPLACE_ME|oops)|seatclaim_(cli_secret_token|abc123secret)[A-Za-z0-9_-]*|sk-test-DO-NOT-LEAK-1234567890)$'
+KEY_ALLOW_RE='^((ALTRUAGENT_OFFICIAL_AGENT_KEY=)?eak_live_your_key_here|(ALTRUAGENT_API_KEY=)?sk_agent_(your_key_here|test[A-Za-z0-9_]*|FAKE[A-Za-z0-9_-]*|old_platform_key|wrong_kind|OTHERKEY[0-9]*|REALLOOKINGKEY[0-9]*|REPLACE_ME|oops)|seatclaim_(cli_secret_token|abc123secret|should_be_ignored|token_is_rejected)[A-Za-z0-9_-]*|sk-test-DO-NOT-LEAK-1234567890)$'
 EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}'
 EMAIL_ALLOW_RE='(@users\.noreply\.github\.com|^noreply@|^no-reply@|@example\.(com|org|net)|^git@github\.com)$'
 PRIVATE_RE='\b(guang|sandra)\b|回信|私人邮件|private (e-?mail|reply|correspondence)'
-ISSUE_RE='spectat[a-z]* (feed|stream|state|endpoint|api|sse)|/spectate|dm recipients?|recipients? of (every|each) dm|who messaged whom|spectators? (can |could )?see|before both (sides|players) (have )?(chosen|moved)|sse (message|event)|观战(数据流|接口)|私信(内容|的收件人)'
+ISSUE_RE='spectat[a-z]* (feed|stream|state|endpoint|api|sse)|/spectate|dm recipients?|recipients? of (every|each) dm|who messaged whom|spectators see a move after|confirm spectators|before both (sides|players) (have )?(chosen|moved)|sse (message|event)|观战(数据流|接口)|私信(内容|的收件人)'
 PATH_RE='/home/[a-z][a-z0-9_-]*/|/mnt/[a-z]/|[A-Za-z]:\\+Users\\+|/Users/[A-Za-z]|linmengfdm|siyuan|~/exp[0-9]|~/wt/|_compliance_out|scratchpad|wsl\.localhost|/tmp/claude'
 BAD_FILES_FIND=( \( -name '.env' -o -name '.env.*' ! -name '.env.example' -o -name '*.pem' -o -name '*.key' -o -name '*.p12'
                     -o -name 'id_rsa*' -o -name 'id_ed25519*' -o -name '.npmrc' -o -name '.pypirc' -o -name '.netrc' \) )
@@ -100,7 +100,8 @@ scan_tree() {   # DIR -> prints findings, returns their number (capped at 250) t
     hit="${line#*:*:}"
     if grep -qiE "$EMAIL_ALLOW_RE" <<<"$hit"; then continue; fi
     echo "  EMAIL     ${line%:*}  ${hit%%@*}@..."; n=$((n + 1))
-  done < <(cd "$d" && grep -rIonE --exclude-dir=.git --exclude-dir=node_modules "$EMAIL_RE" . 2>/dev/null | sed 's#^\./##')
+  done < <(cd "$d" && grep -rIonE --exclude-dir=.git --exclude-dir=node_modules --exclude=package-lock.json "$EMAIL_RE" . 2>/dev/null | sed 's#^\./##')
+  # (package-lock.json: npm's own metadata of third-party packages, e.g. a maintainer's public contact in a notice)
   while IFS= read -r line; do
     echo "  PRIVATE   ${line%%:*}:$(printf '%s' "${line#*:}" | cut -d: -f1)"; n=$((n + 1))
   done < <(cd "$d" && grep -rIniE --exclude-dir=.git --exclude-dir=node_modules "$PRIVATE_RE" . 2>/dev/null | sed 's#^\./##')
@@ -121,7 +122,7 @@ readme_paths() {   # DIR -> prints every repository path its README.md names in 
       agent/*|altruagent/*|data/*|deploy/*|scripts/*|docs/*|local/*|tests/*|logs/*) ;;
       *) continue ;;
     esac
-    case "$p" in *'*'*|*'<'*|*'>'*|*'...'*) continue ;; esac
+    case "$p" in *'*'*|*'<'*|*'>'*|*'...'*|logs/*.out) continue ;; esac     # (patterns, placeholders, run-time logs)
     [ -e "$d/$p" ] || echo "  README names $p, which is not in the export"
   done < <(grep -oE '`[^` ]+`' "$d/README.md" | tr -d '`' | sed -E 's/[.,;:)]+$//' | sort -u || true)
   return 0
@@ -202,13 +203,14 @@ fi
 
 # ---- export --------------------------------------------------------------------------------------------------------
 [ -n "$OUT" ] || die "--out DIR is required (see --help)"
-mkdir -p "$OUT"
-OUT="$(cd "$OUT" && pwd)"
+OUT="$(realpath -m -- "$OUT")"                      # (checked before anything is created)
+ROOT_REAL="$(realpath -- "$ROOT")"
 case "$OUT/" in
-  "$ROOT"/*|/|/home/|/tmp/) die "refusing --out $OUT (inside this repository or a system directory)" ;;
+  "$ROOT"/*|"$ROOT_REAL"/*|/|/home/|/tmp/) die "refusing --out $OUT (inside this repository or a system directory)" ;;
 esac
-case "$ROOT/" in "$OUT"/*) die "refusing --out $OUT (it contains this repository)" ;; esac
-[ "$OUT" = "${HOME:-/nonexistent}" ] && die "refusing --out $OUT (the home directory)"
+case "$ROOT_REAL/" in "$OUT"/*) die "refusing --out $OUT (it contains this repository)" ;; esac
+[ "$OUT" = "$(realpath -m -- "${HOME:-/nonexistent}")" ] && die "refusing --out $OUT (the home directory)"
+mkdir -p "$OUT"
 if [ -n "$(ls -A "$OUT" | grep -vx '.git' || true)" ]; then
   [ "$REPLACE" = 1 ] || die "$OUT is not empty (use --replace to replace everything in it except .git)"
   find "$OUT" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
