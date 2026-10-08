@@ -369,6 +369,8 @@ class Economy:
         POWER_CANCEL_S; the next view builds the power plant. True when a cancel went out."""
         if v.surplus >= 0 or not v.buildings or any(it in POWER for _q, it in v.ready):
             return False
+        if self._power_item(v) is None or v.tick < self.full_until:
+            return False                                 # no power plant can come now (none to build, no room)
         head = next((it for it in v.queue_items("Building") if not it["ready"]), None)
         if head is None or head["item"] in POWER:
             return False
