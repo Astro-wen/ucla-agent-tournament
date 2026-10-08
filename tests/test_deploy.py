@@ -226,12 +226,12 @@ def test_a_fresh_session_the_platform_still_refuses_keeps_the_runtime_and_its_ma
 
 
 @pytest.mark.parametrize("status, code, detail", [(401, "invalid_official_agent_key", None),
-                                                  (401, "invalid_official_agent_key", "Invalid official agent key"),
-                                                  (403, "registration_incomplete", "rules")])
+                                                  (401, "invalid_official_agent_key", "Invalid official agent key")])
 def test_a_refused_key_at_relogin_still_ends_the_runtime_even_through_the_standby(status, code, detail):
-    # a key the platform refuses (revoked, replaced, the agent not Self-hosted) or an incomplete registration cannot
-    # get better by retrying: the SDK ends the runtime (its finally terminates the workers; run_agent.sh restarts it
-    # with its back-off and says so). The standby wrapper passes the listing's errors through untouched.
+    # a key the platform refuses (revoked, replaced, the agent not Self-hosted) cannot get better by retrying: the SDK
+    # ends the runtime (its finally terminates the workers; run_agent.sh restarts it with its back-off and says so).
+    # The standby wrapper passes the listing's errors through untouched. (An incomplete registration no longer ends
+    # it since SDK PR #7: next test.)
     from altruagent.official import OfficialAgentError as OffErr
     from altruagent.official import is_fatal_auth_error
     from altruagent.supervisor import run_tournament_forever
@@ -246,6 +246,61 @@ def test_a_refused_key_at_relogin_still_ends_the_runtime_even_through_the_standb
                                    process_factory=factory, log=lambda m: None, max_iterations=6)
         assert is_fatal_auth_error(exc_info.value) and exc_info.value.error_code == code
         assert all(p.terminated for p in factory.processes)
+
+
+RULES_LINE = ("Accept the updated Official Rules on your dashboard "
+              "(https://platform.altruagent-game.com/tournament/dashboard); I'll keep trying.")
+
+
+@pytest.mark.parametrize("standby", [False, True])
+def test_updated_rules_at_relogin_keep_the_runtime_and_its_matches_and_say_what_to_do(standby):
+    # v4.2.4 (SDK PR #7): the Official Rules updated mid-event (re-login answers 403 registration_incomplete,
+    # next_step "rules") used to end the runtime and terminate every worker, and run_agent.sh restarted it in a loop
+    # until the owner re-accepted. Now the runtime keeps its running games, says what to do (once, then at most every
+    # 5 minutes), asks again every 30 s and picks the listing up as soon as the Rules are accepted. Also through the
+    # hot standby's wrapper, which passes the listing's errors through untouched.
+    import httpx
+
+    from altruagent.supervisor import run_tournament_forever
+    from tests.test_supervisor import FakeProcessFactory
+
+    calls, clock, log, factory = {"auth": 0, "list": 0, "refused": 0}, {"t": 0.0}, [], FakeProcessFactory()
+    accepted_at = 100.0                                   # the owner accepts the updated Rules here
+
+    def backend(request):
+        path = request.url.path
+        if path == "/tournament/agent/authenticate":
+            calls["auth"] += 1
+            if calls["auth"] == 1 or clock["t"] >= accepted_at:
+                return httpx.Response(200, json={"access_token": f"session-{calls['auth']}"})
+            calls["refused"] += 1
+            return httpx.Response(403, json={"error": "registration_incomplete", "detail": "Official Rules updated",
+                                             "next_step": "rules"})
+        if path.endswith("/grant"):                       # (the standby's seat check: no other runtime holds it)
+            return httpx.Response(200, json={"access_token": "seat-token", "game_session_id": "g1", "agent_id": "a1",
+                                             "gameapi_server_url": "https://game.example.test", "seat_id": "s1"})
+        calls["list"] += 1
+        if calls["list"] == 1 or request.headers["authorization"] != "Bearer session-1":
+            return httpx.Response(200, json={"assignments": [
+                {"match_id": "m1", "seat_id": "s1", "game_type": "pokemon_vgc_doubles_draft"}]})
+        return httpx.Response(401, json={"error": "invalid_agent_session"})   # session-1 expired after one listing
+
+    def sleep(s):
+        clock["t"] += s
+
+    official = _official(backend)
+    if standby:
+        agent_main._HotStandby.install(official, now=lambda: clock["t"], log=log.append, hold_new_s=0.0)
+    run_tournament_forever(official, agent_spec="agent.agent:create_agent", sleep=sleep, now=lambda: clock["t"],
+                           process_factory=factory, log=log.append, max_iterations=16, poll_interval=10.0,
+                           cooldown_seconds=10.0)
+    assert len(factory.processes) == 1                    # the seat's worker, started once, never stopped or restarted
+    assert not [line for line in log if "no longer assigned" in line]
+    assert log.count(RULES_LINE) == 1                     # said what to do, once (the reminder is every 5 minutes)
+    assert "Assignment discovery recovered." in log      # picked up again once the Rules were accepted
+    assert 2 <= calls["refused"] <= 5                     # asked again every 30 s (t = 10, 40, 70), not every poll
+    assert [line for line in log if "active match worker(s)" in line] == ["Stopping 1 active match worker(s)..."]
+    assert log[-1] == "Stopping 1 active match worker(s)..."          # (only when the bounded test loop ends)
 
 
 @pytest.mark.parametrize("hold, expected", [(0.0, [0.0, 40.0]), (20.0, [20.0, 60.0])])
@@ -408,6 +463,29 @@ def test_the_first_authentication_waits_out_a_transient_failure(monkeypatch, cap
     assert not agent_main._authenticate(Flaky([OffErr("The Official Agent Key was not accepted.", status_code=401)]))
     assert slept == [5.0, 10.0, 20.0] and "Could not connect with your Official Agent Key: The Official Agent Key" \
         in capsys.readouterr().out
+
+
+def test_an_incomplete_registration_at_start_starts_the_runtime_anyway(monkeypatch, capsys):
+    # v4.2.4 (as upstream's start since SDK PR #7): 403 registration_incomplete (e.g. updated Official Rules) used to
+    # end the start ("Could not connect ...", exit 1) and run_agent.sh restarted it in a loop. The key is fine: the
+    # runtime starts without a session and its supervisor says what to do and keeps checking (the test above and
+    # tests/test_main_tournament.py). No retry of our own here, no "Connected" line.
+    from altruagent.official import OfficialAgentError as OffErr
+    slept, tries = [], []
+    monkeypatch.setattr(agent_main, "_sleep", slept.append)
+
+    class Rules:
+        def authenticate(self):
+            tries.append(1)
+            err = OffErr("Accept the updated Official Rules on your dashboard (x).", status_code=403,
+                         error_code="registration_incomplete")
+            err.next_step = "rules"
+            raise err
+
+    assert agent_main._authenticate(Rules()) is True
+    assert len(tries) == 1 and slept == []
+    out = capsys.readouterr().out
+    assert "Connected with your Official Agent Key" not in out and "Could not connect" not in out
 
 
 def test_a_failed_session_mint_at_start_is_waited_out_not_reported_as_a_bad_key(monkeypatch, capsys):

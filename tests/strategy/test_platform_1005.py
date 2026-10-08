@@ -506,11 +506,17 @@ def test_a_tournament_seat_whose_first_workers_fail_still_connects_inside_its_wi
     fail before connecting (their grant's sign-in answering 503 agent_session_unavailable or 429: each such worker
     exits 2, a seat failure) got its 6th worker at 360 s with our 10 s cooldown and poll, past the 240 s connect window
     (a no-show), and a match whose worker kept crashing waited 160 s, then 320 s, past Werewolf's 120 s and Pokemon's
-    300 s idle clocks. The runtime's tuning (agent.__main__._tournament_tuning) caps the doubling at 30 s."""
+    300 s idle clocks. The runtime's tuning (agent.__main__._tournament_tuning) caps the doubling at 30 s.
+
+    v4.2.4 (SDK PR #7, 951f4f7): SEAT_FAILURE_BACKOFF_MAX_SECONDS is now also the SDK's "long run" threshold (a worker
+    that ran at least that long before failing starts a new count), so at our 30 s a match whose worker crashes again
+    and again after playing gets a new one 10 s after each crash (it was 10, 20, 30, 30 s). And a worker that never
+    reached its game for a temporary reason (EXIT_NOT_CONNECTED, after its own 60 s of grant retries) is replaced in
+    the same poll while the connect window is open, without counting."""
     import agent.__main__ as agent_main
     import altruagent.supervisor as sup
     from altruagent.models import OfficialAssignment
-    from altruagent.worker import EXIT_SEAT_BUSY, EXIT_SUCCESS
+    from altruagent.worker import EXIT_NOT_CONNECTED, EXIT_SEAT_BUSY, EXIT_SUCCESS
 
     row = OfficialAssignment.from_dict({
         "match_id": "match-1", "seat_id": "seat-1", "game_type": GAME, "seat_position": 0, "seat_count": 2,
@@ -519,11 +525,12 @@ def test_a_tournament_seat_whose_first_workers_fail_still_connects_inside_its_wi
     official = SimpleNamespace(assignments=lambda: [row])
     opts = agent_main._tournament_options({"ARENA_DISCOVERY_S": "10", "ARENA_WORKER_COOLDOWN_S": "10"})
     assert opts == {"poll_interval": 10.0, "cooldown_seconds": 10.0}
-    failed = 2                                        # (run_tournament_worker's exit on a temporary sign-in failure)
-    assert failed not in (EXIT_SUCCESS, EXIT_SEAT_BUSY)
+    failed = 2                                        # (run_tournament_worker's exit on an unexpected error)
+    assert failed not in (EXIT_SUCCESS, EXIT_SEAT_BUSY, EXIT_NOT_CONNECTED)
 
-    def starts(fail_first: int, *, plays_s: float = 2.0, tuned: bool = True, horizon: float = 3000.0) -> list[float]:
-        """Start times of the seat's workers: the first `fail_first` exit `failed` after `plays_s`, the next one
+    def starts(fail_first: int, *, plays_s: float = 2.0, tuned: bool = True, horizon: float = 3000.0,
+               code: int = failed) -> list[float]:
+        """Start times of the seat's workers: the first `fail_first` exit `code` after `plays_s`, the next one
         connects and plays on."""
         clock, out = [0.0], []
 
@@ -537,7 +544,7 @@ def test_a_tournament_seat_whose_first_workers_fail_still_connects_inside_its_wi
 
             def is_alive(self):
                 if self.exitcode is None and self.n < fail_first and clock[0] >= out[self.n] + plays_s:
-                    self.exitcode = failed
+                    self.exitcode = code
                 return self.exitcode is None
 
             def join(self, timeout=None):
@@ -562,7 +569,14 @@ def test_a_tournament_seat_whose_first_workers_fail_still_connects_inside_its_wi
     assert starts(5) == [0, 20, 50, 90, 130, 170]                       # 5 failed workers: the 6th starts at 170 s
     assert starts(6) == [0, 20, 50, 90, 130, 170, 210]                  # 6: the 7th at 210 s, still inside 240 s
     mid = starts(6, plays_s=120.0)                                      # one long match, its worker crashing again
-    assert [b - (a + 120) for a, b in zip(mid, mid[1:])] == [10, 20, 30, 30, 30, 30]
+    assert [b - (a + 120) for a, b in zip(mid, mid[1:])] == [10, 10, 10, 10, 10, 10]   # each ran >= 30 s: a new count
+    mid_sdk = starts(6, plays_s=120.0, tuned=False)                     # (the SDK alone: 120 s < its 600 s threshold)
+    assert [b - (a + 120) for a, b in zip(mid_sdk, mid_sdk[1:])] == [10, 20, 40, 80, 160, 320]
+    short = starts(6, plays_s=15.0)                     # reaped 20 s after its start (< 30 s): still doubling to 30 s
+    assert [b - (a + 20) for a, b in zip(short, short[1:])] == [10, 20, 30, 30, 30, 30]
+    # never reached the game (a temporary problem): replaced in the same poll, tuned or not, while the window is open
+    assert starts(6, code=EXIT_NOT_CONNECTED) == [0, 10, 20, 30, 40, 50, 60]
+    assert starts(6, code=EXIT_NOT_CONNECTED, tuned=False) == [0, 10, 20, 30, 40, 50, 60]
     assert sup.SEAT_FAILURE_BACKOFF_MAX_SECONDS == 600.0                # (the SDK's own value, back after the runtime)
 
 
