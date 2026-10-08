@@ -4,7 +4,7 @@ platform; nothing is recorded (ARENA_RECORD=0).
 
     python -m local.ra_platform --a rusher --b turtle --games 4                 # deterministic lockstep clock
     python -m local.ra_platform --a ours --b llm --games 2 --clock realtime --speed 10 --max-minutes 10
-    python -m local.ra_platform --a agent.redalert.bot:create --b rusher --games 20 --json out.json
+    python -m local.ra_platform --a agent.redalert.bot:create --b rusher --games 40 --jobs 4 --json out.json
 
 Agents (--a / --b): idle | turtle | rusher | llm (local/ra_bots.py), ours (agent.agent:create_agent, the deployed
 contestant), or module:attr for any factory (called with no arguments; or with seed= when it accepts one). Side A
@@ -13,6 +13,11 @@ plays seat Multi0 in even games and Multi1 in odd ones; maps cycle through --map
 Per match: result for A, reason, game minutes, then per side: first refinery / war factory (game seconds), peak army
 value, kills / deaths cost, assets, batches sent and per game second, INVALID_ACTION refusals, rejected / partial
 orders, other tool errors, choose_action calls per game second, the slowest decision (wall ms), runner errors.
+The last line sums it up: A's wins / losses / draws and score with its 95% Wilson interval.
+
+Clocks: `lockstep` (default) is deterministic and runs as fast as the agents (a 20-minute match takes about 10 s),
+but every agent gets one decision per 0.2 s view whatever its thinking time (--latency-ticks adds a fixed delay);
+`realtime` runs a view every 0.2 s / --speed of wall time, so thinking time costs game time like on the platform.
 """
 from __future__ import annotations
 
@@ -176,6 +181,28 @@ def _fmt_side(s: dict) -> str:
             f"slow {s['slowest_ms']:.0f}ms{te}{err}{hung}")
 
 
+def wilson(score: float, n: int, z: float = 1.96) -> tuple[float, float]:
+    """95% Wilson interval of a score rate (draws count half)."""
+    if n <= 0:
+        return 0.0, 1.0
+    p = score / n
+    d = 1 + z * z / n
+    c = (p + z * z / (2 * n)) / d
+    h = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / d
+    return max(0.0, c - h), min(1.0, c + h)
+
+
+def _one(job: dict) -> dict:
+    """One game in a worker process (--jobs): factories are rebuilt from their specs there."""
+    os.environ["ARENA_RECORD"] = "0"
+    fa, fb = make_factory(job["a"]), make_factory(job["b"])
+    seed = job["seed"]
+    return play_match(fa(seed * 2 + 1), fb(seed * 2 + 2), seed=seed, map_id=job["map"], a_seat=job["a_seat"],
+                      clock=job["clock"], speed=job["speed"], max_minutes=job["max_minutes"],
+                      starting_cash=job["cash"], latency_ticks=job["latency_ticks"], lost_rate=job["lost_rate"],
+                      names=(job["a"].split(":")[-1], job["b"].split(":")[-1]))
+
+
 def main(argv=None) -> None:
     os.environ["ARENA_RECORD"] = "0"
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -192,34 +219,43 @@ def main(argv=None) -> None:
                     help="lockstep: hold each batch until N ticks after its state (think + network; default 0)")
     ap.add_argument("--lost-rate", type=float, default=0.0, help="share of pending orders that come back lost")
     ap.add_argument("--no-swap", action="store_true", help="A always in seat Multi0")
+    ap.add_argument("--jobs", type=int, default=1, help="games in parallel processes (default 1)")
     ap.add_argument("--json", type=Path, default=None, help="write all rows here")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
-    fa, fb = make_factory(a.a), make_factory(a.b)
+    make_factory(a.a), make_factory(a.b)                         # fail fast on a bad spec
     maps = [m for m in a.maps.split(",") if m]
-    rules = Rules()
+    jobs = [{"a": a.a, "b": a.b, "seed": a.seed * 1000 + g, "map": maps[g % len(maps)],
+             "a_seat": 0 if a.no_swap else g % 2, "clock": a.clock, "speed": a.speed, "max_minutes": a.max_minutes,
+             "cash": a.cash, "latency_ticks": a.latency_ticks, "lost_rate": a.lost_rate} for g in range(a.games)]
+    if a.jobs > 1:
+        from concurrent.futures import ProcessPoolExecutor
+        pool = ProcessPoolExecutor(max_workers=a.jobs)
+        results = pool.map(_one, jobs)
+    else:
+        pool, results = None, map(_one, jobs)
     rows = []
-    for g in range(a.games):
-        seed = a.seed * 1000 + g
-        a_seat = 0 if a.no_swap else g % 2
-        row = play_match(fa(seed * 2 + 1), fb(seed * 2 + 2), seed=seed, map_id=maps[g % len(maps)], a_seat=a_seat,
-                         clock=a.clock, speed=a.speed, max_minutes=a.max_minutes, starting_cash=a.cash,
-                         latency_ticks=a.latency_ticks, lost_rate=a.lost_rate, rules=rules,
-                         names=(a.a.split(":")[-1], a.b.split(":")[-1]))
-        rows.append(row)
-        if not a.quiet:
-            print(f"game {g} seed {seed} {row['map']} A=Multi{a_seat}: {row['result_a'].upper()} ({row['reason']}) "
-                  f"{row['game_s'] / 60:.1f} game-min in {row['wall_s']:.1f}s wall")
-            print("   A " + _fmt_side(row["a"]))
-            print("   B " + _fmt_side(row["b"]))
-        sys.stdout.flush()
+    try:
+        for g, row in enumerate(results):
+            rows.append(row)
+            if not a.quiet:
+                print(f"game {g} seed {row['seed']} {row['map']} A=Multi{row['a_seat']}: {row['result_a'].upper()} "
+                      f"({row['reason']}) {row['game_s'] / 60:.1f} game-min in {row['wall_s']:.1f}s wall")
+                print("   A " + _fmt_side(row["a"]))
+                print("   B " + _fmt_side(row["b"]))
+            sys.stdout.flush()
+    finally:
+        if pool is not None:
+            pool.shutdown()
     res = [r["result_a"] for r in rows]
     w, l, d = res.count("win"), res.count("loss"), res.count("draw")
+    lo, hi = wilson(w + 0.5 * d, len(rows))
     reasons: dict[str, int] = {}
     for r in rows:
         reasons[r["reason"]] = reasons.get(r["reason"], 0) + 1
     errs = sum(1 for r in rows for s in ("a", "b") if r[s]["error"] or r[s]["hung"])
-    print(f"{len(rows)} games {a.a} vs {a.b}: A {w}W {l}L {d}D, reasons {reasons}, runner errors/hangs {errs}, "
+    print(f"{len(rows)} games {a.a} vs {a.b}: A {w}W {l}L {d}D, score {100 * (w + 0.5 * d) / max(1, len(rows)):.0f}% "
+          f"(95% CI {100 * lo:.0f}-{100 * hi:.0f}%), reasons {reasons}, runner errors/hangs {errs}, "
           f"A invalid {sum(r['a']['invalid_actions'] for r in rows)} rejected {sum(r['a']['rejected'] for r in rows)}, "
           f"B invalid {sum(r['b']['invalid_actions'] for r in rows)} rejected {sum(r['b']['rejected'] for r in rows)}, "
           f"median wall {statistics.median([r['wall_s'] for r in rows]) if rows else 0:.1f}s")

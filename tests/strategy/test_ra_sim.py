@@ -544,6 +544,35 @@ def test_the_batch_gap_holds_a_quick_second_batch_until_the_next_view():
     assert first["accepted"] and second["accepted"] and sent2 >= sent1 + STEP
 
 
+def test_a_second_batch_while_the_first_is_being_answered_is_not_your_turn():
+    w = mk()
+    srv = started(w)                                              # no clock thread: the world only moves below
+    order = {"type": "orders", "orders": [{"cmd": "stop", "units": [mcv(w, 0).id]}]}
+    assert srv.play_action(0, w.tick, order)["accepted"]
+    out = {}
+    sv = w.tick
+    t = threading.Thread(target=lambda: out.setdefault("held", srv.play_action(0, sv, order)), daemon=True)
+    t.start()                                                     # held for the 0.2 s gap
+    deadline = time.monotonic() + 5
+    while not srv.seats[0].in_flight and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert srv.play_action(0, sv, order)["error"] == "NOT_YOUR_TURN"
+    assert srv.state(0)["is_current_actor"] is False
+    with srv.cv:
+        srv._advance()
+    t.join(5)
+    assert out["held"]["accepted"] and srv.seats[0].last_orders["sent_at_tick"] == sv + STEP
+    la = srv.get_legal_actions(0)
+    assert la["state_version"] == w.tick and la["deploy"] == [mcv(w, 0).id]
+
+
+def test_cli_runs_games_in_parallel_processes(capsys):
+    platform_main(["--a", "rusher", "--b", "idle", "--games", "2", "--max-minutes", "0.5", "--jobs", "2"])
+    text = capsys.readouterr().out
+    # 30 s: no fight yet, the tiebreak's assets_value goes to the side that built something
+    assert "game 1 seed 7001 trapped A=Multi1" in text and "2 games rusher vs idle: A 2W 0L 0D, score 100%" in text
+
+
 def test_time_limit_tiebreak_idle_rule_and_resignation():
     srv = started(mk(), max_minutes=0.1)
     with srv.cv:
