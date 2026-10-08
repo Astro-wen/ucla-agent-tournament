@@ -154,9 +154,10 @@ select_tests() {   # prints the test files of COMMIT whose imports and paths are
     body="$(git cat-file blob "$COMMIT:$t")"
     # imports of code that is not exported
     grep -qE '^\s*(from|import)\s+(local|champion|versions|examples|scripts)([. ]|$)' <<<"$body" && continue
-    # paths that are not exported: local/ champion/ versions/ examples/ (as a path or a quoted name), recordings,
-    # CLAUDE.md, HANDOFF, a "docs" directory, docs other than the two exported ones, scripts other than the exported
-    grep -qE '(^|[^A-Za-z0-9_.-])(local|champion|versions|examples)/|["'\''](local|champion|versions|examples|logs|docs)["'\'']|logs/|CLAUDE\.md|HANDOFF' <<<"$body" && continue
+    # paths that are not exported: local/ champion/ versions/ examples/ (as a path, a quoted name or a quoted dotted
+    # module such as "examples.smoke_agent"), recordings, CLAUDE.md, HANDOFF, a "docs" directory, docs other than the
+    # two exported ones, scripts other than the exported ones
+    grep -qE '(^|[^A-Za-z0-9_.-])(local|champion|versions|examples)/|["'\''](local|champion|versions|examples)[./"'\'']|["'\''](logs|docs)["'\'']|logs/|CLAUDE\.md|HANDOFF' <<<"$body" && continue
     bad="$(grep -oE 'docs/[A-Za-z0-9_./-]*' <<<"$body" | grep -vxE 'docs/(deploy|restart_load)\.md' || true)"
     [ -n "$bad" ] && continue
     bad="$(grep -oE 'scripts/[A-Za-z0-9_.-]+' <<<"$body" | grep -vxE "$EXPORTED_SCRIPTS_RE" || true)"
