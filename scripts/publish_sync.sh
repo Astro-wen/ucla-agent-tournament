@@ -165,7 +165,34 @@ select_tests() {   # prints the test files of COMMIT whose imports and paths are
     echo "$t"
   done < <(git ls-tree -r --name-only "$COMMIT" -- tests | grep -E '(^|/)test_[^/]*\.py$' || true)
 }
+test_deps() {   # a test file -> the test files it imports (from test_x / .test_x / tests.strategy.test_x import ...,
+  local t="$1" dir body m                     # from tests.strategy import test_x)
+  dir="$(dirname "$t")"
+  body="$(git cat-file blob "$COMMIT:$t")"
+  while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    if git cat-file -e "$COMMIT:$dir/$m.py" 2>/dev/null; then echo "$dir/$m.py"; else echo "tests/$m.py"; fi
+  done < <(grep -oE '^\s*(from|import)\s+test_[A-Za-z0-9_]+' <<<"$body" | awk '{ print $2 }' || true)
+  { grep -oE '^\s*from\s+\.test_[A-Za-z0-9_]+' <<<"$body" | sed -E "s#.*\.(test_[A-Za-z0-9_]+)#$dir/\1.py#"
+    grep -oE '^\s*from\s+tests(\.[A-Za-z0-9_]+)*\.test_[A-Za-z0-9_]+\s+import' <<<"$body" | awk '{ print $2 }' | tr . / | sed 's/$/.py/'
+    grep -oE '^\s*from\s+tests(\.[A-Za-z0-9_]+)*\s+import\s+test_[A-Za-z0-9_]+' <<<"$body" | awk '{ print $2 "." $4 }' | tr . / | sed 's/$/.py/'
+  } || true
+}
+in_tests() { local x; for x in "${TEST_FILES[@]+"${TEST_FILES[@]}"}"; do [ "$x" = "$1" ] && return 0; done; return 1; }
 mapfile -t TEST_FILES < <(select_tests)
+changed=1                                   # drop tests that import a test that is not exported, until none does
+while [ "$changed" = 1 ]; do
+  changed=0; keep=()
+  for t in "${TEST_FILES[@]+"${TEST_FILES[@]}"}"; do
+    ok=1
+    while IFS= read -r dep; do
+      [ -n "$dep" ] || continue
+      in_tests "$dep" || { ok=0; break; }
+    done < <(test_deps "$t")
+    if [ "$ok" = 1 ]; then keep+=("$t"); else changed=1; fi
+  done
+  TEST_FILES=("${keep[@]+"${keep[@]}"}")
+done
 TEST_SUPPORT=()
 if [ "${#TEST_FILES[@]}" -gt 0 ]; then
   git cat-file -e "$COMMIT:tests/conftest.py" 2>/dev/null && TEST_SUPPORT+=(tests/conftest.py)

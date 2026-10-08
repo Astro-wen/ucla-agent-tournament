@@ -83,6 +83,11 @@ def test_the_export_holds_only_the_competition_files_of_the_commit(tmp_path):
     for t in tests:
         body = (out / t).read_text(encoding="utf-8")
         assert not re.search(r"^\s*(from|import)\s+(local|champion|versions|examples)\b", body, re.M), t
+        # a test another exported test imports is exported too (test_console / test_lease import test_tournament)
+        for m in re.findall(r"^\s*(?:from|import)\s+(?:tests(?:\.\w+)*\.)?(test_\w+)", body, re.M):
+            assert list((out / "tests").rglob(f"{m}.py")), (t, m)
+        for m in re.findall(r"^\s*from\s+tests(?:\.\w+)*\s+import\s+(test_\w+)", body, re.M):
+            assert list((out / "tests").rglob(f"{m}.py")), (t, m)
     # the tree hash it prints is what a commit of exactly these files records, and the code equals the commit's
     tree = re.search(r"^  tree ([0-9a-f]{40})$", r.stdout, re.M).group(1)
     assert "every exported path is identical to commit" in r.stdout
