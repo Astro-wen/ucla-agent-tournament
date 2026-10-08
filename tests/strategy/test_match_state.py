@@ -421,6 +421,10 @@ def test_a_restarted_chat_window_keeps_the_quota_and_never_repeats(monkeypatch):
         if not isinstance(out, SendMessage):
             break
         sent.append(out.content)
+        # the next state shows it (the server's new_messages carries our own chats; one missing there did not land and
+        # would be sent again, v4.2.4: test_resend_after_hiccup.py)
+        st = {**st, "new_messages": st["new_messages"] + [
+            {"seq": 10 + len(sent), "sender": 3, "type": "chat", "content": out.content, "recipients": []}]}
     assert sent == ["line 2", "line 3", "line 4"]              # 2 already sent this window: 3 left, none repeated
 
 

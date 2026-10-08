@@ -170,13 +170,37 @@ def test_follow_up_cap_survives_a_restart():
     _opened(c, g)
     g.clock = 30
     _chat(g, 2, "I am the Seer. Player3 is a wolf.")
-    assert isinstance(c.message_step(_gs(g), ctx()), SendMessage)
+    follow_up = c.message_step(_gs(g), ctx())
+    assert isinstance(follow_up, SendMessage)
+    _chat(g, 3, follow_up.content)                        # it reached the server (the next state shows it)
     saved = c._export("werewolf", None)
     d = _listener()
     d._import(saved)
     g.clock = 40
     _chat(g, 6, "I am the Seer. Player3 is a wolf. Vote Player3.")
     assert d.message_step(_gs(g), ctx()) is TERMINATE_MESSAGING
+
+
+def test_a_follow_up_that_never_landed_is_not_counted_across_a_restart():
+    """v4.2.4: the follow-up's send failed (the runner re-reads instead of ending the match) and the worker restarted
+    from the state saved with it in flight: the state it is asked with does not show it, so it is not counted (the
+    follow-up budget, the quota) and is sent again, once."""
+    c, g = _listener(), _game()
+    _opened(c, g)
+    g.clock = 30
+    _chat(g, 2, "I am the Seer. Player3 is a wolf.")
+    follow_up = c.message_step(_gs(g), ctx())
+    assert isinstance(follow_up, SendMessage)
+    d = _listener()
+    d._import(c._export("werewolf", None))                # saved with the follow-up counted and in flight
+    g.clock = 35
+    again = d.message_step(_gs(g), ctx())
+    assert isinstance(again, SendMessage) and again.content == follow_up.content
+    assert d.undelivered == 1 and d._followups == 1 and d._chat_sent == 2
+    _chat(g, 3, again.content)
+    g.clock = 40
+    _chat(g, 6, "I am the Seer. Player3 is a wolf. Vote Player3.")
+    assert d.message_step(_gs(g), ctx()) is TERMINATE_MESSAGING   # the budget is used now: no third chat
 
 
 def test_without_a_runner_session_listening_ends_in_a_terminate():

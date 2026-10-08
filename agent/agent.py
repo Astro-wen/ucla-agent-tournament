@@ -21,6 +21,10 @@ after 120 s in Werewolf). So everything here is defensive:
     behaviour (WAIT for the whole match). Any other real-time game
     (`pacing.mode == "realtime"`) we have no policy for is answered with WAIT
     for its whole match: nothing is sent, the runner waits for the next view;
+  * a move or chat the runner could not send for a temporary reason is not resent: it re-reads the state and asks
+    again (SDK PR #7), and every decision is simply made again from that state. A Werewolf chat that did not reach
+    the server is then not counted (quota, never-twice rule, saved match state) and is decided again: the next
+    state's `new_messages` shows whether it landed (Contestant._settle_pending);
   * a doubles turn is also checked as a pair (Showdown's rule: never the same
     switch-in twice, no `pass` while a switch-in is still free for that slot)
     right before it goes to the runner, whatever path produced it (policy,
@@ -207,6 +211,11 @@ class Contestant:
         self._chat_done = False                       # we terminated this window: never chat again in it
         self._chat_sent = 0
         self._chat_said: set = set()
+        # The chat last handed to the runner, until the next state shows whether it reached the server (see
+        # _settle_pending), and whether this match has shown one of our own chats back in new_messages yet.
+        self._chat_pending: dict | None = None
+        self._echo = False
+        self.undelivered = 0                          # chats un-counted because the next state did not show them
         # Listening (ARENA_WW_LISTEN): chats of the day's opening batch still queued, chats sent after it, and the
         # window's clock (its length W, our first sight, when another seat last chatted; see _listen_wait).
         self.listen = listen_enabled()
@@ -615,7 +624,7 @@ class Contestant:
         me, term = st.get("your_position"), st.get("terminated_messaging")
         if day != self._chat_day:
             self._chat_day, self._chat_done, self._chat_sent, self._chat_said = day, False, 0, set()
-            self._followups, self._win = 0, None
+            self._followups, self._win, self._chat_pending = 0, None, None
             # A restarted worker without its predecessor's saved memory (agent/matchstate.py) can join a window our seat
             # already chatted in: new_messages carries the whole window, so count and remember our own chats there (the
             # 5-chat quota and the no-repeat rule then hold across the restart). At a window's first call in one
@@ -626,8 +635,10 @@ class Contestant:
                         and m.get("day", day) in (day, None):
                     self._chat_sent += 1
                     self._chat_said.add((clip_chat(m.get("content", "")), tuple(m.get("recipients") or ())))
+                    self._echo = True
             self._chat_queue = self._ask_chat(st)
             self._chat_opening = len(self._chat_queue)
+        self._settle_pending(st, me, day)
         if self.listen:
             self._listen_wait(st)                         # the window's clock starts at our first sight of it
         if isinstance(term, list) and isinstance(me, int) and me in term:
@@ -654,11 +665,59 @@ class Contestant:
                     self._followups += 1
                     if self.listen:
                         self.listen_stats["followups"] += 1
+                self._chat_pending = {"day": day, "text": text, "rec": tuple(rec or ()), "opening": opening,
+                                      "m": dict(m)}
                 return SendMessage(text, recipients=rec)
         if self.listen and not self._chat_done and self._may_hold(st, me):
             return HOLD
         self._chat_done = True
         return TERMINATE_MESSAGING
+
+    def _settle_pending(self, st: dict, me, day) -> None:
+        """Did the chat we last handed the runner reach the server? Since PR #7 the runner does not end the match
+        when a send_message fails for a temporary reason (a dropped connection, a 5xx, RUNTIME_TEMPORARILY_UNAVAILABLE,
+        TOO_MANY_WAITS): it never resends, it re-reads the state and asks us again. `new_messages` carries the open
+        window's messages, our own included ("You always see your own messages", 06-messaging.md), so a chat that
+        went out is in the next state we are asked with. One that is missing there (its text not among our chats
+        shown, and fewer of ours shown than we counted) did not land: it is un-counted (the 5-chat quota, the
+        never-twice rule, the follow-up budget) and queued first again, so this call decides again with it, and the
+        saved match state (written after this decision) does not count it either.
+
+        Only once this match has shown one of our own chats back (`_echo`): if new_messages left our own chats out,
+        every chat would look undelivered and be sent again. Before that first echo a chat stays counted, as before.
+        The count never drops below the chats of ours the server shows (the quota is counted there): never a 6th chat
+        (a refused chat ends the match process). Nothing to settle without a list of messages, on another day, or
+        without a seat. Never raises."""
+        p, self._chat_pending = self._chat_pending, None
+        if p is None:
+            return
+        try:
+            msgs = st.get("new_messages")
+            if not isinstance(msgs, list) or p.get("day") != day or not isinstance(me, int) or isinstance(me, bool):
+                return
+            own = [m for m in msgs if isinstance(m, dict) and m.get("sender") == me and m.get("type", "chat") == "chat"
+                   and m.get("day", day) in (day, None)]
+            if own:
+                self._echo = True
+            key = (p.get("text"), tuple(p.get("rec") or ()))
+            if not self._echo or len(own) >= self._chat_sent or any(
+                    (clip_chat(m.get("content", "")), tuple(m.get("recipients") or ())) == key for m in own):
+                return                # (as many of ours shown as counted: it landed, even if its text came back changed)
+            # (never below what the server shows: the quota is counted there)
+            self._chat_sent = max(len(own), self._chat_sent - 1)
+            self._chat_said.discard(key)
+            if p.get("opening"):
+                self._chat_opening += 1
+            else:
+                self._followups = max(0, self._followups - 1)
+                if self.listen:
+                    self.listen_stats["followups"] = max(0, self.listen_stats["followups"] - 1)
+            self._chat_queue.insert(0, dict(p.get("m") or {"content": key[0], "recipients": list(key[1]) or None}))
+            self.undelivered += 1
+            log.warning("our chat did not reach the server (not in the state read after it): deciding again, it is "
+                        "not counted (%d chat(s) counted this window)", self._chat_sent)
+        except Exception:
+            log.debug("settling the last chat failed", exc_info=True)
 
     # ---- Werewolf listening (ARENA_WW_LISTEN) -------------------------------
     def _may_hold(self, st: dict, me) -> bool:
@@ -797,6 +856,7 @@ class Contestant:
         self._chat_day, self._chat_queue, self._chat_done = _UNSET, [], False
         self._chat_sent, self._chat_said = 0, set()
         self._chat_opening, self._followups, self._win = 0, 0, None
+        self._chat_pending, self._echo, self.undelivered = None, False, 0
         self.overruns = self.fallbacks = self.joint_repairs = self.decisions = self._resumes = self.doubles_turns = 0
         self.waits = 0
         self.resumed, self._summarized = None, False
@@ -805,7 +865,8 @@ class Contestant:
     def _export(self, family: str, raw) -> dict:
         chat = {"day": None if self._chat_day is _UNSET else self._chat_day, "has_day": self._chat_day is not _UNSET,
                 "queue": self._chat_queue, "done": self._chat_done, "sent": self._chat_sent, "said": self._chat_said,
-                "opening": self._chat_opening, "followups": self._followups}
+                "opening": self._chat_opening, "followups": self._followups, "pending": self._chat_pending,
+                "echo": self._echo, "undelivered": self.undelivered}
         out = {"game": family, "game_type": self._game, "seat": self._seat,
                "progress": matchstate.progress(raw, family), "t": round(time.time(), 3), "chat": chat,
                "counters": {"decisions": self.decisions, "overruns": self.overruns, "fallbacks": self.fallbacks,
@@ -826,6 +887,9 @@ class Contestant:
         self._chat_said = set(chat.get("said") or ())
         self._chat_opening = int(chat.get("opening") or 0)
         self._followups = int(chat.get("followups") or 0)
+        self._chat_pending = dict(chat["pending"]) if isinstance(chat.get("pending"), dict) else None
+        self._echo = bool(chat.get("echo"))
+        self.undelivered = int(chat.get("undelivered") or 0)
         c = saved.get("counters") or {}
         self.decisions = int(c.get("decisions") or 0)
         self.overruns = int(c.get("overruns") or 0)
@@ -877,6 +941,7 @@ class Contestant:
             return f"{head} {ra}"
         if self._family != "pokemon":
             waits = f" waits={self.waits}" if self.waits else ""        # (a real-time game answered with WAIT)
+            waits += f" undelivered_chats={self.undelivered}" if self.undelivered else ""
             ls = self.listen_stats
             listen = (f" listen=on holds={ls['holds']} followups={ls['followups']} listen_s={ls['seconds']:.1f} "
                       f"max_s={ls['max_s']:.1f} listen_errors={ls['errors']} no_game={ls['no_game']}"
