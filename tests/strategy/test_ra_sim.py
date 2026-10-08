@@ -732,7 +732,7 @@ def test_fake_platform_red_alert_match_against_a_rusher_over_mcp(tmp_path, monke
         # numbers (military, opponent_military) only after the world thread stopped (up to 5 s later): wait for
         # those, not for matches_done (stats are written every 0.5 s; allow for a busy machine).
         deadline = time.monotonic() + 40
-        st = {}
+        st, ra = {}, None
         while time.monotonic() < deadline:
             st = json.loads(stats.read_text()) if stats.exists() else {}
             ra = next((m for m in st.get("matches") or [] if m.get("game_type") == "red_alert"), None)
@@ -853,3 +853,12 @@ def test_cli_cycles_opponents():
 def test_limits_constants_match_the_doc():
     assert ra_server.MAX_ORDERS == 20 and ra_server.MAX_COMMANDS == 200 and ra_server.STALE_TICKS == 3000
     assert ra_server.MIN_BATCH_INTERVAL_S == 0.2 and ra_server.IDLE_S == 600
+
+
+@pytest.mark.parametrize("style", ["tanks", "swarm", "pro", "raider", "hider"])
+def test_the_stronger_scripted_bots_play_through_the_runner(style):
+    """local/ra_bots_strong.py: each bot builds and sends batches the runner accepts (no refused batch, no error)."""
+    row = play_match(make_factory(style)(3), make_bot("turtle", 4), seed=12, map_id="trapped", max_minutes=4)
+    a = row["a"]
+    assert a["error"] is None and not a["hung"] and a["invalid_actions"] == 0 and a["batches"] >= 10
+    assert a["assets"] > 0 and (a["first_proc_s"] is not None or style == "hider")

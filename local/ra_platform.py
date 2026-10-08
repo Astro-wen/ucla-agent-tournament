@@ -11,8 +11,9 @@ Situations: --pacing windows (the operator's 5-second windows), --default-stance
 agent seats turn out to be OpenRA bot players), --place-limit N (place is `invalid` after N buildings), --lost-rate,
 --latency-ticks, --cash, --fault-rate (flaky connection: calls fail with HTTP 502 / 429 and the runner retries).
 
-Agents (--a / --b): idle | turtle | rusher | llm (local/ra_bots.py), ours (agent.agent:create_agent, the deployed
-contestant), or module:attr for any factory (called with no arguments; or with seed= when it accepts one). Side A
+Agents (--a / --b): idle | turtle | rusher | llm (local/ra_bots.py), tanks | swarm | pro | raider | hider (stronger
+scripted bots, local/ra_bots_strong.py), ours (agent.agent:create_agent, the deployed contestant), or module:attr for
+any factory (called with no arguments; or with seed= when it accepts one). Side A
 plays seat Multi0 in even games and Multi1 in odd ones; maps cycle through --maps.
 
 Per match: result for A, reason, game minutes, then per side: first refinery / war factory (game seconds), peak army
@@ -51,13 +52,16 @@ MAPS = ("sidestep", "trapped", "shadowfiend-ii")
 
 def make_factory(spec: str):
     """A callable(seed) -> agent for --a / --b."""
-    from . import ra_bots
+    from . import ra_bots, ra_bots_strong
     if spec in ra_bots.BOTS:
         return lambda seed: ra_bots.make_bot(spec, seed)
+    if spec in ra_bots_strong.BOTS:
+        return lambda seed: ra_bots_strong.make_bot(spec, seed)
     if spec == "ours":
         spec = "agent.agent:create_agent"
     if ":" not in spec:
-        raise SystemExit(f"unknown agent {spec!r}: one of {', '.join(ra_bots.STYLES)}, ours, or module:attr")
+        raise SystemExit(f"unknown agent {spec!r}: one of {', '.join(ra_bots.STYLES + ra_bots_strong.STYLES)}, "
+                         f"ours, or module:attr")
     mod, attr = spec.split(":", 1)
     fn = getattr(importlib.import_module(mod), attr)
     try:
