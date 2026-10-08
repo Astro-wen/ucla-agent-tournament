@@ -20,7 +20,10 @@ after 120 s in Werewolf). So everything here is defensive:
   * a move or chat the runner could not send for a temporary reason is not resent: it re-reads the state and asks
     again (SDK PR #7), and every decision is simply made again from that state. A Werewolf chat that did not reach
     the server is then not counted (quota, never-twice rule, saved match state) and is decided again: the next
-    state's `new_messages` shows whether it landed (Contestant._settle_pending);
+    state's `new_messages` shows whether it landed (Contestant._settle_pending). A Pokemon battle decision asked again
+    (the same decision point, whatever its state_version) starts from the battle memory of its first ask, and a move
+    the server refused (on_action_result) is rolled back out of that memory (PokemonPolicy._same_decision /
+    undelivered): a move that did not land never counts as played (Fake Out freshness, Protect chains);
   * a doubles turn is also checked as a pair (Showdown's rule: never the same
     switch-in twice, no `pass` while a switch-in is still free for that slot)
     right before it goes to the runner, whatever path produced it (policy,
@@ -87,6 +90,9 @@ LISTEN_POLL = 1 / 24       # the longest single wait while listening (5 s of 120
 LISTEN_FOLLOWUPS = 1       # chats a day after the opening ones, with listening on
 LISTEN_MIN_WAIT_S = 0.25   # a wait answered at once with nothing new is followed by this pause (no busy loop)
 _ON = {"1", "on", "true", "yes", "enable", "enabled"}
+# Errors on a sent move that mean the server did not take it (on_action_result): the decision had closed or moved on
+# (the runner's race codes, pokemon.md section 8), or the game's engine was busy. A 5xx may have landed: not listed.
+REFUSED_MOVE = frozenset({"STALE_STATE", "NOT_YOUR_TURN", "WRONG_PHASE", "RUNTIME_TEMPORARILY_UNAVAILABLE"})
 
 
 def listen_enabled(env=None) -> bool:
@@ -234,6 +240,8 @@ class Contestant:
         self.decisions = 0
         self.doubles_turns = 0                        # doubles battle decisions (the engine search's share of them)
         self.waits = 0                                # real-time views answered with WAIT (no policy for the game)
+        self.refused_moves = 0                        # Pokemon moves the server refused (rolled back, on_action_result)
+        self._last_raw = None                         # the state of the last decision (what its saved memory is of)
         self._summarized = False
 
     # ---- moves -----------------------------------------------------------
@@ -789,7 +797,8 @@ class Contestant:
         self._chat_opening, self._followups, self._win = 0, 0, None
         self._chat_pending, self._echo, self.undelivered = None, False, 0
         self.overruns = self.fallbacks = self.joint_repairs = self.decisions = self._resumes = self.doubles_turns = 0
-        self.waits = 0
+        self.waits = self.refused_moves = 0
+        self._last_raw = None
         self.resumed, self._summarized = None, False
 
     def _export(self, family: str, raw) -> dict:
@@ -801,6 +810,7 @@ class Contestant:
                "progress": matchstate.progress(raw, family), "t": round(time.time(), 3), "chat": chat,
                "counters": {"decisions": self.decisions, "overruns": self.overruns, "fallbacks": self.fallbacks,
                             "joint_repairs": self.joint_repairs, "doubles_turns": self.doubles_turns,
+                            "refused_moves": self.refused_moves,
                             "resumes": self._resumes + (self.resumed is not None)}}
         if family == "pokemon":
             out["pk"] = self.pk.export_memory()
@@ -826,6 +836,7 @@ class Contestant:
         self.fallbacks = int(c.get("fallbacks") or 0)
         self.joint_repairs = int(c.get("joint_repairs") or 0)
         self.doubles_turns = int(c.get("doubles_turns") or 0)
+        self.refused_moves = int(c.get("refused_moves") or 0)
         self._resumes = int(c.get("resumes") or 0)
         if isinstance(saved.get("pk"), dict):
             self.pk.import_memory(saved["pk"])
@@ -836,16 +847,41 @@ class Contestant:
         """Save the match's memory (unless an overrun policy call is still changing it: the next decision saves) and,
         after a battle turn, its live counters for the health line. Never raises."""
         self.decisions += 1
+        self._last_raw = getattr(state, "raw", None)
         try:
             if not family or self._match is None or not matchstate.enabled():
                 return
             aid, sid = self._match
             if self._busy is None or not self._busy.is_alive():
-                matchstate.save(aid, sid, self._export(family, getattr(state, "raw", None)), seat=self._seat)
+                matchstate.save(aid, sid, self._export(family, self._last_raw), seat=self._seat)
             if battle and family == "pokemon":
                 matchstate.write_health(aid, sid, self.counters(), seat=self._seat)
         except Exception:
             log.debug("match state not saved", exc_info=True)
+
+    def on_action_result(self, result, context) -> None:
+        """The runner's report on each move it sent (altruagent.runner: the play_action answer, or {"error": code, ...}
+        when the runner recovered from an error). A Pokemon move the server refused (REFUSED_MOVE: a race such as
+        STALE_STATE / NOT_YOUR_TURN, i.e. the decision had closed and the move timer played for us, or a busy engine)
+        never landed, so what its decision wrote about our action (Protect chains, last actions) goes back
+        (PokemonPolicy.undelivered), and the saved match state with it (a restarted worker resumes from that).
+        Any other error (a 5xx: the move may have landed) and a send that failed without an answer are left to the
+        re-read state: the same decision point again restores that memory (PokemonPolicy._same_decision). Never raises:
+        the runner ends the match on an exception here."""
+        try:
+            if not isinstance(result, dict) or result.get("error") not in REFUSED_MOVE or self._family != "pokemon":
+                return
+            if self._busy is not None and self._busy.is_alive():
+                return                                    # an overrun policy call still owns the memory
+            if not self.pk.undelivered():
+                return
+            self.refused_moves += 1
+            log.warning("our move was refused (%s): it is not remembered as played", str(result.get("error"))[:40])
+            if self._match is not None and matchstate.enabled():
+                aid, sid = self._match
+                matchstate.save(aid, sid, self._export(self._family, self._last_raw), seat=self._seat)
+        except Exception:
+            log.debug("move result bookkeeping failed", exc_info=True)
 
     def counters(self) -> dict:
         """The match's battle-decision counters (health line, summary)."""
@@ -873,10 +909,13 @@ class Contestant:
             return f"{head} fallbacks={self.fallbacks} overruns={self.overruns} resumed={resumed}{waits}{listen}"
         by_count = sorted((ss.get("reasons") or {}).items(), key=lambda kv: -kv[1])
         reasons = f" ({', '.join(f'{k} x{v}' for k, v in by_count)})" if by_count else ""
+        # (only when it happened: a decision point asked again, a move the server refused)
+        redo = f" redecided={self.pk.redecided}" if getattr(self.pk, "redecided", 0) else ""
+        redo += f" refused_moves={self.refused_moves}" if self.refused_moves else ""
         return (f"{head} battle={c['battle']} search={c['mode']} used={c['used']} classic={c['battle'] - c['used']}"
                 f"{reasons} degraded={c['degraded']}{' lite' if c['lite'] else ''} cut={ss.get('cut', 0)} "
                 f"search_ms p50={c['ms_p50']} max={c['ms_max']} fallbacks={self.fallbacks} overruns={self.overruns} "
-                f"repairs={self.joint_repairs} resumed={resumed} engine[{_engine_stats()}] calc[{_calc_stats()}]")
+                f"repairs={self.joint_repairs}{redo} resumed={resumed} engine[{_engine_stats()}] calc[{_calc_stats()}]")
 
     def _summary(self) -> None:
         if self._summarized or not (self.decisions or self.waits):

@@ -1,29 +1,37 @@
 """Per-decision time budgets: never lose a game on time.
 
-The platform's clocks (docs/competition_brief.md, checked against logs/*/):
-  * Pokémon VGC runs Showdown's VGC timer: 90 s at team preview, 55 s per turn (90 s on the first), and a 420 s bank for
-    the whole battle that is never refilled (plus 90 s of first-turn grace). A turn that runs out is auto-played; a bank
-    that runs out loses the battle. The bank is drawn down in real time while the server waits for us, so it pays for
-    our thinking AND for the platform's round trip (about 0.7 s per decision in the recordings).
+The platform's clocks (docs/competition_brief.md, checked against logs/*/; the live pokemon skill doc, section 8 "Move
+timer", re-read 10-08):
+  * Pokémon VGC runs Showdown's VGC timer: 90 s at team preview (not from the bank), 55 s per battle decision, and a
+    420 s bank for the whole battle that is never refilled. A decision that runs out is auto-played; a bank that runs
+    out loses the battle. The bank is drawn down in real time while the server waits for us, so it pays for our
+    thinking AND for the platform's round trip (about 0.7 s per decision in the recordings). The platform acts first:
+    after 50 s (85 s at team preview) without an answer it plays a random legal choice for us.
   * Every draft pick has its own clock (pokemon.md section 4, since 10-05): 15 s from the moment the pick becomes ours
     (`observation.decision_timeout_seconds`), then the server picks a random legal card for us and rejects our late
-    pick as STALE_STATE. The teambuild phase has no idle timer; team preview is covered by the 90 s.
+    pick as STALE_STATE. The teambuild phase has no idle timer; team preview is covered by the 85 s.
   * Werewolf / Avalon auto-play a seat after 120 s idle.
-What a battle decision can see: Showdown sends `|inactive|Time left: T sec this turn | B sec total [| G sec grace]` with
-every request, and the platform forwards the whole protocol in `observation.protocol_log` (the last such line is the
-current request's). Nothing is visible during the draft or at team preview.
+What a decision can see: Showdown sends `|inactive|Time left: T sec this turn | B sec total [| G sec grace]` with every
+battle request, and the platform forwards the whole protocol in `observation.protocol_log` (the last such line is the
+current request's). That line is as old as the request: a state read again later (the runner re-reads and asks again
+after a move it could not send, SDK PR #7; a restarted worker) still shows it. The platform's own countdown,
+`observation.clock` {"decision_seconds_left", "bank_seconds_left"} (live doc 10-08; missing until Showdown reported
+the time), is counted when the state is read and runs to the platform's random choice (50 / 85 s, or the bank when
+less is left). Nothing is visible during the draft.
 
 `budget_for(raw, game_type)` turns that into one `Deadline` per decision:
   * draft pick DRAFT_S (20 s), and never more than the pick's clock (decision_timeout_seconds, else DRAFT_CLOCK_S)
     minus DRAFT_RESERVE_S: 10 s of the 15 s, the rest for noticing the turn, the round trips and the watchdog's grace
     (a match process's first pick also waits for the calculator's start-up, DamageCalc.warm: seconds on a cold
     machine, bounded by this budget; ARENA_TC_DRAFT_S sets the budget outright);
-    teambuild TEAMBUILD_S (20 s), team preview PREVIEW_S (30 s of the 90 s), Werewolf / unknown games OTHER_S (20 s
+    teambuild TEAMBUILD_S (20 s), team preview PREVIEW_S (30 s of the 85 s), Werewolf / unknown games OTHER_S (20 s
     of the 120 s), a chat turn MESSAGE_S;
   * a battle decision: BATTLE_S (10 s), and when the timer line is visible also at most
     TURN_SHARE x (T - LATENCY_S)   (half of what is left of this turn after the platform's latency) and
     (bank - BANK_RESERVE_S) / BANK_SPREAD   (the bank left, spread over the next 20 decisions, 30 s kept in reserve),
-    never below MIN_S (a heuristic answer takes milliseconds).
+    and the same two caps from `observation.clock` when it is there (decision_seconds_left for T), never below MIN_S
+    (a heuristic answer takes milliseconds). Team preview: PREVIEW_S, and at most TURN_SHARE x (decision_seconds_left
+    - LATENCY_S) with the clock. The clock only binds on a late read (well inside the 50 s otherwise: 10 s < 23.5 s).
 `Contestant.choose_action` (agent/agent.py) enters `decision(deadline)` for the whole decision, and everything that can
 take time bounds itself by `current()` / `cap()`: DamageCalc round trips (calc.py), the drafter's search wall
 (policy._drafter_pick), the preview solver's wall cap (policy._preview_matrix) and the lookahead's TIME_CAP
@@ -68,8 +76,8 @@ DRAFT_S = 20.0          # a draft pick at most (v4.2 on the real states: p99 0.1
 DRAFT_CLOCK_S = 15.0    # the platform's per-pick clock (this when the state does not say, pokemon.md section 4) minus
 DRAFT_RESERVE_S = 5.0   # this: noticing the turn, the round trips around our answer, the watchdog's grace
 TEAMBUILD_S = 20.0
-PREVIEW_S = 30.0        # team preview: 90 s on the platform (v3 worst case 2.7 s)
-BATTLE_S = 10.0         # a battle decision at most (55 s per turn; v3 worst case 84 ms)
+PREVIEW_S = 30.0        # team preview: the platform plays for us after 85 s (v3 worst case 2.7 s)
+BATTLE_S = 10.0         # a battle decision at most (the platform plays for us after 50 s; v3 worst case 84 ms)
 OTHER_S = 20.0          # Werewolf / Avalon / an unknown game or phase (auto-played after 120 s idle)
 MESSAGE_S = 20.0        # a chat turn
 MIN_S = 0.5             # floor of every budget
@@ -177,15 +185,52 @@ def parse_timer(raw) -> dict | None:
     return None
 
 
-def battle_seconds(timer: dict | None) -> tuple[float, str]:
-    """(budget, source) of a battle decision from its timer line (None = not visible: the default)."""
-    secs = _knob("BATTLE_S", BATTLE_S)
-    if not timer:
-        return max(_knob("MIN_S", MIN_S), secs), "default"
-    turn_cap = (timer["turn"] - _knob("LATENCY_S", LATENCY_S)) * _knob("TURN_SHARE", TURN_SHARE)
-    bank = timer["total"] + timer.get("grace", 0)
-    bank_cap = (bank - _knob("BANK_RESERVE_S", BANK_RESERVE_S)) / max(1.0, _knob("BANK_SPREAD", BANK_SPREAD))
-    return max(_knob("MIN_S", MIN_S), min(secs, turn_cap, bank_cap)), "timer"
+def parse_clock(raw) -> dict | None:
+    """The platform's live countdown of a decision, `observation.clock` (see the module docstring): {"decision": s,
+    "bank": s}, either None when not given, or None when there is no usable clock (missing, malformed). Never raises."""
+    try:
+        obs = raw.get("observation") if isinstance(raw, dict) else None
+        clk = obs.get("clock") if isinstance(obs, dict) else None
+        if not isinstance(clk, dict):
+            return None
+
+        def secs(v):
+            ok = isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v >= 0
+            return float(v) if ok else None
+        out = {"decision": secs(clk.get("decision_seconds_left")), "bank": secs(clk.get("bank_seconds_left"))}
+        return out if out["decision"] is not None or out["bank"] is not None else None
+    except Exception:
+        return None
+
+
+def _turn_cap(seconds_left: float) -> float:
+    return (seconds_left - _knob("LATENCY_S", LATENCY_S)) * _knob("TURN_SHARE", TURN_SHARE)
+
+
+def _bank_cap(bank: float) -> float:
+    return (bank - _knob("BANK_RESERVE_S", BANK_RESERVE_S)) / max(1.0, _knob("BANK_SPREAD", BANK_SPREAD))
+
+
+def battle_seconds(timer: dict | None, clock: dict | None = None) -> tuple[float, str]:
+    """(budget, source) of a battle decision from its timer line and the platform's clock (None = not visible: the
+    default). The clock is the newer of the two (counted when the state was read), so it is the source when given."""
+    caps, source = [_knob("BATTLE_S", BATTLE_S)], "default"
+    if timer:
+        caps += [_turn_cap(timer["turn"]), _bank_cap(timer["total"] + timer.get("grace", 0))]
+        source = "timer"
+    if clock:
+        caps += [f(clock[k]) for k, f in (("decision", _turn_cap), ("bank", _bank_cap)) if clock.get(k) is not None]
+        source = "clock"
+    return max(_knob("MIN_S", MIN_S), min(caps)), source
+
+
+def preview_seconds(raw) -> tuple[float, str]:
+    """(budget, source) of team preview: PREVIEW_S, within the platform's clock when the state shows one."""
+    secs = _knob("PREVIEW_S", PREVIEW_S)
+    clock = parse_clock(raw)
+    if clock and clock.get("decision") is not None:
+        return max(_knob("MIN_S", MIN_S), min(secs, _turn_cap(clock["decision"]))), "clock"
+    return secs, "default"
 
 
 def draft_clock(raw) -> tuple[float, str]:
@@ -227,9 +272,11 @@ def budget_for(raw, game_type: str | None = None) -> Deadline:
                 if kind == "draft":
                     secs, source = draft_seconds(raw)
                     return Deadline(secs, kind, source)
-                default = {"teambuild": TEAMBUILD_S, "preview": PREVIEW_S}[kind]
-                return Deadline(_knob(f"{kind.upper()}_S", default), kind)
-            secs, source = battle_seconds(parse_timer(raw))
+                if kind == "preview":
+                    secs, source = preview_seconds(raw)
+                    return Deadline(secs, kind, source)
+                return Deadline(_knob("TEAMBUILD_S", TEAMBUILD_S), kind)
+            secs, source = battle_seconds(parse_timer(raw), parse_clock(raw))
             return Deadline(secs, "battle" if phase in BATTLE_PHASES else f"pokemon:{phase or '?'}", source)
         return Deadline(_knob("OTHER_S", OTHER_S), game or "unknown")
     except Exception:
