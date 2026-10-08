@@ -1068,6 +1068,9 @@ class World:
                 a.hstate, a.htick = "unloading", -DOCK_TICKS
             return
         if st == "unloading":
+            if not procs:                                  # the refinery is gone: look for another one
+                a.hstate = "to_proc"
+                return
             a.htick += STEP
             cap = self.capacity(seat)
             while a.htick >= BALE_UNLOAD_TICKS and a.cargo > 0:
@@ -1121,7 +1124,7 @@ class World:
 
     def _auto_ok(self, a: Actor, t: Actor, structures: bool) -> bool:
         """OpenRA AutoTargetPriority: units and defenses; plain buildings only under attack_anything."""
-        if t.wreck or not self._can_hit(a, t):
+        if t.wreck or t.hp <= 0 or not self._can_hit(a, t):
             return False
         if t.bld and t.type not in DEFENSE_TYPES and not structures:
             return False
