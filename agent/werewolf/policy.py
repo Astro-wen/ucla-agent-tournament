@@ -16,8 +16,8 @@ wolf is found ("I am the Seer. PlayerN is a WOLF."), when another seat claims se
 (the public-record lynch prediction is itself, or at least two living seats press it in today's chat), from day 2
 when that saves a cleared villager or the table is down to five; once claimed it posts its results every day.
 
-Wolves: both compute the same kill target from the public record; only with ARENA_WW_DM=on (default off: the
-spectate feed shows who messaged whom) do they also send it privately to the living ally ("Tonight: PlayerN."; the
+Wolves: both compute the same kill target from the public record; only with ARENA_WW_DM=on (DMs are off by
+default) do they also send it privately to the living ally ("Tonight: PlayerN."; the
 lower-seat wolf's message decides, so two copies never swap targets); a lower-seat ally's private plan is followed
 either way; kill a claimed seer first (the one who named one of us, if several); counter-claim seer only when a live claimer names us; in a
 claim fight involving one of us vote the rival claimant, otherwise with the table's top non-wolf suspect (no
@@ -66,8 +66,7 @@ def _exp(name: str) -> bool:
 
 
 def dm_enabled() -> bool:
-    """Private kill-plan messages are OFF unless ARENA_WW_DM=on: the unauthenticated spectate feed shows chat
-    recipients (and may carry DM content), so a wolf-to-wolf DM names both wolves and the night's target."""
+    """Private kill-plan messages to the ally: DMs are off by default, ARENA_WW_DM=on turns them on."""
     return str(os.environ.get(DM_ENV, "off")).strip().lower() in _ON
 
 
@@ -236,7 +235,7 @@ class WerewolfPolicy:
         return c
 
     @staticmethod
-    def _scores(v: View, private: bool = True) -> dict[int, float]:
+    def _scores(v: View, private: bool = True, vill_view: bool = False) -> dict[int, float]:
         """Public-record suspicion of every living seat (including me)."""
         score: dict[int, float] = defaultdict(float)
         for day, votes, elim in v.votes:
@@ -253,7 +252,7 @@ class WerewolfPolicy:
         # Vote-calls ("I'll vote PlayerX", "p3 is sus") are the easiest way to steer a table. Villagers and the seer
         # are not moved by them (measured: +1.5 villager / +0.8 seer win rate, most in tables of silent bots); wolves
         # use them to vote with the crowd (measured: +1.5 wolf win rate).
-        sus_w = SUS if v.role == "wolf" else 0.0
+        sus_w = SUS if v.role == "wolf" and not vill_view else 0.0
         for _seq, sender, f, _day in _chats(v):
             if f.injection:
                 score[sender] += INJECT
@@ -276,8 +275,13 @@ class WerewolfPolicy:
             for t in c.trusted_clears():
                 score[t] += TRUSTED_CLEAR
         else:
-            cn = _exp("cn")
+            cn = _exp("cn") or _exp("ev2c")
+            proven = {s for s in live_claimers if any(v.dead.get(t) == "wolf" for t in c.wolves.get(s, ()))} \
+                if _exp("ev2c") else set()
             for s in live_claimers:       # contested: at least one of them is lying
+                if s in proven and len(proven) < len(live_claimers):
+                    score[s] += TRUSTED_CLEAR          # named a seat that flipped wolf: the likelier true seer
+                    continue
                 score[s] += CONTESTED + (REACTIVE if s in c.reactive else 0.0)
                 for t in c.wolves.get(s, ()):
                     if not (cn and t in live_claimers):
@@ -538,6 +542,11 @@ class WerewolfPolicy:
         ally = self._doomed_ally(v, c, targets)
         if ally is not None:
             return ally, "the table follows the seer onto my ally: vote with it"
+        if (_exp("nosk") or _exp("nosk2")) and pool:
+            vs = self._scores(v, private=False, vill_view=True)
+            vp = self._top({s: x for s, x in vs.items() if s != v.me}, [t for t in targets if t != v.me])
+            if vp in v.allies and (_exp("nosk2") or (not v.votes and not c.order)):
+                return vp, "vote the table's default pick"
         sus = self.suspicion(v, exclude=set(v.allies))
         if _exp("wbayes") and pool and (v.votes or c.order):
             post = self.posterior(v, private=False)          # the village's view: vote where it is heading
@@ -641,8 +650,7 @@ class WerewolfPolicy:
         first = not self._topics
         out = []
         c = self.claims(v, private=True)
-        # With ARENA_WW_DM=on a wolf's first message of the day is the private kill plan (off by default: the
-        # spectate feed shows the sender and recipient of every DM, which names both wolves).
+        # With ARENA_WW_DM=on a wolf's first message of the day is the private kill plan (DMs are off by default).
         if v.role == "wolf" and dm_enabled() and "dm" not in self._topics:
             allies = [a for a in v.allies if a in v.alive]
             targets = [s for s in v.alive if s not in allies and s != v.me]
@@ -708,14 +716,20 @@ class WerewolfPolicy:
                 others = [s for s in v.alive if s != v.me]
                 ally = self._doomed_ally(v, c, others)
                 if ally is not None and c.trusted is not None and ally in c.wolves.get(c.trusted, ()):
-                    return "bus", {"content": f"Following the Seer (Player{c.trusted}): I vote Player{ally}. "
-                                              f"Everyone vote Player{ally} so we do not split.", "recipients": []}
+                    return "bus", self._follow_msg(v, c, ally)
             return None
         a = accusers[0]
         if _exp("denyw"):
             return "deny", self._deny(a)
         return "counter", {"content": f"I am the Seer. Player{a} is a WOLF and is lying about being Seer. Vote Player{a}.",
                            "recipients": []}
+
+    @staticmethod
+    def _follow_msg(v: View, c: Claims, t: int) -> dict:
+        txt = f"Following the Seer (Player{c.trusted}): I vote Player{t}."
+        if not (_exp("soft") and v.dead.get(c.trusted) != "seer"):
+            txt += f" Everyone vote Player{t} so we do not split."
+        return {"content": txt, "recipients": []}
 
     @staticmethod
     def _deny(a: int) -> dict:
@@ -734,8 +748,7 @@ class WerewolfPolicy:
                     return "deny", self._deny(f)
         known = c.trusted_wolves(v.alive)
         if known and c.trusted != v.me:
-            return "follow", {"content": f"Following the Seer (Player{c.trusted}): I vote Player{known[0]}. "
-                                         f"Everyone vote Player{known[0]} so we do not split.", "recipients": []}
+            return "follow", self._follow_msg(v, c, known[0])
         live = c.live(v)
         if c.trusted is None and len(live) >= 2 and v.role == "villager":
             others = [s for s in v.alive if s != v.me]
@@ -754,7 +767,11 @@ class WerewolfPolicy:
             sus = self.suspicion(v, exclude=set(self.seer_knowledge(v)[1]))
         else:
             sus = self.suspicion(v)
-        if pick is not None and ((sus.get(pick, 0) > 0 and not _exp("fab")) or (_exp("fab") and v.votes)):
+        if pick is not None and _exp("fab2") and not v.votes and sus.get(pick, 0) > 0:
+            return {"content": f"From today's talk, Player{pick} is my top suspect. "
+                               f"I'll vote Player{pick} unless someone has better info.", "recipients": []}
+        if pick is not None and ((sus.get(pick, 0) > 0 and not _exp("fab") and not _exp("fab2"))
+                                 or (_exp("fab") and v.votes) or (_exp("fab2") and v.votes and sus.get(pick, 0) > 0)):
             return {"content": f"My read from the vote record: Player{pick} is most suspicious. "
                                f"I'll vote Player{pick} unless someone has better info.", "recipients": []}
         if pick is not None:
@@ -771,7 +788,9 @@ _SELF_WOLF = re.compile(r"(?i)\b(?:i am|i'm|im|we are|we're|us)\s+(?:a\s+|the\s+
                         r"\bally\b|\ballies\b|\btonight\b|\bkill")
 _SEER_CLAIM_OUT = re.compile(r"(?i)\b(?:i am|i'm|im)\s+(?:the\s+)?(?:real\s+|true\s+)?seer\b")
 _RESULT_OUT = re.compile(r"(?i)player\d+\s+is\s+(?:a\s+)?(?:wolf|clear|villager)")
-_BUS_OUT = re.compile(r"Following the Seer \(Player\d\): I vote Player\d\. Everyone vote Player\d so we do not split\.")
+_BUS_OUT = re.compile(r"Following the Seer \(Player\d\): I vote Player\d\.(?: Everyone vote Player\d so we do not split\.)?")
+_OPEN_OUT = re.compile(r"No hard info yet\. To avoid a split vote I'll vote Player\d unless the Seer speaks up\. "
+                       r"Please don't abstain\.")
 _WORD_CAP = 50
 _CHAR_CAP = 1024        # MESSAGE_TOO_LONG over 1024 characters (werewolf.md §8); counted in UTF-8 bytes, which is
 #                         never fewer than the characters or UTF-16 units the server might count
@@ -796,6 +815,7 @@ def chat_guard(msg, v: View, topic: str):
             return None
         mentioned = {int(x) for x in re.findall(r"(?i)player(\d+)", text)}
         bus = topic == "bus" and _BUS_OUT.fullmatch(text)       # following the seer onto a doomed ally, villager words
+        bus = bus or (topic == "open" and (_exp("nosk") or _exp("nosk2")) and _OPEN_OUT.fullmatch(text))
         if (mentioned & set(v.allies) and not bus) or re.search(rf"(?i)player{v.me}\s+is\s+(?:a\s+)?wolf", text):
             return None
         if _SEER_CLAIM_OUT.search(text) and topic != "counter":
