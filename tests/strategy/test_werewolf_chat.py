@@ -197,8 +197,9 @@ def test_chat_guard(role, text, rec, topic, ok):
 
 
 def test_no_leaks_over_many_local_games():
-    """Our seats in full and mixed tables: wolves never name their ally or themselves as wolf in public, never
-    claim seer unless accused; villagers never claim seer; private messages only between living wolves."""
+    """Our seats in full and mixed tables: wolves never name themselves as wolf in public, name their ally only in a
+    villager's own words for voting it (v4.3: an ally the table votes out anyway), never claim seer unless accused;
+    villagers never claim seer; private messages only between living wolves."""
     random.seed(0)
     checked = 0
     for g in range(60):
@@ -221,7 +222,7 @@ def test_no_leaks_over_many_local_games():
                 continue
             if game.roles[s] == "wolf":
                 ally = [w for w in wolves if w != s][0]
-                assert f"Player{ally}" not in text
+                assert f"Player{ally}" not in text or P._BUS_OUT.fullmatch(text)
                 assert f"Player{s} is a" not in text
             if game.roles[s] == "villager":
                 assert "I am the Seer" not in text

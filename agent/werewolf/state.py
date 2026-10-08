@@ -717,7 +717,6 @@ class View:
     messages: list[dict] = field(default_factory=list)
     names: dict[int, str] = field(default_factory=dict)          # seat -> display name
     evidence: RoleEvidence | None = None                         # what role / allies were resolved from
-    dead_day: dict[int, int] = field(default_factory=dict)       # seat -> the day of its death (when the record says)
 
     @property
     def others_alive(self) -> list[int]:
@@ -798,7 +797,7 @@ def parse(st: dict, messages: list[dict] | None = None) -> View:
 
     alive = sorted({s for s in (seat(n) for n in gs.get("alive") or [] if isinstance(gs.get("alive"), list))
                     if s is not None})
-    dead, cause, dday = {}, {}, {}
+    dead, cause = {}, {}
     for d in gs.get("dead") or [] if isinstance(gs.get("dead"), list) else []:
         if not isinstance(d, dict):
             continue
@@ -806,8 +805,6 @@ def parse(st: dict, messages: list[dict] | None = None) -> View:
         if s is not None:
             dead[s] = d.get("role", "?")
             cause[s] = norm_cause(d.get("cause"))
-            if isinstance(d.get("day"), int) and not isinstance(d.get("day"), bool):
-                dday[s] = d["day"]
     # The observation carries the same public record by seat label: use it when the structured block is missing
     # or its names do not map to seats.
     if not alive:
@@ -818,7 +815,6 @@ def parse(st: dict, messages: list[dict] | None = None) -> View:
         for _day, s, r, c in DEAD_LINE_RE.findall(obs):
             dead[int(s)] = "wolf" if r.lower() == "werewolf" else r.lower()
             cause[int(s)] = norm_cause(c)
-            dday[int(s)] = int(_day)
 
     votes = []
     for vh in gs.get("vote_history") or [] if isinstance(gs.get("vote_history"), list) else []:
@@ -855,5 +851,4 @@ def parse(st: dict, messages: list[dict] | None = None) -> View:
     return View(
         me=me, role=role, day=day, sub_phase=sub, alive=alive, dead=dead, dead_cause=cause, allies=allies,
         investigations=invest, votes=votes, messages=msgs, names={p: n for n, p in name2seat.items()}, evidence=ev,
-        dead_day=dday,
     )

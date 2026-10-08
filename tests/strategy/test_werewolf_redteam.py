@@ -84,16 +84,30 @@ def test_seer_never_votes_a_seat_it_cleared_for_a_fake_claim():
     assert pol.act(st)["action_id"] != "6"
 
 
-def test_seer_votes_its_checked_wolf_the_table_is_on_over_a_deduced_one():
+def test_seer_votes_the_sure_wolf_the_table_is_on():
     """chaos3 seed 2407 game 125: on stall 2 the seer voted a deduced wolf while the table voted its checked wolf; the
-    tie gave the wolves the game. A checked wolf comes first; among sure wolves, the one the table pushes."""
+    tie gave the wolves the game. Among sure wolves (checked or deduced), the one the table pushes."""
     # Living: 1, 3 (me), 4, 6. Dead: 0, 2, 5 villagers. Checked: 6 villager, 4 wolf; 1 is deduced (2 wolves left).
     st = state(SEER, "day_vote", [1, 4, 6], me=3, day=3, alive=[1, 3, 4, 6],
                dead=[(0, "villager", "night_kill", 2), (2, "villager", "vote", 1), (5, "villager", "night_kill", 3)],
                msgs=[(6, "I vote Player4."), (1, "vote Player4")])
-    v = parse(st)
-    assert set(WerewolfPolicy.seer_wolves(v)) == {1, 4} and WerewolfPolicy.seer_wolves(v)[0] == 4
+    assert WerewolfPolicy.seer_knowledge(parse(st))[0] == [1, 4]
     assert WerewolfPolicy().act(st)["action_id"] == "4"
+
+
+def test_seer_and_the_villagers_following_it_vote_the_same_sure_wolf():
+    """Without table pressure the seer votes the lowest of its sure wolves, the one it names first ("Everyone vote
+    PlayerN") and the one villagers following its claim pick: a checked-first order split those votes (llmq k=5, 3 of
+    1000 games lost, 10-08)."""
+    st = state(SEER, "day_vote", [1, 4, 6], me=3, day=3, alive=[1, 3, 4, 6],
+               dead=[(0, "villager", "night_kill", 2), (2, "villager", "vote", 1), (5, "villager", "night_kill", 3)])
+    assert WerewolfPolicy().act(st)["action_id"] == "1"
+    claim = WerewolfPolicy().chat(st | {"phase": "messaging"})[0]["content"]
+    assert claim.startswith("I am the Seer. Player1 is a WOLF. Player4 is a WOLF.") and "Everyone vote Player1" in claim
+    follower = state("Your role: VILLAGER", "day_vote", [1, 3, 4], me=6, day=3, alive=[1, 3, 4, 6],
+                     dead=[(0, "villager", "night_kill", 2), (2, "villager", "vote", 1),
+                           (5, "villager", "night_kill", 3)], msgs=[(3, claim)])
+    assert WerewolfPolicy().act(follower)["action_id"] == "1"
 
 
 def test_villager_joins_the_table_on_the_other_sure_wolf():
@@ -104,4 +118,84 @@ def test_villager_joins_the_table_on_the_other_sure_wolf():
                dead=[(2, "seer", "night_kill", 2), (6, "villager", "vote", 1)],
                msgs=[(2, "I am the Seer. Player1 is a WOLF.", 1), (5, "I am the real Seer. Player2 is lying.", 1),
                      (0, "Player5 lied about being seer. Vote Player5.", 2), (4, "vote Player5", 2)])
+    assert WerewolfPolicy().act(st)["action_id"] == "5"
+
+
+# ---------------------------------------------------------------- the wolf's tells (detective, talker, chaos)
+WOLF = "Your role: WOLF\nYour fellow wolves: Player5"
+
+
+def test_wolf_follows_a_trusted_claim_onto_its_doomed_ally_like_a_villager():
+    """detective / talker: our wolf never voted or followed a seer claim naming its partner (0 of 160), our villagers
+    almost always did (772 of 782): the partner's flip then exposed our wolf. Now it votes the ally the table will
+    vote out anyway and says so in the villagers' own words."""
+    st = state(WOLF, "day_vote", [0, 1, 2, 4, 5, 6], me=3, msgs=[(1, "I am the Seer. Player5 is a wolf.")])
+    assert WerewolfPolicy().act(st)["action_id"] == "5"
+    chat = WerewolfPolicy().chat(st | {"phase": "messaging"})
+    assert [m["content"] for m in chat] == [
+        "Following the Seer (Player1): I vote Player5. Everyone vote Player5 so we do not split."]
+    villager = state("Your role: VILLAGER", "day_vote", [0, 1, 2, 4, 5, 6], me=3,
+                     msgs=[(1, "I am the Seer. Player5 is a wolf.")])
+    assert WerewolfPolicy().chat(villager | {"phase": "messaging"}) == chat       # word for word
+
+
+def test_wolf_named_with_its_ally_still_counter_claims_and_votes_the_claimer():
+    claim = (1, "I am the Seer. Player5 is a wolf. Player3 is a wolf.")
+    st = state(WOLF, "day_vote", [0, 1, 2, 4, 5, 6], me=3, msgs=[claim])
+    chat = WerewolfPolicy().chat(st | {"phase": "messaging"})
+    assert [m["content"] for m in chat] == ["I am the Seer. Player1 is a WOLF and is lying about being Seer. Vote Player1."]
+    st = state(WOLF, "day_vote", [0, 1, 2, 4, 5, 6], me=3, msgs=[claim, (3, chat[0]["content"])])
+    assert WerewolfPolicy().act(st)["action_id"] == "1"
+
+
+def test_wolf_votes_an_ally_exposed_as_a_fake_seer_or_pressed_by_the_table():
+    exposed = state(WOLF, "day_vote", [0, 1, 4, 5, 6], me=3, day=2, alive=[0, 1, 3, 4, 5, 6],
+                    dead=[(2, "villager", "night_kill", 2)],
+                    msgs=[(5, "I am the Seer. Player2 is a wolf.", 1)])
+    assert WerewolfPolicy().act(exposed)["action_id"] == "5"
+    pressed = state(WOLF, "day_vote", [0, 1, 2, 4, 5, 6], me=3,
+                    msgs=[(0, "Player5 is a wolf, vote Player5."), (1, "vote Player5"), (6, "Player5 is sus")])
+    assert WerewolfPolicy().act(pressed)["action_id"] == "5"
+    two = state(WOLF, "day_vote", [0, 1, 2, 4, 5, 6], me=3, msgs=[(0, "vote Player5"), (1, "Player5 is sus")])
+    assert WerewolfPolicy().act(two)["action_id"] != "5"             # two seats are not the whole table
+
+
+@pytest.mark.parametrize("role", ["WOLF\nYour fellow wolves: Player5", "VILLAGER", "SEER\nYour investigations: none yet"])
+def test_day_one_opening_never_cites_a_vote_record_that_does_not_exist(role):
+    """detective: on day 1 our wolves wrote "My read from the vote record" (430 times, villagers and seer 0) whenever
+    the table's chat gave them a suspect: a role tell before any vote exists."""
+    st = state(f"Your role: {role}", "day_vote", [], me=3, phase="messaging",
+               msgs=[(0, "Player2 is acting sus, vote Player2"), (1, "Player2 seems off")])
+    chat = WerewolfPolicy().chat(st)
+    assert len(chat) == 1 and chat[0]["content"].startswith("No hard info yet. To avoid a split vote I'll vote Player")
+    later = state(f"Your role: {role}", "day_vote", [], me=3, day=2, phase="messaging", alive=[0, 1, 2, 3, 5, 6],
+                  dead=[(4, "villager", "vote", 1)], votes=[(1, {0: 4, 1: 4, 2: 4, 3: 4, 5: 2, 6: 2}, 4)])
+    assert WerewolfPolicy().chat(later)[0]["content"].startswith("My read from the vote record: Player")
+
+
+# ---------------------------------------------------------------- frames and claim fights (wolfpack, talker, chaos)
+def test_a_framed_villager_says_the_claimer_lies_and_votes_it():
+    """wolfpack: a fake seer named our villager; it voted the claimer (108 of 108) but never said a word (1007 of 1007
+    framed days) and was voted out 56% of those days."""
+    st = state("Your role: VILLAGER", "day_vote", [0, 1, 2, 4, 5, 6], me=3, msgs=[(1, "I am the Seer. Player3 is a wolf.")])
+    assert WerewolfPolicy().act(st)["action_id"] == "1"
+    chat = WerewolfPolicy().chat(st | {"phase": "messaging"})
+    assert [m["content"] for m in chat] == ["Player1 is lying: I am not a wolf, so Player1 is a fake Seer. Vote Player1."]
+
+
+def test_a_claimant_calling_the_other_a_wolf_is_not_evidence():
+    """chaos2 / talker: when a true seer named a wolf, the OTHER wolf claimed seer at once and called the true seer a
+    wolf; we voted the claimant the other one accused (the true seer) every time. Neither claimed reactively here, so
+    the tie goes to the lower seat, whoever accused whom."""
+    for a, b in ((1, 5), (5, 1)):
+        st = state("Your role: VILLAGER", "day_vote", [0, 1, 2, 4, 5, 6], me=3,
+                   msgs=[(a, "I am the Seer. Player2 is a wolf."), (b, f"I am the Seer. Player{a} is a wolf.")])
+        assert WerewolfPolicy().act(st)["action_id"] == "1"
+
+
+def test_a_claimant_whose_named_wolf_flipped_wolf_is_believed_over_the_other():
+    """Two live claimants; the wolf one of them named was voted out and revealed a wolf: vote the other one."""
+    st = state("Your role: VILLAGER", "day_vote", [0, 1, 4, 5, 6], me=3, day=2, alive=[0, 1, 3, 4, 5, 6],
+               dead=[(2, "wolf", "vote", 1)], votes=[(1, {0: 2, 1: 2, 2: 1, 3: 2, 4: 2, 5: 1, 6: 2}, 2)],
+               msgs=[(1, "I am the Seer. Player2 is a wolf.", 1), (5, "I am the Seer. Player1 is a wolf.", 1)])
     assert WerewolfPolicy().act(st)["action_id"] == "5"
