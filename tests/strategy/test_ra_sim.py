@@ -728,17 +728,19 @@ def test_fake_platform_red_alert_match_against_a_rusher_over_mcp(tmp_path, monke
                                                            game_type="red_alert", agent_spec="agent.agent:create_agent",
                                                            execution_id="exec-R-" + "q" * 40))
         assert code == 0
-        # The platform closes the match after the world thread stops (up to 5 s) and writes its stats every 0.5 s:
-        # allow for a busy machine (10 s was once not enough during a full pytest next to other heavy jobs).
+        # The stats count the match as done once the server is terminal, but the match thread writes its final
+        # numbers (military, opponent_military) only after the world thread stopped (up to 5 s later): wait for
+        # those, not for matches_done (stats are written every 0.5 s; allow for a busy machine).
         deadline = time.monotonic() + 40
         st = {}
         while time.monotonic() < deadline:
             st = json.loads(stats.read_text()) if stats.exists() else {}
-            if (st.get("totals") or {}).get("matches_done"):
+            ra = next((m for m in st.get("matches") or [] if m.get("game_type") == "red_alert"), None)
+            if ra is not None and ra.get("terminal") and "opponent_military" in ra:
                 break
             time.sleep(0.3)
-        assert (st.get("totals") or {}).get("matches_done"), f"the fake platform never closed the match: {st}"
-        ra = next(m for m in st["matches"] if m["game_type"] == "red_alert")
+        assert ra is not None and ra.get("terminal") and "opponent_military" in ra, \
+            f"the fake platform never closed the match: {st}"
         if bot == "off":
             assert ra["terminal"] and ra["reason"] == "victory" and ra["win"] is False and not ra["opponent_error"]
             assert ra["batches"] == 0 and ra["opponent_military"]["kills_cost"] >= 2000
