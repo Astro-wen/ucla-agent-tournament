@@ -187,7 +187,7 @@ def parse_timer(raw) -> dict | None:
 
 def parse_clock(raw) -> dict | None:
     """The platform's live countdown of a decision, `observation.clock` (see the module docstring): {"decision": s,
-    "bank": s}, either None when not given, or None when there is no usable clock (missing, malformed). Never raises."""
+    "bank": s} (None for a field it lacks), or None without a usable clock (missing, malformed). Never raises."""
     try:
         obs = raw.get("observation") if isinstance(raw, dict) else None
         clk = obs.get("clock") if isinstance(obs, dict) else None
