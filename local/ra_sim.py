@@ -182,6 +182,7 @@ class Player:
         self.mil = {"kills_cost": 0, "deaths_cost": 0, "assets_value": 0, "army_value": 0, "units_killed": 0,
                     "units_lost": 0, "buildings_killed": 0, "buildings_lost": 0}
         self.explored = bytearray(w * h)
+        self.explored_count = 0            # explored cells inside map.bounds
         self.visible: set[int] = set()
         self.spotted: set[int] = set()
         self.defeated = False
@@ -851,6 +852,8 @@ class World:
             cx, cy = a.cell()
             if not self._fits(cx - 1, cy - 1, *self.rules.footprint("fact")):
                 return "no room to deploy here"
+            if a.order is not None and a.order["kind"] == "deploy" and a.deploy_tick is not None:
+                return None                        # already unfolding: a repeated deploy changes nothing
             a.order, a.oq = {"kind": "deploy", "to": None, "target": None}, []
             a.deploy_tick = self.tick + DEPLOY_TICKS
             return None
@@ -909,12 +912,22 @@ class World:
         self._check_victory()
 
     def _buckets(self) -> list[dict]:
+        """Each side's live actors by BUCKET x BUCKET square, and (self._reach) the squares within REACH of them:
+        an actor whose square is outside the other side's reach has nothing of it within 2 * BUCKET - 4 cells."""
         out = [{}, {}]
         for a in self.actors.values():
             if a.wreck:
                 continue
             cx, cy = a.center()
             out[a.owner].setdefault((int(cx) // BUCKET, int(cy) // BUCKET), []).append(a)
+        self._reach = []
+        for b in out:
+            s = set()
+            for bx, by in b:
+                for dy in (-2, -1, 0, 1, 2):
+                    for dx in (-2, -1, 0, 1, 2):
+                        s.add((bx + dx, by + dy))
+            self._reach.append(s)
         return out
 
     def _near(self, bucket: dict, x: float, y: float, r: float):
@@ -1097,6 +1110,8 @@ class World:
         enemy = buckets[1 - a.owner]
         vis = self.players[a.owner].visible
         cx, cy = a.center()
+        if radius <= 2 * BUCKET - 4 and (int(cx) // BUCKET, int(cy) // BUCKET) not in self._reach[1 - a.owner]:
+            return None
         best, bd = None, None
         for t in self._near(enemy, cx, cy, radius):
             if t.id not in vis or not self._auto_ok(a, t, structures):
@@ -1261,11 +1276,14 @@ class World:
         for p in self.players:
             seat = p.seat
             mine = buckets[seat]
+            reach = self._reach[seat]
             vis = set()
             for e in self.actors.values():
                 if e.owner == seat:
                     continue
                 ex, ey = e.center()
+                if (int(ex) // BUCKET, int(ey) // BUCKET) not in reach:
+                    continue                           # no actor of ours within 12 cells (sight is at most 10)
                 for a in self._near(mine, ex, ey, 10.5):
                     ax, ay = a.center()
                     if e.dist_from(ax, ay) <= a.sight:
@@ -1295,22 +1313,20 @@ class World:
             r2 = a.sight * a.sight
             for dy in range(-r, r + 1):
                 y = key[1] + dy
-                if not 0 <= y < self.height:
+                if not self.by0 <= y <= self.by1:
                     continue
                 for dx in range(-r, r + 1):
                     x = key[0] + dx
-                    if 0 <= x < w and dx * dx + dy * dy <= r2:
+                    if self.bx0 <= x <= self.bx1 and dx * dx + dy * dy <= r2 and not p.explored[y * w + x]:
                         p.explored[y * w + x] = 1
+                        p.explored_count += 1
 
     def explored_percent(self, seat: int) -> float:
         p = self.players[seat]
-        w = self.width
-        tot = seen = 0
-        for y in range(self.by0, self.by1 + 1):
-            row = p.explored[y * w + self.bx0: y * w + self.bx1 + 1]
-            seen += sum(row)
-            tot += len(row)
-        return round(100.0 * seen / max(1, tot), 1)
+        if self.explored_map:
+            return 100.0
+        tot = (self.bx1 - self.bx0 + 1) * (self.by1 - self.by0 + 1)
+        return round(100.0 * p.explored_count / max(1, tot), 1)
 
     # ---- stats / victory -------------------------------------------------------------------------------------------
     def _update_stats(self) -> None:

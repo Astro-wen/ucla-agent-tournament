@@ -172,6 +172,8 @@ class Rules:
         self.buildings.setdefault("fact", dict(FACT))
         self.maps: dict[str, dict] = dict(rules.get("maps") or {})
         self.prereqs = {k: _prereq_groups(v.get("prerequisites")) for k, v in {**self.buildings, **self.units}.items()}
+        self._weapon: dict[str, tuple | None] = {}
+        self._fight: dict[str, bool] = {}
 
     # ---- items ----
     def item(self, name: str) -> dict | None:
@@ -228,6 +230,11 @@ class Rules:
     def weapon(self, name: str) -> tuple | None:
         """(range, damage, period ticks, versus, only) of the actor's ground weapon, or None if it has none."""
         n = (name or "").lower()
+        if n not in self._weapon:
+            self._weapon[n] = self._weapon_of(n)
+        return self._weapon[n]
+
+    def _weapon_of(self, n: str) -> tuple | None:
         if n in GROUND_WEAPON:
             wname = GROUND_WEAPON[n]
         else:
@@ -249,7 +256,10 @@ class Rules:
 
     def can_fight(self, name: str) -> bool:
         n = (name or "").lower()
-        return n not in NON_COMBAT and self.queue(n) != SHIP_QUEUE and self.weapon(n) is not None
+        out = self._fight.get(n)
+        if out is None:
+            out = self._fight[n] = n not in NON_COMBAT and self.queue(n) != SHIP_QUEUE and self.weapon(n) is not None
+        return out
 
     def husk(self, name: str) -> bool:
         return (name or "").lower() in HUSKS
