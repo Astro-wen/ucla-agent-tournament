@@ -129,7 +129,7 @@ Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）；一�
 ## 一次性准备（A. 自托管，git checkout）
 
 ```bash
-git clone https://github.com/Astro-wen/ucla-agent-tournament.git && cd ucla-agent-tournament
+git clone <参赛仓库的地址> arena-agent && cd arena-agent   # 参赛的那个仓库；方案 C 时是单独的公开仓库，不是私有的开发仓库
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.lock      # 锁定版本的 29 个运行依赖；开发机再 pip install -e ".[dev]"（-e 可编辑安装，不要去掉 -e）
 (cd agent/js && npm ci --omit=dev)              # 计算器的 node_modules，按 package-lock.json 精确安装
