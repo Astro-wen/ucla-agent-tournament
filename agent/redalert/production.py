@@ -8,6 +8,7 @@ from .world import is_infantry
 
 MAIN_TANKS = ("3tnk", "2tnk", "1tnk")
 LIGHT_TANK = "1tnk"
+STRANDED_INFANTRY = 60          # infantry cap once no building can be added (stranded)
 AIR_TYPES = frozenset({"heli", "mh60", "yak", "mig", "hind"})
 
 
@@ -15,13 +16,68 @@ class Production:
     def __init__(self, pol):
         self.pol = pol
 
+    @staticmethod
+    def stranded(v) -> bool:
+        """Our construction yard is gone and no MCV can come back (none left, none buildable: that needs a war factory
+        and a service depot): no building can ever be added, so the money goes into units."""
+        return v.fact is None and v.count("mcv") == 0 and "mcv" not in v.avail and bool(v.buildings)
+
     def _pending(self, v, queue: str) -> bool:
         led, rules = self.pol.ledger, v.st.rules
         return any(k[0] == "train" and rules.queue(k[1]) == queue and led.is_pending(k) for k in list(led.pending))
 
     def step(self, v, out: list[Cand]) -> None:
-        self._vehicles(v, out)
+        if self.pol.econ.emergency:
+            self._harvester_first(v, out)
+        else:
+            self._vehicles(v, out)
         self._infantry(v, out)
+
+    # ---- every harvester lost (economy.harv_emergency): a harvester first, paid by refunds and sales ----
+    def _harvester_first(self, v, out) -> None:
+        """No income until a harvester is rebuilt: queue one (or a refinery, which comes with one, when no war
+        factory can build it), cancel what stands before it in its queue and the other in-progress buildings for
+        their refund (production is paid as it progresses, so they would eat every credit first), and when the money
+        is still short sell a spare building."""
+        econ = self.pol.econ
+        rules = v.st.rules
+        led = self.pol.ledger
+        src = "harv" if "harv" in v.avail else ("proc" if "proc" in v.avail else None)
+        if src is None:
+            return
+        queue = rules.queue(src)
+        items = v.queue_items(queue)
+        first = next((k for k, it in enumerate(items) if it["item"] == src), None)
+        refund = 0                                     # (cancels already sent count too: their refund is coming)
+        ahead = items if first is None else items[:first]
+        for it in ahead:
+            if it["item"] != src and not it["ready"]:
+                if not led.is_pending(("cancel", it["item"])):
+                    out.append(Cand({"cmd": "cancel", "item": it["item"]}, key=("cancel", it["item"]), urgent=True))
+                refund += int(rules.cost(it["item"]) * it["progress"])
+        if first is None and not led.is_pending(("train" if src == "harv" else "build", src)):
+            if src == "harv":
+                out.append(Cand({"cmd": "train", "item": "harv", "count": 1}, key=("train", "harv"), urgent=True,
+                                base=v.in_prod.get("harv", 0)))
+            else:
+                out.append(Cand({"cmd": "build", "item": "proc"}, key=("build", "proc"), urgent=True,
+                                base=v.in_prod.get("proc", 0)))
+        need = rules.cost(src) * (1.0 - (items[first]["progress"] if first is not None else 0.0))
+        have = v.money + refund
+        if have >= need:
+            return
+        # the other queues' in-progress items (not a power plant, not one ready to place)
+        for q in ("Building", "Defense", "Vehicle"):
+            if q == queue:
+                continue
+            for it in v.queue_items(q)[:1]:
+                if it["ready"] or it["item"] in ("powr", "apwr") or it["progress"] <= 0.0:
+                    continue
+                if not led.is_pending(("cancel", it["item"])):
+                    out.append(Cand({"cmd": "cancel", "item": it["item"]}, key=("cancel", it["item"]), urgent=True))
+                have += int(rules.cost(it["item"]) * it["progress"])
+        if have < need and v.money < 50:
+            econ.sell_spare(v, out, need - have)         # (only once the harvester stalls for want of money)
 
     # ---- infantry ----
     def _infantry(self, v, out) -> None:
@@ -33,6 +89,8 @@ class Production:
         rules = v.st.rules
         army = self.pol.army
         p = self.pol.p
+        if self.pol.econ.emergency and not army.threatened:
+            return                                     # every credit goes to the new harvester
         alive = [u for u in v.units if is_infantry(u["type"], rules) and u["type"] not in ("medi", "mech", "e6", "spy")]
         queued = sum(1 for it in items)
         n = len(alive) + queued
@@ -57,9 +115,15 @@ class Production:
             if army.scout_lost_early and v.game_s < 240:
                 target = max(target, int(p.early_infantry))
             idle_money = n >= (5 if soviet else 4) and not army.defense_first(v)
+        stranded = not late and self.stranded(v)
+        if stranded:
+            # no yard and no MCV to come: money can only become units (the tiebreak's assets count units and
+            # buildings, never cash), and an army that keeps training never sits idle
+            target, idle_money = max(target, STRANDED_INFANTRY), False
         if n >= target:
             return
-        if not threatened and not late and v.have.get("weap") and v.game_s >= 240:
+        if not threatened and not late and v.have.get("weap") and v.game_s >= 240 and \
+                not (stranded and v.money > 1500):
             # once tanks can be built, infantry stays a share of the army (more of it against an infantry army)
             inf_val = sum(rules.cost(u["type"]) for u in alive)
             veh_val = sum(rules.cost(u["type"]) for u in v.units if u["type"] in ("1tnk", "2tnk", "3tnk", "4tnk",
@@ -95,6 +159,8 @@ class Production:
         count = 1
         if threatened or late or inf_heavy:
             count = max(1, min(3, target - n, spend // max(1, cost)))
+        elif stranded:
+            count = max(1, min(5, target - n, spend // max(1, cost)))
         out.append(Cand({"cmd": "train", "item": item, "count": int(count)}, key=("train", item), urgent=threatened,
                         base=v.in_prod.get(item, 0)))
 
@@ -117,7 +183,8 @@ class Production:
                                                           army.enemy_army(v) > 0.8 * v.army_value)):
             reserve += 400                             # rifles (and towers) first against an infantry army
         spend = v.money - reserve
-        if items and spend < 2 * cost:
+        short_harv = item == "harv" and v.unit_count.get("harv", 0) < v.have.get("proc", 0)
+        if items and spend < 2 * cost and not short_harv:
             return                                     # a second item only when money is plentiful
         if spend < cost and not (item in ("harv", "mcv") and spend >= 0.5 * cost):
             return

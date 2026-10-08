@@ -33,6 +33,7 @@ EXC_WINDOW_S = 30.0
 SAFE_FOR_TICKS = 60 * 25       # ... switch to safe mode for 60 s
 RECORD_EVERY_TICKS = 250       # sparse recording: one state every 10 game seconds
 STATUS_EVERY_S = 30.0
+MAX_ARMY_SKIPS = 2             # slow frames in a row that may skip the army step
 
 
 class RedAlertPolicy:
@@ -55,6 +56,8 @@ class RedAlertPolicy:
         self.exc_kinds: dict[str, int] = {}
         self._exc_times: deque = deque()
         self.slow_frames = 0
+        self.army_skipped = 0
+        self._army_skips = 0
         self.ms: list[float] = []
         self.batches = 0
         self.orders_sent = 0
@@ -164,13 +167,20 @@ class RedAlertPolicy:
             elapsed = (self.clock() - t0) * 1000.0
             if elapsed > self.p.budget_ms:
                 self.slow_frames += 1
-                if self.slow_frames == 1:
+            if elapsed > self.p.budget_ms and self._army_skips < MAX_ARMY_SKIPS:
+                # a slow frame (wall time: the machine may be busy) skips the army step, but never more than
+                # MAX_ARMY_SKIPS views in a row: the step itself takes a few ms, and a starved CPU must not leave the
+                # army without orders for long
+                self._army_skips += 1
+                self.army_skipped += 1
+                if self.army_skipped == 1:
                     log.warning("[ra] slow frame (%.0f ms before the army step): army skipped this view", elapsed)
                 try:
                     self.army.refresh(v)
                 except Exception as e:                      # noqa: BLE001
                     self.note_exception("army.refresh", e)
             else:
+                self._army_skips = 0
                 try:
                     self.army.step(v, cands, allow)
                 except Exception as e:                      # noqa: BLE001
@@ -251,7 +261,8 @@ class RedAlertPolicy:
             "ms_max": round(ms[-1], 1) if ms else None, "exceptions": self.exceptions,
             "exception_kinds": dict(self.exc_kinds), "safe_mode": self.safe_entries, "slow_frames": self.slow_frames,
             "low_power_s": round(self.low_power_s, 1), "army": self.army.summary(),
-            "game_s": round(v.game_s, 1) if v else None,
+            "game_s": round(v.game_s, 1) if v else None, "harv_emergencies": self.econ.emergencies,
+            "sales": self.econ.sales, "power_cancels": self.econ.power_cancels, "army_skips": self.army_skipped,
         }
 
     def summary_text(self) -> str:
@@ -263,4 +274,5 @@ class RedAlertPolicy:
                 f"orders={s['orders']} rejected={rej} lost={s['lost']} invalid_action={s['invalid_action']} "
                 f"waits={s['waits']} noops={s['noops']} anchors={s['anchors']} ms_p50={s['ms_p50']} ms_p99={s['ms_p99']} "
                 f"exceptions={s['exceptions']} safe_mode={s['safe_mode']} low_power_s={s['low_power_s']} "
-                f"waves={s['army']['waves']}")
+                f"waves={s['army']['waves']} harv_emergencies={s['harv_emergencies']} sales={s['sales']} "
+                f"power_cancels={s['power_cancels']} hunt_seen={s['army']['hunt_seen']}")

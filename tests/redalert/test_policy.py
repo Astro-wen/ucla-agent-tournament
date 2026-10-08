@@ -326,6 +326,125 @@ def test_a_failing_module_is_contained_and_repeated_failures_switch_to_safe_mode
     assert sum(1 for r in caplog.records if "army failed" in r.getMessage()) == 1   # logged once per kind
 
 
+def kill_own(srv, seat, types):
+    w = srv.world
+    with srv.cv:
+        victims = [a for a in w.own(seat) if a.type in types]
+        for a in victims:
+            w._kill(a, None)
+    return len(victims)
+
+
+def test_every_harvester_lost_with_no_money_a_harvester_comes_first(monkeypatch):
+    # review 10-08: with all harvesters dead and the money gone, the tank and the war factory in progress ate every
+    # credit and the bot sat at zero income for the rest of the match. Now: cancel for the refund, sell a spare.
+    srv = server()
+    pol = RedAlertPolicy()
+    monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)     # no attack: the idle seat must live on
+    drive(srv, pol, 300)
+    p = srv.world.players[0]
+    assert kill_own(srv, 0, {"harv"}) >= 2
+    p.cash, p.ore = 0, 0
+    drive(srv, pol, 90)
+    assert pol.econ.emergencies == 1 and not pol.econ.emergency
+    assert any(a.type == "harv" for a in srv.world.own(0)), "no harvester rebuilt within 90 s"
+    assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+
+
+def test_low_power_cancels_a_slow_building_in_progress_for_a_power_plant():
+    srv = server()
+    pol = RedAlertPolicy()
+    w = srv.world
+    for _ in range(400):                               # until something slow is in the Building queue
+        drive(srv, pol, 1)
+        q = w.players[0].queues["Building"]
+        if q and q[0].name in ("proc", "weap", "fix") and not q[0].done and q[0].progress < 0.4:
+            break
+    item = w.players[0].queues["Building"][0].name
+    assert kill_own(srv, 0, {"powr", "apwr"}) >= 1
+    log = []
+    drive(srv, pol, 3, record=log)
+    assert {"cmd": "cancel", "item": item} in [o for _sv, orders, _r in log for o in orders]
+    drive(srv, pol, 30)
+    assert any(a.type in ("powr", "apwr") for a in w.own(0)) and pol.econ.power_cancels == 1
+
+
+def test_repair_starts_and_stops_on_the_same_money():
+    srv = server()
+    pol = RedAlertPolicy()
+    drive(srv, pol, 180)
+    w = srv.world
+    b = next(a for a in w.own(0, units=False) if a.type == "powr")
+    b.hp = b.max_hp * 0.5
+    repairs = 0
+    for _ in range(150):                               # 30 s at cash 250 + ore 400 (start > 500, stop < 300)
+        w.players[0].cash, w.players[0].ore = 250, 400
+        st = srv.state(0)
+        orders, _ = pol.decide(st, CONFIG)
+        if orders:
+            repairs += sum(1 for o in orders if o["cmd"] == "repair" and o["building"] == b.id)
+            pol.on_result(srv.play_action(0, st["state_version"], {"type": "orders", "orders": copy.deepcopy(orders)}))
+        advance(srv)
+    assert repairs == 1
+
+
+def test_search_points_cover_every_reachable_cell_of_each_map():
+    from agent.redalert.world import COVER_STEP
+    for map_id in ("sidestep", "trapped", "shadowfiend-ii"):
+        srv = server(map_id)
+        st = Static(srv.state(0), CONFIG)
+        v = View(srv.state(0), st)
+        st.setup(v.base, v.enemy_hint)
+        pts = st.coverage()
+        reach = st._reachable(st.my_spawn)
+        assert pts and all(st.can_pass(*p) and st.in_bounds(p) for p in pts)
+        far = [k for k in reach if min((k % st.width - p[0]) ** 2 + (k // st.width - p[1]) ** 2 for p in pts)
+               > (COVER_STEP + 1) ** 2]
+        assert not far, f"{map_id}: {len(far)} reachable cells farther than {COVER_STEP + 1} from every point"
+
+
+def test_a_base_built_away_from_both_spawns_is_found():
+    # review 10-08, league seed 81 game 9: the hider unfolds its MCV in a corner; the HUNT that only cycled the sweep
+    # points never saw it in 15 minutes and lost the tiebreak 0 / 100 with 6x the assets.
+    from local.ra_platform import make_factory, play_match
+    seed = 81009
+    row = play_match(make_factory("ours")(seed * 2 + 1), make_factory("hider")(seed * 2 + 2), seed=seed,
+                     map_id="sidestep", a_seat=1, max_minutes=14)
+    assert row["a"]["error"] is None and row["a"]["buildings_killed"] >= 5, row["a"]
+
+
+def test_without_a_yard_or_an_mcv_to_come_the_money_goes_into_units(monkeypatch):
+    srv = server()
+    pol = RedAlertPolicy()
+    monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)     # no attack: the idle seat must live on
+    drive(srv, pol, 130)
+    w = srv.world
+    assert not any(a.type == "fix" for a in w.own(0))
+    kill_own(srv, 0, {"fact", "mcv"})
+    drive(srv, pol, 120)
+    v = pol.view
+    assert pol.prod.stranded(v)
+    inf = sum(1 for a in w.own(0, buildings=False) if a.type in ("e1", "e3", "e2"))
+    assert inf > int(pol.p.max_infantry), f"only {inf} infantry with {v.money} credits"
+
+
+def test_slow_frames_never_skip_the_army_step_more_than_twice_in_a_row(monkeypatch):
+    srv = server()
+    t = [0.0]
+
+    def clock():
+        t[0] += 0.06                                   # every reading 60 ms later: each frame is "slow"
+        return t[0]
+    pol = RedAlertPolicy(clock=clock)
+    calls = []
+    real = pol.army.step
+    monkeypatch.setattr(pol.army, "step", lambda *a, **k: (calls.append(1), real(*a, **k)))
+    for _ in range(9):
+        pol.decide(srv.state(0), CONFIG)
+        advance(srv)
+    assert len(calls) == 3 and pol.army_skipped == 6
+
+
 def test_params_from_the_environment():
     p = load_params({"ARENA_RA_ATTACK_MIN_VALUE": "5000", "ARENA_RA_THROTTLE_TICKS": "x", "ARENA_RA_RETREAT_RATIO": "nan"})
     assert p.attack_min_value == 5000 and p.throttle_ticks == 9 and p.retreat_ratio == 0.7

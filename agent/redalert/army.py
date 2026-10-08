@@ -10,6 +10,11 @@ from .world import AIR, GROUND_DEFENSES, NON_COMBAT, WALLS, dist, is_combat, is_
 
 PRODUCTION_TARGETS = frozenset({"weap", "tent", "barr", "hpad", "afld", "afld.ukraine", "spen", "syrd", "kenn"})
 TOWER_TYPES = frozenset({"pbox", "hbox", "gun", "ftur", "tsla"})
+# HUNT (no enemy building known): the sweep points, then a grid over the whole map (world.Static.coverage).
+SEEN_FROM_S = 120          # a search point counts as looked at once a unit of ours came within HUNT_SEE cells of it
+HUNT_SEE = 4               # (from 2:00, when even a base built away from the spawns stands)
+HUNT_GOAL_TICKS = 45 * 25  # a group heading this long to one point gives it up (unreachable, stuck)
+LEAD_TICKS = 90 * 25       # an enemy unit seen this recently (away from our base) is followed first
 
 
 def _centroid(pts):
@@ -54,6 +59,10 @@ class Army:
         self.engage_kills = 0
         self.hunt_i = 0
         self.hunt_tick = 0
+        self.hunt_seen: set[tuple[int, int]] = set()
+        self.hunt_goal: dict[int, tuple] = {}
+        self._seen_tick = -10 ** 9
+        self._search_cache: list | None = None
         self.nothing_since = None
         # what we know of the enemy
         self.enemy_units: dict[int, dict] = {}
@@ -369,6 +378,7 @@ class Army:
         self.refresh(v)
         self.assess(v)
         self.endgame(v)
+        self._mark_seen(v)
         self._defend(v, out, allow)
         if allow:
             self._scout_step(v, out)
@@ -504,6 +514,8 @@ class Army:
             return True
         if v.game_s >= p.attack_late_s and n_veh >= p.attack_late_units and main_val >= 2000 * self.fail_mult:
             return True
+        if self.pol.prod.stranded(v) and n >= 15 and main_val >= 1500 * self.fail_mult:
+            return True                                # no base to come back to: the army is all we can still use
         quiet = (v.tick - self.last_enemy_combat) / 25.0 >= p.quiet_s
         if v.game_s >= p.opportunistic_s and n_veh >= 3 and quiet and self.fail_mult <= 1.0:
             return True
@@ -759,26 +771,92 @@ class Army:
             self._send(out, v, ids, "attack", target=first["id"], min_gap=10, same_gap=100)
 
     def _hunt(self, v, out, ids, c) -> None:
-        st = v.st
+        """No enemy building known: follow the freshest enemy sighting (its units lead back to its base), else look
+        at the search points nobody of ours has been near yet, nearest first: the sweep points (around its spawn,
+        distant ore, quadrants), then the map-wide grid, edges and corners included. 8+ units split into 2 groups,
+        18+ into 3, each with its own point."""
         if v.enemy_blds or self.enemy_blds:
             self._go(v, "SIEGE")
             self._siege(v, out, ids, c)
             return
-        pts = st.sweep or [st.enemy_spawn]
-        target = pts[self.hunt_i % len(pts)]
-        upts = self._pts(ids, v)
-        near = sum(1 for p in upts if dist(p, target) <= 6)
-        if near >= 0.7 * len(upts) or v.tick - self.hunt_tick > 35 * 25:
-            self.hunt_i += 1
-            self.hunt_tick = v.tick
-            target = pts[self.hunt_i % len(pts)]
-        if len(ids) >= 8:
-            half = len(ids) // 2
-            other = pts[(self.hunt_i + 1) % len(pts)]
-            self._send(out, v, ids[:half], "attack_move", to=target, min_gap=25, same_gap=200)
-            self._send(out, v, ids[half:], "attack_move", to=other, min_gap=25, same_gap=200)
-        else:
-            self._send(out, v, ids, "attack_move", to=target, min_gap=25, same_gap=200)
+        k = 1 if len(ids) < 8 else (2 if len(ids) < 18 else 3)
+        size = (len(ids) + k - 1) // k
+        claimed: list = []
+        lead = self._lead(v)
+        for gi in range(k):
+            g = ids[gi * size:(gi + 1) * size]
+            if not g:
+                continue
+            gc = _centroid(self._pts(g, v)) or c
+            target = lead if (gi == 0 and lead is not None) else self._search_target(v, gi, gc, claimed)
+            claimed.append(target)
+            self._send(out, v, g, "attack_move", to=target, min_gap=25, same_gap=200)
+
+    def _search_points(self, v) -> list[tuple[int, int]]:
+        if self._search_cache is not None:
+            return self._search_cache
+        st = v.st
+        sweep = list(st.sweep) or [st.enemy_spawn]
+        try:
+            grid = st.coverage()
+        except Exception as e:                            # noqa: BLE001 - the sweep points alone still work
+            self.pol.note_exception("coverage", e)
+            return sweep
+        self._search_cache = sweep + [p for p in grid if all(dist(p, s) > 4 for s in sweep)]
+        return self._search_cache
+
+    def _mark_seen(self, v) -> None:
+        """Once a second (from SEEN_FROM_S): search points within HUNT_SEE cells of one of our units (or a little
+        more of one of our buildings) have been looked at."""
+        if v.tick - self._seen_tick < 25 or v.game_s < SEEN_FROM_S or not v.st.ready:
+            return
+        self._seen_tick = v.tick
+        todo = [p for p in self._search_points(v) if p not in self.hunt_seen]
+        if not todo:
+            return
+        units = [(u["x"], u["y"]) for u in v.units]
+        blds = [(b["x"], b["y"]) for b in v.buildings]
+        r_u, r_b = HUNT_SEE * HUNT_SEE, (HUNT_SEE + 3) * (HUNT_SEE + 3)
+        for p in todo:
+            if any((p[0] - x) ** 2 + (p[1] - y) ** 2 <= r_u for x, y in units) or \
+                    any((p[0] - x) ** 2 + (p[1] - y) ** 2 <= r_b for x, y in blds):
+                self.hunt_seen.add(p)
+
+    def _search_target(self, v, gi: int, gc, claimed: list) -> tuple[int, int]:
+        goal = self.hunt_goal.get(gi)
+        if goal is not None:
+            t, since = goal
+            if t not in self.hunt_seen and t not in claimed and v.tick - since <= HUNT_GOAL_TICKS:
+                return t
+            if t not in self.hunt_seen and v.tick - since > HUNT_GOAL_TICKS:
+                self.hunt_seen.add(t)                     # could not get there: count it as looked at
+        pts = self._search_points(v)
+        todo = [p for p in pts if p not in self.hunt_seen and p not in claimed]
+        if not todo:
+            self.hunt_seen.clear()                        # looked everywhere and found nothing: start over
+            todo = [p for p in pts if p not in claimed] or pts
+        sweep = set(v.st.sweep)
+        first = [p for p in todo if p in sweep] or todo
+        t = min(first, key=lambda p: (dist(p, gc), p))
+        self.hunt_goal[gi] = (t, v.tick)
+        return t
+
+    def _lead(self, v):
+        """The freshest enemy unit seen in the last LEAD_TICKS away from our base and from our attack group (a
+        harvester first: it drives back to its refinery), or None."""
+        base = v.base
+        mine = self._pts(sorted(self.main), v)
+        best = None
+        for e in self.enemy_units.values():
+            if v.tick - e["tick"] > LEAD_TICKS:
+                continue
+            p = (e["x"], e["y"])
+            if (base is not None and dist(p, base) < 20) or any(dist(p, m) <= 3 for m in mine):
+                continue
+            key = (e["type"] == "harv", e["tick"], -e["x"], -e["y"])
+            if best is None or key > best[0]:
+                best = (key, p)
+        return v.st.clamp(best[1]) if best is not None else None
 
     # ---- reinforcements -------------------------------------------------------------------------------------------
     def _reinf_step(self, v, out) -> None:
@@ -820,4 +898,4 @@ class Army:
 
     def summary(self) -> dict:
         return {"state": self.state, "waves": self.waves, "home": len(self.home), "main": len(self.main),
-                "reinf": len(self.reinf), "rush": self.rush, "mode": self.mode}
+                "reinf": len(self.reinf), "rush": self.rush, "mode": self.mode, "hunt_seen": len(self.hunt_seen)}
