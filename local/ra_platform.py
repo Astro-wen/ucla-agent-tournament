@@ -9,7 +9,7 @@ platform; nothing is recorded (ARENA_RECORD=0).
 
 Situations: --pacing windows (the operator's 5-second windows), --default-stance attack_anything (if the platform's
 agent seats turn out to be OpenRA bot players), --place-limit N (place is `invalid` after N buildings), --lost-rate,
---latency-ticks, --cash.
+--latency-ticks, --cash, --fault-rate (flaky connection: calls fail with HTTP 502 / 429 and the runner retries).
 
 Agents (--a / --b): idle | turtle | rusher | llm (local/ra_bots.py), ours (agent.agent:create_agent, the deployed
 contestant), or module:attr for any factory (called with no arguments; or with seed= when it accepts one). Side A
@@ -106,7 +106,7 @@ def play_match(agent_a, agent_b, *, seed: int, map_id: str, a_seat: int = 0, clo
                speed: float = 1.0, max_minutes: float = 20.0, starting_cash: int = 5000, latency_ticks: int = 0,
                lost_rate: float = 0.0, countries=None, rules: Rules | None = None, timeout_s: float | None = None,
                names=("A", "B"), idle_s: float = 600.0, pacing: str = "realtime", default_stance: str = "defend",
-               place_limit: int | None = None) -> dict:
+               place_limit: int | None = None, fault_rate: float = 0.0) -> dict:
     """One match: agent_a in seat `a_seat`, agent_b in the other. Returns the metrics row."""
     world = World(rules, map_id, seed, starting_cash=starting_cash, countries=countries,
                   default_stance=default_stance, place_limit=place_limit)
@@ -118,12 +118,13 @@ def play_match(agent_a, agent_b, *, seed: int, map_id: str, a_seat: int = 0, clo
                          max_minutes=max_minutes, latency_ticks=latency_ticks, lost_rate=lost_rate, idle_s=idle_s,
                          session_id=f"ra-sim-{seed}", pacing=pacing)
     errors: dict[int, str] = {}
+    sessions = [SeatSession(server, i, fault_rate=fault_rate) for i in (0, 1)]
 
     def seat_main(i):
         ctx = DecisionContext(session_id=server.session_id, tournament_id=None, game_type="red_alert",
                               agent_id=ids[i], seat_position=i)
         try:
-            run_game(SeatSession(server, i), ctx, seats[i], wait_seconds=0.05, sleep=lambda s: time.sleep(min(s, 0.2)))
+            run_game(sessions[i], ctx, seats[i], wait_seconds=0.05, sleep=lambda s: time.sleep(min(s, 0.2)))
         except BaseException as e:  # noqa: BLE001 - reported in the row
             errors[i] = f"{type(e).__name__}: {e}"[:300]
         finally:
@@ -144,10 +145,10 @@ def play_match(agent_a, agent_b, *, seed: int, map_id: str, a_seat: int = 0, clo
     server.stop()
     world_thread.join(5)
     wall = time.monotonic() - t0
-    return _row(server, world, seats, ids, a_seat, errors, hung, wall, map_id, seed)
+    return _row(server, world, seats, ids, a_seat, errors, hung, wall, map_id, seed, sessions)
 
 
-def _row(server, world, seats, ids, a_seat, errors, hung, wall, map_id, seed) -> dict:
+def _row(server, world, seats, ids, a_seat, errors, hung, wall, map_id, seed, sessions=None) -> dict:
     game_s = max(0, world.tick - server.start_tick) / TICKS_PER_SECOND if server.started_wall else 0.0
     if server.failure:
         res_a = "no_result"
@@ -178,6 +179,7 @@ def _row(server, world, seats, ids, a_seat, errors, hung, wall, map_id, seed) ->
                 if p.place_delays else 0.0,
                 "unplaced": sum(1 for q in ("Building", "Defense") if p.queues[q] and p.queues[q][0].done),
                 "views": st["views"], "error": errors.get(seat), "hung": seat in hung,
+                "faults": dict(sessions[seat].faults) if sessions else {},
                 "invalid_details": list(server.seats[seat].invalid_details),
                 "problems": server._problems(server.seats[seat])}
 
@@ -221,7 +223,8 @@ def _one(job: dict) -> dict:
                      clock=job["clock"], speed=job["speed"], max_minutes=job["max_minutes"],
                      starting_cash=job["cash"], latency_ticks=job["latency_ticks"], lost_rate=job["lost_rate"],
                      names=(job["a"].split(":")[-1], job["b"].split(":")[-1]), pacing=job["pacing"],
-                     default_stance=job["stance"], place_limit=job["place_limit"])
+                     default_stance=job["stance"], place_limit=job["place_limit"],
+                     fault_rate=job.get("fault_rate", 0.0))
     row["b_spec"] = job["b"]
     return row
 
@@ -249,6 +252,9 @@ def main(argv=None) -> None:
                                            "for a bot player; the platform's choice is not documented)")
     ap.add_argument("--place-limit", type=int, default=None,
                     help="test switch: every place after this many placed buildings per side is invalid (no room)")
+    ap.add_argument("--fault-rate", type=float, default=0.0,
+                    help="share of game calls that fail like a flaky connection (HTTP 502 / 429; a play_action "
+                         "before or after it was applied), which the runner rides out (SDK PR #7)")
     ap.add_argument("--jobs", type=int, default=1, help="games in parallel processes (default 1)")
     ap.add_argument("--json", type=Path, default=None, help="write all rows here")
     ap.add_argument("--quiet", action="store_true")
@@ -260,7 +266,8 @@ def main(argv=None) -> None:
     jobs = [{"a": a.a, "b": opponents[g % len(opponents)], "seed": a.seed * 1000 + g, "map": maps[g % len(maps)],
              "a_seat": 0 if a.no_swap else g % 2, "clock": a.clock, "speed": a.speed, "max_minutes": a.max_minutes,
              "cash": a.cash, "latency_ticks": a.latency_ticks, "lost_rate": a.lost_rate, "pacing": a.pacing,
-             "stance": a.default_stance, "place_limit": a.place_limit} for g in range(a.games)]
+             "stance": a.default_stance, "place_limit": a.place_limit, "fault_rate": a.fault_rate}
+            for g in range(a.games)]
     if a.jobs > 1:
         from concurrent.futures import ProcessPoolExecutor
         pool = ProcessPoolExecutor(max_workers=a.jobs)

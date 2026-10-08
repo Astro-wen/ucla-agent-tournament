@@ -650,12 +650,35 @@ class MatchServer:
 
 class SeatSession:
     """The MCPGameSession surface `altruagent.runner.run_game` uses, for one seat of a MatchServer: tool errors
-    come back as MCPToolError with the platform's error codes, like the real session."""
+    come back as MCPToolError with the platform's error codes, like the real session.
 
-    def __init__(self, server: MatchServer, seat: int):
+    `fault_rate` (test switch): that share of the calls fails like a flaky connection (SDK PR #7's temporary
+    failures, which the runner rides out by pausing, re-reading and deciding again, never resending). A read fails
+    with HTTP 502 before it is served. A play_action fails in one of three ways, chosen at random: HTTP 502 before
+    it reaches the game (nothing applied), HTTP 502 after the game applied it (the answer is lost), or HTTP 429
+    `rate_limited` after it was applied (a code, so the runner reports it to on_action_result). Counted in
+    `faults`."""
+
+    def __init__(self, server: MatchServer, seat: int, fault_rate: float = 0.0):
         self.server, self.seat = server, seat
         self.session_id = server.session_id
         self.game_server_url = "local-ra-sim"
+        self.fault_rate = float(fault_rate)
+        self.fault_rng = random.Random(f"fault:{server.world.seed}:{seat}")
+        self.faults = {"read": 0, "before": 0, "after": 0, "after_coded": 0}
+
+    def _flaky(self) -> bool:
+        return bool(self.fault_rate) and self.fault_rng.random() < self.fault_rate
+
+    @staticmethod
+    def _http(status: int, code=None) -> MCPToolError:
+        return MCPToolError(f"MCP tool request failed with HTTP {status} (simulated)", status_code=status,
+                            error_code=code)
+
+    def _read_fault(self) -> None:
+        if self._flaky():
+            self.faults["read"] += 1
+            raise self._http(502)
 
     @staticmethod
     def _raise(out: dict) -> dict:
@@ -666,10 +689,12 @@ class SeatSession:
         return out
 
     def get_state(self) -> GameState:
+        self._read_fault()
         return GameState.from_mcp_state(self._raise(self.server.get_game_state(self.seat)))
 
     def wait_for_update(self, *, since_version, since_message_seq=None, since_is_current_actor=None,
                         since_phase=None, timeout_seconds=None) -> GameState:
+        self._read_fault()
         return GameState.from_mcp_state(self._raise(self.server.wait_for_update(
             self.seat, since_version, since_is_current_actor, since_phase, timeout_seconds)))
 
@@ -680,7 +705,15 @@ class SeatSession:
         return self._raise(self.server.get_legal_actions(self.seat))
 
     def play_action(self, *, action_id=None, action=None, state_version, reasoning_summary=None) -> dict:
-        return self._raise(self.server.play_action(self.seat, state_version, action, action_id, reasoning_summary))
+        kind = self.fault_rng.choice(("before", "after", "after_coded")) if self._flaky() else None
+        if kind == "before":
+            self.faults[kind] += 1
+            raise self._http(502)
+        out = self._raise(self.server.play_action(self.seat, state_version, action, action_id, reasoning_summary))
+        if kind is not None:
+            self.faults[kind] += 1
+            raise self._http(502) if kind == "after" else self._http(429, "rate_limited")
+        return out
 
     def send_message(self, **_kw) -> dict:
         return self._raise(_err("RUNTIME_UNAVAILABLE", "Red Alert has no messaging"))

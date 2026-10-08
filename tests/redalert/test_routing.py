@@ -184,6 +184,17 @@ def test_our_agent_beats_the_idle_bot_on_the_simulator():
     assert a["low_power_s"] <= 5 and a["place_delay_max_s"] <= 1.0 and a["p99_ms"] < 30
 
 
+def test_our_agent_rides_out_a_flaky_connection_on_the_simulator():
+    # SDK PR #7: temporary failures (HTTP 502 before / after a batch was applied, 429 rate_limited after) are
+    # retried by the runner, which never resends; the bot keeps playing and never queues what may have landed twice.
+    row = play_match(make_factory("ours")(1), make_bot("rusher", 2), seed=33, map_id="trapped", max_minutes=4,
+                     fault_rate=0.05)
+    a = row["a"]
+    assert a["error"] is None and not a["hung"] and row["b"]["error"] is None
+    assert sum(a["faults"].values()) >= 10 and a["faults"]["after_coded"] >= 1
+    assert a["invalid_actions"] == 0 and a["rejected"] <= 0.05 * max(1, a["orders"])
+
+
 def test_our_agent_survives_windows_mode_on_the_simulator():
     row = play_match(make_factory("ours")(1), make_bot("rusher", 2), seed=32, map_id="sidestep", max_minutes=3,
                      pacing="windows")

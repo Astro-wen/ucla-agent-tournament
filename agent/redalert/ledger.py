@@ -14,9 +14,10 @@ BLOCK_AFTER = 3
 BLOCK_TICKS = 30 * 25
 FORGET_TICKS = 120 * 25
 _REFUSAL_ROW = re.compile(r"\[(\d+)\] ([a-z_]+): ([a-z_]+)(?: \(([^)]*)\))?")
-# Batch-level errors: nothing in the batch was applied.
+# Batch-level errors: nothing in the batch was applied. Any other code the runner reports comes from a temporary
+# failure it recovered from (SDK PR #7: a gateway / server error, a tool failure): the batch may have landed.
 NOTHING_APPLIED = ("NOT_YOUR_TURN", "STALE_STATE", "INVALID_ACTION", "RUNTIME_TEMPORARILY_UNAVAILABLE",
-                   "GAME_ALREADY_COMPLETE", "WRONG_PHASE")
+                   "GAME_ALREADY_COMPLETE", "WRONG_PHASE", "PLAYER_ELIMINATED")
 
 
 def order_key(order: dict) -> str:
@@ -47,6 +48,7 @@ class Ledger:
         self.seen_rows: dict = {}                     # (batch, index) of final rows already handled (ordered)
         self.invalid_actions = 0
         self.errors: dict[str, int] = {}
+        self.uncertain = 0                            # batches a temporary failure left unknown (may have landed)
         self.lost = 0
         self.rejected = 0
         self.tick = 0
@@ -106,8 +108,14 @@ class Ledger:
             self.errors[str(err)] = self.errors.get(str(err), 0) + 1
             if rec is None:
                 return
-            # Every batch-level error (NOTHING_APPLIED and any other code): nothing of the batch ran, so its pending
-            # entries and unit command times are dropped and the orders may go again at once.
+            if str(err) not in NOTHING_APPLIED:
+                # A temporary failure the runner recovered from without resending: the batch may have landed. Its
+                # pending entries and unit command times stay (the next states show what landed, and an entry that
+                # never shows up expires after PENDING_TICKS), so nothing is queued twice.
+                self.uncertain += 1
+                return
+            # A refusal of the whole batch (NOTHING_APPLIED): nothing of it ran, so its pending entries and unit
+            # command times are dropped and the orders may go again at once.
             for key in rec["keys"]:
                 if key is not None:
                     self.pending.pop(key, None)

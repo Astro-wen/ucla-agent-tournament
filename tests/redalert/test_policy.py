@@ -235,6 +235,22 @@ def test_batch_errors_drop_the_pending_entries_and_lost_verdicts_are_resent():
     assert not led.is_pending(("build", "proc")) and led.lost == 1     # counted once (problems row deduped)
 
 
+def test_a_temporary_failure_keeps_the_pending_entries_since_the_batch_may_have_landed():
+    # SDK PR #7: after a temporary failure of play_action (a 5xx, a tool failure) the runner reports the code, never
+    # resends and asks again from a fresh state; the batch may have landed, so nothing of it is queued again at once.
+    led = Ledger()
+    led.tick = 300
+    led.add_pending(("build", "powr"), 300)
+    led.note_unit(7, ("move", 1, 2))
+    led.note_sent(300, [{"cmd": "build", "item": "powr"}, {"cmd": "move", "units": [7], "to": [1, 2]}],
+                  [("build", "powr"), None])
+    led.on_result({"error": "internal_error", "detail": "MCP tool 'play_action' request failed with HTTP 502"})
+    assert led.is_pending(("build", "powr")) and 7 in led.unit_cmd
+    assert led.uncertain == 1 and led.errors == {"internal_error": 1} and led.invalid_actions == 0
+    led.tick = 300 + 80                                # never shown in production: it expires and may go again
+    assert not led.is_pending(("build", "powr"))
+
+
 def test_pending_entries_expire():
     led = Ledger()
     led.tick = 0
