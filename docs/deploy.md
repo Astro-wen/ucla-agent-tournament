@@ -7,7 +7,7 @@
 - **计算器**：`agent/js/calc.js`，用 Node 跑的精确伤害计算。**引擎搜索**：`agent/js/search.js`，在 Showdown 引擎副本上试打每一步（默认对战策略）。
 - **worker**：每场对局（每个座位）一个独立子进程。
 - **event agent / Self-hosted / Oracle-hosted**：每人一个参赛 agent。Self-hosted = 自己跑代码（我们）；Oracle-hosted = 交一份 Markdown 提示词，由平台在 Oracle 上代跑（我们不用）。agent 设成 Oracle-hosted 时 key 会被拒。
-- **两种对局**：分配里的 `context` 写着 `testing`（Testing 页面建的练习赛，不计分、没有连接期限）或 `tournament`（正式赛）。`--match` 只打测试赛、`--tournament` 只打正式赛，两个一起写就都打；看门脚本固定两个都写。
+- **两种对局**：分配里的 `context` 写着 `testing`（Testing 页面建的练习赛，不计分；开始等人后 20 分钟没到齐就取消；提交截止时关闭）或 `tournament`（正式赛）。`--match` 只打测试赛、`--tournament` 只打正式赛，两个一起写就都打；看门脚本固定两个都写。
 - **已停用（10-06，平台回 410）**：`sk_agent_` key 和不带参数的 `python -m agent`（「发现模式」，`platform_agents_retired`）、测试赛认领码 `--claim seatclaim_…`（`claim_codes_retired`）。现在运行它们只打印一段说明；看门脚本遇到 `ARENA_MODE=discovery`、只有 sk key、`--claim` 都拒绝启动并写明原因。
 - **分配（assignment）**：平台告诉我们「你在哪场比赛的哪个座位」。**座位租约（lease）**：平台记录「此刻哪个进程在控制这个座位」，每次续约管 30 s。**execution id**：运行时的随机身份号，租约记在它名下（同一台机器上同一个 `--name` 和 `LOG_DIR` 的看门脚本，重启多少次都用同一个）。
 - **热备（hot standby）**：另一台机器上用同一把 key 跑的第二个进程；主进程在时它只等待，主进程停止续约后约 30–45 s 自动接管座位。
@@ -38,7 +38,7 @@
 ### 主人的一次性准备（按顺序）
 
 1. **登录**：用 UCLA Google 账号登录 <https://platform.altruagent-game.com/tournament>，把报名做完（问卷、接受 Official Rules、agent 名字、公开的代码仓库）。报名没做完时 key 会被拒（403 `registration_incomplete`）。
-2. **Agent Configuration 页面**（`/tournament/dashboard/agent-setup`）：选 **Self Hosted**（不要选 Oracle Hosted：那是交 Markdown 提示词让平台代跑，选了它我们的 key 会被拒），然后生成 Official Agent Key（`eak_live_` + 64 位十六进制）。泄露了就在同一页面重新生成（新 key 替换旧 key，旧 key 不能再用），再换进 `.env`、`systemctl --user restart arena-agent@main`。
+2. **Agent Configuration 页面**（`/tournament/dashboard/agent-setup`）：选 **Self Hosted**（不要选 Oracle Hosted：那是交 Markdown 提示词让平台代跑，选了它我们的 key 会被拒；10-08 时它也还没开放）。**截止（10-13 23:59 PDT）后托管方式改不了**：切回 Self Hosted 只能在截止前，所以截止后别再碰这个设置。然后生成 Official Agent Key（`eak_live_` + 64 位十六进制）。泄露了就在同一页面重新生成（新 key 替换旧 key，旧 key 开的会话立刻失效），再换进 `.env`、`systemctl --user restart arena-agent@main`（比赛进行中这样做要马上通知主办方，见下面「比赛进行中的规矩」）。
 3. **放进主机的 `.env`**（只在要跑比赛的那台机器上；不要贴到聊天、GitHub、截图里）：
 
 ```bash
@@ -57,15 +57,37 @@ bash scripts/run_agent.sh status             # 健康行必须有 mode=tournamen
 
 Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）；一次性检查 `docker run --rm --env-file arena.keys arena-agent check-tournament`（见 `deploy/Dockerfile` 顶部）。
 
-### 比赛日时间表
+### 截止和比赛日时间表（绝对时间）
 
-| 时间 | 做什么 | 看什么 |
-|---|---|---|
-| T−1 天 | `git pull` 到冻结的 tag；`python -m pytest -q`；`selfcheck.py`；`check-tournament` | 全绿；每行 ✓ |
-| T−2 小时 | 确认只有计划中的机器在跑这把 key（主机 + 经主办方同意的热备）；`free -m`、`df -h` | 内存 ≥ 1.2 GB × 预计并发场数，磁盘 > 1 GB |
-| T−1 小时 | `systemctl --user restart arena-agent@main`（或 `start`），看 `status` | `mode=tournament(primary) agent=up restarts=0 calc=ok(...)`，`search=idle(probe=…s)`（还没对局）或 `search=ok(used=…)` |
-| 比赛中每小时 | `bash scripts/run_agent.sh status`；`grep -c 'Match assigned' logs/agent-main.out` | `restarts` 不涨；`workers` = 在打的座位数；日志没有 Traceback |
-| 比赛后 | `systemctl --user stop arena-agent@main`；`python -m local.pool --harvest`；提交 `logs/yoriko` 之外的新录像按惯例处理 | — |
+时间都是 PDT（太平洋夏令时，UTC−7）；北京时间 = PDT + 15 小时。日程来自官网（`docs/competition_brief.md`「2026-10-08 更新」B 节），开赛时刻以 Discord 公告为准。
+
+| PDT | 北京时间 | 做什么 | 看什么 |
+|---|---|---|---|
+| 10-13 截止前（建议白天） | 10-14 凌晨–上午 | 最后一次合进 `main` 并推送。比赛机部署**截止时 `main` 上最新的那个提交**，不用 tag（规则第 8 节：比赛版本就是截止时默认分支上最新的提交）：`git switch main && git pull --ff-only origin main`，记下 `git rev-parse HEAD`（截止后 `main` 不会再动，它就是比赛版本）。用压缩包时从这个提交**重新打包**：`bash scripts/bundle.sh`，包里的 `COMMIT` 文件必须是同一个提交号、没有 `built with uncommitted changes`。然后 `python -m pytest -q`、`selfcheck.py`、`check-tournament` | 全绿、每行 ✓；`git status` 干净；提交号 = GitHub 上 `main` 的最新提交 |
+| **10-13 23:59** | **10-14 14:59** | **提交截止（2026-10-14T06:59Z）**。之后到成绩公布后至少 30 天，**不往参赛仓库推任何东西**（不提交、不改历史、不改回私有、不删仓库），不换版本；测试赛关闭；Agent Configuration 也不能再切回 Self Hosted | — |
+| 10-14 – 10-15 | | 比赛机保持截止提交；可以在本地测（不改提交的版本）。把截止提交号和比赛机配置（去掉 key 的 `.env`、systemd 单元）记到仓库以外的地方 | `grep 'deployed:' logs/agent-main.out` 的最后一行 = 截止提交号 |
+| 10-16 7:00 | 10-16 22:00 | 确认只有计划中的机器在跑这把 key（主机；热备只在主办方同意后）；`free -m`、`df -h` | 内存 ≥ 1.2 GB × 预计并发场数；磁盘 ≥ 3 GB（日志上限约 2 GB） |
+| 10-16 8:30 | 10-16 23:30 | 登录 dashboard：有「规则已更新，请重新同意」就**马上同意**；Tournaments 页面每个要打的比赛都按过 **Register my agent** | 没有待同意的规则；报名状态完整 |
+| **10-16 9:00**（最晚 9:30） | 10-17 00:00 | `systemctl --user restart arena-agent@main`（或 `bash scripts/run_agent.sh start`），看 `status` | `mode=tournament(primary) agent=up restarts=0 calc=ok(...)`，`search=idle(probe=…s)` 或 `search=ok(used=…)`；日志里 `deployed: commit <截止提交号> (git checkout)`（压缩包：`(bundle arena-agent-…)`），没有 `uncommitted changes` |
+| 10-16 9:50 | 10-17 00:50 | 再看一次 dashboard 有没有规则更新提示 | — |
+| **10-16 10:00–12:00** | 10-17 01:00–03:00 | **宝可梦和狼人杀正式赛**（两场同时）。每 30 分钟 `bash scripts/run_agent.sh status`；`grep -c 'Match assigned' logs/agent-main.out`。只看 status 和日志，**不开观战页看我们自己的对局** | `restarts` 不涨；`workers` = 在打的座位数；日志没有 Traceback |
+| 10-16 约 12:30 | 10-17 约 03:30 | 两个比赛都显示 completed（`GET /tournaments/<id>` 或网站），而且没报红警：可以停 | — |
+| 10-16 13:30–14:00 | 10-17 04:30–05:00 | 报了红警：再看 dashboard 和 `status` | 同上 |
+| 10-16 14:00–17:00 | 10-17 05:00–08:00 | 红警（我们整场回 WAIT）。进程一直开到约 17:30 | 同上 |
+| 比赛后 | | `systemctl --user stop arena-agent@main`。把 `logs/`（`agent-main.out*`、`*.jsonl`、`manual-actions.txt`）、比赛机配置（去掉 key）和实际跑的提交号拷到安全的地方，保存到成绩公布后至少 30 天（规则第 9 节）。**不提交、不推送**（以前这里写「提交新录像」，截止后不允许）；`python -m local.pool --harvest` 这类改动只能留在本地 | — |
+
+### 比赛进行中的规矩（Official Rules 第 4、6、8、9 节）
+
+- **自动恢复可以，人工干预要授权**：`run_agent.sh` / systemd 的自动重启、SDK 的重连和重新认证是事先配好的自动恢复，规则允许。比赛进行中**人动手**的事都算人工干预，要先问主办方（Discord），得到同意再做：`restart` / `start` / `stop`、改 `.env` 或任何 `ARENA_*` 设置（包括下面排障表里的 `ARENA_ALLOW_NO_CALC=1`、`ARENA_BATTLE=classic`）、换 key、换机器、开热备。唯一的例外是出于安全的紧急停机（比如 key 泄露、机器被入侵），停完马上报告主办方。只看 `status`、日志、dashboard 不算干预。
+- **管运维的人不看观战**：负责重启、看日志的人不能同时用观战页或直播看我们这局（延迟播出也不行）。想看比赛，让一个不碰运维、也不给运维传话的人看。
+- **规则一更新就马上重新同意**：日志出现 `Accept the updated Official Rules on your dashboard …` 时立刻登录 dashboard 同意（不用重启，运行时每 30 s 自己再查）。没同意之前新局开不了，正式赛 4 分钟内没连上判负。
+- **换 key 之后**：只在 key 泄露时才换。在 dashboard 按 Rotate key 后，旧 key 开的所有会话立刻失效；把新 key 写进 `.env`，然后 `bash scripts/run_agent.sh restart`（systemd 下 `systemctl --user restart arena-agent@main`；`.env` 只在启动时读一次），并**马上通知主办方**（换 key 本身就是人工干预；泄露的凭据按规则第 8 节也要报告）。
+- **每次手动操作都记下来**（规则第 9 节要保存人工干预记录）：时间（PDT 和 UTC）、做了什么、为什么、谁批准的，写进 `logs/manual-actions.txt`（`logs/` 不进 git，赛后和日志一起拷走），例如：
+
+  ```bash
+  echo "$(date -u +%FT%TZ) / $(TZ=America/Los_Angeles date +%H:%M) PDT  restart after repeated worker crashes; organizer OK in Discord 10:42" >> logs/manual-actions.txt
+  ```
+- **配置截止前就定好**：比赛机的 `.env` 只放 key（和热备机器的 `ARENA_ROLE=standby`），所有 `ARENA_*` 用默认值（`README.md`「Settings used in competition」）。每次启动日志里的 `settings:` 行就是当时的配置。
 
 ### 看门脚本和 agent 在上游运行时之上额外做了什么（都不改 `altruagent/`）
 
@@ -340,7 +362,7 @@ python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-* --out /tmp/of
 - **只开 `--match` 的进程不会接正式赛**：每一局正式赛它只打一次警告（`You have a tournament game waiting …: run with --tournament to play it`），那一局会因为 no-show 判负。看门脚本默认两个都开，不会出这个问题。
 - **`--claim` 现在会怎样**：只打印上游的停用说明（`Testing claim codes were retired; run with --match …`）后退出（退出码 1），不连平台。看门脚本拒绝 `--claim`。
 - **还没开打的座位每 10–20 s 起一个短命 worker，是正常的**：对局还在大厅里时（分配的 `match_status` 是 `lobby` / `pending`，比如开放座位还没人加入），平台对 `grant` 回 409 `assignment_not_grantable`，「还没准备好」和「已经结束」是同一个代码。SDK 的 worker 把它当成已结束：日志 `[match … seat=…] assignment already ended; nothing to play`，接着运行时打 `Match finished.`，冷却 10 s、再等下一次查询后重来。所以**同一个座位反复出现 `Match assigned` / `Starting match...` / `assignment already ended; nothing to play` / `Match finished.`，意思是对局还在大厅里，不是结束了**。每一轮起一个新进程、加载一遍 agent（约 1–2 s CPU）、用 key 认证一次；对局一准备好，下一个 worker 在约 20–30 s 内连上（正式赛的连接窗口默认 4 分钟，来得及）。这是 SDK 原有的行为，main 上一样（10-06 复审用真 worker、假时钟测过：60 s 里起 4 次 worker，每次退出码 0）。
-- 测试对局不计分、没有连接期限：漏掉不算输，只是别的座位在等你（红警测试对局两边 15 分钟内没到齐就无结果结束）。
+- 测试对局不计分：漏掉不算输，只是别的座位在等你；开始等人后 20 分钟还没到齐就取消（无结果；红警测试对局两边 15 分钟内没到齐就无结果结束）。**提交截止（10-13 23:59 PDT）后不能再建测试赛**，最后的真实测试要在那之前打完。
 - 红警测试对局：我们的 agent 整场只回答 `WAIT`（见上面「被分到红警」），不要用它测红警。
 
 ## 每局都在录
@@ -372,37 +394,41 @@ python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-* --out /tmp/of
 
 ## 上线前检查清单
 
-- [ ] `git pull` 到冻结的 tag；`python -m pytest -q` 全绿；`python scripts/replay_real.py` 和 `--no-calc` 0 失败
+- [ ] 比赛机部署的是**截止时 `main` 上最新的提交**（不是 tag）：`git rev-parse HEAD` 和 GitHub 上 `main` 一致、`git status` 干净；用压缩包时它是从这个提交重新打的，`COMMIT` 文件是同一个提交号、没有 `built with uncommitted changes`；`python -m pytest -q` 全绿；`python scripts/replay_real.py` 和 `--no-calc` 0 失败
+- [ ] 启动日志里 `deployed: commit <截止提交号> …` 没有 `uncommitted changes`；`settings:` 行只有看门脚本自己设的 `ARENA_DISCOVERY_S` / `ARENA_WORKER_COOLDOWN_S` / `ARENA_RECORD_DIR`（和 `ARENA_LOCK_DIR` 之类本机路径），没有别的 `ARENA_*`
+- [ ] 已加入 Discord 并打开通知；10:00 PDT 前看过 dashboard 没有待同意的规则；`logs/manual-actions.txt` 的写法会用；管运维的人不开观战页
 - [ ] `.venv/bin/python scripts/selfcheck.py` → `selfcheck: ready`，且有 `OK    damage calculator answers`、`OK    battle policy: engine search` 和 `OK    Official Agent Key configured … (python -m agent --tournament --match …)`
 - [ ] dashboard：报名做完、Agent Configuration 是 **Self Hosted**、key 有效；要打的每个比赛都在 Tournaments 页面按过 **Register my agent**
 - [ ] `bash scripts/run_agent.sh check-tournament` → 每行 ✓（会连平台，主人执行）；`.env` 权限 600；`.env` 里没有 `ARENA_CALC` / `ARENA_ALLOW_NO_CALC` / `ARENA_BATTLE=classic` / `ARENA_EXECUTION_ID` / `ARENA_MODE` / `ARENA_NEW_SEAT_DELAY_S` / `.env.example` 的占位 key，主机的 `.env` 里也没有 `ARENA_ROLE=standby`（只有热备机器才写）
 - [ ] 至少打过一局 Testing（宝可梦和狼人杀各一局），日志里有 `Match assigned: … (Testing)` 和 `Match finished.`
 - [ ] 这把 eak key 只在计划中的机器上跑（主机；热备只在主办方同意后才开）；笔记本、旧云主机上的都已停掉
 - [ ] systemd 已重新 `install-systemd`（单元里有 `OOMPolicy=continue`）、`enable --now` 且 `enable-linger`；`bash scripts/run_agent.sh status` 显示 `mode=tournament(primary)`、`agent=up`、`calc=ok(...)`、`search=idle(probe=…s)`（还没对局）或 `search=ok(used=…)`、`restarts=0`
-- [ ] 磁盘剩余 > 1 GB；`logs/` 可写；内存至少 1.2 GB × 预计并发场数空闲
+- [ ] 磁盘剩余 ≥ 3 GB（日志上限约 2 GB）；`logs/` 可写；内存至少 1.2 GB × 预计并发场数空闲
 - [ ] 提前至少 1 小时启动并看到健康行；比赛中每小时看一次 `status`（`restarts` 不涨、`calc` 仍是 ok、`workers` 与在打的对局数一致）
 - [ ] 已加入主办方 Discord 公告频道；主办方回复了：几点开始、要在线到几点、允不允许热备、同时最多几场
 - [ ] 交给主办方或换新机器时：`bash scripts/bundle.sh` 出包（自带 node），在一台干净机器上按 `BUNDLE_README.txt` 走一遍 selfcheck 和 replay_real，确认计算器用的是包里的 node
 
 ## 比赛中出事怎么办
 
+**先读这段**：下表里凡是要人动手的（`restart`、改 `.env`、设 `ARENA_*`、换 key、换机器），在比赛进行中都算人工干预（规则第 4 节）：先在 Discord 问主办方，同意了再做，并记进 `logs/manual-actions.txt`（时间、做了什么、谁批准的；见上面「比赛进行中的规矩」）。只看 `status`、日志、dashboard 不算干预；出于安全的紧急停机可以先做，停完马上报告。不在比赛进行中（比如赛前、两个时段之间没有在打的局）时照常处理，也记一笔。
+
 | 现象 | 处理 |
 |---|---|
-| `status` 显示 `agent=down` 且不恢复 | `tail -50 logs/agent-main.out` 看原因；key / 报名类错误修好后 `systemctl --user restart arena-agent@main` |
+| `status` 显示 `agent=down` 且不恢复 | `tail -50 logs/agent-main.out` 看原因；key / 报名类错误修好后 `systemctl --user restart arena-agent@main`（比赛中先问主办方） |
 | 主机的健康行是 `mode=tournament(standby)` | 本机已有同一把 key 的另一个看门脚本（`ps -ef \| grep run_agent`），或主机的 key 文件里误写了 `ARENA_ROLE=standby`：改好后 restart。否则这台机器每个新座位都晚 20 s 才接 |
 | 日志 "ERROR: only ALTRUAGENT_API_KEY (an sk_agent_ key) is set" / "ARENA_MODE=discovery … was retired" / "still the .env.example placeholder" | key 文件里没有真正的 eak key，或留着停用的设置：放进 Official Agent Key、删掉 `ARENA_MODE`，restart；这时一场正式对局都接不到，立刻处理 |
-| 日志 "ALTRUAGENT_OFFICIAL_AGENT_KEY doesn't look like an Official Agent Key" / "The Official Agent Key was not accepted. Check that your agent is set to Self-hosted …" | Agent Configuration 是不是被改成了 Oracle Hosted（改回 Self Hosted），否则从 dashboard 重新复制（或重新生成）key，写进 `.env`，restart；不要把 key 贴到任何聊天里 |
-| 日志 `Accept the updated Official Rules on your dashboard (…); I'll keep trying.` 或 `Your event registration isn't complete. Finish it on your dashboard (…); I'll keep trying.` | 主人马上登录 dashboard 重新同意规则 / 补上报名缺项（问卷、Official Rules、代码仓库）。**不用 restart**：运行时每 30 s 自己再查，恢复时一行 `Assignment discovery recovered.`；在打的局最多还能打约 1 小时，新局在这之前开不了（正式赛 4 分钟内没连上判负） |
-| 日志 `Your Official Agent Key is no longer accepted, so no new game will start.` | key 被换掉（有人按了 Rotate key）或 agent 不再是 Self Hosted：确认 Self Hosted，新 key 写进 `.env`，`bash scripts/run_agent.sh restart`（比赛中先问主办方，算人工干预）；在打的局在此之前继续 |
+| 日志 "ALTRUAGENT_OFFICIAL_AGENT_KEY doesn't look like an Official Agent Key" / "The Official Agent Key was not accepted. Check that your agent is set to Self-hosted …" | Agent Configuration 是不是被改成了 Oracle Hosted（改回 Self Hosted：**只有截止前能改**，截止后只能找主办方），否则从 dashboard 重新复制（或重新生成）key，写进 `.env`，restart（比赛中先问主办方，换了 key 要通知主办方）；不要把 key 贴到任何聊天里 |
+| 日志 `Accept the updated Official Rules on your dashboard (…); I'll keep trying.` 或 `Your event registration isn't complete. Finish it on your dashboard (…); I'll keep trying.` | 主人马上登录 dashboard 重新同意规则 / 补上报名缺项（问卷、Official Rules、代码仓库；这是账号操作，不改 agent）。**不用 restart**：运行时每 30 s 自己再查，恢复时一行 `Assignment discovery recovered.`；在打的局最多还能打约 1 小时，新局在这之前开不了（正式赛 4 分钟内没连上判负） |
+| 日志 `Your Official Agent Key is no longer accepted, so no new game will start.` | key 被换掉（有人按了 Rotate key）或 agent 不再是 Self Hosted：确认 Self Hosted（截止后改不了，找主办方），新 key 写进 `.env`，`bash scripts/run_agent.sh restart`（比赛中先问主办方，算人工干预；换 key 要通知主办方）；在打的局在此之前继续 |
 | 日志 `[match … seat=…] Connection problem (…); retrying for up to 90s.` | 对局里的暂时断线，runner 在局内重试（重读再决定，不重发），看到 `Connection back; the game goes on.` 就好了；90 s 都不行时 worker 退出（`Lost the connection to that game for a while; retrying that game in 10s …`），supervisor 再接上 |
 | 日志 `Could not renew your agent session (…). Games already running keep playing; retrying automatically.` | 平台认证接口暂时出错 / 限流 / 签发会话失败，在打的对局不受影响，SDK 按 10–60 s 退避自己恢复（`Assignment discovery recovered.`）；持续几分钟以上就 `curl -sI https://api.altruagent-game.com` 并看 Discord 公告 |
 | 日志 `You have a tournament game waiting …: run with --tournament to play it` | 这个进程只开了 `--match`（有人手动 `-- --match` 启动了）：去掉，按默认（两个都开）restart，否则这局 no-show 判负 |
 | 日志 `Another runtime is playing this match with your Official Agent Key` | 另一个进程（忘了停的旧机器，或已经接管了座位的热备）占着座位。不是计划中的就去停掉它。看门脚本重启后正常不会出现（它沿用 execution id）；只有换了新 id（拿不到本机的 key 锁、换了 `LOG_DIR` / `--name`、机器重启过）而旧租约还没过期时出现一次属正常（约 65 s 后接上） |
 | 热备日志 `standby: seat … is free (no other runtime holds its lease): playing it`，而主机明明在跑 | 主机至少 30 s 没续上这个座位的租约（网络断了、机器卡死）：看主机日志和 `status`；热备会把这场打完，主机恢复后只接新座位 |
-| 日志 `Your agent's process for this match stopped with an error (exit code …); the match continues. Retrying in 10s …`（之后 20s、30s）反复出现 | 同一座位的 worker 一直崩：看该座位 `[match … seat=…]` 前后的报错（`SESSION_NOT_FOUND` = 游戏服务器把这局弄丢了，平台几分钟内会关掉它，不用管）；必要时 `ARENA_BATTLE=classic` 临时退回冠军打法 |
-| 日志有 "THE DAMAGE CALCULATOR CANNOT RUN … NOT STARTING" | 按横幅里的原因修（装 node / 设 `ARENA_NODE` / `cd agent/js && npm ci --omit=dev` / 删掉 `ARENA_CALC=off`），systemd 会自己重试；实在修不好又必须上场：临时设 `ARENA_ALLOW_NO_CALC=1`（node 本身坏了时搜索也会自动改 classic；启发式也比被随机代打强），修好后删掉并重启 |
+| 日志 `Your agent's process for this match stopped with an error (exit code …); the match continues. Retrying in 10s …`（之后 20s、30s）反复出现 | 同一座位的 worker 一直崩：看该座位 `[match … seat=…]` 前后的报错（`SESSION_NOT_FOUND` = 游戏服务器把这局弄丢了，平台几分钟内会关掉它，不用管）；必要时 `ARENA_BATTLE=classic` 临时退回冠军打法（改配置：比赛中要主办方授权） |
+| 日志有 "THE DAMAGE CALCULATOR CANNOT RUN … NOT STARTING" | 按横幅里的原因修（装 node / 设 `ARENA_NODE` / `cd agent/js && npm ci --omit=dev` / 删掉 `ARENA_CALC=off`），systemd 会自己重试；实在修不好又必须上场：临时设 `ARENA_ALLOW_NO_CALC=1`（node 本身坏了时搜索也会自动改 classic；启发式也比被随机代打强），修好后删掉并重启（改配置：比赛中要主办方授权，并记下来） |
 | 运行中 `calc=MISSING` / `NO-NODE_MODULES` | 同上修好后重启；在此之前 agent 仍在用启发式打 |
-| 日志有 "ARENA_BATTLE=search BUT THE ENGINE SEARCH CANNOT RUN … NOT STARTING"，或健康行 `search=NO-SIMULATOR` | 模拟器没装或坏了：git checkout 里 `(cd local/js && npm ci)`，或换成压缩包；systemd 会自己重试。实在修不好又必须上场：临时设 `ARENA_BATTLE=classic`（冠军 v3.2 的打法，照样能打），修好后删掉并重启 |
+| 日志有 "ARENA_BATTLE=search BUT THE ENGINE SEARCH CANNOT RUN … NOT STARTING"，或健康行 `search=NO-SIMULATOR` | 模拟器没装或坏了：git checkout 里 `(cd local/js && npm ci)`，或换成压缩包；systemd 会自己重试。实在修不好又必须上场：临时设 `ARENA_BATTLE=classic`（冠军 v3.2 的打法，照样能打），修好后删掉并重启（改配置：比赛中要主办方授权，并记下来） |
 | 健康行 `search=DEGRADED(...)` / `SLOW(probe=…)`，或日志有 `ENGINE SEARCH DEGRADED` / `ENGINE SEARCH NOT STARTED` | 机器太忙或内存不够，部分回合退回了经典打法（合法，只是弱一些）：`free -m`、`uptime`，停掉同机的其他重活；`NOT STARTED` 是整机搜索槽位满或可用内存 < 500 MB，别的对局结束后每 5 秒自动重试（`docs/restart_load.md` 第 2、3 节） |
 | 日志 `resumed match … after a worker restart` | 正常：worker 重启后从状态文件接上了这局的记忆（v4.2）。频繁出现说明 worker 在反复崩，按上面「stopped with an error」处理 |
 | "ERROR: LOG_DIR … is not writable" | 把 `LOG_DIR` 指到可写目录（systemd：单元里加 `Environment=LOG_DIR=…`，或修目录权限），systemd 会自己重试 |
