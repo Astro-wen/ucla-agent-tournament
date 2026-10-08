@@ -1,8 +1,8 @@
 """Public move reasoning: the `reasoning_summary` the platform shows spectators next to each move.
 
-Everything written here must be treated as read by the opponent, live: the spectate feed is public, needs no login
-and refreshes every second (docs/competition_brief.md 4.4), and a draft pick's reason is copied straight into the
-other seat's own observation (`picks[].public_reason`, docs/platform/pokemon.md). So the texts are built from public
+Everything written here must be treated as read by the opponent, live: spectators see it next to each move, and a
+draft pick's reason is copied straight into the other seat's own observation (`picks[].public_reason`,
+docs/platform/pokemon.md). So the texts are built from public
 information only, from fixed templates, and never say anything about a choice the other side has not seen yet:
 
 * Werewolf: nothing at night (only wolves and the seer act at night, so even a bland line would say "I am one of
