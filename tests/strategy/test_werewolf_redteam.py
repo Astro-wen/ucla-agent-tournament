@@ -1,5 +1,7 @@
 """Werewolf red-team findings (10-08, four context-free challenger bots in local/redteam_*.py): what they made our
 agent misread or misplay, pinned down as tests."""
+import time
+
 import pytest
 
 from agent.werewolf.policy import WerewolfPolicy
@@ -69,6 +71,26 @@ def test_long_chat_is_read_to_the_platform_cap():
     assert 900 < len(filler) < 1000
     f = read_chat(filler + "I am the Seer. Player5 is a wolf.", 2, {})
     assert f.claim and f.wolves == {5}
+
+
+@pytest.mark.parametrize("pad", [" ", "\t\n", "　"])
+@pytest.mark.parametrize("word", ["result", "my check", ". result"])
+def test_whitespace_padded_chat_is_read_quickly(word, pad):
+    """Review 10-08: "result" and a thousand spaces (1024 characters and one word, inside the platform's caps) took 2 s
+    to read, because the own-quote reader had three optional whitespace runs in a row; ten such chats made a decision
+    overrun its budget. Simulated chats never have whitespace runs, so no evaluation could see it."""
+    text = (word + pad * 1024)[:1024]
+    t0 = time.perf_counter()
+    read_chat(text, 2, {})
+    assert time.perf_counter() - t0 < 0.1
+
+
+def test_whitespace_padding_does_not_change_what_a_chat_says():
+    plain = 'I am the Seer. My result: "Player5 is a wolf". Player3 is a villager.'
+    padded = 'I   am the\t\tSeer.\n\n My result:    "Player5 is a wolf".      Player3  is a   villager.  ' + " " * 600
+    a, b = read_chat(plain, 2, {}), read_chat(padded, 2, {})
+    assert a.claim and b.claim
+    assert a.wolves == b.wolves == {5} and a.clears == b.clears == {3}
 
 
 # ---------------------------------------------------------------- the seer's own votes (chaos)
