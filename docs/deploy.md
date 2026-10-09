@@ -73,7 +73,7 @@ Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）；一�
 | **10-16 10:00–12:00** | 10-17 01:00–03:00 | **宝可梦和狼人杀正式赛**（两场同时）。每 30 分钟 `bash scripts/run_agent.sh status`；`grep -c 'Match assigned' logs/agent-main.out`。只看 status 和日志，**不开观战页看我们自己的对局** | `restarts` 不涨；`workers` = 在打的座位数；日志没有 Traceback |
 | 10-16 约 12:30 | 10-17 约 03:30 | 两个比赛都显示 completed（`GET /tournaments/<id>` 或网站），而且没报红警：可以停 | — |
 | 10-16 13:30–14:00 | 10-17 04:30–05:00 | 报了红警：再看 dashboard 和 `status` | 同上 |
-| 10-16 14:00–17:00 | 10-17 05:00–08:00 | 红警（我们整场回 WAIT）。进程一直开到约 17:30 | 同上 |
+| 10-16 14:00–17:00 | 10-17 05:00–08:00 | 红警（v4.3 起规则型 bot 来打；`ARENA_RA=off` 时整场回 WAIT）。进程一直开到约 17:30 | 同上 |
 | 比赛后 | | `systemctl --user stop arena-agent@main`。把 `logs/`（`agent-main.out*`、`*.jsonl`、`manual-actions.txt`）、比赛机配置（去掉 key）和实际跑的提交号拷到安全的地方，保存到成绩公布后至少 30 天（规则第 9 节）。**不提交、不推送**（以前这里写「提交新录像」，截止后不允许）；`python -m local.pool --harvest` 这类改动只能留在本地 | — |
 
 ### 比赛进行中的规矩（Official Rules 第 4、6、8、9 节）

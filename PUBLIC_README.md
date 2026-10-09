@@ -91,8 +91,8 @@ safeguards.
 
 Every `ARENA_*` setting stays at its default; none is set deliberately. The defaults that matter: `ARENA_BATTLE=search`
 (engine search), damage calculator on (`ARENA_CALC`), `ARENA_REASONING=safe`, `ARENA_WW_DM=off` (no private Werewolf
-messages), `ARENA_WW_LISTEN=off`, `ARENA_RA=on` (the Red Alert bot plays; `off` would answer every Red Alert view with
-`WAIT`), no `ARENA_RA_*` tuning override, `ARENA_RECORD=1` (states recorded), the per-match restart memory on,
+messages), `ARENA_WW_LISTEN=on` (after its opening chat the Werewolf policy keeps reading the discussion and may answer
+it once a day), `ARENA_RA=on` (the Red Alert bot plays; `off` would answer every Red Alert view with `WAIT`), no `ARENA_RA_*` tuning override, `ARENA_RECORD=1` (states recorded), the per-match restart memory on,
 `ARENA_SEAT_BACKOFF_MAX_S=30`. `scripts/run_agent.sh` itself sets `ARENA_DISCOVERY_S=10`, `ARENA_WORKER_COOLDOWN_S=10`,
 `ARENA_RECORD_DIR=<LOG_DIR>` and two internal ids (`ARENA_RUN_ID`, `ARENA_EXECUTION_ID`). The emergency switches
 `ARENA_ALLOW_NO_CALC=1` and `ARENA_BATTLE=classic` are not used. The competition machine's `.env` holds only the key.

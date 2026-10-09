@@ -71,8 +71,9 @@ one process, one worker process per game). `bash scripts/run_agent.sh status` pr
 
 **Settings used in competition.** Every `ARENA_*` setting stays at its default; none is set deliberately. The defaults
 that matter: `ARENA_BATTLE=search` (engine search), damage calculator on (`ARENA_CALC`), `ARENA_REASONING=safe`,
-`ARENA_WW_DM=off` (no private Werewolf messages), `ARENA_WW_LISTEN=off`, `ARENA_RA=on` (the Red Alert bot plays;
-`off` would answer every Red Alert view with `WAIT`), no `ARENA_RA_*` tuning override, `ARENA_RECORD=1` (states
+`ARENA_WW_DM=off` (no private Werewolf messages), `ARENA_WW_LISTEN=on` (after its opening chat the Werewolf policy
+keeps reading the discussion and may answer it once a day), `ARENA_RA=on` (the Red Alert bot plays; `off` would
+answer every Red Alert view with `WAIT`), no `ARENA_RA_*` tuning override, `ARENA_RECORD=1` (states
 recorded), the per-match restart memory on, `ARENA_SEAT_BACKOFF_MAX_S=30`. `scripts/run_agent.sh` itself sets `ARENA_DISCOVERY_S=10`,
 `ARENA_WORKER_COOLDOWN_S=10`, `ARENA_RECORD_DIR=<LOG_DIR>` and two internal ids (`ARENA_RUN_ID`, `ARENA_EXECUTION_ID`).
 The emergency switches `ARENA_ALLOW_NO_CALC=1` and `ARENA_BATTLE=classic` are not used; changing any setting during
@@ -165,7 +166,7 @@ bash scripts/run_agent.sh start        # 部署：一直开着上面那条，崩
 
 ### 红警（实时游戏）
 
-红警（`red_alert`）是正式赛项目之一（实时，OpenRA）。上游 SDK 支持实时模式（`state.raw["pacing"]["mode"] == "realtime"`）：`choose_action` 可以返回 `altruagent.WAIT`（这一刻什么都不发）。规则型红警 bot（`agent/redalert/`，不用大模型，`ARENA_RA` 默认开）在分支 `ra/bot-v0` 上做，合进 `main` 以后由它打；在那之前（以及设了 `ARENA_RA=off` 时）被分到红警整场都回答 `WAIT`（不发任何命令、不崩、只记一行日志），等于这一局认输，宝可梦和狼人杀不受影响。上面英文一节按合进来以后的样子写（截止时 `main` 上必须真有这个 bot，否则要改回「answered with WAIT」）。上游的大模型示例 `examples/llm_agent.py` 也会打红警（`examples/llm/redalert.py`，要花 OpenAI 的钱，我们不用）。
+红警（`red_alert`）是正式赛项目之一（实时，OpenRA）。上游 SDK 支持实时模式（`state.raw["pacing"]["mode"] == "realtime"`）：`choose_action` 可以返回 `altruagent.WAIT`（这一刻什么都不发）。v4.3 起由规则型红警 bot（`agent/redalert/`，不用大模型，`ARENA_RA` 默认开；10-08 在 `integrate/v43` 上和宝可梦、狼人杀的改动合在一起）来打；设了 `ARENA_RA=off` 时（以及 v4.3 之前）被分到红警整场都回答 `WAIT`（不发任何命令、不崩、只记一行日志），等于这一局认输，宝可梦和狼人杀不受影响。上面英文一节按 bot 在 `main` 上的样子写（截止时 `main` 必须是 v4.3 或之后，否则要改回「answered with WAIT」）。上游的大模型示例 `examples/llm_agent.py` 也会打红警（`examples/llm/redalert.py`，要花 OpenAI 的钱，我们不用）。
 
 ## 同步官方更新
 
