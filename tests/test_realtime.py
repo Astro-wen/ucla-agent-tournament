@@ -239,11 +239,13 @@ def test_other_agent_errors_in_a_real_time_game_keep_the_usual_message():
 
 def test_our_agent_module_in_red_alert_answers_wait_never_the_placeholder_error(monkeypatch):
     # Upstream's version of this test drives the starter's placeholder agent/agent.py ("Your agent can't play Red
-    # Alert"). Ours is the Contestant, which has no Red Alert policy and answers every real-time view with WAIT: the
-    # runner waits for the next view, nothing is sent, the match runs to its end, no DecisionError.
+    # Alert"). Ours is the Contestant; with its Red Alert bot off (ARENA_RA=off, the behaviour before v4.3) it
+    # answers every real-time view with WAIT: the runner waits for the next view, nothing is sent, the match runs to
+    # its end, no DecisionError.
     from agent.agent import create_agent
 
     monkeypatch.setenv("ARENA_RECORD", "0")
+    monkeypatch.setenv("ARENA_RA", "off")
     game = RealtimeFakeGame(CONFIG).queue_state(ra_state(100), ra_state(105), ra_state(110), terminal_state())
     game.queue_result(result_dict())
     agent = create_agent()
@@ -254,6 +256,7 @@ def test_our_agent_module_in_red_alert_answers_wait_never_the_placeholder_error(
     assert game.play_action_calls == [] and game.resign_calls == 0
     assert [c["since_version"] for c in game.wait_calls] == [100, 105, 110]
     assert agent.waits == 3 and agent.last_decision["path"] == "realtime-wait"
+    # (With the bot on, the default, the same match through the runner: tests/redalert/test_routing.py.)
 
 
 def test_picking_at_random_from_the_empty_legal_actions_says_it_cant_play_either():
