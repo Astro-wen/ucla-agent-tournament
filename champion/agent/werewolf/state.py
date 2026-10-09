@@ -280,9 +280,20 @@ _TYPOS = {"teh": "the", "wolff": "wolf", "woolf": "wolf", "wolfe": "wolf", "werw
           "vilager": "villager", "villlager": "villager", "villiger": "villager", "villagr": "villager",
           "seeer": "seer", "voet": "vote"}
 _TYPO_RE = re.compile(r"\b(?:" + "|".join(_TYPOS) + r")\b")
-# A seer quoting its own result ('My result: "Player3 is a wolf"') speaks in its own voice: that quote is kept.
+# Runs of whitespace are collapsed to one character (a newline when the run had one) before anything is read: one chat
+# of "result" and a thousand spaces, inside the platform's word and character caps, once took 2 s to read, because
+# _OWN_QUOTE had three optional whitespace runs in a row.
+_WS_RUN = re.compile(r"\s{2,}")
+
+
+def _squeeze(t: str) -> str:
+    return _WS_RUN.sub(lambda m: "\n" if "\n" in m.group() else " ", t)
+
+
+# A seer quoting its own result ('My result: "Player3 is a wolf"') speaks in its own voice: that quote is kept. Each
+# optional word or sign takes its own trailing whitespace, so no two optional whitespace runs touch.
 _OWN_QUOTE = re.compile(r"((?:\bmy\s+(?:seer\s+)?|(?:^|[.!?:]\s*)(?:seer\s+)?)(?:results?|checks?|findings?|visions?|"
-                        r"readings?)\s*(?:is|was|are|were)?\s*[:=\-—–]?\s*)[\"“«„]([^\"”»“]{1,200})[\"”»“]")
+                        r"readings?)\s*(?:(?:is|was|are|were)\s*)?(?:[:=\-—–]\s*)?)[\"“«„]([^\"”»“]{1,200})[\"”»“]")
 _W = r"(?:wolf|wolves|werewolf|werewolves|ww|wolfie)"
 _P = r"player([0-6])"
 _ADV = r"(?:(?:definitely|def|prob|probably|clearly|obviously|surely|totally|for sure|100%|confirmed|actually)\s+)?"
@@ -637,7 +648,7 @@ def normalize(text, names: dict[int, str] | None = None) -> str:
     """Lower-case ASCII-ish text with seat mentions rewritten to 'playerN' and quoted passages removed."""
     if not isinstance(text, str):
         return ""
-    t = unicodedata.normalize("NFKC", text[:MAX_CHAT_CHARS]).casefold()
+    t = _squeeze(unicodedata.normalize("NFKC", text[:MAX_CHAT_CHARS]).casefold())
     t = _MARKUP.sub("", t)
     t = _OWN_QUOTE.sub(lambda m: f"{m.group(1)}{m.group(2)}. ", t)
     t = _QUOTED.sub(" ", t)
@@ -677,7 +688,7 @@ def _claim_only_wolves(t: str) -> set[int]:
 def read_chat(text, sender: int | None = None, names: dict[int, str] | None = None) -> ChatFacts:
     """The facts one chat message asserts (never instructions). The sender's own seat is never its own target."""
     f = ChatFacts()
-    raw = unicodedata.normalize("NFKC", text[:MAX_CHAT_CHARS]).casefold() if isinstance(text, str) else ""
+    raw = _squeeze(unicodedata.normalize("NFKC", text[:MAX_CHAT_CHARS]).casefold()) if isinstance(text, str) else ""
     if _INJECTION.search(raw):
         f.injection = True
         return f
