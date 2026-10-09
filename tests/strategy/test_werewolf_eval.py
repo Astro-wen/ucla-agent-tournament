@@ -125,7 +125,8 @@ def test_platform_stand_in_runs_our_agent_through_the_real_runner():
     agents = [create_agent() for _ in range(4)] + [SeatAgent(LLMSeat(), random.Random(1)),
                                                    SeatAgent(HeuristicSeat(), random.Random(2)),
                                                    SeatAgent(we.OfficialBaseline(), random.Random(3))]
-    out = play_table(agents, seed=3, idle_limit=120.0, timeout=60.0)
+    # (a time-compressed 10 s window: our seats listen, by default since v4.3, until a quiet spell of 1/5 window)
+    out = play_table(agents, seed=3, idle_limit=120.0, timeout=60.0, window_limit=10.0)
     assert out["terminal"] and not out["hung"] and not out["errors"]
     assert not [v for v in out["log"]["violations"] if v[0] < 4]
     assert not [a for a in out["log"]["auto"] if a[0] < 4]

@@ -12,6 +12,11 @@ A condition is (background, k): k seats (1..7) are ours, the other 7-k are one b
   llmq       llmx phrased like the real Qwen3 seats: their seer-result wording, plus skeptical table talk that is not
              a verdict ("that doesn't mean they're a wolf", "Seer claim: none yet", "It was the wolves"); it prices
              both reading real LLM chat and misreading it
+  rt_*       the red-team challengers (10-08) as permanent opponents: rt_wolfpack (a fake-claiming, counter-claiming
+             wolf pair with llmq villagers, local/redteam_wolfpack.py), rt_talker (persuasive LLM-like seats in every
+             role, local/redteam_talker.py), rt_detective (a Bayesian village over all 105 deals that also reads our
+             fixed phrasing, local/redteam_detective.py), rt_chaos (claim fights, day-1 call tells and noisy wording,
+             = chaos4 of local/redteam_chaos.py); each module's variants are registered under their own names too
   mixed      each background seat drawn from first / heuristic / random / llm (llmx / llmq are not drawn, so the deals
              of earlier runs are unchanged); `mixed:K1+K2...` draws each background seat from the listed kinds
   llm_real   the REAL examples/llm_agent.py on Nebius Token Factory (local/llm_seats.py; opt-in, costs API calls, see
@@ -68,11 +73,25 @@ import time
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 
+from .redteam_chaos import CHAOS_BACKGROUNDS
+from .redteam_detective import VARIANTS as DETECTIVE_VARIANTS
+from .redteam_talker import SEATS as TALKER_SEATS
+from .redteam_wolfpack import KINDS as WOLFPACK_KINDS
 from .werewolf_bots import HeuristicSeat, LLMQwenSeat, LLMSeat, LLMVariedSeat
 from .werewolf_env import ContestantSeat, Game, OfficialBaseline, RandomSeat, deal_roles
 
 BACKGROUNDS = {"first": OfficialBaseline, "heuristic": HeuristicSeat, "random": RandomSeat, "llm": LLMSeat,
                "llmx": LLMVariedSeat, "llmq": LLMQwenSeat}
+# Red-team backgrounds (10-08, four context-free challengers; see docs/progress.md "狼人杀红队"): every variant under
+# its own name, plus the four permanent evaluation opponents rt_* (each challenger's final version; rt_chaos is the
+# chaos3 strategy with the chaosx noise on top).
+BACKGROUNDS.update(WOLFPACK_KINDS)                      # wolfpack, wolfpack_h (local/redteam_wolfpack.py)
+BACKGROUNDS.update(TALKER_SEATS)                        # talker, talker_* (local/redteam_talker.py)
+BACKGROUNDS.update(DETECTIVE_VARIANTS)                  # detective, det_v1, det_noskip (local/redteam_detective.py)
+BACKGROUNDS.update(CHAOS_BACKGROUNDS)                   # chaos, chaosx, chaos1..chaos5 (local/redteam_chaos.py)
+RT_BACKGROUNDS = {"rt_wolfpack": WOLFPACK_KINDS["wolfpack"], "rt_talker": TALKER_SEATS["talker"],
+                  "rt_detective": DETECTIVE_VARIANTS["detective"], "rt_chaos": CHAOS_BACKGROUNDS["chaos4"]}
+BACKGROUNDS.update(RT_BACKGROUNDS)
 MIXED = ("first", "heuristic", "random", "llm")       # what a `mixed` seat is drawn from (fixed: keeps old deals)
 LLM_REAL = "llm_real"                                   # the real examples/llm_agent.py (local/llm_seats.py), opt-in
 LOW_K = 3                                               # slice "k<=3": few of our seats at a table

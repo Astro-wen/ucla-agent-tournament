@@ -1,8 +1,8 @@
 """Public move reasoning: the `reasoning_summary` the platform shows spectators next to each move.
 
-Everything written here must be treated as read by the opponent, live: the spectate feed is public, needs no login
-and refreshes every second (docs/competition_brief.md 4.4), and a draft pick's reason is copied straight into the
-other seat's own observation (`picks[].public_reason`, docs/platform/pokemon.md). So the texts are built from public
+Everything written here must be treated as read by the opponent, live: spectators see it next to each move, and a
+draft pick's reason is copied straight into the other seat's own observation (`picks[].public_reason`,
+docs/platform/pokemon.md). So the texts are built from public
 information only, from fixed templates, and never say anything about a choice the other side has not seen yet:
 
 * Werewolf: nothing at night (only wolves and the seer act at night, so even a bland line would say "I am one of
@@ -12,8 +12,8 @@ information only, from fixed templates, and never say anything about a choice th
   ability or moves (hidden once the battle starts) and never a card still in the pool.
 * Pokemon team preview and battle turns are simultaneous. In the default "safe" mode the line is the same whatever
   we chose (lineup, move, target, Protect, switch): the turn number and the public knockout count. "detail" mode
-  (ARENA_REASONING=detail) names the action just chosen (leads at preview, move/target/switch in battle), never
-  anything else; only use it once the organizers confirm spectators see a move after both sides have chosen.
+  (ARENA_REASONING=detail, opt-in, not the competition setting) names the action just chosen (leads at preview,
+  move/target/switch in battle), never anything else.
 
 ARENA_REASONING=off (or 0/false/no/none) is the kill switch: no reasoning is attached at all, and the agent returns
 exactly the decisions it returned before this module existed. Every text goes through `sanitize` (printable ASCII

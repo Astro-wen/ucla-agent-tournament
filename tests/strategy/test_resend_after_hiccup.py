@@ -48,6 +48,13 @@ class Game(FakeMCPGameSession):
         return self._pop(self._play_action_queue)
 
 
+@pytest.fixture(autouse=True)
+def _not_listening(monkeypatch):
+    """These games script every state the runner reads; Werewolf listening (on by default since v4.3) would read more
+    of them. Listening's own runner tests, a lost follow-up included, are in test_werewolf_listen.py."""
+    monkeypatch.setenv("ARENA_WW_LISTEN", "off")
+
+
 @pytest.fixture
 def store(tmp_path, monkeypatch):
     monkeypatch.setenv("ARENA_STATE", "1")

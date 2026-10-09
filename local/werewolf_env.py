@@ -39,7 +39,7 @@ nothing said, not terminated, asked again later.
 
 Failure model (docs/platform/werewolf.md section 9 and altruagent/runner.py): a
 seat whose decision raises, answers an illegal action, sends a chat the
-platform would reject (empty, over 50 words, bad recipients, a 6th chat) or
+platform would reject (empty, over 50 words or 1024 characters, bad recipients, a 6th chat) or
 takes longer than the 120 s idle limit loses its process: from then on the
 platform auto-plays it (day vote -> abstain, night -> first legal target, chat
 -> terminate). Every such event is counted in `Game.stats` per seat.
@@ -64,6 +64,7 @@ ABSTAIN = 7
 IDLE_LIMIT_S = 120.0                  # werewolf.md section 9
 MAX_CHATS = 5
 MAX_WORDS = 50
+MAX_CHARS = 1024                      # MESSAGE_TOO_LONG above it (werewolf.md section 8; red-team chaos found it missing)
 ROUNDS = 6                            # discussion rounds before the idle timeout would close the window
 WINDOW_S = 120.0                      # a discussion window closes 2 minutes after it opens (werewolf.md section 8)
 ROUND_S = 20.0                        # "rounds" timing: one round on the window's clock
@@ -368,8 +369,8 @@ class Game:
             return False
         words = str(m.get("content", "")).split()
         rec = list(m.get("recipients") or [])
-        return bool(words) and len(words) <= MAX_WORDS and sent < MAX_CHATS and len(rec) <= 1 \
-            and all(isinstance(r, int) and 0 <= r < N and r != seat for r in rec)
+        return bool(words) and len(words) <= MAX_WORDS and len(str(m.get("content", ""))) <= MAX_CHARS \
+            and sent < MAX_CHATS and len(rec) <= 1 and all(isinstance(r, int) and 0 <= r < N and r != seat for r in rec)
 
     def _ask_message(self, seat: int, sent: dict) -> str | None:
         """Ask one seat for its discussion move: "msg" (a chat or DM went out), "term" (it terminated, or its

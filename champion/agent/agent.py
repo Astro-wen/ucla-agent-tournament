@@ -84,9 +84,10 @@ _DAY_RE = re.compile(r"Day\s+(\d+)\s*\|")
 # window open and read it, and send at most LISTEN_FOLLOWUPS more chats that day reacting to what was said since
 # (follow a seer claim, counter a fake one); we end our part of the window when a stop rule fires. Times are fractions
 # of the window's length W, the `messaging_seconds_left` of the first state we see in it (WINDOW_S when the state has
-# no countdown).
+# no countdown). On by default since v4.3 (10-08): without it, under the official runner's timing we speak once at
+# t = 0 and can answer nothing said later (red team: 0 of 1007 frames answered); ARENA_WW_LISTEN=off turns it off.
 LISTEN_ENV = "ARENA_WW_LISTEN"
-LISTEN_DEFAULT = "off"
+LISTEN_DEFAULT = "on"
 WINDOW_S = 120.0           # a Werewolf discussion window closes 2 minutes after it opens (werewolf.md §8)
 LISTEN_MARGIN = 1 / 8      # terminate at the latest this long before the window closes (15 s of 120)
 LISTEN_QUIET = 1 / 5       # ... or once no other seat has chatted for this long (24 s of 120)
