@@ -66,7 +66,7 @@
 - **录像**（`logs/<session>.jsonl`）每一行多两个字段：
   - `decision`：`path`（policy / fallback / overrun / crash / busy / repaired / unknown-game，后面可能带 +filled / +repaired）、`kind`、`budget`、`ms`；对战回合还有 `battle`（search = 用了搜索的答案，classic = 经典打法）；重启接上的还有 `resumed`。
   - `search`：这一步搜索的结果：`used`、没用上的原因 `why`、`ms`、`rows`、`cols`、`samples`、`cut`、`lite`。
-- **每局汇总**：worker 退出时打一行 `[match-summary] session=… game=… decisions=… battle=… search=search used=… classic=…（原因 x 次数）degraded=… cut=… search_ms p50=… max=… fallbacks=… overruns=… repairs=… resumed=… engine[starts timeouts late busy hung denied slot] calc[…]`。`ARENA_SUMMARY=0` 关闭。进程被 SIGKILL 时打不出来，但健康行的数据每一步都会更新。
+- **每局汇总**：worker 退出时打一行 `[match-summary] session=… game=… decisions=… battle=… search=search used=… classic=…（原因 x 次数）degraded=… cut=… search_ms p50=… max=… fallbacks=… overruns=… repairs=… resumed=… engine[starts timeouts late busy hung denied slot] calc[…]`（v4.2.5 起，同一步被再问过、招式被服务器拒收过时，`repairs=` 后面还有 `redecided=N`、`refused_moves=N`）。`ARENA_SUMMARY=0` 关闭。进程被 SIGKILL 时打不出来，但健康行的数据每一步都会更新。
 - **健康行**的 `search=` 不再只看文件在不在：
   - `ok(used=38/40)`：最近 30 分钟里所有对局的双打回合，≥80% 用上了搜索的答案；
   - `DEGRADED(used=3/20,no_answer=10,not_warm=7,lite=1)`：低于 80%，后面是机器原因的计数；
