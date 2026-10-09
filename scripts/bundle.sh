@@ -4,7 +4,8 @@
 # official Node.js build for Linux x64 (node/bin/node), the pinned Python requirements, the runbook scripts, the
 # Dockerfile and one recorded real match for the self-check. Without node the agent wins only ~12% against itself
 # with the calculator, so node ships by default. Never contains keys: .env files are excluded and the staged tree
-# is scanned; the build fails on anything key-like.
+# is scanned; the build fails on anything key-like. Its COMMIT file names the full commit id it was built from (and
+# says so when the checkout had uncommitted changes); scripts/run_agent.sh logs that line at every start.
 #
 #   bash scripts/bundle.sh                      # -> dist/arena-agent-<version>.tar.gz (+ .sha256), Node NODE_VERSION
 #   bash scripts/bundle.sh --out /tmp/x         # another output directory
@@ -64,6 +65,13 @@ sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -
 VERSION="$(git describe --always --dirty 2>/dev/null || true)"
 [ -n "$VERSION" ] || VERSION="$(date +%Y%m%d-%H%M)"
 NAME="arena-agent-$VERSION"
+# The full commit id the bundle is built from, for its COMMIT file (Official Rules sections 8 and 9: the deployed
+# version must be identifiable; scripts/run_agent.sh logs this line at every start). Only ROOT's own repository counts.
+COMMIT_LINE="commit unknown (not built from a git checkout)"
+if [ -e "$ROOT/.git" ] && SRC_COMMIT="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" && [[ "$SRC_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+  COMMIT_LINE="commit $SRC_COMMIT"
+  git -C "$ROOT" diff --quiet --no-ext-diff HEAD -- 2>/dev/null || COMMIT_LINE="$COMMIT_LINE (built with uncommitted changes)"
+fi
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 DEST="$STAGE/$NAME"
@@ -229,8 +237,11 @@ if [ -f "$DEST/node/bin/node" ] && [ "$NODE_MODULES" = 1 ] && [ "$(uname -sm)" =
   fi
 fi
 
+BUILT="$(date -u +%Y-%m-%dT%H:%MZ)"
+printf '%s\nbundle %s, built %s\n' "$COMMIT_LINE" "$NAME" "$BUILT" > "$DEST/COMMIT"
 cat > "$DEST/BUNDLE_README.txt" <<EOF
-AltruAgent tournament agent, bundle $VERSION (built $(date -u +%Y-%m-%dT%H:%MZ)).
+AltruAgent tournament agent, bundle $VERSION (built $BUILT).
+Source: $COMMIT_LINE (also in COMMIT; scripts/run_agent.sh logs it at every start).
 Contains no key. Runbook: docs/deploy.md (the official tournament: section "比赛日手册").
 
 Needs: Linux x86-64 with glibc >= 2.28 for the bundled node (Ubuntu >= 18.10, Debian >= 10, RHEL/Rocky/Alma >= 8,

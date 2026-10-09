@@ -7,7 +7,7 @@
 > - **赞助商改为 OCI + Replit**（Nebius 已移除）。
 > - **VGC 实测计时**：队伍预览 90 s、每回合 55 s、整场总时间 420 s（用完判负），文档写的 300 s 不会先触发。
 > - **谁运行 agent 仍未知**：SDK 只有参赛者自托管的运行方式，测试座位也写着自托管；按「我们自己托管」准备，同时保持代码可打包。
-> - 平台新增测试阶段（`python -m agent --claim seatclaim_...`，dashboard 尚未上线）和公开理由接口（理由会显示给观众，不能写底牌）；观战数据流不需要登录。
+> - 平台新增测试阶段（`python -m agent --claim seatclaim_...`，dashboard 尚未上线）和公开理由接口（理由会显示给观众，不能写底牌）。
 > - 官方示例 agent：basic（永远第一个合法动作）、smoke、messaging、llm_agent（gpt-4o-mini，单次 60 s 超时）。
 
 ✅ = 已从官方来源确认 · ⚠️ = 推断 / 来源互相矛盾 · ❓ = 未知，需要问主办方

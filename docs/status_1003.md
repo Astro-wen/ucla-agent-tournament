@@ -109,15 +109,15 @@
 
 ## 6. 需要主人做的事
 
-1. **今天给 Guang Cheng 或 Sandra 发邮件（或 Discord）**，问这几件事：
-   - 代码怎么提交和托管（自己的主机、Replit，还是主办方运行）？提交入口哪天开？
+1. **今天问主办方（先在 Discord 问）**，问这几件事：
+   - 代码怎么提交和托管（自己的主机，还是主办方运行）？提交入口哪天开？
    - 锦标赛 dashboard 和官方密钥（eak_live_ 开头）哪天能用？由谁生成？
    - 宝可梦是单局还是三局两胜？按胜场还是总分排名？每个 agent 同时打几场（max_active_matches）？
    - 狼人杀计不计分、打几局、怎么入座（官方分配还是自己进房间）、空座由谁补（用什么模型）、我们两个 agent 能不能同桌？
    - 登录接口的限流阈值是多少？能不能在第二台机器上用同一把密钥热备？
-   - 观战页面会不会暴露夜里谁在行动、私信内容？（只问，不利用）
+   - 疑似平台问题：由主人私下报告主办方，仓库里不写细节。
 2. **每天看一次锦标赛 dashboard**。上线当天生成官方密钥，写进比赛主机的 .env（`ALTRUAGENT_OFFICIAL_AGENT_KEY=…`，执行 chmod 600，不提交到 git，也不要贴进聊天），然后运行 `python -m agent --check-tournament`，每行都要打勾，把输出发给 Claude（去掉密钥）。
-3. **定主机**：us-west 的非突发型 VM，至少 4 核 8 GB（最好 8 核 16 GB），x86-64，glibc ≥ 2.28。如果主办方指定 Replit，就用 Reserved VM 或 Always-On。比赛当天这台机器不跑别的重活。
+3. **定主机**：us-west 的非突发型 VM，至少 4 核 8 GB（最好 8 核 16 GB），x86-64，glibc ≥ 2.28。如果主办方指定托管平台，就按它的要求选常开的机器。比赛当天这台机器不跑别的重活。
 4. **狼人杀测试房**，二选一：
    - A：dashboard 能建测试赛时，建一场狼人杀测试赛，开 7 个终端分别运行 `ARENA_RECORD_DIR=logs/ww-test/seatN .venv/bin/python -m agent --claim -`，在隐藏提示里粘贴座位 token（不要保存 token），开着终端直到显示 Match finished。
    - B：dashboard 还不行时，同意 Claude 用平台注册接口再注册 5 个 agent，由你认领，再在 Human dashboard 建一个 werewolf 预设的 7 座房间（每个账号同时只能有 1 个进行中的房间）。

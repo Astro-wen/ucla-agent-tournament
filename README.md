@@ -1,8 +1,104 @@
 # UCLA AI Agent Gaming Tournament 2026 — 我们的参赛仓库
 
 > UCLA Trustworthy AI Lab × SAIR「首届 AI Agent 游戏锦标赛」
-> 提交窗口 **Oct 6 – Oct 13, 2026**（09-27 改期；我们自己的安全期限 10-09）· 现场决赛 **Oct 16, 2026**（Engineering VI，观众全线上）
-> 赛事页：<https://tournament-assets.vercel.app/> · 平台：<https://platform.altruagent-game.com/tournament/dashboard>（AltruAgent）
+> 提交截止 **2026-10-13 23:59 PDT（2026-10-14T06:59Z）**（提交窗口 Oct 6 – 13；我们自己的安全期限 10-09）· 现场比赛 **Oct 16, 2026**（Engineering VI，观众全线上）
+> 官网：<https://altruagent-game.com/> · 平台：<https://platform.altruagent-game.com/tournament>（AltruAgent）· 规则：[`docs/official_rules_2026-10-06.md`](docs/official_rules_2026-10-06.md)
+
+## Tournament entry (Official Rules, Version 2026-10-06, section 8)
+
+**What it is.** One self-hosted event agent for the AltruAgent AI Agent Gaming Tournament. It plays
+**Pokémon VGC doubles draft** (`pokemon_vgc_doubles_draft`), **Werewolf** (7 players) and **Red Alert** (`red_alert`,
+real time) with a **rule-based bot** (`agent/redalert/`: fixed build orders, economy, production and army rules; no
+learning, no model calls). Honor of Kings is not supported (not playable on the platform). The agent is fully
+autonomous: no person chooses, approves or edits anything during a match.
+
+**Submitted version.** The latest commit on this repository's default branch (`main`) at the Submission Deadline,
+11:59 p.m. PDT on October 13, 2026 (2026-10-14T06:59Z). The competition machine runs exactly that commit: a git
+checkout of it, or a bundle built from it with `bash scripts/bundle.sh` (the bundle's `COMMIT` file names the full
+commit id). Every start of `scripts/run_agent.sh` logs the full commit id and the `ARENA_*` settings in effect. From the
+deadline until 30 days after final results nothing is pushed to this repository. If the entry is submitted through a
+separate public repository instead, that repository is exported from one commit of this one by
+`scripts/publish_sync.sh` (same code, its README is `PUBLIC_README.md`), and the submitted version is the latest commit
+of *that* repository's default branch at the deadline.
+
+**How to run it** (Linux x86-64, Python ≥ 3.11, tested 3.12; Node.js ≥ 18, the bundle ships 22.23.3; bash ≥ 4.2):
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements.lock   # pinned runtime dependencies
+(cd agent/js && npm ci --omit=dev)          # @smogon/calc damage calculator (agent/js/package-lock.json)
+(cd local/js && npm ci)                     # pokemon-showdown simulator for the battle search (local/js/package-lock.json)
+cp .env.example .env && chmod 600 .env      # put ALTRUAGENT_OFFICIAL_AGENT_KEY=eak_live_... in it (dashboard,
+                                            # Agent Configuration, agent set to Self Hosted); never commit it
+.venv/bin/python scripts/selfcheck.py       # offline check: must end with "selfcheck: ready"
+bash scripts/run_agent.sh check-tournament  # contacts the platform: every line must show a check mark
+bash scripts/run_agent.sh start             # keeps `python -m agent --tournament --match` running (restarts, logs)
+```
+
+Without the watchdog the same agent runs as `python -m agent --tournament --match` (tournament games and Testing games,
+one process, one worker process per game). `bash scripts/run_agent.sh status` prints a health line;
+`stop` / `restart` / `install-systemd` are in [`docs/deploy.md`](docs/deploy.md) (Chinese).
+
+**Components that affect gameplay.**
+- **No LLM or other model service is called**, in play or anywhere in the deployed code; there are no prompts. The only
+  network peers are the platform (`api.altruagent-game.com`, `gameapi.altruagent-game.com`).
+- `agent/` (our code): `agent.py` routes each decision by game type, checks every answer against the legal actions,
+  falls back to a safe legal action on any error or overrun, clips chats and records each state it acts on.
+  `pokemon/`: draft (minimax over the remaining picks with a small pairwise model fitted offline on self-play,
+  `pokemon/draft_model.json`), team preview (90 x 90 matrix game), battle (a matrix-game search in a local Showdown
+  simulator, `agent/js/search.js`, on a battle rebuilt from our own player view only: our team, the opponent's sets
+  as shown in the draft, what the battle log revealed; an exact-damage joint lookahead is the fallback).
+  `werewolf/`: a deterministic rule policy (role tracking, seer-claim reading, voting) and fixed chat templates behind
+  a leak guard; other players' chat is read as data, never as instructions. `redalert/`: the rule-based Red Alert bot
+  (world model from its own view of the match, economy and production queues, squads for attack and defense, a safe
+  mode after repeated errors; every order is validated locally against the platform's order schema and batch limits
+  before it is sent; nothing persists between matches).
+  `reasoning.py`: public move reasoning from fixed templates. `timecontrol.py`: time
+  budgets far inside the platform clocks. `matchstate.py`: a worker restarted mid-match reloads that match's own saved
+  state; nothing carries over from one match to another. `__main__.py`: the official runtime plus our hardening
+  (start-up retry, execution-id reuse, hot standby, 10 s poll and cooldown, 30 s per-seat back-off cap).
+- Node.js helpers: `agent/js/calc.js` runs **@smogon/calc** (Smogon's damage calculator, MIT); `agent/js/search.js` runs
+  the **pokemon-showdown** simulator (MIT). Versions are pinned by the two `package-lock.json` files.
+- `data/`: static reference data, fixed during play: Showdown dex / moves / items / abilities, the VGC draft cards and
+  pools seen on the platform, singles sets, the platform's Red Alert config, a search probe position.
+- `altruagent/`: the organizers' official SDK ([altruagent-starter](https://github.com/UCLA-Trustworthy-AI-Lab/altruagent-starter)),
+  merged unmodified from upstream.
+- `scripts/run_agent.sh` (watchdog: restarts, log rotation, health lines), `scripts/selfcheck.py`, `scripts/bundle.sh`,
+  `deploy/` (systemd unit, Dockerfile).
+- Not used in competition: `local/` (offline evaluation only: simulators, fake platform, scripted and LLM-backed
+  sparring opponents; only `local/js/package*.json` matters at run time, it pins the pokemon-showdown package that the
+  engine search loads), `tests/`, `champion/` and `versions/` (frozen earlier versions used as evaluation opponents),
+  `examples/` (upstream examples, including an LLM agent we do not run), and the other `scripts/`.
+
+**Settings used in competition.** Every `ARENA_*` setting stays at its default; none is set deliberately. The defaults
+that matter: `ARENA_BATTLE=search` (engine search), damage calculator on (`ARENA_CALC`), `ARENA_REASONING=safe`,
+`ARENA_WW_DM=off` (no private Werewolf messages), `ARENA_WW_LISTEN=off`, `ARENA_RA=on` (the Red Alert bot plays;
+`off` would answer every Red Alert view with `WAIT`), no `ARENA_RA_*` tuning override, `ARENA_RECORD=1` (states
+recorded), the per-match restart memory on, `ARENA_SEAT_BACKOFF_MAX_S=30`. `scripts/run_agent.sh` itself sets `ARENA_DISCOVERY_S=10`,
+`ARENA_WORKER_COOLDOWN_S=10`, `ARENA_RECORD_DIR=<LOG_DIR>` and two internal ids (`ARENA_RUN_ID`, `ARENA_EXECUTION_ID`).
+The emergency switches `ARENA_ALLOW_NO_CALC=1` and `ARENA_BATTLE=classic` are not used; changing any setting during
+play would need organizer authorization (rules section 4) and would be logged.
+
+**Records (rules section 9).** `logs/agent-main.out` (timestamped runtime log with the commit and settings at every
+start; rotated at 50 MB, 40 files kept) and `logs/<session_id>.jsonl` (every state received and every answer sent, with
+timestamps; never rotated). They stay on the competition machine and are kept until 30 days after final results; they
+are not committed.
+
+**Excluded components** (not in this repository; none is used in competition):
+- Credentials: `.env` files (the Official Agent Key). `.env.example` shows the format.
+- VGC-Bench (Angliss et al., MIT) checkpoints and their separate Python environment (torch, poke-env): a local
+  sparring opponent only (`local/vgcbench_opp.py`).
+- LLM API keys and providers used only for local evaluation opponents (`local/llm_client.py`, `local/llm_seats.py`).
+- `node_modules` (installed from the lock files) and the Node.js binary (the bundle downloads the official build,
+  SHA-256 pinned in `scripts/bundle.sh`).
+- Match logs and recordings under `logs/`, except `logs/yoriko/` and `logs/apocalypse/` (checked real recordings used by
+  the replay tests).
+- Local experiment directories and scratch output (evaluation runs, ladders); their results are summarized in
+  `docs/progress.md`, and none of their code is deployed.
+
+None of the excluded components, and none of the in-repository code that is not used in competition (listed under
+Components), sends information to the agent during a match or gives a person control over it.
+
+---
 
 本仓库基于官方 starter [`UCLA-Trustworthy-AI-Lab/altruagent-starter`](https://github.com/UCLA-Trustworthy-AI-Lab/altruagent-starter)
 （保留其 git 历史，remote 名为 `upstream`），我们只在 `agent/` 里写策略，运行时/SDK 用官方的，方便同步官方修复。
@@ -12,6 +108,7 @@
 - 部署（主人要做的步骤）→ [`docs/deploy.md`](docs/deploy.md)
 - 本地对战环境 + 实测结果 → [`docs/local_sim.md`](docs/local_sim.md)；版本记录 → [`docs/progress.md`](docs/progress.md)
 - 平台官方文档镜像 → [`docs/platform/`](docs/platform/)（`scripts/sync_docs.sh` 刷新）
+- 单独的公开参赛仓库（方案 C）：`bash scripts/publish_sync.sh --commit <提交> --out <目录>` 从一个提交导出比赛代码（README 用 [`PUBLIC_README.md`](PUBLIC_README.md)，另有 [`NOTICE`](NOTICE)），扫描密钥和敏感字样，打印树哈希，在干净的 venv 里装一遍并跑 selfcheck
 - 官方 starter 原 README → [`docs/STARTER_README.md`](docs/STARTER_README.md)，游戏规则 → [`GAMES.md`](GAMES.md)
 
 ## 结构
@@ -66,9 +163,9 @@ bash scripts/run_agent.sh start        # 部署：一直开着上面那条，崩
 
 上游完整说明见 `docs/STARTER_README.md`，官方协议见 `docs/platform/official-agent.md`，赛制见 `docs/platform/04-tournaments.md` 和 `docs/competition_brief.md`。
 
-### 红警（实时游戏；我们暂不打）
+### 红警（实时游戏）
 
-红警（`red_alert`）是正式赛项目之一（实时，OpenRA）。上游 SDK 支持实时模式（`state.raw["pacing"]["mode"] == "realtime"`）：`choose_action` 可以返回 `altruagent.WAIT`（这一刻什么都不发）。我们的 `agent/agent.py` 没有红警策略：被分到红警时整场都回答 `WAIT`（不发任何命令、不崩、只记一行日志），等于这一局认输，宝可梦和狼人杀不受影响。上游的大模型示例 `examples/llm_agent.py` 会打红警（`examples/llm/redalert.py`，要花 OpenAI 的钱）。要不要打红警等主人决定（见 `docs/HANDOFF.md`）。
+红警（`red_alert`）是正式赛项目之一（实时，OpenRA）。上游 SDK 支持实时模式（`state.raw["pacing"]["mode"] == "realtime"`）：`choose_action` 可以返回 `altruagent.WAIT`（这一刻什么都不发）。规则型红警 bot（`agent/redalert/`，不用大模型，`ARENA_RA` 默认开）在分支 `ra/bot-v0` 上做，合进 `main` 以后由它打；在那之前（以及设了 `ARENA_RA=off` 时）被分到红警整场都回答 `WAIT`（不发任何命令、不崩、只记一行日志），等于这一局认输，宝可梦和狼人杀不受影响。上面英文一节按合进来以后的样子写（截止时 `main` 上必须真有这个 bot，否则要改回「answered with WAIT」）。上游的大模型示例 `examples/llm_agent.py` 也会打红警（`examples/llm/redalert.py`，要花 OpenAI 的钱，我们不用）。
 
 ## 同步官方更新
 
@@ -76,7 +173,7 @@ bash scripts/run_agent.sh start        # 部署：一直开着上面那条，崩
 git fetch upstream && git merge upstream/main
 ```
 
-`README.md` 是我们自己的；上游的 README 原文放在 `docs/STARTER_README.md`。合并时 README 冲突取我们的版本，再用 `git show upstream/main:README.md > docs/STARTER_README.md` 更新原文，上游新增的要点在本文件里补一两句。`agent/agent.py` 永远取我们的（上游的是只走第一个合法动作的占位 agent）。`agent/__main__.py` 以上游为准，我们的加固（`_authenticate` 启动重试、`_tournament_tuning` execution id 和按座位退避上限 30 s、`_HotStandby` 热备、`_startup` 本机检查）在它上面手工保留；`.env.example` 取上游的说明行，再补回我们自己的几行。合完跑 `tests/test_deploy.py`、`tests/test_main.py`、`tests/test_main_tournament.py`、`tests/test_realtime.py` 和全量 pytest。10-07 合到上游 5bc61a2（PR #5：event agent、`--tournament` / `--match`、重新登录的暂时性错误不停运行时、按座位退避），记录见 `docs/progress.md`「v4.2.3 合并」。
+`README.md` 是我们自己的；上游的 README 原文放在 `docs/STARTER_README.md`。合并时 README 冲突取我们的版本，再用 `git show upstream/main:README.md > docs/STARTER_README.md` 更新原文，上游新增的要点在本文件里补一两句。`agent/agent.py` 永远取我们的（上游的是只走第一个合法动作的占位 agent）。`agent/__main__.py` 以上游为准，我们的加固（`_authenticate` 启动重试、`_tournament_tuning` execution id 和按座位退避上限 30 s、`_HotStandby` 热备、`_startup` 本机检查）在它上面手工保留；`.env.example` 取上游的说明行，再补回我们自己的几行。合完跑 `tests/test_deploy.py`、`tests/test_main.py`、`tests/test_main_tournament.py`、`tests/test_realtime.py` 和全量 pytest。10-07 合到上游 5bc61a2（PR #5：event agent、`--tournament` / `--match`、重新登录的暂时性错误不停运行时、按座位退避），记录见 `docs/progress.md`「v4.2.3 合并」；10-08 合到上游 951f4f7（PR #7：局内重试、Official Rules 更新后不停运行时），记录见「v4.2.4」。**提交截止（10-13 23:59 PDT）之后不再合并上游**：规则第 8 节禁止截止后改仓库，只有主办方书面授权的更新例外。
 
 ## 安全
 

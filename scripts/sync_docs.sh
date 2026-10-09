@@ -4,6 +4,8 @@
 # pages (01-signup 02-auth 03-competitions 08-commands 09-end-to-end avalon testing-seat-claim) and added
 # official-agent. An unknown topic answers 404 with the live list ("Available: ..."), printed below, so a
 # new or retired page shows up here; a local page that is no longer published is listed for `git rm`.
+# The pages change without a version bump (10 of them changed on 10-07/08 under the same v0.5.0): compare the
+# files (the diff --stat at the end), never only the version line. Last mirrored 2026-10-08 (same topics).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BASE=https://api.altruagent-game.com
