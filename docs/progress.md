@@ -746,3 +746,17 @@
 | `candidates/r2-switching-endgame` | 主动换人、U-turn 类、残局风险 | 半成品（WIP） |
 
 真实对局记录：`logs/yoriko/`、`logs/apocalypse/`（10 局，已确认不含密钥）现在也在仓库里，`scripts/replay_real.py` 和 `scripts/calibrate_calc.py` 在任何机器上都能直接用。
+
+### v4.3 合并（10-08 合并，10-10 收尾；分支 `integrate/v43`）
+把四个分支按顺序合到 main（7a59a65，v4.2.4）上：`pk/tracker-1008`（v4.2.5，宝可梦没落地的出招不算用过）、`ra/bot-v0`（v4.3.1，红警规则型 bot）、`ww/redteam`（v4.3，狼人杀红队加固，默认继续听讨论）、`docs/1008`（规则合规、比赛日手册、公开仓库准备）。冲突只在 `agent/agent.py`（两个 `on_action_result` 合成一个：先红警，后宝可梦）、`champion/VERSION` 和文档；各游戏的决策代码和各自分支逐字相同。
+
+检查（树 5eb830a，输出在 `~/wt/_v43_out`）：
+- 全量 pytest 2235 个全过（= 1962 + 宝可梦 35 + 红警 96 + 狼人杀 134 + 文档 8）。
+- `replay_real.py` 2349 个真实决策 0 失败、0 修补，搜索 1296/1296，p99 1700 ms；`--no-calc` 同样 0 失败，p99 1671 ms。
+- 宝可梦逐局对比：20 局对冠军（种子 171、确定性设置），胜负、回合数、非法动作、计时器代打和 main 逐局相同（20/20）。
+- 狼人杀官方运行器本地路径 40 局：0 错误（63/112，默认继续听讨论；main 是 67/112）。
+- 红警模拟器配对联赛 54 局：和 `ra/bot-v0` 结果、局长逐局相同（51 胜），0 次报错。
+- selfcheck ready；新包 arena-agent-5eb830a（46 MB，428 个文件，带 COMMIT 文件）在干净环境 selfcheck ready、重放 60 个决策 0 拒收、坏 key 退出 1。
+- `rehearsal_official.py` 16/16（含 auth503、热备接管 31.9 s、0 次缺席）；红警假平台端到端两场都真的在打（0 个不合法动作）。
+- `publish_sync.sh` 预演：扫描干净、README 合格，112 个文件 / 4.3 MB，READY。
+- 冠军已冻结（5eb830a）。只有真实 Testing 对局才能确认的：红警的真实寻路、战斗平衡、采矿收入；狼人杀「继续听讨论」在真实服务器上的表现。
