@@ -45,19 +45,34 @@ def states(n, seed):
     return out
 
 
-def test_off_is_the_v43_drafter_exactly():
-    """Default (ARENA_DRAFT_OPP unset), and meta mode with a fixed weight 0, search exactly like champion/agent (v4.3)."""
-    champ = importlib.import_module("champion.agent.pokemon.drafter")
-    champ_policy = importlib.import_module("champion.agent.pokemon.policy")
+V43 = {"opp_mode": "off", "resid": 0}          # the fallback switches: exactly the v4.3 drafter
+
+
+def test_off_is_the_v43_drafter_exactly(monkeypatch):
+    """Both switches off (by argument or ARENA_DRAFT_OPP=off + ARENA_DRAFT_RESID=0), and meta mode with a fixed weight
+    0, search exactly like the v4.3 drafter (a frozen copy: versions/v4_engine_search, same drafter as v4.3)."""
+    old_mod = importlib.import_module("versions.v4_engine_search.agent.pokemon.drafter")
+    old_policy = importlib.import_module("versions.v4_engine_search.agent.pokemon.policy")
     for rest, mine, opp, legal, taken in states(8, 11):
-        old = champ.Drafter(prior_score=lambda c: champ_policy.card_score(c, []))
+        old = old_mod.Drafter(prior_score=lambda c: old_policy.card_score(c, []))
         a = old.pick(rest, mine, opp, legal, n_taken=taken)
-        for kw in ({}, {"opp_mode": "meta", "opp_w": 0.0}):
-            new = Drafter(prior_score=lambda c: card_score(c, []), **kw)
+        for kw in (V43, {"opp_mode": "meta", "opp_w": 0.0, "resid": 0}, "env"):
+            if kw == "env":
+                monkeypatch.setenv("ARENA_DRAFT_OPP", "off")
+                monkeypatch.setenv("ARENA_DRAFT_RESID", "0")
+                new = Drafter(prior_score=lambda c: card_score(c, []))
+                monkeypatch.delenv("ARENA_DRAFT_OPP")
+                monkeypatch.delenv("ARENA_DRAFT_RESID")
+            else:
+                new = Drafter(prior_score=lambda c: card_score(c, []), **kw)
             assert new.pick(rest, mine, opp, legal, n_taken=taken) == a
             for k in ("depth", "nodes", "value", "top", "ties"):
                 assert new.info[k] == old.info[k], k
-            assert "opp_w" not in new.info or kw
+
+
+def test_the_defaults_are_the_v44_draft():
+    d = Drafter(prior_score=lambda c: card_score(c, []))
+    assert d.opp_mode == "meta" and d.opp_prior == pytest.approx(0.2) and d.resid == 1.0
 
 
 def test_meta_mode_is_legal_and_within_the_node_budget():
@@ -81,11 +96,11 @@ def _play_out(opp_picker, our_seat_first: bool, n_opp_picks: int, seed=3):
         held = {c["item"] for c in side}
         legal = {c["card_id"] for c in rest if c["item"] not in held} or {c["card_id"] for c in rest}
         if ours and len(opp) >= n_opp_picks:
-            d = Drafter(prior_score=lambda c: card_score(c, []), opp_mode="meta")
+            d = Drafter(prior_score=lambda c: card_score(c, []), opp_mode="meta", opp_prior=0.5, resid=0)
             d.pick(rest, mine, opp, legal, n_taken=n)
             return d.info
         if ours:
-            cid = Drafter(prior_score=lambda c: card_score(c, [])).pick(rest, mine, opp, legal, n_taken=n)
+            cid = Drafter(prior_score=lambda c: card_score(c, []), **V43).pick(rest, mine, opp, legal, n_taken=n)
         else:
             cid = opp_picker(rest, opp, mine, legal, n)
         side.append(next(c for c in rest if c["card_id"] == cid))
@@ -101,7 +116,7 @@ def test_the_weight_follows_how_the_opponent_drafts():
         return max((c for c in rest if c["card_id"] in legal), key=lambda c: (meta.utility(c), c["card_id"]))["card_id"]
 
     def model_like(rest, own, other, legal, n):            # the v4.3 drafter on the opponent's side
-        return Drafter(prior_score=lambda c: card_score(c, [])).pick(rest, own, other, legal, n_taken=n)
+        return Drafter(prior_score=lambda c: card_score(c, []), **V43).pick(rest, own, other, legal, n_taken=n)
 
     w_meta, w_model = [], []
     for seed in (1, 2, 3):
@@ -124,10 +139,10 @@ def test_singles_and_a_missing_prior_turn_it_off(tmp_path, monkeypatch):
     monkeypatch.setenv("ARENA_DRAFT_META", str(tmp_path / "missing.json"))
     monkeypatch.setattr(DraftMeta, "_cache", None)
     try:
-        d = Drafter(prior_score=lambda c: card_score(c, []), opp_mode="meta")
+        d = Drafter(prior_score=lambda c: card_score(c, []), opp_mode="meta", resid=0)
         assert not d.meta
         rest, mine, opp, legal, taken = states(1, 2)[0]
-        base = Drafter(prior_score=lambda c: card_score(c, []))
+        base = Drafter(prior_score=lambda c: card_score(c, []), **V43)
         assert d.pick(rest, mine, opp, legal, n_taken=taken) == base.pick(rest, mine, opp, legal, n_taken=taken)
         assert d.info["opp_w"] == 0.0
     finally:
@@ -137,7 +152,7 @@ def test_singles_and_a_missing_prior_turn_it_off(tmp_path, monkeypatch):
 def test_residuals_shift_both_sides_by_species(tmp_path, monkeypatch):
     rest, mine, opp, legal, taken = states(1, 6)[0]
     cards = mine + opp + rest
-    base = Drafter(prior_score=lambda c: card_score(c, []))
+    base = Drafter(prior_score=lambda c: card_score(c, []), resid=0)
     m0, _, _ = base._tables(cards)
     mo0 = list(base.m_opp)
     target = dex.to_id(cards[0]["species"])
@@ -151,8 +166,8 @@ def test_residuals_shift_both_sides_by_species(tmp_path, monkeypatch):
         assert m1[0] == pytest.approx(m0[0] + 0.5) and d.m_opp[0] == pytest.approx(mo0[0] + 0.5)
         assert m1[1:] == pytest.approx(m0[1:]) and d.m_opp[1:] == pytest.approx(mo0[1:])
         assert Drafter(singles=True, resid=1).resid == 0.0
-        monkeypatch.setenv("ARENA_DRAFT_RESID", "1")
-        assert Drafter().resid == 1.0
+        monkeypatch.setenv("ARENA_DRAFT_RESID", "0")
+        assert Drafter().resid == 0.0
     finally:
         monkeypatch.setattr(drafter, "_RESID", None)
 
@@ -166,25 +181,28 @@ def test_shipped_residuals_exist_and_are_small():
     assert not set(d["seeds"]) & {7, 11, 31, 45, 73, 75, 83}          # the gate seeds stay out of sample
 
 
-def test_policy_reads_the_switch(monkeypatch):
+def test_policy_drafts_with_the_v44_defaults_and_the_switches_restore_v43(monkeypatch):
     seen = {}
     real = drafter.Drafter.pick
 
     def spy(self, *a, **k):
-        seen["mode"] = self.opp_mode
+        seen["mode"], seen["resid"] = self.opp_mode, self.resid
         return real(self, *a, **k)
 
     monkeypatch.setattr(drafter.Drafter, "pick", spy)
-    monkeypatch.setenv("ARENA_DRAFT_OPP", "meta")
     from agent.pokemon.policy import PokemonPolicy
     rest, mine, opp, legal, taken = states(1, 4)[0]
-    pk = PokemonPolicy()
     obs = {"phase": "draft", "current_seat": "me", "pick_number": taken + 1, "available_cards": rest,
            "rosters": {"me": [{"card_id": c["card_id"], "species": c["species"]} for c in mine],
                        "op": [{"card_id": c["card_id"], "species": c["species"]} for c in opp]}, "picks": []}
-    pk.draft_pool.update({c["card_id"]: c for c in mine + opp + rest})
-    cid = pk._drafter_pick(obs, "me", legal)
-    assert cid in legal and seen["mode"] == "meta" and "opp_w" in pk.draft_info
+    for env, want in (({}, ("meta", 1.0)), ({"ARENA_DRAFT_OPP": "off", "ARENA_DRAFT_RESID": "0"}, ("off", 0.0))):
+        for k, v in env.items():
+            monkeypatch.setenv(k, v)
+        pk = PokemonPolicy()
+        pk.draft_pool.update({c["card_id"]: c for c in mine + opp + rest})
+        cid = pk._drafter_pick(obs, "me", legal)
+        assert cid in legal and (seen["mode"], seen["resid"]) == want
+        assert ("opp_w" in pk.draft_info) == (want[0] == "meta")
 
 
 # ---- the evaluation opponent ------------------------------------------------------------------------------------

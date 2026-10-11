@@ -83,11 +83,13 @@ DEFAULT_PRIOR = {"a": -0.11, "b": 0.02}  # m = a + b * card_score for unseen car
 #   top-OPP_K cards by u, weighted by softmax(u); its greedy roll-out pick is the top card by u when w >= 0.5.
 # Our own valuation (the model) is unchanged: this only changes WHICH cards we expect the opponent to take.
 META_PATH = Path(__file__).resolve().parent / "draft_meta.json"
-OPP_MODE = "off"         # off | meta
-OPP_PRIOR = 0.5          # prior probability of a meta-like opponent
-OPP_TEMP = 0.15          # temperature (logit units of model gain) of the model-like opponent's pick likelihood
+OPP_MODE = "meta"        # meta (v4.4-draft) | off (= v4.3)
+OPP_PRIOR = 0.2          # prior probability of a meta-like opponent (0.2 beat 0.5 / 0.8 in draft-only tuning, seed 101)
+OPP_TEMP = 0.15          # temperature (logit units of model gain) of the model-like opponent's pick likelihood (max-
+                         # likelihood value for the v4.3 drafter's own picks, 145 simulated drafts)
 OPP_K = 3                # meta candidates expanded at an opponent node
 OPP_W = -1.0             # >= 0: a fixed mixture weight (no likelihood update); experiments only
+OPP_MIN_KNOWN = 6        # the prior must know at least this many of the draft's species, else the model stays off
 W_EPS = 1e-3             # w below this: the v4.3 search; above 1 - W_EPS: no adversary branch
 
 # ---- v4-pilot residual strengths (ARENA_DRAFT_RESID=1; off = v4.3) ------------------------------------------------
@@ -95,7 +97,7 @@ W_EPS = 1e-3             # w below this: the v4.3 search; above 1 - W_EPS: no ad
 # scripts/fit_draft_resid.py fits, on local search-vs-search games (gate seeds excluded), a per-species residual d on
 # top of the model's log-odds; with RESID on, d is added to a card's strength on both sides (m and m_opp).
 RESID_PATH = Path(__file__).resolve().parent / "draft_resid.json"
-RESID = 0.0              # 1 = on; any other number scales d (experiments)
+RESID = 1.0              # 1 = on (v4.4-draft), 0 = off (= v4.3); any other number scales d (experiments)
 
 
 class _Timeout(Exception):
@@ -551,7 +553,8 @@ class Drafter:
         # ---- opponent model (ARENA_DRAFT_OPP=meta). Off, or w ~ 0: the v4.3 functions above, untouched. ----
         w = 0.0
         pref: list[float] = []
-        if self.opp_mode == "meta" and self.meta:
+        if self.opp_mode == "meta" and self.meta and \
+                sum(to_id(c.get("species", "")) in self.meta.u for c in cards) >= OPP_MIN_KNOWN:
             pref = [self.meta.utility(c) for c in cards]
             w = self._opp_weight(cards, my_idx, opp_idx, taken, me_letter, mo, P, S, pref, items)
 

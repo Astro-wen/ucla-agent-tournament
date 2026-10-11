@@ -73,6 +73,33 @@ def load(dirs, exclude) -> list[dict]:
     return rows
 
 
+def load_rows(paths, exclude) -> list[dict]:
+    """local.panel result rows that carry both sixes (six_cand / six_opp: the meta* opponents, whose pilot is the
+    champion's engine search). Only pass runs whose candidate also battles with the engine search."""
+    from agent.pokemon.dex import card_catalog
+    by_sp: dict[str, dict] = {}
+    for c in card_catalog().values():
+        by_sp.setdefault(to_id(c["species"]), c)
+    rows = []
+    for pat in paths:
+        for p in sorted(glob.glob(os.path.expanduser(pat))):
+            for line in open(p):
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if "error" in r or "six_cand" not in r or r.get("tie") or r.get("seed") in exclude:
+                    continue
+                try:
+                    ours = [by_sp[to_id(s)] for s in r["six_cand"]]
+                    theirs = [by_sp[to_id(s)] for s in r["six_opp"]]
+                except KeyError:
+                    continue
+                rows.append({"ours": ours, "theirs": theirs, "win": 1 if r["win"] else 0,
+                             "pool": (r["seed"], r["g"]), "run": p})
+    return rows
+
+
 def model_logodds(rows) -> None:
     from agent.pokemon.drafter import Drafter
     d = Drafter(opp_mode="off", resid=False)
@@ -137,7 +164,8 @@ def cv(rows, species, lam, folds=5, seed=0) -> float:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("dirs", nargs="+", help="experiment directories searched for local.panel runs with --save-logs")
+    ap.add_argument("dirs", nargs="*", help="experiment directories searched for local.panel runs with --save-logs")
+    ap.add_argument("--rows", nargs="*", default=[], help="local.panel result files (globs) with six_cand / six_opp")
     ap.add_argument("--exclude", default=",".join(map(str, GATE_SEEDS)), help="match seeds left out (gate seeds)")
     ap.add_argument("--lams", default="80,300,1000", help="L2 strengths tried by cross-validation")
     ap.add_argument("--lam", type=float, default=None, help="use this L2 strength (default: the best by CV)")
@@ -145,7 +173,7 @@ def main() -> None:
     ap.add_argument("--out", default="")
     a = ap.parse_args()
     exclude = {int(x) for x in a.exclude.split(",") if x.strip()}
-    rows = load(a.dirs, exclude)
+    rows = load(a.dirs, exclude) + load_rows(a.rows, exclude)
     if not rows:
         raise SystemExit("no usable games")
     model_logodds(rows)

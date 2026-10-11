@@ -161,7 +161,7 @@ def test_unseen_strength_is_the_two_feature_prior_with_this_drafts_mean_duel(mon
     fps = {c["card_id"]: card_fingerprint(c) for c in cards[1:]}
     m = DraftModel({"main": {c["card_id"]: 0.0 for c in cards[1:]}, "fingerprints": fps, "beta": 0.2,
                     "prior": {"a": -0.05, "b": 0.01, "c": -0.3, "z_mean": 0.0}})
-    d = Drafter(m, prior_score=prior)
+    d = Drafter(m, prior_score=prior, resid=0)          # the model's own strengths (v4.4-draft residuals off)
     mvec, P, _ = d._tables(cards)
     duel = ((0.9 - 0.5) + (0.7 - 0.5) + (0.2 - 0.5)) / 3
     assert mvec[0] == pytest.approx(-0.05 + 0.01 * prior(cards[0]) - 0.3 * duel)
@@ -204,7 +204,9 @@ def test_node_budget_is_deterministic_and_load_independent(monkeypatch, capsys):
     d = Drafter(prior_score=prior)
     want = d.pick(pool, mine, opp, legal, n_taken=0)
     assert d.info["depth"] == drafter.MAX_DEPTH and not d.info["budget_hit"]    # the default budget never binds here
-    assert d.info["nodes"] < drafter.NODE_BUDGET / 3
+    # (v4.4-draft: the opponent model expands up to OPP_K extra cards at opponent nodes; 47.6k nodes here, at most
+    # 55.5k over the 132 recorded real draft states, 0 budget hits: still well inside the budget)
+    assert d.info["nodes"] < drafter.NODE_BUDGET / 2
     small = Drafter(prior_score=prior, node_budget=3000)
     got = small.pick(pool, mine, opp, legal, n_taken=0)
     ref = dict(small.info)

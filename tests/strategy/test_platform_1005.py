@@ -68,7 +68,11 @@ def store(tmp_path, monkeypatch):
 
 @pytest.fixture
 def steady(monkeypatch):
-    """No wall-clock cut in the draft search or the preview game (answers depend only on the state)."""
+    """No wall-clock cut in the draft search or the preview game (answers depend only on the state). The draft runs
+    with the v4.3 drafter switches (v4.4-draft opponent model and residuals off): these tests replay a recorded match
+    and compare our memory with the picks the recording actually made."""
+    monkeypatch.setenv("ARENA_DRAFT_OPP", "off")
+    monkeypatch.setenv("ARENA_DRAFT_RESID", "0")
     monkeypatch.setenv("ARENA_TC_PREVIEW_S", "120")
     monkeypatch.setenv("ARENA_TC_DRAFT_S", "120")
     monkeypatch.setitem(preview_matrix.KNOBS, "wall_cap_s", 60.0)
