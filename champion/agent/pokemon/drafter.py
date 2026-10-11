@@ -43,6 +43,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import os
 import sys
 import time
@@ -71,6 +72,33 @@ MAX_DEPTH = 4            # picks searched exactly (the root pick included); the 
 DEFAULT_BETA = 0.19      # weight of the calc matchup prior when no model file is present (fitted value)
 DEFAULT_PRIOR = {"a": -0.11, "b": 0.02}  # m = a + b * card_score for unseen cards (no model file; fitted value)
 
+# ---- opponent model (ARENA_DRAFT_OPP; "off" = the v4.3 search exactly) ------------------------------------------------
+# v4.3 assumes the opponent drafts by OUR model (the minimax's adversary, its greedy roll-outs take the opponent's model
+# gain). The real contestants draft the standard competitive core instead (Flutter Mane, Incineroar, Dragonite, ...):
+# our model names only ~19% of their real picks, a conditional logit fitted on them ~58% (scripts/fit_meta_drafter.py
+# -> META_PATH, per-species utility u). With ARENA_DRAFT_OPP=meta the search treats the opponent as a mixture:
+#   w   = posterior probability that this opponent drafts like the real contestants (OPP_PRIOR before its first pick;
+#         each observed pick multiplies the odds by P_meta(pick) / P_model(pick), P_model = softmax(model gain / OPP_TEMP))
+#   an opponent node is worth (1 - w) * min over the top-K by model gain (as v4.3) + w * the expectation over the
+#   top-OPP_K cards by u, weighted by softmax(u); its greedy roll-out pick is the top card by u when w >= 0.5.
+# Our own valuation (the model) is unchanged: this only changes WHICH cards we expect the opponent to take.
+META_PATH = Path(__file__).resolve().parent / "draft_meta.json"
+OPP_MODE = "meta"        # meta (v4.4-draft) | off (= v4.3)
+OPP_PRIOR = 0.2          # prior probability of a meta-like opponent (0.2 beat 0.5 / 0.8 in draft-only tuning, seed 101)
+OPP_TEMP = 0.15          # temperature (logit units of model gain) of the model-like opponent's pick likelihood (max-
+                         # likelihood value for the v4.3 drafter's own picks, 145 simulated drafts)
+OPP_K = 3                # meta candidates expanded at an opponent node
+OPP_W = -1.0             # >= 0: a fixed mixture weight (no likelihood update); experiments only
+OPP_MIN_KNOWN = 6        # the prior must know at least this many of the draft's species, else the model stays off
+W_EPS = 1e-3             # w below this: the v4.3 search; above 1 - W_EPS: no adversary branch
+
+# ---- v4-pilot residual strengths (ARENA_DRAFT_RESID=1; off = v4.3) ------------------------------------------------
+# The model above was fitted on v3 self-play (classic battle pilot); since v4 both seats battle with the engine search.
+# scripts/fit_draft_resid.py fits, on local search-vs-search games (gate seeds excluded), a per-species residual d on
+# top of the model's log-odds; with RESID on, d is added to a card's strength on both sides (m and m_opp).
+RESID_PATH = Path(__file__).resolve().parent / "draft_resid.json"
+RESID = 1.0              # 1 = on (v4.4-draft), 0 = off (= v4.3); any other number scales d (experiments)
+
 
 class _Timeout(Exception):
     pass
@@ -83,6 +111,61 @@ def _knob(name: str, default: float) -> float:
         return float(v) if v not in (None, "") else default
     except ValueError:
         return default
+
+
+def _knob_str(name: str, default: str) -> str:
+    v = os.environ.get(f"ARENA_DRAFT_{name}")
+    return str(v).strip().lower() if v not in (None, "") else default
+
+
+class DraftMeta:
+    """What real opponents take (META_PATH): species id -> utility u; unknown species -> mu. Empty when missing."""
+
+    def __init__(self, d: dict | None = None):
+        d = d or {}
+        self.u = {str(k): float(v) for k, v in (d.get("u") or {}).items()}
+        self.mu = float(d.get("mu", 0.0))
+
+    def __bool__(self) -> bool:
+        return bool(self.u)
+
+    def utility(self, card: dict) -> float:
+        return self.u.get(to_id(card.get("species", "")), self.mu)
+
+    _cache: "DraftMeta | None" = None
+
+    @classmethod
+    def load(cls) -> "DraftMeta":
+        if cls._cache is None:
+            meta = None
+            try:
+                p = Path(os.environ.get("ARENA_DRAFT_META") or META_PATH)
+                if p.exists():
+                    meta = cls(json.loads(p.read_text()))
+            except Exception:
+                log.warning("draft meta prior unreadable; opponent model off", exc_info=True)
+                meta = None
+            cls._cache = meta or cls(None)
+        return cls._cache
+
+
+_RESID: dict | None = None
+
+
+def load_resid() -> dict:
+    """species id -> residual strength (RESID_PATH, or ARENA_DRAFT_RESID_FILE); {} when missing or unreadable."""
+    global _RESID
+    if _RESID is None:
+        out = {}
+        try:
+            p = Path(os.environ.get("ARENA_DRAFT_RESID_FILE") or RESID_PATH)
+            if p.exists():
+                out = {str(k): float(v) for k, v in (json.loads(p.read_text()).get("d") or {}).items()}
+        except Exception:
+            log.warning("draft residual file unreadable; residuals off", exc_info=True)
+            out = {}
+        _RESID = out
+    return _RESID
 
 
 def card_fingerprint(card: dict | None) -> str | None:
@@ -283,9 +366,23 @@ def singles_threat_table():
 class Drafter:
     def __init__(self, model: DraftModel | None = None, prior_score=None, node_budget: int | None = None,
                  top_k: int | None = None, max_depth: int | None = None, use_matchups: bool = True,
-                 tie_eps: float | None = None, wall_cap: float | None = None, singles: bool = False):
+                 tie_eps: float | None = None, wall_cap: float | None = None, singles: bool = False,
+                 opp_mode: str | None = None, opp_prior: float | None = None, opp_temp: float | None = None,
+                 opp_k: int | None = None, opp_w: float | None = None, meta: DraftMeta | None = None,
+                 resid: float | bool | None = None):
         self.model = model or DraftModel.load()
         self.singles = singles               # OU singles draft: counters from singles_threat_table()
+        # v4-pilot residual strengths (see RESID): a scale, 0 = off (v4.3); never for the OU singles draft
+        self.resid = 0.0 if singles else float(resid if resid is not None else _knob("RESID", RESID))
+        # opponent model (see OPP_MODE); never for the OU singles draft (the prior is fitted on VGC drafts)
+        self.opp_mode = (opp_mode if opp_mode is not None else _knob_str("OPP", OPP_MODE)).lower()
+        if singles:
+            self.opp_mode = "off"
+        self.opp_prior = float(opp_prior if opp_prior is not None else _knob("OPPPRIOR", OPP_PRIOR))
+        self.opp_temp = max(1e-3, float(opp_temp if opp_temp is not None else _knob("OPPTEMP", OPP_TEMP)))
+        self.opp_k = max(1, int(opp_k if opp_k is not None else _knob("OPPK", OPP_K)))
+        self.opp_w = float(opp_w if opp_w is not None else _knob("OPPW", OPP_W))
+        self.meta = meta if meta is not None else (DraftMeta.load() if self.opp_mode == "meta" else DraftMeta(None))
         self.prior_score = prior_score
         self.node_budget = int(node_budget if node_budget is not None else _knob("NODES", NODE_BUDGET))
         self.top_k = int(top_k if top_k is not None else _knob("TOPK", TOP_K))
@@ -329,6 +426,12 @@ class Drafter:
         # the opponent's strengths: main_opp where the model has it, else the same as ours (symmetric model)
         self.m_opp = [self.model.main_opp[k] if k is not None and k in self.model.main_opp else m[i]
                       for i, k in enumerate(keys)]
+        if self.resid:                       # v4-pilot residuals (RESID): the same shift on both sides
+            rd = load_resid()
+            if rd:
+                shift = [self.resid * rd.get(to_id(c.get("species", "")), 0.0) for c in cards]
+                m = [v + s for v, s in zip(m, shift)]
+                self.m_opp = [v + s for v, s in zip(self.m_opp, shift)]
         for i in range(n):
             for j in range(i + 1, n):
                 v = self.model.x(keys[i], keys[j])
@@ -447,12 +550,66 @@ class Drafter:
                     best = v
             return best
 
+        # ---- opponent model (ARENA_DRAFT_OPP=meta). Off, or w ~ 0: the v4.3 functions above, untouched. ----
+        w = 0.0
+        pref: list[float] = []
+        if self.opp_mode == "meta" and self.meta and \
+                sum(to_id(c.get("species", "")) in self.meta.u for c in cards) >= OPP_MIN_KNOWN:
+            pref = [self.meta.utility(c) for c in cards]
+            w = self._opp_weight(cards, my_idx, opp_idx, taken, me_letter, mo, P, S, pref, items)
+
+        def greedy_m(k, rem, gm, go, L, mi, oi):
+            while k < len(seq_me) and rem:
+                ours = seq_me[k]
+                cand = legal(rem, mi if ours else oi)
+                if cand:
+                    g = gm if ours else (pref if w >= 0.5 else go)
+                    c = max(cand, key=g.__getitem__)
+                    rem, gm, go, L, mi, oi = apply(c, ours, rem, gm, go, L, mi, oi)
+                k += 1
+            return L
+
+        def search_m(k, depth, rem, gm, go, L, mi, oi):
+            if k >= len(seq_me) or not rem:
+                return L
+            if depth <= 0:
+                return greedy_m(k, rem, gm, go, L, mi, oi)
+            if nodes[0] > budget:
+                raise _Timeout
+            if time.monotonic() > wall:
+                wall_hit[0] = True
+                raise _Timeout
+            ours = seq_me[k]
+            cand = legal(rem, mi if ours else oi)
+            if not cand:
+                return search_m(k + 1, depth, rem, gm, go, L, mi, oi)
+            if ours:
+                best = None
+                for c in sorted(cand, key=gm.__getitem__, reverse=True)[:self.top_k]:
+                    v = search_m(k + 1, depth - 1, *apply(c, True, rem, gm, go, L, mi, oi))
+                    if best is None or v > best:
+                        best = v
+                return best
+            # the opponent: (1 - w) x the adversary of v4.3 + w x the expected pick of a meta-like drafter
+            adv = sorted(cand, key=go.__getitem__, reverse=True)[:self.top_k] if w < 1.0 - W_EPS else []
+            prd = sorted(cand, key=pref.__getitem__, reverse=True)[:self.opp_k]
+            vals = {}
+            for c in dict.fromkeys(adv + prd):
+                vals[c] = search_m(k + 1, depth - 1, *apply(c, False, rem, gm, go, L, mi, oi))
+            top = max(pref[c] for c in prd)
+            ws = [math.exp(pref[c] - top) for c in prd]
+            exp_v = sum(wi * vals[c] for wi, c in zip(ws, prd)) / sum(ws)
+            if not adv:
+                return exp_v
+            return (1.0 - w) * min(vals[c] for c in adv) + w * exp_v
+
+        run = search_m if w > W_EPS else search
         values, depth_done, budget_hit = None, 0, False
         for depth in range(1, self.max_depth + 1):
             try:
                 vals = {}
                 for c in roots:
-                    vals[c] = search(1, depth - 1, *apply(c, True, rem, gm, go, L0, my_items0, opp_items0))
+                    vals[c] = run(1, depth - 1, *apply(c, True, rem, gm, go, L0, my_items0, opp_items0))
                 values, depth_done = vals, depth
             except _Timeout:
                 budget_hit = True
@@ -470,8 +627,50 @@ class Drafter:
                                  f"({nodes[0]} nodes)\n")
             except Exception:
                 pass
+        # diagnostics only (scripts / local evaluation): every legal root's search value and immediate gain
+        self.root_values = {cards[c]["card_id"]: (values[c], gm[c]) for c in roots}
         self.info = {"depth": depth_done, "nodes": nodes[0], "ms": round(1000 * (time.monotonic() - t0), 1),
                      "value": round(values[best], 3), "fitted": self.model.fitted,
                      "budget_hit": budget_hit, "wall_hit": wall_hit[0], "ties": len(near),
                      "top": sorted(((round(values[c], 3), cards[c]["species"]) for c in roots), reverse=True)[:4]}
+        if self.opp_mode == "meta":
+            self.info["opp_w"] = round(w, 3)
         return cards[best]["card_id"]
+
+    def _opp_weight(self, cards, my_idx, opp_idx, taken, me_letter, mo, P, S, pref, items) -> float:
+        """Posterior probability that the opponent drafts like the real contestants (meta prior) rather than like
+        our model: OPP_PRIOR, times P_meta / P_model of each pick it made so far (rosters are in pick order, the
+        snake order says which earlier picks were whose). Every legal set is rebuilt from the full pool (Item
+        Clause included). A history that does not fit the snake order keeps the prior."""
+        if self.opp_w >= 0:
+            return min(1.0, self.opp_w)
+        p = min(1 - 1e-3, max(1e-3, self.opp_prior))
+        lo = math.log(p / (1 - p))
+        n = len(cards)
+
+        def lse(xs):
+            mx = max(xs)
+            return mx + math.log(sum(math.exp(x - mx) for x in xs))
+
+        if len(my_idx) + len(opp_idx) == taken:
+            ours, theirs = iter(my_idx), iter(opp_idx)
+            mine_before, opp_before, gone = [], [], set()
+            for k in range(taken):
+                if SNAKE[k] == me_letter:
+                    c = next(ours)
+                    mine_before.append(c)
+                    gone.add(c)
+                    continue
+                c = next(theirs)
+                held = {items[j] for j in opp_before if items[j]}
+                leg = [x for x in range(n) if x not in gone and not (items[x] and items[x] in held)] \
+                    or [x for x in range(n) if x not in gone]
+                if c not in leg:
+                    leg.append(c)
+                gain = {x: mo[x] + sum(P[x][y] for y in mine_before) + sum(S[x][y] for y in opp_before) for x in leg}
+                lo += (pref[c] - lse([pref[x] for x in leg])) \
+                    - (gain[c] / self.opp_temp - lse([gain[x] / self.opp_temp for x in leg]))
+                opp_before.append(c)
+                gone.add(c)
+        lo = max(-30.0, min(30.0, lo))
+        return 1.0 / (1.0 + math.exp(-lo))
