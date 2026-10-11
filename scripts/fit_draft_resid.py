@@ -11,7 +11,9 @@ residual favours (Incineroar, Flutter Mane, Landorus-T, Amoonguss), see scripts/
 Data: every local.panel game against `champion` whose per-game log (<run>.jsonl.logs/*.json, --save-logs) has both
 rosters, from runs where both seats used the engine search (the champion is v4 or later: runs started after the v4
 merge, 2026-09-29), excluding the gate seeds of docs/v5_standard.md (--exclude, default 7, 11, 31, 45, 73, 75, 83) so
-the gates stay out of sample. Same-team games are skipped (no draft difference).
+the gates stay out of sample. Same-team games are skipped (no draft difference). --rows adds local.panel result
+files whose rows carry both sixes (six_cand / six_opp: the meta* opponents); the shipped file was fitted without them
+(adding 400 games against the meta drafter, seed 103, left almost no out-of-sample gain: +0.0007 nats/game).
 
 Model:  P(win) = sigmoid(a0 + a1 * L + sum_{c in ours} d[species c] - sum_{c in theirs} d[species c]),  L = the shipped
 model's log-odds of our six against theirs; d is L2-regularised (--lam, chosen by grouped 5-fold cross-validation over
