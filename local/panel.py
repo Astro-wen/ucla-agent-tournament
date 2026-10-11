@@ -34,6 +34,9 @@ Panel (--opps, default all 13; groups: all, strength, field; or a comma list):
             logs / + self-play), run in their own venv by local/vgcbench_worker.py (local/vgcbench_opp.py); draft
             with the champion's code, team preview and battle by the policy. ~0.1 s per decision after a ~1 min
             worker start per panel worker; knobs VGCBENCH_* from the shell (recorded in the meta file).
+  meta / meta_soft / meta_v3   opt-in only, by name: drafts like the real contestants we met (local/meta_opp.py,
+            fitted on our real platform drafts by scripts/fit_meta_drafter.py -> data/meta_drafter.json), previews and
+            battles with the champion's code (meta, meta_soft: softmax draws) or versions/v3_draft_preview (meta_v3).
 Any versions/<dir> name, or a dotted package that holds agent/agent.py, works as an extra opponent. Every opponent
 package must run its own calc.js (versions/*/agent/js/node_modules and local/sparring/*/agent/js/node_modules linked
 to agent/js/node_modules, see scripts/setup_machine.sh); the panel checks that before the first game.
@@ -114,10 +117,11 @@ BOTS = ("greedy", "protect_spam")
 LIVE = ("llm_live", "llm_real")                                                  # = local.field_opps.LIVE
 EXT = ("simbot", "simbot_v1")                                                    # = local.ext_opp.NAMES (opt-in)
 VGCB = ("vgcbench_bc", "vgcbench_sp")             # = local.vgcbench_opp.NAMES (opt-in, needs the VGC-Bench install)
+META = ("meta", "meta_soft", "meta_v3")                                          # = local.meta_opp.NAMES (opt-in)
 # per-game counters of the VGC-Bench players (local.vgcbench_opp.EXTRA_KEYS) -> row fields vgb_<key>
 VGCB_KEYS = ("preview_fallbacks", "restarts", "vocab_lookups", "vocab_unknown", "unknown_decisions", "retargeted",
              "gimmicks", "header_mismatch", "policy_ms")
-BUILTIN = ("official_baseline", "random") + BOTS + FIELD_ALL + LIVE + EXT + VGCB
+BUILTIN = ("official_baseline", "random") + BOTS + FIELD_ALL + LIVE + EXT + VGCB + META
 KNOB_PREFIXES = ("LOOKAHEAD_", "ARENA_DRAFT_", "PREVIEW_MATRIX_")
 # Time-dependent lookahead counters (agent/pokemon/lookahead.py STATS) -> per-game row fields <name>_cand / <name>_opp:
 # a decision that hit the 2.5 s cap, or a Nash mix that fell back (mostly its 0.25 s budget), depends on machine load.
@@ -733,6 +737,11 @@ def _opponent(name: str):
         p = ext_opp.make(name)                  # p.calc_pkg = the package it drafts / previews with
         p.calc_info = _warm(p.calc_pkg)
         instrument_preview(p.calc_pkg)
+    elif name in META:
+        from . import meta_opp
+        p = meta_opp.make(name)                 # p.calc_pkg = the pilot package (preview + battle)
+        p.calc_info = _warm(p.calc_pkg)
+        instrument_preview(p.calc_pkg)
     elif name in VGCB:
         from . import vgcbench_opp
         p = vgcbench_opp.make(name)             # p.calc_pkg = the package it drafts with (the champion)
@@ -908,6 +917,8 @@ def _play(task: tuple[str, int]) -> dict:
             for k, field in DIAG.items():
                 if k in after:
                     row[f"{field}_{s}"] = after[k] - before[s].get(k, 0)
+        if opp in META:                                  # both drafted sixes (the draft is what differs)
+            row.update(six_cand=r.rosters[seat], six_opp=r.rosters[1 - seat])
         if opp in EXT or opp in VGCB:                    # simbot's / VGC-Bench's own counters
             st = o.stats
             row.update(ext_decisions=st["decisions"], ext_fallbacks=st["fallbacks"], ext_errors=st["errors"],
