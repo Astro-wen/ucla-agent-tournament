@@ -5,6 +5,7 @@ ground path's waypoints -> ENGAGE / SIEGE with focus fire -> HUNT; RETREAT when 
 and the tiebreak endgame (hold, careful, all-in)."""
 from __future__ import annotations
 
+from . import counters
 from .orders import Cand
 from .world import AIR, GROUND_DEFENSES, NON_COMBAT, WALLS, dist, is_combat, is_infantry
 
@@ -15,6 +16,12 @@ SEEN_FROM_S = 120          # a search point counts as looked at once a unit of o
 HUNT_SEE = 4               # (from 2:00, when even a base built away from the spawns stands)
 HUNT_GOAL_TICKS = 45 * 25  # a group heading this long to one point gives it up (unreachable, stuck)
 LEAD_TICKS = 90 * 25       # an enemy unit seen this recently (away from our base) is followed first
+HARV_DANGER = 6            # harv_guard: an enemy combat unit this close to a harvester attacks it
+HARV_HIT_TICKS = 3 * 25    # an under_attack event on a harvester counts this long
+HARV_HELP_RANGE = 40       # free combat units this close go help it
+HARV_FLEE = 7              # cells a harvester drives away from its attackers when its refinery is on their side
+EARLY_ARMY_S = 120         # econ_first: signs of an early enemy army before this (scout killed in their base, 2+
+EARLY_ARMY_VALUE = 700     # barracks, or this much of their combat units seen) -> a few more rifles and one tower
 
 
 def _centroid(pts):
@@ -50,6 +57,7 @@ class Army:
         self.wave_value = 0.0
         self.enemy_peak = 0.0
         self._peak_tick = 0
+        self._kills_seen = 0
         self._bk = 0
         self.waves = 0
         self.stuck_pos = None
@@ -82,6 +90,14 @@ class Army:
         self.defense_point = None
         self.rush = False
         self.rush_tick = -10 ** 9
+        self.harv_hit: dict[int, int] = {}      # harvester id -> tick of the last under_attack event on it
+        self.harv_pulls = 0
+        self.harv_helps = 0
+        self.intel_tick = -10 ** 9      # last time we saw enemy combat units or looked at the enemy base
+        self.rescout_tick = -10 ** 9
+        self.rescouts = 0
+        self.early_army = False         # econ_first: an early enemy army (EARLY_ARMY_S)
+        self.two_barracks = False       # econ_first: two enemy barracks seen before 2:30 (a rush tell)
         self.mode = "normal"            # endgame: normal / hold / careful / allin
         self.tag = "opening"
         self.v = None
@@ -107,13 +123,32 @@ class Army:
         if self.scout is not None and self.scout not in alive:
             # killed on its way out, far from the enemy base: something is coming our way
             last = self.scout_pos
+            for ev in v.events:                       # where it died (the unit_lost event), when the event says
+                if ev.get("kind") == "unit_lost" and ev.get("id") == self.scout and \
+                        isinstance(ev.get("x"), int) and isinstance(ev.get("y"), int) and \
+                        not isinstance(ev.get("x"), bool) and not isinstance(ev.get("y"), bool):
+                    last = (ev["x"], ev["y"])
             if v.game_s < 150:
                 self.scout_lost_early = True          # an army already stands in their base: more rifles early
                 self.pol.log_event(f"scout killed early at {v.game_s:.0f}s near {last}")
+            if v.game_s < EARLY_ARMY_S and last is not None and v.st.enemy_spawn is not None and \
+                    dist(last, v.st.enemy_spawn) <= 12 and not self.early_army:
+                # killed inside their base this early: an army stands at home (a rush may be coming); econ_first
+                # answers with a few more rifles and one tower, not a stalled opening
+                self.early_army = True
+                self.pol.log_event(f"early enemy army: scout killed in their base at {v.game_s:.0f}s")
             if self.scout_phase in ("out", "look", "back") and v.game_s < 240 and last is not None and \
                     dist(last, v.st.enemy_spawn) > 12:
-                self.pol.log_event(f"scout lost on the way at {v.game_s:.0f}s near {last}: expecting a rush")
-                self.rush, self.rush_tick = True, v.tick
+                # econ_first: only a scout killed on OUR half of the map means an army is on its way (the real loss
+                # cb4bfc36: a picket 18 cells in front of the enemy base killed it and we built 24 rifles, 2 towers
+                # and the war factory at 282 s)
+                ours_half = v.base is not None and dist(last, v.base) < dist(last, v.st.enemy_spawn)
+                if not self.pol.p.econ_first or ours_half:
+                    self.pol.log_event(f"scout lost on the way at {v.game_s:.0f}s near {last}: expecting a rush")
+                    self.rush, self.rush_tick = True, v.tick
+                else:
+                    self.pol.log_event(f"scout lost at {v.game_s:.0f}s near {last}, on their half: an enemy picket, "
+                                       f"the opening goes on")
             self.scout = None
             self.scouted = True
         quota = 10 ** 6 if self.rush else int(self.pol.p.home_infantry)
@@ -151,11 +186,22 @@ class Army:
             if is_combat(t, rules) and t not in AIR:
                 self.last_enemy_combat = v.tick
                 vis_val += self.cost(t) * max(0.1, e["hp"] / 100.0)
+        if v.tick - self.intel_tick > 25:
+            # a look at their home (spawn, or a production building we know of): the army standing there, we see
+            # (meeting part of their army on the way is no such look: v4.5 tuning seed 501032)
+            homes = [v.st.enemy_spawn] if v.st.enemy_spawn is not None else []
+            homes += [(b["x"], b["y"]) for b in self.enemy_blds.values() if b["type"] in PRODUCTION_TARGETS]
+            if any(abs(u["x"] - h[0]) <= 7 and abs(u["y"] - h[1]) <= 7 for u in v.units for h in homes):
+                self.intel_tick = v.tick
         # the largest enemy army seen at once, fading slowly (half-life 6 minutes): what an attack must beat even
         # after that army went back into the fog
         dt = max(0, v.tick - self._peak_tick)
         self._peak_tick = v.tick
-        self.enemy_peak = max(vis_val, self.enemy_peak * 0.5 ** (dt / (360 * 25.0)))
+        peak = self.enemy_peak * 0.5 ** (dt / (360 * 25.0))
+        if self.pol.p.econ_first and v.kills > self._kills_seen:
+            peak = max(0.0, peak - (v.kills - self._kills_seen))   # what we killed of it is gone
+        self._kills_seen = max(self._kills_seen, v.kills)
+        self.enemy_peak = max(vis_val, peak)
         for b in v.enemy_blds:
             self.enemy_blds[b["id"]] = {"type": b["type"], "tick": v.tick, "x": b["x"], "y": b["y"], "hp": b["hp"]}
         for k in [k for k, e in self.enemy_units.items() if v.tick - e["tick"] > 240 * 25]:
@@ -173,6 +219,22 @@ class Army:
         if bk > self._bk:
             self.fail_mult, self.last_fail_value = 1.0, 0.0      # razing a building resets the caution
         self._bk = bk
+        if v.game_s < 150 and not self.two_barracks:
+            barracks = sum(1 for b in self.enemy_blds.values() if b["type"] in ("tent", "barr"))
+            if barracks >= 2:
+                # two barracks this early: an infantry rush is likely (v4.5 tuning seed 506026: 35 rifles at 178 s)
+                self.two_barracks = self.early_army = True
+                self.pol.log_event(f"two enemy barracks at {v.game_s:.0f}s: infantry rush likely")
+        if v.game_s < EARLY_ARMY_S and not self.early_army and v.st.enemy_spawn is not None:
+            # counted inside their base only: a picket out on the road is not an army massing for a rush (v4.5
+            # measurement seed block 99: the nash script's 4-unit picket set this off and the towers it brought cost
+            # the games a v4.5 without them won)
+            es = v.st.enemy_spawn
+            seen = sum(self.cost(e["type"]) for e in self.enemy_units.values()
+                       if is_combat(e["type"], rules) and e["type"] not in AIR and dist((e["x"], e["y"]), es) <= 12)
+            if seen >= EARLY_ARMY_VALUE:
+                self.early_army = True
+                self.pol.log_event(f"early enemy army at {v.game_s:.0f}s (seen {seen} in their base)")
 
     def enemy_army(self, v, secs: float = 60.0) -> float:
         """Cost of the enemy combat units seen recently: full weight up to half of `secs`, fading out by `secs`."""
@@ -190,10 +252,62 @@ class Army:
     def enemy_strength(self, v) -> float:
         """What an attack has to beat: the enemy army (recent sightings, or the biggest army seen at once, fading)
         plus 1.5x the towers we know of."""
-        return max(self.enemy_army(v, 180.0), self.enemy_peak) + 1.5 * self.enemy_towers()
+        return max(self.enemy_army(v, 180.0), self.enemy_peak, self.prior(v)) + 1.5 * self.enemy_towers()
+
+    def blind(self, v) -> bool:
+        p = self.pol.p
+        return bool(p.econ_first) and v.game_s < p.prior_until_s and (v.tick - self.intel_tick) / 25.0 > p.blind_s
+
+    def prior(self, v) -> float:
+        """econ_first, blind (no enemy army seen and no look at their base for blind_s): the army a competent
+        opponent has by now (an unseen army is not a weak one: v4.4 attacked 'enemy strength 0' at 240 s and lost
+        its base to the counterattack)."""
+        if not self.blind(v):
+            return 0.0
+        p = self.pol.p
+        # (tried: minus what we killed in the last 3 minutes; tuning seed 501 116 -> 107 / 120 and 507 47 -> 34 / 60:
+        # a skirmish won early made the first attack go too soon)
+        return min(float(p.prior_cap), max(0.0, p.prior_rate * (v.game_s - 90.0)))
 
     def enemy_towers(self) -> float:
         return sum(self.cost(b["type"]) for b in self.enemy_blds.values() if b["type"] in GROUND_DEFENSES)
+
+    # ---- counter_value: forces for agent/redalert/counters.py ------------------------------------------------------
+    def own_force(self, ids, v) -> list:
+        out = []
+        for i in ids:
+            u = v.unit_by_id.get(i)
+            if u is not None:
+                out.append((u["type"], 1.0, max(0.05, u["hp"] / 100.0)))
+        return out
+
+    def enemy_force(self, v) -> list:
+        """The enemy army an attack has to beat, by type: recent sightings (full weight 90 s, fading out by 180 s)
+        scaled up to enemy_strength's army part (the biggest army seen, the blind prior), or a generic mix when
+        nothing was seen; plus the towers we know of."""
+        rules = v.st.rules
+        vals: dict[str, float] = {}
+        for e in self.enemy_units.values():
+            t = e["type"]
+            if not is_combat(t, rules) or t in AIR:
+                continue
+            age = (v.tick - e["tick"]) / 25.0
+            w = 1.0 if age <= 90 else max(0.0, (180 - age) / 90.0)
+            if w > 0:
+                vals[t] = vals.get(t, 0.0) + self.cost(t) * w
+        total = sum(vals.values())
+        target = max(total, self.enemy_peak, self.prior(v))
+        if target > total:
+            # the part we have not seen is a typical army, not more of what we saw (v4.5 tuning seed 507056: a
+            # rifle / rocket picket scaled up to the prior looked easy prey for rifles; six tanks stood behind it)
+            tank = "3tnk" if v.enemy_faction in ("russia", "ukraine", "soviet") else "2tnk"
+            rest = target - total
+            for t, share in (("e1", 0.3), ("e3", 0.15), (tank, 0.55)):
+                vals[t] = vals.get(t, 0.0) + share * rest
+        force = [(t, x / max(1, self.cost(t)), 1.0) for t, x in vals.items()]
+        force += [(b["type"], 1.0, max(0.1, b["hp"] / 100.0)) for b in self.enemy_blds.values()
+                  if b["type"] in GROUND_DEFENSES]
+        return force
 
     def enemy_vehicle_share(self) -> float:
         v = self.v
@@ -231,6 +345,8 @@ class Army:
         come before the war factory and the depot until we have a solid infantry screen."""
         if v.game_s >= 240 or not (self.rush or self.scout_lost_early):
             return False
+        if self.pol.p.econ_first and not self.rush:
+            return False                               # a dead scout alone is no reason to stall the war factory
         rules = v.st.rules
         inf = sum(1 for u in v.units if is_infantry(u["type"], rules) and is_combat(u["type"], rules))
         return inf < int(self.pol.p.early_infantry)
@@ -246,9 +362,25 @@ class Army:
         e_army = self.enemy_army(v)
         if self.infantry_heavy(v) and e_army > 0.8 * v.army_value:
             want = 2 if e_army < 2 * max(1, v.army_value) else 3
-        if self.threatened and v.game_s < 360 and self.threat_value > 600:
+        floor = 600
+        p = self.pol.p
+        if p.econ_first and self.early_army and v.game_s < 420:
+            want = max(want, int(p.early_army_towers))   # an early enemy army: towers against a rush
+        if p.econ_first and not self.pol.first.get("weap"):
+            floor = max(floor, p.real_threat)            # a light harass before the war factory: no tower money
+        elif p.econ_first and v.game_s >= p.safety_tower_s:
+            # economy first leaves a thinner army at home around 4:00, when a balanced opponent's first wave comes
+            # (v4.5 tuning seed 501062: 29 infantry at 253 s razed a base with 20 rifles and 3 tanks): towers at the
+            # front once the war factory stands
+            want = max(want, 1 if v.game_s < p.safety_tower_s + 60 else int(p.safety_towers))
+        if self.threatened and v.game_s < 360 and self.threat_value > floor:
             want = max(want, 1 if self.threat_value < 1500 else 2)
         return min(4, want)
+
+    def real_attack(self, v) -> bool:
+        """A real attack on the base (an early rush, or the threat at home worth real_threat or more), as opposed to
+        a scout or a light harass that the home guard handles."""
+        return self.rush or (self.threatened and self.threat_value >= self.pol.p.real_threat)
 
     # ---- home: threat and rush -----------------------------------------------------------------------------------
     def assess(self, v) -> None:
@@ -318,6 +450,10 @@ class Army:
             self._ev_seq = max(self._ev_seq, seq)
             if ev.get("kind") not in ("under_attack", "unit_lost", "building_lost"):
                 continue
+            hid = ev.get("id")
+            if ev.get("kind") == "under_attack" and str(ev.get("type") or "") == "harv" and isinstance(hid, int) \
+                    and not isinstance(hid, bool):
+                self.harv_hit[hid] = v.tick
             x, y = ev.get("x"), ev.get("y")
             if not isinstance(x, int) or not isinstance(y, int) or isinstance(x, bool) or isinstance(y, bool):
                 aid = ev.get("id")
@@ -380,7 +516,9 @@ class Army:
         self.endgame(v)
         self._mark_seen(v)
         self._defend(v, out, allow)
+        self._harv_guard(v, out)
         if allow:
+            self._rescout(v)
             self._scout_step(v, out)
             self._main_step(v, out)
             self._reinf_step(v, out)
@@ -440,6 +578,65 @@ class Army:
         if sent:
             self.defense_tick, self.defense_point = v.tick, tp
 
+    def _harv_guard(self, v, out) -> None:
+        """harv_guard: a harvester under attack (an enemy combat unit within HARV_DANGER cells, or an under_attack
+        event on it in the last 3 s) drives to its nearest refinery, or away from the attackers when that refinery
+        is on their side; and while the base itself is not under attack (_defend handles that), the nearest free
+        combat units (home guard, the attack group waiting at home) go there with about 1.5x the attackers' value."""
+        if not self.pol.p.harv_guard:
+            return
+        alive = v.unit_by_id
+        for k in [k for k in self.harv_hit if k not in alive]:
+            del self.harv_hit[k]
+        harvs = [u for u in v.units if u["type"] == "harv"]
+        if not harvs:
+            return
+        rules = v.st.rules
+        enemies = [e for e in v.enemies if is_combat(e["type"], rules) and e["type"] not in AIR]
+        docks = [(b["x"] + 1, b["y"] + 1) for b in v.buildings if b["type"] == "proc"] or \
+            ([v.base] if v.base is not None else [])
+        taken: set[int] = set()
+        for h in harvs:
+            hp = (h["x"], h["y"])
+            near = [e for e in enemies if dist((e["x"], e["y"]), hp) <= HARV_DANGER]
+            hit = v.tick - self.harv_hit.get(h["id"], -10 ** 9) <= HARV_HIT_TICKS
+            if not near and not hit:
+                continue
+            ec = _centroid([(e["x"], e["y"]) for e in near]) if near else None
+            if docks and (near or h["hp"] < 60):
+                dock = min(docks, key=lambda p: (dist(p, hp), p))
+                to = dock
+                if ec is not None and dist(dock, ec) < dist(hp, ec) + 1:
+                    # the refinery is on the attackers' side: drive away from them instead
+                    d = dist(hp, ec) or 1.0
+                    to = v.st.clamp((hp[0] + (hp[0] - ec[0]) * HARV_FLEE / d, hp[1] + (hp[1] - ec[1]) * HARV_FLEE / d))
+                if dist(to, hp) > 3 and self._send(out, v, [h["id"]], "move", to=to, urgent=True, min_gap=25,
+                                                   same_gap=100, tag="harv"):
+                    self.harv_pulls += 1
+            if not near or self.threatened:
+                continue
+            want = 1.5 * sum(self.cost(e["type"]) * max(0.1, e["hp"] / 100.0) for e in near)
+            pool = [i for i in self.home if i not in taken]
+            if self.state == "GATHER":
+                pool += [i for i in self.main if i not in taken]
+            cand = []
+            for i in pool:
+                u = alive.get(i)
+                if u is not None and dist((u["x"], u["y"]), hp) <= HARV_HELP_RANGE:
+                    cand.append((dist((u["x"], u["y"]), hp), i))
+            cand.sort()
+            pick, got = [], 0.0
+            for _d, i in cand:
+                if got >= want and len(pick) >= 2:
+                    break
+                pick.append(i)
+                got += self.value([i], v)
+            if pick:
+                taken.update(pick)
+                if self._send(out, v, pick, "attack_move", to=v.st.clamp(ec), urgent=True, min_gap=10, same_gap=50,
+                              tag="harv"):
+                    self.harv_helps += 1
+
     def _home_idle(self, v, out) -> None:
         if self.threatened:
             return
@@ -490,6 +687,39 @@ class Army:
             self.home.add(self.scout)                 # the picket comes home when the base needs it
             self.scout = None
 
+    def _rescout(self, v) -> None:
+        """econ_first, blind: one cheap unit goes to look at the enemy base again (the picket, else an e1 of the
+        home guard or of the attack group waiting at home, else a fast vehicle), at most once every 90 s."""
+        if not self.blind(v) or v.game_s < 150 or self.threatened or self.mode != "normal":
+            return
+        if v.tick - self.rescout_tick < 90 * 25:
+            return
+        if self.scout is not None:
+            if self.scout_phase == "picket":
+                self.scout_phase, self.scout_tick = "out", v.tick
+                self.rescout_tick = v.tick
+                self.rescouts += 1
+            return
+        if self.state not in ("GATHER", "DEFEND"):
+            return                                    # the attack group is out there: it sees for itself
+        pick = None
+        for kinds in (("e1",), ("e2", "e3", "dog"), ("jeep", "ftrk", "1tnk", "apc")):
+            for i in sorted(self.home) + sorted(self.main):
+                u = v.unit_by_id.get(i)
+                if u is not None and u["type"] in kinds:
+                    pick = i
+                    break
+            if pick is not None:
+                break
+        if pick is None:
+            return
+        self.home.discard(pick)
+        self.main.discard(pick)
+        self.scout, self.scout_phase, self.scout_tick = pick, "out", v.tick
+        self.rescout_tick = v.tick
+        self.rescouts += 1
+        self.pol.log_event(f"blind at {v.game_s:.0f}s: re-scouting with {v.unit_by_id[pick]['type']} {pick}")
+
     # ---- MAIN ------------------------------------------------------------------------------------------------------
     def _go(self, v, state: str) -> None:
         if state != self.state:
@@ -506,7 +736,14 @@ class Army:
         if self.mode == "allin":
             return True
         strength = self.enemy_strength(v)
-        if strength > 0 and main_val < p.attack_ratio * strength:
+        eq = main_val                                  # our attack group's worth against what it has to beat
+        if p.counter_value and strength > 0:
+            theirs = self.enemy_force(v)
+            if theirs:
+                ids = sorted(i for i in self.main if i in v.unit_by_id)
+                r = counters.ratio(self.own_force(ids, v), theirs, v.st.rules)
+                eq = min(r, 100.0) * strength
+        if strength > 0 and eq < p.attack_ratio * strength:
             return False
         if self.last_fail_value > 0 and main_val < 1.3 * self.last_fail_value:
             return False                               # the last wave had to retreat: come back bigger
@@ -519,7 +756,11 @@ class Army:
         quiet = (v.tick - self.last_enemy_combat) / 25.0 >= p.quiet_s
         if v.game_s >= p.opportunistic_s and n_veh >= 3 and quiet and self.fail_mult <= 1.0:
             return True
-        return strength > 0 and n >= 3 and main_val >= 3.0 * strength and v.game_s >= 180
+        if p.econ_first and main_val < p.attack_3x_min:
+            # a look at their home that shows next to nothing at 4:00 means their army is elsewhere, maybe on its
+            # way (v4.5 measurement seed 62043: 14 rifles went for "3x the 100 we saw" and met 34 rifles)
+            return False
+        return strength > 0 and n >= 3 and eq >= 3.0 * strength and v.game_s >= 180
 
     def _main_step(self, v, out) -> None:
         st = v.st
@@ -658,7 +899,8 @@ class Army:
         p = self.pol.p
         if self.mode == "allin" and v.remaining <= p.allin_s:
             return False
-        ours = self.value([i for i in ids if dist((v.unit_by_id[i]["x"], v.unit_by_id[i]["y"]), c) <= 15], v)
+        near = [i for i in ids if dist((v.unit_by_id[i]["x"], v.unit_by_id[i]["y"]), c) <= 15]
+        ours = self.value(near, v)
         theirs = 0.0
         for e in enemies:
             w = 1.5 if e["type"] in GROUND_DEFENSES else 1.0
@@ -666,13 +908,20 @@ class Army:
         if theirs <= 0:
             return False
         ratio = p.retreat_ratio if self.mode != "careful" else 1.0
-        if self.state == "SIEGE" and len(blds) <= 2 and ours >= 0.5 * theirs:
+        if p.counter_value:
+            # by unit-type counters (towers' hit points and damage are in the numbers: no 1.5 weight)
+            r = counters.ratio(self.own_force(near, v), [(e["type"], 1.0, max(0.1, e["hp"] / 100.0)) for e in enemies],
+                               v.st.rules)
+            eq_ours, eq_theirs = min(r, 100.0), 1.0
+        else:
+            eq_ours, eq_theirs = ours, theirs
+        if self.state == "SIEGE" and len(blds) <= 2 and eq_ours >= 0.5 * eq_theirs:
             return False
-        if ours < ratio * theirs:
+        if eq_ours < ratio * eq_theirs:
             return True
         # heavy losses for few kills since this fight began
         if self.engage_value > 0 and ours < 0.5 * self.engage_value and \
-                (v.kills - self.engage_kills) < 0.3 * (self.engage_value - ours) and ours < theirs:
+                (v.kills - self.engage_kills) < 0.3 * (self.engage_value - ours) and eq_ours < eq_theirs:
             return True
         return False
 
@@ -898,4 +1147,6 @@ class Army:
 
     def summary(self) -> dict:
         return {"state": self.state, "waves": self.waves, "home": len(self.home), "main": len(self.main),
-                "reinf": len(self.reinf), "rush": self.rush, "mode": self.mode, "hunt_seen": len(self.hunt_seen)}
+                "reinf": len(self.reinf), "rush": self.rush, "mode": self.mode, "hunt_seen": len(self.hunt_seen),
+                "harv_pulls": self.harv_pulls, "harv_helps": self.harv_helps, "rescouts": self.rescouts,
+                "early_army": self.early_army}
