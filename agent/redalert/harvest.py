@@ -80,6 +80,7 @@ class Harvest:
         self._cap = None
         self.ended_by: str | None = None      # what ended the serialisation last (for the event log)
         self.suppressed = False               # early army / rush signs seen: off for the match
+        self._path_len = None
 
     # ---- numbers ------------------------------------------------------------------------------------------------
     def on(self) -> bool:
@@ -129,11 +130,24 @@ class Harvest:
     def procs(self, v) -> int:
         return self.pol.econ.role_count(v, "proc")
 
+    def path_len(self, v) -> float:
+        """Length of the ground path between the spawns (cells, diagonals 1.41): how far an enemy army walks."""
+        if self._path_len is None:
+            path = v.st.path or []
+            self._path_len = sum(dist(a, b) for a, b in zip(path, path[1:])) if v.st.ready else 0.0
+        return self._path_len
+
+    def map_ok(self, v) -> bool:
+        """Greed only where the enemy army walks far (harv_min_path; pool maps: shadowfiend-ii 92 yes, sidestep 55 and
+        trapped 57 no). Dev seeds 601-608: on sidestep v4.5 wins many nash games with its 6-8 minute attack, which
+        harvesters first delays (h5: 1 better / 5 worse); on shadowfiend-ii harvesters first was 9 better / 4 worse."""
+        return self.path_len(v) >= float(self.pol.p.harv_min_path)
+
     def active(self, v) -> bool:
         """The harvester target and its refinery apply: harv_first on and no early-army / rush sign, no real attack.
         (Dev seeds 601006 / 604015: with an early enemy army seen, harvesters and a third refinery before the depot
         left 20 rifles and no tank when the 4-minute attack came; the v4.5 opening handles those games.)"""
-        if not self.on() or self.suppressed:
+        if not self.on() or self.suppressed or not self.map_ok(v):
             return False
         army = self.pol.army
         if army.rush or army.early_army or army.two_barracks:

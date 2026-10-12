@@ -637,8 +637,23 @@ def test_harvester_target_over_time_and_the_map_cap():
         assert lo <= p2.harv.cap(p2.view) <= hi, (map_id, p2.harv.cap(p2.view))
 
 
+def test_harv_first_needs_a_long_way_between_the_bases_and_is_v45_elsewhere(monkeypatch):
+    # sidestep (ground path 55) and trapped (57): the v4.5 play order for order; shadowfiend-ii (92): on
+    for map_id, on in (("sidestep", False), ("trapped", False), ("shadowfiend-ii", True)):
+        logs = []
+        for env in ({}, HARV_ON):
+            srv = server(map_id)
+            pol = RedAlertPolicy(params=load_params(env))
+            monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)
+            rec = []
+            drive(srv, pol, 240, record=rec)
+            logs.append([(sv, orders) for sv, orders, _r in rec])
+        assert pol.harv.map_ok(pol.view) == on
+        assert (logs[0] == logs[1]) == (not on), map_id
+
+
 def test_harv_first_builds_harvesters_and_a_third_refinery_before_more_infantry(monkeypatch):
-    srv = server()
+    srv = server("shadowfiend-ii")
     pol = RedAlertPolicy(params=load_params(HARV_ON))
     monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)       # no attack: the idle seat must live on
     serial_views, bad = 0, []                                     # orders sent while serialised
@@ -670,7 +685,7 @@ def test_harv_first_builds_harvesters_and_a_third_refinery_before_more_infantry(
 
 
 def test_harv_first_serialisation_ends_under_a_real_threat():
-    srv = server()
+    srv = server("shadowfiend-ii")
     pol = RedAlertPolicy(params=load_params(HARV_ON))
     drive(srv, pol, 160)
     v = pol.view

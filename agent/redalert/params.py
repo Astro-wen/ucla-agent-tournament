@@ -60,6 +60,7 @@ DEFAULTS: dict[str, float] = {
     "harv_t6": 270,                 # 8 by harv_t8, never more than harv_cap (the map's ore near home lowers it:
     "harv_t8": 390,                 # about one harvester per harv_cells_per ore cells within 15 cells of our spawn)
     "harv_cap": 10,
+    "harv_min_path": 70,            # only on maps where the ground path between the spawns is at least this long
     "harv_cells_per": 12,
     "harv_per_proc": 2.5,           # a refinery more when the target exceeds this many harvesters per refinery
     "harv_proc_first": 1,           # the third refinery before the depot (0: after it)
