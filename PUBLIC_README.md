@@ -198,8 +198,10 @@ flowchart TD
 
 - **Economy first, all game long.** A fixed opening for each faction and starting cash (power plant, barracks,
   refineries, war factory, service depot), production queues that never stand empty, a power surplus kept at all
-  times, harvesters replaced the moment they die. An early scout tells the bot whether to expect a rush; only then
-  does it spend on early infantry and defensive towers.
+  times, harvesters replaced the moment they die, two harvesters per refinery once the war factory stands. An early
+  scout tells the bot whether to expect a rush (a scout killed by an outpost on the enemy's half of the map is not
+  one); only a real threat makes it spend on early infantry and defensive towers. Harvesters under attack pull back
+  and nearby units come to help.
 - **Faction-agnostic.** Unit choices come from preference lists filtered by what the server says we can build, so the
   same code plays Allies and Soviets on every map in the pool.
 - **The army fights as a group:**
@@ -216,8 +218,11 @@ stateDiagram-v2
     Retreat --> Gather: back at the rally point
 ```
 
-- **Attack** only when the main force is clearly stronger than the strongest enemy army seen recently, plus a premium
-  for known defensive towers; move along waypoints of a path computed on the map so fast units wait for slow ones.
+- **Attack** only when the main force clearly beats the army it expects to meet: the strongest enemy force seen
+  recently plus a premium for known defensive towers, or, if the bot has not looked at the enemy base for a while, an
+  assumed army that grows with time (and it sends a unit to look again). Strength is compared with a Lanchester-style
+  model built from the engine's own weapon tables, so a crowd of rifles does not count as a match for tanks. The army
+  moves along waypoints of a path computed on the map, so fast units wait for slow ones.
 - **Focus fire** in a fixed order: defensive towers, harvesters (they are the enemy's income), production buildings,
   refineries, power, the construction yard.
 - **Retreat** when losing (below 0.7 x the enemy's strength in the fight) and re-engage only above 1.2 x, so the army
@@ -228,9 +233,10 @@ stateDiagram-v2
 - **Recovery**: lost all harvesters, construction yard destroyed, power down: each has a rule that restores the
   economy first.
 
-Every order is checked locally against the platform's order schema and batch limits before it is sent, a ledger
-remembers what was ordered but not yet seen (so nothing is built twice), and five exceptions within 30 s switch to a
-minimal safe mode for 60 s.
+Every order is checked locally against the platform's order schema and batch limits before it is sent; every batch
+also carries one harmless order that is always valid, so a batch can never be rejected as a whole (for example when
+every unit it commands died a moment before the server checked it). A ledger remembers what was ordered but not yet
+seen (so nothing is built twice), and five exceptions within 30 s switch to a minimal safe mode for 60 s.
 
 ---
 
@@ -277,7 +283,10 @@ flowchart LR
   points more often at red-team tables and 10 points more at ordinary tables, no ordinary-table condition got
   significantly worse, and there were zero crashes, invalid actions or rejected chats.
 - **Red Alert.** A local simulator of the platform's Red Alert interface with a set of scripted opponents (rushers,
-  turtles, tank swarms, mixed armies).
+  turtles, tank swarms, mixed armies, and one scripted after a real loss). After a real Testing loss in which the bot
+  over-defended early and starved its economy, the economy-first opening won **+7.5 points** against a balanced
+  scripted opponent that reproduces that failure (480 games on fresh seeds, p 0.0014), with no significant loss against
+  the others.
 - **On the platform.** Testing matches against other contestants' agents, up to October 11: Pokémon **17 wins, 7
   losses**; Red Alert **3 wins, 1 loss**. Across all real matches the agent made zero invalid actions and never ran
   out of time. Recorded real states are replayed through the agent before every release (`scripts/replay_real.py`;
