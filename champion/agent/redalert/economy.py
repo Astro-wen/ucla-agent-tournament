@@ -94,6 +94,10 @@ class Economy:
         self._place(v, out)
         self._reserve(v)
         if v.fact is None:
+            if allow and self.pol.p.idle_harv_fix:
+                # (v4.6 fix: without a yard the upkeep below never ran, so a harvester left idle by a harvester-guard
+                # pull never went back to work: dev seed 602053 sat on 390 credits with 8 harvesters for 7 minutes)
+                self._idle_harvesters(v, out)
             return
         self._building_queue(v, out)
         self._defense_queue(v, out)
@@ -327,6 +331,10 @@ class Economy:
             return None
         try:
             if item == "proc":
+                if self.pol.p.harv_first and v.have.get("proc", 0) >= 2 and self.pol.harv.engaged(v):
+                    spot = self.pol.harv.proc_spot(v)      # refineries 3+: the field with the most ore per refinery
+                    if spot is not None and tuple(spot) not in set(self.tried_at.get(item, [])):
+                        return spot
                 ore = st.ore_near(v.base, 16)
                 if ore is None:
                     return None
@@ -425,6 +433,11 @@ class Economy:
                     continue                              # not buildable yet: look further down the plan
         if choice is None:
             choice = self._midgame(v)
+        if p.harv_first and choice in (None, "fix", "weap", "dome") and pol.harv.need_proc(v) and \
+                not (choice == "fix" and (self.role_count(v, "proc") >= 3 or not p.harv_proc_first)):
+            # harvesters first: the third refinery before the depot (the Vehicle queue builds harvesters until the
+            # target, so the depot is not needed earlier), a fourth one only after it
+            choice = self.role_item(v, "proc") or choice
         if (pol.army.rush or pol.army.defense_first(v)) and choice not in (None, "powr", "apwr", "tent", "barr", "proc") \
                 and v.money < 1500:
             choice = None                                 # an early rush: the money goes to rifles and towers
@@ -462,10 +475,16 @@ class Economy:
         # econ_first: the third refinery waits for the army until 6:00 (two refineries already pay for one war
         # factory; v4.5 tuning seed 502010: a third refinery at 210 s and no tank before 300 s lost to the first wave)
         greedy_ok = not self.pol.p.econ_first or v.game_s >= 360 or v.money > 2500
-        if procs < 3 and v.game_s >= 200 and (harv >= procs + 1 or v.money > 2500) and greedy_ok:
-            return self.role_item(v, "proc")
+        if procs < 3 and v.game_s >= 200 and (harv >= procs + 1 or v.money > 2500) and greedy_ok and \
+                not (p.harv_first and self.pol.harv.engaged(v)):
+            return self.role_item(v, "proc")          # (harv_first: harvest.need_proc decides the refineries)
         if self.role_count(v, "weap") < min(2, p.max_weaps) and v.game_s >= 240 and v.money > 2000 and harv >= 3 \
-                and v.army_value >= 3000:
+                and v.army_value >= 3000 and not (p.harv_first and self.pol.harv.serialized(v)):
+            return self.role_item(v, "weap")
+        if p.harv_first and p.harv_weap2 and self.pol.harv.engaged(v) and \
+                self.role_count(v, "weap") < min(2, p.max_weaps) and \
+                v.game_s >= 180 and v.money > p.harv_weap2 and harv >= 5 and not self.pol.harv.serialized(v):
+            # harvesters first: the income outgrows one war factory (simulator: 2000-4000 floating at 4-6 minutes)
             return self.role_item(v, "weap")
         if procs < p.max_procs and v.game_s >= 420 and v.money > 3000:
             return self.role_item(v, "proc")
@@ -485,7 +504,8 @@ class Economy:
         else:
             towers = sum(v.have.get(t, 0) for t in ANTI_VEHICLE_DEF + ("hbox",))
             want = army.towers_wanted(v)
-            if v.game_s > 360 and v.money > 2500 and v.have.get("weap", 0):
+            if v.game_s > 360 and v.money > 2500 and v.have.get("weap", 0) and \
+                    not (self.pol.p.harv_first and self.pol.harv.serialized(v)):
                 want = max(want, min(int(self.pol.p.late_defenses), 1 + int(v.game_s // 300)))
             if towers < want:
                 prefs = ANTI_VEHICLE_DEF if army.enemy_vehicle_share() > 0.5 else ANTI_INFANTRY_DEF + ANTI_VEHICLE_DEF
@@ -567,7 +587,19 @@ class Economy:
             if led.is_pending(key):
                 continue
             out.append(Cand({"cmd": "rally", "building": b["id"], "to": list(target)}, key=key))
+        self._idle_harvesters(v, out)
+
+    def _idle_harvesters(self, v, out) -> None:
+        p = self.pol.p
+        led = self.pol.ledger
         idle_harv = [u["id"] for u in v.units if u["type"] == "harv" and u["idle"]
                      and led.unit_ok(u["id"], ("harvest",), True, min_gap=50, same_gap=125)]
+        if p.harv_spread and v.have.get("proc", 0) > 0:
+            try:
+                done = set(self.pol.harv.spread(v, out, idle_harv[:10]))
+            except Exception as e:                         # noqa: BLE001 - plain harvest orders still go out
+                self.pol.note_exception("harv_spread", e)
+                done = set()
+            idle_harv = [i for i in idle_harv if i not in done]
         if idle_harv and (v.have.get("proc", 0) > 0):
             out.append(Cand({"cmd": "harvest", "units": idle_harv[:50]}, sig=("harvest",)))

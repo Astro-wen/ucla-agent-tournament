@@ -139,6 +139,9 @@ class Production:
             # two thirds of the opponent's when its push came)
             target = max(target, min(FLOAT_INFANTRY_MAX, int(p.max_infantry) + (v.money - FLOAT_MONEY) // 100))
             idle_money = False
+        if p.harv_first and not late and not stranded and self.pol.harv.serialized(v):
+            # harvesters first: below the harvester target and not really attacked, no infantry beyond a picket
+            target = min(target, int(p.serial_infantry))
         if n >= target:
             return
         if not threatened and not late and v.have.get("weap") and v.game_s >= 240 and \
@@ -221,6 +224,11 @@ class Production:
         harv = v.count("harv")
         target_harv = min(int(p.max_harvesters), 2 * procs, procs + int(v.game_s // 150))
         if procs and harv < procs and "harv" in v.avail:
+            return "harv"
+        if p.harv_first and v.remaining > 240 and "harv" in v.avail and self.pol.harv.active(v) and \
+                harv < min(self.pol.harv.want(v), 3 * self.pol.econ.role_count(v, "proc")):
+            # harvesters first (harvest.py): the harvester target over time, at most 3 per refinery (a refinery more
+            # comes through harvest.need_proc)
             return "harv"
         if p.econ_first and v.remaining > 240 and harv < min(int(p.max_harvesters), 2 * procs) and \
                 "harv" in v.avail and not army.real_attack(v):
