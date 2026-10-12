@@ -176,6 +176,19 @@ def test_a_batch_of_fragile_orders_carries_an_anchor_that_is_always_valid():
     assert res.get("accepted") and res["results"][0]["status"] == "rejected"
 
 
+def test_every_batch_carries_the_anchor():
+    # v4.5: with 1 s between the view and the platform's check, a batch of attack_moves of 3+ units that had all
+    # died was refused as a whole (INVALID_ACTION); such a batch was not "fragile" and carried no anchor
+    srv = server()
+    pol = RedAlertPolicy()
+    log = []
+    drive(srv, pol, 120, record=log)
+    with_buildings = [orders for sv, orders, res in log if any(o["cmd"] != "deploy" for o in orders)]
+    assert with_buildings and all(any(o["cmd"] == "power_toggle" and o.get("on") is True for o in orders)
+                                  for orders in with_buildings if len(orders) < 20)
+    assert all(res.get("accepted") for _sv, _o, res in log)
+
+
 # ---- the ledger -----------------------------------------------------------------------------------------------------
 def test_a_build_is_never_sent_twice_before_the_state_shows_it():
     srv = server()
