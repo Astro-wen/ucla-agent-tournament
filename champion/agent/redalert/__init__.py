@@ -21,7 +21,7 @@ from . import safe
 from .army import Army
 from .economy import Economy
 from .ledger import Ledger
-from .orders import MAX_ORDERS, Cand, anchor, finalize, fragile, noop
+from .orders import MAX_ORDERS, Cand, anchor, finalize, noop
 from .params import load as load_params
 from .production import Production
 from .world import Static, View
@@ -188,9 +188,11 @@ class RedAlertPolicy:
             self.tag = self.army.tag
         orders, kept, dropped = finalize(cands, v, self.ledger, urgent_only=not allow)
         self.dropped += dropped
-        if orders and (v.windows or all(fragile(o) for o in orders)) and len(orders) < MAX_ORDERS:
-            # a batch the world could invalidate as a whole before the runner checks it (in windows mode that would
-            # end the seat): add an order that is always valid and costs no engine command
+        if orders and len(orders) < MAX_ORDERS:
+            # every batch could be invalidated as a whole by the world before the platform checks it (in windows mode
+            # that would end the seat): add an order that is always valid and costs no engine command. (v4.5: every
+            # batch, not only all-fragile ones; with 1 s of latency, 2 v4.4 / 3 v4.5 games out of 48 had a batch of
+            # 3+-unit attack_moves whose units had all died -> INVALID_ACTION; the real-time e2e rehearsal had one.)
             a = anchor(v)
             if a is not None and not any(o.get("cmd") == "power_toggle" and o.get("building") == a["building"]
                                          for o in orders):
@@ -275,4 +277,6 @@ class RedAlertPolicy:
                 f"waits={s['waits']} noops={s['noops']} anchors={s['anchors']} ms_p50={s['ms_p50']} ms_p99={s['ms_p99']} "
                 f"exceptions={s['exceptions']} safe_mode={s['safe_mode']} low_power_s={s['low_power_s']} "
                 f"waves={s['army']['waves']} harv_emergencies={s['harv_emergencies']} sales={s['sales']} "
-                f"power_cancels={s['power_cancels']} hunt_seen={s['army']['hunt_seen']}")
+                f"power_cancels={s['power_cancels']} hunt_seen={s['army']['hunt_seen']} "
+                f"rescouts={s['army']['rescouts']} harv_pulls={s['army']['harv_pulls']} "
+                f"harv_helps={s['army']['harv_helps']} early_army={int(s['army']['early_army'])}")

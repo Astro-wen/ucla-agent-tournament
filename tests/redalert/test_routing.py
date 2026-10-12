@@ -42,7 +42,8 @@ def test_red_alert_views_go_to_the_bot_with_a_phase_tag():
     out = c.choose_action(ra_state(), RED_ALERT)
     assert isinstance(out, WithReasoning) and out.reasoning_summary in ("opening", "economy", "gathering")
     orders = _orders(out)
-    assert orders and all(o["cmd"] in ("build", "train", "deploy", "move", "attack_move", "rally") for o in orders)
+    assert orders and all(o["cmd"] in ("build", "train", "deploy", "move", "attack_move", "rally", "power_toggle")
+                          for o in orders)                   # (power_toggle on=true: the v4.5 anchor of every batch)
     _validate_decision(out, ra_state().legal_actions)              # what the runner accepts
     assert c._ra is not None and c.decisions == 1 and c.last_decision["path"] == "red-alert"
 

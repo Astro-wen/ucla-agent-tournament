@@ -9,6 +9,8 @@ from .world import is_infantry
 MAIN_TANKS = ("3tnk", "2tnk", "1tnk")
 LIGHT_TANK = "1tnk"
 STRANDED_INFANTRY = 60          # infantry cap once no building can be added (stranded)
+FLOAT_MONEY = 1200              # econ_first: money above this after the war factory raises the infantry cap ...
+FLOAT_INFANTRY_MAX = 36         # ... by one per 100 credits, up to this
 AIR_TYPES = frozenset({"heli", "mh60", "yak", "mig", "hind"})
 
 
@@ -66,8 +68,12 @@ class Production:
         have = v.money + refund
         if have >= need:
             return
-        # the other queues' in-progress items (not a power plant, not one ready to place)
-        for q in ("Building", "Defense", "Vehicle"):
+        # the other queues' in-progress items (not a power plant, not one ready to place); econ_first: the Infantry
+        # queue too (v4.5 recovery seeds 7122 / 7136 / 7142: a rocket soldier and the harvester shared the last
+        # credits and both sat half built for 150 s with no income)
+        queues = ("Building", "Defense", "Vehicle", "Infantry") if self.pol.p.econ_first else \
+            ("Building", "Defense", "Vehicle")
+        for q in queues:
             if q == queue:
                 continue
             for it in v.queue_items(q)[:1]:
@@ -89,7 +95,7 @@ class Production:
         rules = v.st.rules
         army = self.pol.army
         p = self.pol.p
-        if self.pol.econ.emergency and not army.threatened:
+        if self.pol.econ.emergency and (not army.threatened or (p.econ_first and v.money < rules.cost("harv"))):
             return                                     # every credit goes to the new harvester
         alive = [u for u in v.units if is_infantry(u["type"], rules) and u["type"] not in ("medi", "mech", "e6", "spy")]
         queued = sum(1 for it in items)
@@ -112,7 +118,7 @@ class Production:
             target = max(int(p.home_infantry) + 4, 10)
         else:
             target = int(p.max_infantry)
-            if army.scout_lost_early and v.game_s < 240:
+            if army.scout_lost_early and v.game_s < 240 and not p.econ_first:
                 target = max(target, int(p.early_infantry))
             idle_money = n >= (5 if soviet else 4) and not army.defense_first(v)
         stranded = not late and self.stranded(v)
@@ -120,10 +126,23 @@ class Production:
             # no yard and no MCV to come: money can only become units (the tiebreak's assets count units and
             # buildings, never cash), and an army that keeps training never sits idle
             target, idle_money = max(target, STRANDED_INFANTRY), False
+        elif p.econ_first and not late and not self.pol.first.get("weap") and v.game_s < 420 \
+                and not army.real_attack(v):
+            # economy first: until the first war factory stands, a handful of rifles (scout + home guard) and the
+            # rest of the money goes into the refineries and the war factory, unless a real attack is on
+            target = min(target, int(p.pre_weap_infantry) + (2 if army.threatened else 0)
+                         + (int(p.early_army_infantry) if army.early_army else 0)
+                         + (int(p.early_army_infantry) if army.two_barracks else 0))
+        elif p.econ_first and not late and self.pol.first.get("weap") and v.money > FLOAT_MONEY:
+            # money piling up (one war factory cannot spend two refineries' income): more infantry rather than an
+            # idle bank before the first big fight (v4.5 tuning seed 507008: 2500 floating at 4:30-6:00 and an army
+            # two thirds of the opponent's when its push came)
+            target = max(target, min(FLOAT_INFANTRY_MAX, int(p.max_infantry) + (v.money - FLOAT_MONEY) // 100))
+            idle_money = False
         if n >= target:
             return
         if not threatened and not late and v.have.get("weap") and v.game_s >= 240 and \
-                not (stranded and v.money > 1500):
+                not (stranded and v.money > 1500) and not (p.econ_first and v.money > FLOAT_MONEY):
             # once tanks can be built, infantry stays a share of the army (more of it against an infantry army)
             inf_val = sum(rules.cost(u["type"]) for u in alive)
             veh_val = sum(rules.cost(u["type"]) for u in v.units if u["type"] in ("1tnk", "2tnk", "3tnk", "4tnk",
@@ -202,6 +221,12 @@ class Production:
         harv = v.count("harv")
         target_harv = min(int(p.max_harvesters), 2 * procs, procs + int(v.game_s // 150))
         if procs and harv < procs and "harv" in v.avail:
+            return "harv"
+        if p.econ_first and v.remaining > 240 and harv < min(int(p.max_harvesters), 2 * procs) and \
+                "harv" in v.avail and not army.real_attack(v):
+            # economy first: two harvesters per refinery as soon as the war factory stands (v4.5 tuning seed 507008:
+            # 2 harvesters until 4:00 and an army half the size of a double-refinery opponent's at 7:00). (Tried:
+            # two tanks first after signs of an early enemy army; tuning seeds 501 116 -> 111 / 120, 507 55 -> 51 / 60.)
             return "harv"
         if v.remaining > 240 and harv < target_harv and "harv" in v.avail and not army.threatened \
                 and v.money > 900:

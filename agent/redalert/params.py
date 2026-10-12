@@ -39,6 +39,21 @@ DEFAULTS: dict[str, float] = {
     "endgame_s": 150,
     "allin_s": 90,
     "hold_margin": 1500,
+    # v4.5 switches (1 on, 0 the v4.3.1 behaviour); see docs/redalert_design.md section 16
+    "econ_first": 1,                # a scout killed or a light harass does not derail the opening
+    "pre_weap_infantry": 6,         # econ_first: infantry cap before the first war factory, unless a real attack
+    "early_army_infantry": 6,       # econ_first: that many more rifles and early_army_towers towers after signs of
+    "early_army_towers": 2,         # an early enemy army (scout killed in their base, 2+ barracks, 700+ seen)
+    "real_threat": 800,             # econ_first: enemy value at home that counts as a real attack (not a harass)
+    "harv_guard": 1,                # harvesters under attack: pull back, idle units go help
+    "counter_value": 1,             # compare armies by unit-type counters (rifles barely scratch tanks), not cost
+    "blind_s": 150,                 # econ_first: no look at the enemy army / base for this long = blind: then an
+    "prior_rate": 25,               # attack must beat an assumed army of prior_rate x (t - 90 s), at most
+    "prior_cap": 9000,              # prior_cap, and a cheap unit goes to look again (re-scout)
+    "prior_until_s": 900,
+    "attack_3x_min": 2000,          # econ_first: "3x the enemy we saw" attacks only with this much (0: any size)
+    "safety_tower_s": 150,          # econ_first: one tower at the front from here (war factory up), safety_towers
+    "safety_towers": 2,             # a minute later
 }
 
 
