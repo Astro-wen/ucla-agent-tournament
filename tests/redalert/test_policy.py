@@ -608,6 +608,106 @@ def test_blind_the_enemy_army_is_assumed_until_we_look_at_their_base():
     assert pol.army.prior(v) == 0.0
 
 
+# ---- v4.6: harvesters first (agent/redalert/harvest.py) --------------------------------------------------------------
+HARV_ON = {"ARENA_RA_HARV_FIRST": "1"}
+
+
+def test_harv_first_is_off_by_default_and_leaves_the_summary_as_it_was():
+    pol = RedAlertPolicy(params=load_params({}))
+    assert not pol.p.harv_first and pol.summary()["harv"] is None
+    srv = server()
+    drive(srv, pol, 5)
+    assert "harv_180=" not in pol.summary_text()
+
+
+def test_harvester_target_over_time_and_the_map_cap():
+    srv = server()
+    pol = RedAlertPolicy(params=load_params(HARV_ON))
+    drive(srv, pol, 1)
+    v = pol.view
+    h = pol.harv
+    assert h.cap(v) == 8                                          # sidestep: ~100 ore cells near the spawn
+    for t, want in ((60, 2), (120, 2), (150, 4), (195, 5), (240, 6), (360, 8), (900, 8)):   # (30 s ahead)
+        v.game_s = float(t)
+        assert h.want(v) == want, (t, h.want(v))
+    for map_id, lo, hi in (("trapped", 6, 8), ("shadowfiend-ii", 9, 10)):
+        s2 = server(map_id)
+        p2 = RedAlertPolicy(params=load_params(HARV_ON))
+        drive(s2, p2, 1)
+        assert lo <= p2.harv.cap(p2.view) <= hi, (map_id, p2.harv.cap(p2.view))
+
+
+def test_harv_first_builds_harvesters_and_a_third_refinery_before_more_infantry(monkeypatch):
+    srv = server()
+    pol = RedAlertPolicy(params=load_params(HARV_ON))
+    monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)       # no attack: the idle seat must live on
+    serial_views, bad = 0, []                                     # orders sent while serialised
+    for _ in range(280 * 5):
+        st = srv.state(0)
+        orders, _tag = pol.decide(st, CONFIG)
+        if pol.harv._serial:
+            serial_views += 1
+            n_inf = sum(1 for u in pol.view.units if u["type"] in INFANTRY_TYPES)
+            bad += [o for o in orders or [] if (o["cmd"] == "train" and o["item"] in INFANTRY_TYPES
+                                                and n_inf >= int(pol.p.serial_infantry))
+                    or (o["cmd"] == "build" and o["item"] in ("pbox", "ftur", "gun", "tsla", "weap"))]
+        if orders:
+            pol.on_result(srv.play_action(0, st["state_version"], {"type": "orders", "orders": copy.deepcopy(orders)}))
+        advance(srv)
+    own = list(srv.world.own(0))
+    harv = sum(1 for a in own if a.type == "harv")
+    procs = sum(1 for a in own if a.type == "proc")
+    assert harv >= 6 and procs >= 3, (harv, procs)
+    assert serial_views > 0 and not bad, bad
+    s = pol.summary()["harv"]
+    assert s["harv_180"] >= 3 and s["harv_270"] >= 5 and s["serial_s"] > 0, s
+    yard = next(a for a in own if a.type == "fact")
+    for a in own:
+        if a.type == "proc":                                      # every refinery within the yard's build radius
+            assert ((a.x + 1.5 - yard.x - 1.5) ** 2 + (a.y + 2 - yard.y - 2) ** 2) ** 0.5 <= 16
+    assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+    assert "harv_270=" in pol.summary_text()
+
+
+def test_harv_first_serialisation_ends_under_a_real_threat():
+    srv = server()
+    pol = RedAlertPolicy(params=load_params(HARV_ON))
+    drive(srv, pol, 160)
+    v = pol.view
+    assert v.have.get("weap")
+    pol.harv._tick = None
+    if pol.harv.count(v) >= pol.harv.want(v):                    # make sure we are below the target
+        v.game_s, v.tick = 260.0, v.tick + 1
+    assert pol.harv.serialized(v)
+    for setup in (lambda a: setattr(a, "rush", True), lambda a: setattr(a, "early_army", True),
+                  lambda a: (setattr(a, "threatened", True), setattr(a, "threat_value", 400.0)),
+                  lambda a: a.harv_hit.__setitem__(12345, v.tick)):
+        army = pol.army
+        saved = (army.rush, army.early_army, army.threatened, army.threat_value, dict(army.harv_hit))
+        setup(army)
+        pol.harv._tick = None
+        assert not pol.harv.serialized(v)
+        army.rush, army.early_army, army.threatened, army.threat_value = saved[:4]
+        army.harv_hit.clear()
+        army.harv_hit.update(saved[4])
+    pol.harv._tick = None
+    assert pol.harv.serialized(v)
+
+
+def test_harv_spread_sends_an_idle_harvester_to_a_field_cell():
+    srv = server()
+    pol = RedAlertPolicy(params=load_params({**HARV_ON, "ARENA_RA_HARV_SPREAD": "1"}))
+    drive(srv, pol, 120)
+    v = pol.view
+    harvs = [u for u in v.units if u["type"] == "harv"]
+    assert harvs
+    out = []
+    done = pol.harv.spread(v, out, [harvs[0]["id"]])
+    assert done == [harvs[0]["id"]]
+    o = out[0].order
+    assert o["cmd"] == "harvest" and tuple(o["to"]) in set(v.st.ore_cells)
+
+
 def test_counter_ratio():
     from agent.redalert import counters
     from agent.redalert.world import Rules as BotRules

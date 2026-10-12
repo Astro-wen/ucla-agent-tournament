@@ -21,7 +21,9 @@ from .world import dist, is_combat
 
 AIR = frozenset({"heli", "mh60", "yak", "mig", "hind", "badr", "u2", "tran"})
 FIELD_LINK = 2              # ore cells this close (Chebyshev) belong to one field
-CAP_RADIUS = 18             # ore within this of our spawn sets the harvester cap
+CAP_RADIUS = 15             # fields reaching within this of our spawn set the harvester cap
+LEAD_S = 30.0               # the target is met when the harvesters are alive: queue them this much earlier
+SERIAL_SPARE = 300          # money beyond what the harvesters / refinery in production still cost: no need to wait
 BUILD_RADIUS = 15.0         # refinery cells kept within this of the yard (engine: 16 from the construction yard)
 FIELD_NEAR_PROC = 9         # a field "belongs" to a refinery when one of its cells is this close to the dock
 HIT_RECENT_TICKS = 10 * 25  # a harvester / building hit this recently ends the serialisation
@@ -91,18 +93,20 @@ class Harvest:
         if not st.grid_ok or spawn is None:
             self._cap = min(hi, 8)
             return self._cap
-        n = 0
-        gems = set(getattr(st, "gem_cells", None) or [])
-        for c in st.ore_cells:
-            if dist(c, spawn) <= CAP_RADIUS:
-                n += 2 if c in gems else 1
+        # every field with a cell within CAP_RADIUS of our spawn counts whole (gems twice)
+        n = sum(f["value"] for f in fields(st) if any(dist(c, spawn) <= CAP_RADIUS for c in f["cells"]))
         self._cap = max(4, min(hi, int(round(n / max(1.0, float(p.harv_cells_per))))))
         return self._cap
 
     def want(self, v, lead_s: float = 0.0) -> int:
-        """Harvesters we want (alive or in production) at game second t + lead_s."""
+        """Harvesters we want alive or in production now (lead_s later): the target curve LEAD_S ahead, since one
+        takes 26 s to build."""
+        return min(self.cap(v), int(math.floor(self.goal(v, lead_s) + 1e-9)))
+
+    def goal(self, v, lead_s: float = 0.0) -> float:
+        """The target curve (not rounded, not capped) at game second t + lead_s + LEAD_S."""
         p = self.pol.p
-        t = v.game_s + lead_s
+        t = v.game_s + lead_s + LEAD_S
         pts = [(WEAP_TO_FIRST_HARV_S, 2.0), (float(p.harv_t4), 4.0), (float(p.harv_t6), 6.0), (float(p.harv_t8), 8.0)]
         if t <= pts[0][0]:
             w = 2.0
@@ -114,7 +118,7 @@ class Harvest:
                 if t0 <= t <= t1:
                     w = w0 + (w1 - w0) * (t - t0) / max(1.0, t1 - t0)
                     break
-        return min(self.cap(v), int(math.floor(w + 1e-9)))
+        return w
 
     def count(self, v) -> int:
         led = self.pol.ledger
@@ -140,8 +144,13 @@ class Harvest:
             return False
         if v.remaining <= 240 or self.pol.econ.emergency:
             return False
-        if self.count(v) >= self.want(v):
-            return False
+        if v.unit_count.get("harv", 0) >= self.want(v):
+            return False                                  # (the ones in production still need the money: alive count)
+        rules = v.st.rules
+        need = sum(rules.cost(it["item"]) * max(0.0, 1.0 - it["progress"]) for q in ("Vehicle", "Building")
+                   for it in v.queue_items(q) if it["item"] in ("harv", "proc") and not it["ready"])
+        if v.money >= need + SERIAL_SPARE:
+            return False                                  # money for everything: nothing to wait for
         why = self.threat(v)
         if why:
             if why != self.ended_by:
@@ -192,7 +201,7 @@ class Harvest:
             return False
         if self.pol.army.real_attack(v) or self.pol.econ.emergency:
             return False
-        return self.want(v, 90.0) > p.harv_per_proc * procs + 1e-9
+        return min(float(self.cap(v)), self.goal(v, 90.0)) > p.harv_per_proc * procs + 1e-9
 
     def proc_spot(self, v):
         """Top-left for a new refinery: next to the field (within reach of the yard) with the most ore per refinery
