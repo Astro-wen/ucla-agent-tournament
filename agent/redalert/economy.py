@@ -475,6 +475,10 @@ class Economy:
         if self.role_count(v, "weap") < min(2, p.max_weaps) and v.game_s >= 240 and v.money > 2000 and harv >= 3 \
                 and v.army_value >= 3000 and not (p.harv_first and self.pol.harv.serialized(v)):
             return self.role_item(v, "weap")
+        if p.harv_first and p.harv_weap2 and self.role_count(v, "weap") < min(2, p.max_weaps) and \
+                v.game_s >= 180 and v.money > p.harv_weap2 and harv >= 5 and not self.pol.harv.serialized(v):
+            # harvesters first: the income outgrows one war factory (simulator: 2000-4000 floating at 4-6 minutes)
+            return self.role_item(v, "weap")
         if procs < p.max_procs and v.game_s >= 420 and v.money > 3000:
             return self.role_item(v, "proc")
         return None

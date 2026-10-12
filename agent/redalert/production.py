@@ -225,7 +225,7 @@ class Production:
         target_harv = min(int(p.max_harvesters), 2 * procs, procs + int(v.game_s // 150))
         if procs and harv < procs and "harv" in v.avail:
             return "harv"
-        if p.harv_first and v.remaining > 240 and "harv" in v.avail and not army.real_attack(v) and \
+        if p.harv_first and v.remaining > 240 and "harv" in v.avail and self.pol.harv.active(v) and \
                 harv < min(self.pol.harv.want(v), 3 * self.pol.econ.role_count(v, "proc")):
             # harvesters first (harvest.py): the harvester target over time, at most 3 per refinery (a refinery more
             # comes through harvest.need_proc)

@@ -65,7 +65,8 @@ DEFAULTS: dict[str, float] = {
     "serial_infantry": 6,           # below the target and not really attacked: at most this much infantry, no new
     "serial_threat": 300,           # tower beyond threat towers; a threat at home worth serial_threat (or a harvester /
     "serial_half": 600,             # building hit, enemy army worth serial_half on our half, early-army signs) ends it
-    "harv_spread": 0,               # idle harvesters to the field with the most ore per harvester near our refineries;
+    "harv_weap2": 1500,             # harv_first: a 2nd war factory once 5 harvesters work and this much floats (0 off)
+    "harv_spread": 0,             # idle harvesters to the field with the most ore per harvester near our refineries;
     "harv_share": 3,                # one harvester moves on when more than harv_share share a refinery's field
 }
 

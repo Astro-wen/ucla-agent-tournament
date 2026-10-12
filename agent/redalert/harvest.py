@@ -127,6 +127,15 @@ class Harvest:
     def procs(self, v) -> int:
         return self.pol.econ.role_count(v, "proc")
 
+    def active(self, v) -> bool:
+        """The harvester target and its refinery apply: harv_first on and no early-army / rush sign, no real attack.
+        (Dev seeds 601006 / 604015: with an early enemy army seen, harvesters and a third refinery before the depot
+        left 20 rifles and no tank when the 4-minute attack came; the v4.5 opening handles those games.)"""
+        if not self.on():
+            return False
+        army = self.pol.army
+        return not (army.rush or army.early_army or army.two_barracks or army.real_attack(v))
+
     # ---- serialisation -------------------------------------------------------------------------------------------
     def serialized(self, v) -> bool:
         """Below the harvester target with the war factory up, and no real threat: units and towers wait."""
@@ -199,7 +208,7 @@ class Harvest:
         procs = self.procs(v)
         if procs < 1 or procs >= int(p.max_procs) or v.remaining <= 300:
             return False
-        if self.pol.army.real_attack(v) or self.pol.econ.emergency:
+        if not self.active(v) or self.pol.econ.emergency:
             return False
         return min(float(self.cap(v)), self.goal(v, 90.0)) > p.harv_per_proc * procs + 1e-9
 
