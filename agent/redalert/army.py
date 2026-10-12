@@ -360,10 +360,10 @@ class Army:
             want = 2 if e_army < 2 * max(1, v.army_value) else 3
         floor = 600
         p = self.pol.p
+        if p.econ_first and self.early_army and v.game_s < 420:
+            want = max(want, int(p.early_army_towers))   # an early enemy army: towers against a rush
         if p.econ_first and not self.pol.first.get("weap"):
             floor = max(floor, p.real_threat)            # a light harass before the war factory: no tower money
-            if self.early_army:
-                want = max(want, int(p.early_army_towers))   # an early enemy army: towers against a rush
         elif p.econ_first and v.game_s >= p.safety_tower_s:
             # economy first leaves a thinner army at home around 4:00, when a balanced opponent's first wave comes
             # (v4.5 tuning seed 501062: 29 infantry at 253 s razed a base with 20 rifles and 3 tanks): towers at the
@@ -752,6 +752,10 @@ class Army:
         quiet = (v.tick - self.last_enemy_combat) / 25.0 >= p.quiet_s
         if v.game_s >= p.opportunistic_s and n_veh >= 3 and quiet and self.fail_mult <= 1.0:
             return True
+        if p.econ_first and main_val < 0.5 * p.attack_min_value:
+            # a look at their home that shows next to nothing at 4:00 means their army is elsewhere, maybe on its
+            # way (v4.5 measurement seed 62043: 14 rifles went for "3x the 100 we saw" and met 34 rifles)
+            return False
         return strength > 0 and n >= 3 and eq >= 3.0 * strength and v.game_s >= 180
 
     def _main_step(self, v, out) -> None:

@@ -394,6 +394,13 @@ class Economy:
         item = self._next_building(v)
         if item is None:
             return
+        army = self.pol.army
+        if self.pol.p.econ_first and army.early_army and not self.pol.first.get("weap") and item not in POWER and \
+                any(not it["ready"] and it["item"] in TOWERS for it in v.queue_items("Defense")):
+            # an early enemy army: the tower in production gets the money before the next building starts (v4.5
+            # measurement seed 62005: the war factory started next to it, the tower sat at 8 % until the 36-rifle
+            # rush came at 178 s)
+            return
         out.append(Cand({"cmd": "build", "item": item}, key=("build", item), urgent=True, base=v.in_prod.get(item, 0)))
 
     def _power_item(self, v) -> str | None:
