@@ -24,6 +24,7 @@ FIELD_LINK = 2              # ore cells this close (Chebyshev) belong to one fie
 CAP_RADIUS = 15             # fields reaching within this of our spawn set the harvester cap
 LEAD_S = 30.0               # the target is met when the harvesters are alive: queue them this much earlier
 SERIAL_SPARE = 300          # money beyond what the harvesters / refinery in production still cost: no need to wait
+SUPPRESS_UNTIL_S = 420      # rush / early-army signs before this switch harvesters first off for the match
 BUILD_RADIUS = 15.0         # refinery cells kept within this of the yard (engine: 16 from the construction yard)
 FIELD_NEAR_PROC = 9         # a field "belongs" to a refinery when one of its cells is this close to the dock
 HIT_RECENT_TICKS = 10 * 25  # a harvester / building hit this recently ends the serialisation
@@ -78,6 +79,7 @@ class Harvest:
         self._rebal_tick = -10 ** 9
         self._cap = None
         self.ended_by: str | None = None      # what ended the serialisation last (for the event log)
+        self.suppressed = False               # early army / rush signs seen: off for the match
 
     # ---- numbers ------------------------------------------------------------------------------------------------
     def on(self) -> bool:
@@ -131,10 +133,18 @@ class Harvest:
         """The harvester target and its refinery apply: harv_first on and no early-army / rush sign, no real attack.
         (Dev seeds 601006 / 604015: with an early enemy army seen, harvesters and a third refinery before the depot
         left 20 rifles and no tank when the 4-minute attack came; the v4.5 opening handles those games.)"""
-        if not self.on():
+        if not self.on() or self.suppressed:
             return False
         army = self.pol.army
-        return not (army.rush or army.early_army or army.two_barracks or army.real_attack(v))
+        if army.rush or army.early_army or army.two_barracks:
+            if v.game_s < SUPPRESS_UNTIL_S and not self.suppressed:
+                # sticky: a rush once seen (its flag clears after a quiet minute) still means an early army (dev seed
+                # 606038: the rush flag cleared at 220 s, two refineries and harvesters came before the depot, and
+                # the tank push at 290 s met rifles only)
+                self.suppressed = True
+                self.pol.log_event(f"harvesters first off at {v.game_s:.0f}s: early army / rush signs")
+            return False
+        return not army.real_attack(v)
 
     # ---- serialisation -------------------------------------------------------------------------------------------
     def serialized(self, v) -> bool:
@@ -149,7 +159,7 @@ class Harvest:
         return self._serial
 
     def _compute(self, v) -> bool:
-        if not self.on() or v.fact is None or not v.have.get("weap"):
+        if not self.active(v) or v.fact is None or not v.have.get("weap"):
             return False
         if v.remaining <= 240 or self.pol.econ.emergency:
             return False

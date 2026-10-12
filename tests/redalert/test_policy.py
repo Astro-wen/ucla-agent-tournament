@@ -679,19 +679,29 @@ def test_harv_first_serialisation_ends_under_a_real_threat():
     if pol.harv.count(v) >= pol.harv.want(v):                    # make sure we are below the target
         v.game_s, v.tick = 260.0, v.tick + 1
     assert pol.harv.serialized(v)
-    for setup in (lambda a: setattr(a, "rush", True), lambda a: setattr(a, "early_army", True),
-                  lambda a: (setattr(a, "threatened", True), setattr(a, "threat_value", 400.0)),
-                  lambda a: a.harv_hit.__setitem__(12345, v.tick)):
-        army = pol.army
-        saved = (army.rush, army.early_army, army.threatened, army.threat_value, dict(army.harv_hit))
+    army = pol.army
+    for setup in (lambda a: (setattr(a, "threatened", True), setattr(a, "threat_value", 400.0)),
+                  lambda a: a.harv_hit.__setitem__(12345, v.tick),
+                  lambda a: a.enemy_units.__setitem__(99999, {"type": "3tnk", "tick": v.tick, "x": v.base[0] + 3,
+                                                             "y": v.base[1], "hp": 100})):
+        saved = (army.threatened, army.threat_value, dict(army.harv_hit), dict(army.enemy_units))
         setup(army)
         pol.harv._tick = None
         assert not pol.harv.serialized(v)
-        army.rush, army.early_army, army.threatened, army.threat_value = saved[:4]
+        army.threatened, army.threat_value = saved[:2]
         army.harv_hit.clear()
-        army.harv_hit.update(saved[4])
+        army.harv_hit.update(saved[2])
+        army.enemy_units.clear()
+        army.enemy_units.update(saved[3])
+        pol.harv._tick = None
+        assert pol.harv.serialized(v) and pol.harv.active(v)
+    # rush / early-army signs switch harvesters first off for the match, even after the flag clears
+    army.rush = True
     pol.harv._tick = None
-    assert pol.harv.serialized(v)
+    assert not pol.harv.serialized(v) and not pol.harv.active(v)
+    army.rush = False
+    pol.harv._tick = None
+    assert not pol.harv.serialized(v) and not pol.harv.active(v) and pol.harv.suppressed
 
 
 def test_harv_spread_sends_an_idle_harvester_to_a_field_cell():

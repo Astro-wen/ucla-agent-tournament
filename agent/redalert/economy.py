@@ -429,9 +429,10 @@ class Economy:
                     continue                              # not buildable yet: look further down the plan
         if choice is None:
             choice = self._midgame(v)
-        if p.harv_first and choice in (None, "fix", "weap", "dome") and pol.harv.need_proc(v):
-            # harvesters first: a refinery for the harvester target before the depot / a second war factory (the
-            # Vehicle queue builds harvesters until the target, so the depot is not needed earlier)
+        if p.harv_first and choice in (None, "fix", "weap", "dome") and pol.harv.need_proc(v) and \
+                not (choice == "fix" and self.role_count(v, "proc") >= 3):
+            # harvesters first: the third refinery before the depot (the Vehicle queue builds harvesters until the
+            # target, so the depot is not needed earlier), a fourth one only after it
             choice = self.role_item(v, "proc") or choice
         if (pol.army.rush or pol.army.defense_first(v)) and choice not in (None, "powr", "apwr", "tent", "barr", "proc") \
                 and v.money < 1500:
