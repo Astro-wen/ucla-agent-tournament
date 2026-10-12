@@ -218,6 +218,7 @@ class Static:
         self.passable = None
         self.buildable = None
         self.ore_cells: list[tuple[int, int]] = []
+        self.gem_cells: list[tuple[int, int]] = []
         self._load_layout(info.get("layout"))
         self.ready = False
         self.my_spawn = self.enemy_spawn = None
@@ -237,6 +238,7 @@ class Static:
         pas = bytearray(w * h)
         bld = bytearray(w * h)
         ore = []
+        gems = []
         for i, row in enumerate(rows):
             if not isinstance(row, str):
                 continue
@@ -254,9 +256,12 @@ class Static:
                     bld[base + x] = 1
                 if ch in ORE:
                     ore.append((x, y))
+                    if ch == "*":
+                        gems.append((x, y))
         if sum(pas) < 50:
             return
         self.passable, self.buildable, self.ore_cells, self.grid_ok = pas, bld, ore, True
+        self.gem_cells = gems
 
     def in_bounds(self, c) -> bool:
         return self.bx0 <= c[0] <= self.bx1 and self.by0 <= c[1] <= self.by1
