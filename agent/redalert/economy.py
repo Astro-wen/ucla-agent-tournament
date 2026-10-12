@@ -452,7 +452,10 @@ class Economy:
             return self.role_item(v, "weap")
         if self.role_count(v, "fix") < 1 and "fix" in v.avail and v.money > 800:
             return self.role_item(v, "fix")
-        if procs < 3 and v.game_s >= 200 and (harv >= procs + 1 or v.money > 2500):
+        # econ_first: the third refinery waits for the army until 6:00 (two refineries already pay for one war
+        # factory; v4.5 tuning seed 502010: a third refinery at 210 s and no tank before 300 s lost to the first wave)
+        greedy_ok = not self.pol.p.econ_first or v.game_s >= 360 or v.money > 2500
+        if procs < 3 and v.game_s >= 200 and (harv >= procs + 1 or v.money > 2500) and greedy_ok:
             return self.role_item(v, "proc")
         if self.role_count(v, "weap") < min(2, p.max_weaps) and v.game_s >= 240 and v.money > 2000 and harv >= 3 \
                 and v.army_value >= 3000:

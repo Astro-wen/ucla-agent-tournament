@@ -9,6 +9,8 @@ contract as local/ra_bots.py; local/ra_platform.py takes them by name (--b tanks
             2 towers, mixed army, attacks when its army is worth >= 5000 with 8+ units, defends home with everything
     raider  economy + early jeeps / flak trucks that hunt harvesters (avoid towers), towers at home, big push at 11 min
     hider   drives its MCV to a corner far from both spawns, builds power, barracks, 4 towers, rifles at home
+    nash    the real loss of 10-11 as a script: double refinery, rifle / rocket picket a third of the way to us from
+            the start (kills scouts), infantry probe at ~5:30, main push with 3+ heavy tanks from ~6:30
 """
 from __future__ import annotations
 
@@ -386,7 +388,84 @@ class Hider(Strong):
         return best[1] if best else (me[0], me[1])
 
 
-BOTS = {"tanks": TankRush, "swarm": Swarm, "pro": Pro, "raider": Raider, "hider": Hider}
+class Nash(Strong):
+    """The real loss of 10-11 (cb4bfc36, "Steve Nash Equilibrium", Soviet vs Soviet on sidestep), as a script: a
+    double-refinery economy with a war factory and depot by ~4 min; its rifle / rocket infantry stands at a picket a
+    third of the way to us from the start (it kills an early scout there); an infantry probe at ~5:30 when 8+ stand
+    there; the main push from ~6:30 with 3+ heavy tanks and the infantry; reinforcing waves after; home defense."""
+    style = "nash"
+
+    def __init__(self, seed: int = 0):
+        super().__init__(seed)
+        self.probed = False
+        self.pushed = False
+
+    def decide(self, raw, obs, la):
+        out = self.basics(obs, la)
+        soviet = self.side(obs) == "soviet"
+        bar = "barr" if soviet else "tent"
+        gs = self.game_s(raw, obs)
+        money = self.money(obs)
+        plan = [("powr", 1), (bar, 1), ("proc", 1), ("powr", 2), ("proc", 2), ("weap", 1), ("powr", 3), ("fix", 1),
+                ("powr", 4)]
+        if gs > 360 and money > 1500:
+            plan += [("proc", 3), ("powr", 5), ("weap", 2), ("powr", 6)]
+        nb = self.next_building(obs, plan)
+        if nb:
+            out.append(nb)
+        avail = obs.get("available_production") or []
+        army = self.fighters(obs)
+        inf = [u for u in army if u.get("type") in ("e1", "e2", "e3")]
+        cap = 10 if gs < 240 else (14 if gs < 420 else 18)
+        if self.count(obs, bar) and not self.queue_busy(obs, "Infantry") and len(inf) < cap and \
+                money > (200 if gs < 180 else 600):
+            n_e3 = sum(1 for u in inf if u.get("type") == "e3")
+            out.append(self.train(obs, "e3" if n_e3 * 2 < len(inf) else "e1", 2))
+        if self.count(obs, "weap") and not self.queue_busy(obs, "Vehicle"):
+            procs = self.count(obs, "proc")
+            main = "3tnk" if soviet else "2tnk"
+            if self.count(obs, "harv") < min(5, 2 * procs) and money >= 1100:
+                out.append(self.train(obs, "harv"))
+            elif main in avail and money >= 1000:
+                out.append(self.train(obs, main))
+        alive = {u["id"] for u in army}
+        self.att &= alive
+        st = self.stance(army)
+        if st:
+            out.append(st)
+        home = [u for u in army if u["id"] not in self.att]
+        hd = self.home_defense(obs, home, radius=16)
+        if hd:
+            out.append(hd)
+            return out
+        bc = obs.get("base_center") or [0, 0]
+        eb = la.get("enemy_base") or [0, 0]
+        picket = [int(bc[0] + 0.33 * (eb[0] - bc[0])), int(bc[1] + 0.33 * (eb[1] - bc[1]))]
+        tanks = [u for u in home if u.get("type") in ("3tnk", "2tnk", "1tnk", "4tnk")]
+        hinf = [u for u in home if u not in tanks]
+        go = None
+        if not self.pushed and len(tanks) >= 3 and len(hinf) >= 6 and gs >= 390:
+            self.pushed = True
+            go = home
+        elif self.pushed and len(home) >= 5:
+            go = home
+        elif not self.probed and gs >= 330 and len(hinf) >= 8:
+            self.probed = True
+            go = hinf
+        if go:
+            self.waves += 1
+            out.append({"cmd": "attack_move", "units": [u["id"] for u in go][:50], "to": eb})
+            self.att.update(u["id"] for u in go[:50])
+        else:
+            idle_inf = [u["id"] for u in hinf if u.get("idle") and d((u["x"], u["y"]), picket) > 4]
+            if idle_inf and self.once(obs, "picket", 125):
+                out.append({"cmd": "attack_move", "units": idle_inf[:50], "to": picket})
+        out += self.push(obs, la, [u for u in army if u["id"] in self.att],
+                         (DEF_PRIO, PROD, ("proc",), ("powr", "apwr"), ("fact",)))
+        return out
+
+
+BOTS = {"tanks": TankRush, "swarm": Swarm, "pro": Pro, "raider": Raider, "hider": Hider, "nash": Nash}
 STYLES = tuple(BOTS)
 
 

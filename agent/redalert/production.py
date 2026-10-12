@@ -112,7 +112,7 @@ class Production:
             target = max(int(p.home_infantry) + 4, 10)
         else:
             target = int(p.max_infantry)
-            if army.scout_lost_early and v.game_s < 240:
+            if army.scout_lost_early and v.game_s < 240 and not p.econ_first:
                 target = max(target, int(p.early_infantry))
             idle_money = n >= (5 if soviet else 4) and not army.defense_first(v)
         stranded = not late and self.stranded(v)
@@ -120,6 +120,11 @@ class Production:
             # no yard and no MCV to come: money can only become units (the tiebreak's assets count units and
             # buildings, never cash), and an army that keeps training never sits idle
             target, idle_money = max(target, STRANDED_INFANTRY), False
+        elif p.econ_first and not late and not self.pol.first.get("weap") and v.game_s < 420 \
+                and not army.real_attack(v):
+            # economy first: until the first war factory stands, a handful of rifles (scout + home guard) and the
+            # rest of the money goes into the refineries and the war factory, unless a real attack is on
+            target = min(target, int(p.pre_weap_infantry) + (2 if army.threatened else 0))
         if n >= target:
             return
         if not threatened and not late and v.have.get("weap") and v.game_s >= 240 and \
