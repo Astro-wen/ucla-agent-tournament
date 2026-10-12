@@ -94,6 +94,10 @@ class Economy:
         self._place(v, out)
         self._reserve(v)
         if v.fact is None:
+            if allow and self.pol.p.idle_harv_fix:
+                # (v4.6 fix: without a yard the upkeep below never ran, so a harvester left idle by a harvester-guard
+                # pull never went back to work: dev seed 602053 sat on 390 credits with 8 harvesters for 7 minutes)
+                self._idle_harvesters(v, out)
             return
         self._building_queue(v, out)
         self._defense_queue(v, out)
@@ -430,7 +434,7 @@ class Economy:
         if choice is None:
             choice = self._midgame(v)
         if p.harv_first and choice in (None, "fix", "weap", "dome") and pol.harv.need_proc(v) and \
-                not (choice == "fix" and self.role_count(v, "proc") >= 3):
+                not (choice == "fix" and (self.role_count(v, "proc") >= 3 or not p.harv_proc_first)):
             # harvesters first: the third refinery before the depot (the Vehicle queue builds harvesters until the
             # target, so the depot is not needed earlier), a fourth one only after it
             choice = self.role_item(v, "proc") or choice
@@ -581,6 +585,11 @@ class Economy:
             if led.is_pending(key):
                 continue
             out.append(Cand({"cmd": "rally", "building": b["id"], "to": list(target)}, key=key))
+        self._idle_harvesters(v, out)
+
+    def _idle_harvesters(self, v, out) -> None:
+        p = self.pol.p
+        led = self.pol.ledger
         idle_harv = [u["id"] for u in v.units if u["type"] == "harv" and u["idle"]
                      and led.unit_ok(u["id"], ("harvest",), True, min_gap=50, same_gap=125)]
         if p.harv_spread and v.have.get("proc", 0) > 0:

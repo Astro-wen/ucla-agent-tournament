@@ -62,11 +62,13 @@ DEFAULTS: dict[str, float] = {
     "harv_cap": 10,
     "harv_cells_per": 12,
     "harv_per_proc": 2.5,           # a refinery more when the target exceeds this many harvesters per refinery
+    "harv_proc_first": 1,           # the third refinery before the depot (0: after it)
     "serial_infantry": 6,           # below the target and not really attacked: at most this much infantry, no new
     "serial_threat": 300,           # tower beyond threat towers; a threat at home worth serial_threat (or a harvester /
     "serial_half": 600,             # building hit, enemy army worth serial_half on our half, early-army signs) ends it
     "harv_weap2": 1500,             # harv_first: a 2nd war factory once 5 harvesters work and this much floats (0 off)
-    "harv_spread": 0,             # idle harvesters to the field with the most ore per harvester near our refineries;
+    "idle_harv_fix": 0,             # idle harvesters go back to work even without a construction yard (v4.5 bug)
+    "harv_spread": 0,           # idle harvesters to the field with the most ore per harvester near our refineries;
     "harv_share": 3,                # one harvester moves on when more than harv_share share a refinery's field
 }
 

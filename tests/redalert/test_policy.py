@@ -704,6 +704,25 @@ def test_harv_first_serialisation_ends_under_a_real_threat():
     assert not pol.harv.serialized(v) and not pol.harv.active(v) and pol.harv.suppressed
 
 
+def test_without_a_yard_idle_harvesters_still_go_back_to_work(monkeypatch):
+    for fix, expect in (("0", False), ("1", True)):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params({"ARENA_RA_IDLE_HARV_FIX": fix}))
+        monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)
+        drive(srv, pol, 120)
+        w = srv.world
+        harv = next(a for a in w.own(0) if a.type == "harv")
+        with srv.cv:
+            w._kill(next(a for a in w.own(0) if a.type == "fact"), None)
+            harv.hstate, harv.order, harv.oq = None, None, []           # idle (as after a harvester-guard move)
+        sent = []
+        for _ in range(15):
+            drive(srv, pol, 0.2, record=sent)
+        got = any(o["cmd"] == "harvest" and harv.id in o["units"] for _sv, orders, _r in sent for o in orders)
+        assert got == expect, (fix, got)
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+
+
 def test_harv_spread_sends_an_idle_harvester_to_a_field_cell():
     srv = server()
     pol = RedAlertPolicy(params=load_params({**HARV_ON, "ARENA_RA_HARV_SPREAD": "1"}))
