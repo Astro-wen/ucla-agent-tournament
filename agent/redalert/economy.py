@@ -476,9 +476,9 @@ class Economy:
         if self.busy(v, "Defense") or v.tick < self.full_until:
             return
         army = self.pol.army
-        if self.emergency and not army.threatened:
-            return
         rules = v.st.rules
+        if self.emergency and (not army.threatened or (self.pol.p.econ_first and v.money < rules.cost("harv"))):
+            return                                      # (econ_first: no tower eats the harvester's last credits)
         item = None
         if v.capacity > 0 and v.ore > 0.8 * v.capacity and "silo" in v.avail and v.have.get("silo", 0) < 4:
             item = "silo"

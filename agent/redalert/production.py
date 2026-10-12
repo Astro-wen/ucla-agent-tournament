@@ -68,8 +68,12 @@ class Production:
         have = v.money + refund
         if have >= need:
             return
-        # the other queues' in-progress items (not a power plant, not one ready to place)
-        for q in ("Building", "Defense", "Vehicle"):
+        # the other queues' in-progress items (not a power plant, not one ready to place); econ_first: the Infantry
+        # queue too (v4.5 recovery seeds 7122 / 7136 / 7142: a rocket soldier and the harvester shared the last
+        # credits and both sat half built for 150 s with no income)
+        queues = ("Building", "Defense", "Vehicle", "Infantry") if self.pol.p.econ_first else \
+            ("Building", "Defense", "Vehicle")
+        for q in queues:
             if q == queue:
                 continue
             for it in v.queue_items(q)[:1]:
@@ -91,7 +95,7 @@ class Production:
         rules = v.st.rules
         army = self.pol.army
         p = self.pol.p
-        if self.pol.econ.emergency and not army.threatened:
+        if self.pol.econ.emergency and (not army.threatened or (p.econ_first and v.money < rules.cost("harv"))):
             return                                     # every credit goes to the new harvester
         alive = [u for u in v.units if is_infantry(u["type"], rules) and u["type"] not in ("medi", "mech", "e6", "spy")]
         queued = sum(1 for it in items)

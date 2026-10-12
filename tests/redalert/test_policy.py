@@ -351,6 +351,33 @@ def test_every_harvester_lost_with_no_money_a_harvester_comes_first(monkeypatch)
     assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
 
 
+def test_every_harvester_lost_while_under_attack_the_infantry_in_progress_is_cancelled_too(monkeypatch):
+    # v4.5 recovery seeds 7122 / 7136 / 7142: the base under attack kept training rifles and rocket soldiers, one of
+    # them shared the last credits with the new harvester and both sat half built for 150 s with no income
+    srv = server()
+    pol = RedAlertPolicy()
+    monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)
+    drive(srv, pol, 300)
+    w = srv.world
+    p = w.players[0]
+    monkeypatch.setattr(type(pol.army), "threatened", property(lambda self: True, lambda self, x: None),
+                        raising=False)
+    assert kill_own(srv, 0, {"harv"}) >= 2
+    kill_own(srv, 0, {"e1", "e2", "e3"})               # (the infantry wanted is far from reached)
+    drive(srv, pol, 6)                                 # the emergency starts after 5 s without a harvester
+    assert pol.econ.emergency
+    p.cash, p.ore = 300, 0
+    log = []
+    drive(srv, pol, 10, record=log)
+    sent = [o for _sv, orders, _r in log for o in orders]
+    assert not any(o["cmd"] == "train" and o["item"] in ("e1", "e2", "e3") for o in sent), sent
+    assert not any(it.progress > 0 and not it.done for it in p.queues["Infantry"][:1]) or \
+        any(o["cmd"] == "cancel" and o["item"] in ("e1", "e2", "e3") for o in sent), sent
+    drive(srv, pol, 90)
+    assert any(a.type == "harv" for a in w.own(0)), "no harvester rebuilt within 90 s"
+    assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+
+
 def test_low_power_cancels_a_slow_building_in_progress_for_a_power_plant():
     srv = server()
     pol = RedAlertPolicy()

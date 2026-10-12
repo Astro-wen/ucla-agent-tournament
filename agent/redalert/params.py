@@ -51,6 +51,7 @@ DEFAULTS: dict[str, float] = {
     "prior_rate": 25,               # attack must beat an assumed army of prior_rate x (t - 90 s), at most
     "prior_cap": 9000,              # prior_cap, and a cheap unit goes to look again (re-scout)
     "prior_until_s": 900,
+    "attack_3x_min": 2000,          # econ_first: "3x the enemy we saw" attacks only with this much (0: any size)
     "safety_tower_s": 150,          # econ_first: one tower at the front from here (war factory up), safety_towers
     "safety_towers": 2,             # a minute later
 }

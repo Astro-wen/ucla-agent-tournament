@@ -225,12 +225,16 @@ class Army:
                 # two barracks this early: an infantry rush is likely (v4.5 tuning seed 506026: 35 rifles at 178 s)
                 self.two_barracks = self.early_army = True
                 self.pol.log_event(f"two enemy barracks at {v.game_s:.0f}s: infantry rush likely")
-        if v.game_s < EARLY_ARMY_S and not self.early_army:
+        if v.game_s < EARLY_ARMY_S and not self.early_army and v.st.enemy_spawn is not None:
+            # counted inside their base only: a picket out on the road is not an army massing for a rush (v4.5
+            # measurement seed block 99: the nash script's 4-unit picket set this off and the towers it brought cost
+            # the games a v4.5 without them won)
+            es = v.st.enemy_spawn
             seen = sum(self.cost(e["type"]) for e in self.enemy_units.values()
-                       if is_combat(e["type"], rules) and e["type"] not in AIR)
+                       if is_combat(e["type"], rules) and e["type"] not in AIR and dist((e["x"], e["y"]), es) <= 12)
             if seen >= EARLY_ARMY_VALUE:
                 self.early_army = True
-                self.pol.log_event(f"early enemy army at {v.game_s:.0f}s (seen {seen})")
+                self.pol.log_event(f"early enemy army at {v.game_s:.0f}s (seen {seen} in their base)")
 
     def enemy_army(self, v, secs: float = 60.0) -> float:
         """Cost of the enemy combat units seen recently: full weight up to half of `secs`, fading out by `secs`."""
@@ -752,7 +756,7 @@ class Army:
         quiet = (v.tick - self.last_enemy_combat) / 25.0 >= p.quiet_s
         if v.game_s >= p.opportunistic_s and n_veh >= 3 and quiet and self.fail_mult <= 1.0:
             return True
-        if p.econ_first and main_val < 0.5 * p.attack_min_value:
+        if p.econ_first and main_val < p.attack_3x_min:
             # a look at their home that shows next to nothing at 4:00 means their army is elsewhere, maybe on its
             # way (v4.5 measurement seed 62043: 14 rifles went for "3x the 100 we saw" and met 34 rifles)
             return False
