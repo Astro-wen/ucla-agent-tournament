@@ -54,23 +54,25 @@ DEFAULTS: dict[str, float] = {
     "attack_3x_min": 2000,          # econ_first: "3x the enemy we saw" attacks only with this much (0: any size)
     "safety_tower_s": 150,          # econ_first: one tower at the front from here (war factory up), safety_towers
     "safety_towers": 2,             # a minute later
-    # v4.6 switches (1 on, 0 the v4.5 behaviour exactly); see docs/redalert_design.md section 17
-    "harv_first": 0,                # harvesters first: a harvester target over time, refineries for it, and spending
-    "harv_t4": 180,                 # serialised behind it. Target: 4 harvesters by harv_t4 (game s), 6 by harv_t6,
-    "harv_t6": 270,                 # 8 by harv_t8, never more than harv_cap (the map's ore near home lowers it:
-    "harv_t8": 390,                 # about one harvester per harv_cells_per ore cells within 15 cells of our spawn)
+    # v4.6 switches (ARENA_RA_HARV_FIRST=0 ARENA_RA_IDLE_HARV_FIX=0: the v4.5 behaviour exactly); see
+    # docs/redalert_design.md section 17
+    "harv_first": 1,                # harvesters first (agent/redalert/harvest.py): a harvester target over time,
+    "harv_t4": 180,                 # refineries for it, spending serialised behind it. Target: 4 harvesters by harv_t4
+    "harv_t6": 270,                 # (game s), 6 by harv_t6, 8 by harv_t8, at most harv_cap (fewer with little ore:
+    "harv_t8": 390,                 # one per harv_cells_per ore cells of the fields reaching 15 cells of our spawn)
     "harv_cap": 10,
-    "harv_min_path": 70,            # only on maps where the ground path between the spawns is at least this long
     "harv_cells_per": 12,
+    "harv_min_path": 70,            # only where the spawn-to-spawn ground path is this long (pool: shadowfiend-ii)
     "harv_per_proc": 2.5,           # a refinery more when the target exceeds this many harvesters per refinery
     "harv_proc_first": 1,           # the third refinery before the depot (0: after it)
-    "serial_infantry": 6,           # below the target and not really attacked: at most this much infantry, no new
-    "serial_threat": 300,           # tower beyond threat towers; a threat at home worth serial_threat (or a harvester /
-    "serial_half": 600,             # building hit, enemy army worth serial_half on our half, early-army signs) ends it
-    "harv_weap2": 1500,             # harv_first: a 2nd war factory once 5 harvesters work and this much floats (0 off)
-    "idle_harv_fix": 0,             # idle harvesters go back to work even without a construction yard (v4.5 bug)
-    "harv_spread": 0,           # idle harvesters to the field with the most ore per harvester near our refineries;
-    "harv_share": 3,                # one harvester moves on when more than harv_share share a refinery's field
+    "serial_infantry": 6,           # below the target and nothing attacking: at most this much infantry, no tower
+    "serial_threat": 300,           # beyond threat towers; a threat at home worth serial_threat (or a harvester /
+    "serial_half": 600,             # building hit, an enemy army worth serial_half on our half) ends it
+    "harv_weap2": 0,                # harv_first: a 2nd war factory once 5 harvesters work and this much floats (0 off;
+                                    # 1500 tried: dev seeds 611-616 26 / 10 vs 25 / 9 without it)
+    "idle_harv_fix": 1,             # idle harvesters go back to work even without a construction yard (v4.5 bug)
+    "harv_spread": 0,               # idle harvesters to the field with the most ore per harvester near our refineries;
+    "harv_share": 3,                # one moves on when more than harv_share share a refinery's field (off: no gain)
 }
 
 

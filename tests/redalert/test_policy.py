@@ -610,14 +610,19 @@ def test_blind_the_enemy_army_is_assumed_until_we_look_at_their_base():
 
 # ---- v4.6: harvesters first (agent/redalert/harvest.py) --------------------------------------------------------------
 HARV_ON = {"ARENA_RA_HARV_FIRST": "1"}
+V45 = {"ARENA_RA_HARV_FIRST": "0", "ARENA_RA_IDLE_HARV_FIX": "0"}          # every v4.6 switch off: v4.5
 
 
-def test_harv_first_is_off_by_default_and_leaves_the_summary_as_it_was():
-    pol = RedAlertPolicy(params=load_params({}))
+def test_harv_first_is_on_by_default_and_off_leaves_the_summary_as_it_was():
+    assert load_params({}).harv_first and load_params({}).idle_harv_fix
+    pol = RedAlertPolicy(params=load_params(V45))
     assert not pol.p.harv_first and pol.summary()["harv"] is None
     srv = server()
     drive(srv, pol, 5)
     assert "harv_180=" not in pol.summary_text()
+    on = RedAlertPolicy(params=load_params({}))
+    drive(server(), on, 5)
+    assert "harv_180=" in on.summary_text() and on.summary()["harv"]["serial_s"] == 0.0
 
 
 def test_harvester_target_over_time_and_the_map_cap():
@@ -641,7 +646,7 @@ def test_harv_first_needs_a_long_way_between_the_bases_and_is_v45_elsewhere(monk
     # sidestep (ground path 55) and trapped (57): the v4.5 play order for order; shadowfiend-ii (92): on
     for map_id, on in (("sidestep", False), ("trapped", False), ("shadowfiend-ii", True)):
         logs = []
-        for env in ({}, HARV_ON):
+        for env in (V45, HARV_ON):
             srv = server(map_id)
             pol = RedAlertPolicy(params=load_params(env))
             monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)
@@ -654,7 +659,7 @@ def test_harv_first_needs_a_long_way_between_the_bases_and_is_v45_elsewhere(monk
 
 def test_after_early_army_signs_harv_first_plays_v45_for_the_rest_of_the_match(monkeypatch):
     logs = []
-    for env in ({}, HARV_ON):
+    for env in (V45, HARV_ON):
         srv = server("shadowfiend-ii")
         pol = RedAlertPolicy(params=load_params(env))
         monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)
