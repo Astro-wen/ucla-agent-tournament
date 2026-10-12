@@ -35,7 +35,8 @@ def refusal_rows(detail) -> list[tuple[int, str, str, str | None]]:
 
 class Ledger:
     def __init__(self):
-        self.pending: dict[tuple, dict] = {}          # key -> {tick, base, sv}
+        self.accepted_ttl: dict[str, int] = {}        # kind -> lifetime once the platform accepted the order
+        self.pending: dict[tuple, dict] = {}          # key -> {tick, base, sv[, accepted]}
         self.batches: dict[int, dict] = {}            # state_version sent -> {orders, keys, tick, batch}
         self.by_batch: dict[int, int] = {}            # server batch number -> state_version
         self.last_sv: int | None = None               # the batch play_action answers next
@@ -58,7 +59,8 @@ class Ledger:
         e = self.pending.get(key)
         if e is None:
             return False
-        if self.tick - e["tick"] > PENDING_TICKS.get(key[0], 75):
+        ttl = self.accepted_ttl.get(key[0]) if e.get("accepted") else None
+        if self.tick - e["tick"] > (ttl or PENDING_TICKS.get(key[0], 75)):
             del self.pending[key]
             return False
         return True
@@ -147,6 +149,12 @@ class Ledger:
                 self._refused(rec["orders"][idx], str(row.get("reason") or "rejected"))
             elif status in ("pending", "ok", "partial"):
                 self.refusals.pop(order_key(rec["orders"][idx]), None)
+                self._accepted(rec["keys"][idx])
+
+    def _accepted(self, key) -> None:
+        e = self.pending.get(key) if key is not None else None
+        if e is not None and key[0] in self.accepted_ttl:
+            e["accepted"] = True
 
     def _refused(self, order: dict, reason: str) -> None:
         self.rejected += 1
@@ -237,6 +245,7 @@ class Ledger:
                 self.place_invalid.pop(str(order.get("item") or ""), None)
             if order.get("cmd") == "deploy":
                 self.deploy_invalid = 0
+                self._accepted(key)
 
     # ---- blacklist --------------------------------------------------------------------------------------------------
     def blocked(self, order: dict, view) -> bool:

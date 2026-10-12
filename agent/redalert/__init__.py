@@ -43,6 +43,13 @@ class RedAlertPolicy:
         self.clock = clock
         self.static: Static | None = None
         self.ledger = Ledger()
+        if int(self.p.deploy_pending_ticks) > 0:
+            # v4.6: a deploy the platform accepted is not sent again for this long (v4.5: 4 s like an unanswered
+            # one). With a lagging view the MCV still showed after 4 s, the deploy went again alone (no building yet
+            # for the anchor) and the MCV had become the yard meanwhile: the whole batch was refused (INVALID_ACTION;
+            # the fake-platform test at 25x speed on a loaded machine, v4.5 too). Refused / unanswered deploys keep
+            # the 4 s (ledger.on_result, PENDING_TICKS).
+            self.ledger.accepted_ttl["deploy"] = int(self.p.deploy_pending_ticks)
         self.econ = Economy(self)
         self.prod = Production(self)
         self.army = Army(self)

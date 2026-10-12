@@ -757,6 +757,24 @@ def test_without_a_yard_idle_harvesters_still_go_back_to_work(monkeypatch):
         assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
 
 
+def test_an_accepted_deploy_is_not_resent_from_a_lagging_view():
+    # v4.6: the fake-platform test at 25x speed on a loaded machine (v4.5 too): the view still showed the MCV after
+    # 4 s, the deploy went again alone (no building for the anchor) after the MCV had become the yard: INVALID_ACTION
+    for ticks, resent in (("0", True), ("375", False)):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params({"ARENA_RA_DEPLOY_PENDING_TICKS": ticks}))
+        st = srv.state(0)
+        first, _ = pol.decide(st, CONFIG)
+        assert first and first[0]["cmd"] == "deploy"
+        pol.on_result(srv.play_action(0, st["state_version"], {"type": "orders", "orders": copy.deepcopy(first)}))
+        late = copy.deepcopy(st)                                   # the same picture, 6 s later
+        late["observation"]["tick"] += 150
+        late["state_version"] = late["observation"]["tick"]
+        late["time"] = dict(late.get("time") or {}, game_seconds=late["observation"]["tick"] / 25.0)
+        again, _ = pol.decide(late, CONFIG)
+        assert any(o["cmd"] == "deploy" for o in again or []) == resent, (ticks, again)
+
+
 def test_harv_spread_sends_an_idle_harvester_to_a_field_cell():
     srv = server()
     pol = RedAlertPolicy(params=load_params({**HARV_ON, "ARENA_RA_HARV_SPREAD": "1"}))

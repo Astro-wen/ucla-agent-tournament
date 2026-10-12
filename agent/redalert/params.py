@@ -71,6 +71,7 @@ DEFAULTS: dict[str, float] = {
     "harv_weap2": 0,                # harv_first: a 2nd war factory once 5 harvesters work and this much floats (0 off;
                                     # 1500 tried: dev seeds 611-616 26 / 10 vs 25 / 9 without it)
     "idle_harv_fix": 1,             # idle harvesters go back to work even without a construction yard (v4.5 bug)
+    "deploy_pending_ticks": 375,    # an MCV deploy the platform accepted is not resent for this long (0: v4.5, 100)
     "harv_spread": 0,               # idle harvesters to the field with the most ore per harvester near our refineries;
     "harv_share": 3,                # one moves on when more than harv_share share a refinery's field (off: no gain)
 }
