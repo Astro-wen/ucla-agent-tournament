@@ -202,6 +202,10 @@ flowchart TD
   scout tells the bot whether to expect a rush (a scout killed by an outpost on the enemy's half of the map is not
   one); only a real threat makes it spend on early infantry and defensive towers. Harvesters under attack pull back
   and nearby units come to help.
+- **Harvesters first on long maps.** Where the bases are far apart (Shadowfiend II), the bot follows a harvester
+  schedule once the war factory stands (4 by 3:00, 6 by 4:30, 8 by 6:30, capped by the ore near its base), adds
+  refineries as needed and holds back infantry and towers while money is short, because at zero cash every production
+  queue shares the same income. Any sign of an early enemy army or rush switches this off for the rest of the match.
 - **Faction-agnostic.** Unit choices come from preference lists filtered by what the server says we can build, so the
   same code plays Allies and Soviets on every map in the pool.
 - **The army fights as a group:**
@@ -286,7 +290,8 @@ flowchart LR
   turtles, tank swarms, mixed armies, and one scripted after a real loss). After a real Testing loss in which the bot
   over-defended early and starved its economy, the economy-first opening won **+7.5 points** against a balanced
   scripted opponent that reproduces that failure (480 games on fresh seeds, p 0.0014), with no significant loss against
-  the others.
+  the others. The harvester schedule for long maps then added +2.1 points overall (1,212 games on fresh seeds,
+  p 0.0009) and changed no result against any other opponent.
 - **On the platform.** Testing matches against other contestants' agents, up to October 11: Pokémon **17 wins, 7
   losses**; Red Alert **3 wins, 1 loss**. Across all real matches the agent made zero invalid actions and never ran
   out of time. Recorded real states are replayed through the agent before every release (`scripts/replay_real.py`;
