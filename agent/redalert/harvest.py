@@ -2,16 +2,19 @@
 
 Real matches (10-08..10-11, sidestep, 5000 cash): our cash sat at 0 from about 2:00 while only 2 harvesters worked
 until 5-6 minutes; a harvester pays for itself in under two minutes (real recordings: about 1500-1700 credits a minute
-each next to a fresh field). So once the war factory stands:
+each next to a fresh field). So once the war factory stands, on maps where the enemy army walks far (spawn-to-spawn
+ground path >= harv_min_path: shadowfiend-ii; on the short pool maps v4.5 plays order for order):
 - a harvester target over time (4 by harv_t4, 6 by harv_t6, 8 by harv_t8), capped by the ore near our spawn;
-- a refinery more when the target exceeds harv_per_proc harvesters per refinery, placed at the ore field near our base
-  with the most ore per refinery (a second field when there is one: trapped, shadowfiend-ii);
-- spending serialised behind it: below the target, and not really attacked, no new infantry beyond serial_infantry,
-  no tower beyond what a threat at home asks for, no second war factory; the Vehicle queue builds harvesters first.
-  Any real threat (rush / early-army signs of v4.5, a threat at home worth serial_threat, a harvester or building
-  hit, an enemy army worth serial_half on our half) ends the serialisation at once: the v4.5 rules take over.
-- harv_spread: idle harvesters go to the field with the most ore per harvester next to one of our refineries, and one
-  harvester moves on when more than harv_share work the field of one refinery while another refinery has fewer.
+- a refinery more when the target exceeds harv_per_proc harvesters per refinery (the third one before the depot, a
+  fourth after it), placed at the ore field near our base with the most ore per refinery;
+- spending serialised behind it: while harvesters in production lag the target and money is short, and nothing is
+  attacking, no new infantry beyond serial_infantry, no tower beyond what a threat at home asks for, no second war
+  factory; the Vehicle queue builds harvesters first. A threat at home worth serial_threat, a harvester or building
+  hit, or an enemy army worth serial_half on our half ends the serialisation at once (the v4.5 rules take over);
+  rush / early-army signs (v4.5's) before 7:00 switch harvesters first off for the match.
+- harv_weap2: a second war factory once 5 harvesters work and money floats (one factory cannot spend the income).
+- harv_spread (own switch): idle harvesters go to the field with the most ore per harvester next to one of our
+  refineries, and one harvester moves on when more than harv_share work the field of one refinery.
 Pure functions of the view plus a little memory; never raises into the policy (the callers catch)."""
 from __future__ import annotations
 
@@ -143,22 +146,27 @@ class Harvest:
         harvesters first delays (h5: 1 better / 5 worse); on shadowfiend-ii harvesters first was 9 better / 4 worse."""
         return self.path_len(v) >= float(self.pol.p.harv_min_path)
 
-    def active(self, v) -> bool:
-        """The harvester target and its refinery apply: harv_first on and no early-army / rush sign, no real attack.
-        (Dev seeds 601006 / 604015: with an early enemy army seen, harvesters and a third refinery before the depot
-        left 20 rifles and no tank when the 4-minute attack came; the v4.5 opening handles those games.)"""
+    def engaged(self, v) -> bool:
+        """harv_first applies to this match: on, a long map, and no rush / early-army sign before SUPPRESS_UNTIL_S
+        (sticky: then v4.5 plays the rest of the match, its third-refinery rule included). (Dev seeds 601006 /
+        604015: with an early enemy army seen, harvesters and a third refinery before the depot left 20 rifles and no
+        tank when the 4-minute attack came; 606038: the rush flag cleared at 220 s, harvesters first came back and the
+        tank push at 290 s met rifles only.)"""
         if not self.on() or self.suppressed or not self.map_ok(v):
             return False
         army = self.pol.army
-        if army.rush or army.early_army or army.two_barracks:
-            if v.game_s < SUPPRESS_UNTIL_S and not self.suppressed:
-                # sticky: a rush once seen (its flag clears after a quiet minute) still means an early army (dev seed
-                # 606038: the rush flag cleared at 220 s, two refineries and harvesters came before the depot, and
-                # the tank push at 290 s met rifles only)
-                self.suppressed = True
-                self.pol.log_event(f"harvesters first off at {v.game_s:.0f}s: early army / rush signs")
+        if (army.rush or army.early_army or army.two_barracks) and v.game_s < SUPPRESS_UNTIL_S:
+            self.suppressed = True
+            self.pol.log_event(f"harvesters first off at {v.game_s:.0f}s: early army / rush signs")
             return False
-        return not army.real_attack(v)
+        return True
+
+    def active(self, v) -> bool:
+        """The harvester target and its refinery apply now: engaged and no rush sign / real attack at the moment."""
+        if not self.engaged(v):
+            return False
+        army = self.pol.army
+        return not (army.rush or army.early_army or army.two_barracks or army.real_attack(v))
 
     # ---- serialisation -------------------------------------------------------------------------------------------
     def serialized(self, v) -> bool:

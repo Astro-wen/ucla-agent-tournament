@@ -652,6 +652,20 @@ def test_harv_first_needs_a_long_way_between_the_bases_and_is_v45_elsewhere(monk
         assert (logs[0] == logs[1]) == (not on), map_id
 
 
+def test_after_early_army_signs_harv_first_plays_v45_for_the_rest_of_the_match(monkeypatch):
+    logs = []
+    for env in ({}, HARV_ON):
+        srv = server("shadowfiend-ii")
+        pol = RedAlertPolicy(params=load_params(env))
+        monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)
+        pol.army.early_army = True                                  # as after the scout died in their base
+        rec = []
+        drive(srv, pol, 400, record=rec)
+        logs.append([(sv, orders) for sv, orders, _r in rec])
+    assert pol.harv.suppressed and not pol.harv.engaged(pol.view)
+    assert logs[0] == logs[1]
+
+
 def test_harv_first_builds_harvesters_and_a_third_refinery_before_more_infantry(monkeypatch):
     srv = server("shadowfiend-ii")
     pol = RedAlertPolicy(params=load_params(HARV_ON))
