@@ -97,6 +97,7 @@ class Army:
         self.rescout_tick = -10 ** 9
         self.rescouts = 0
         self.early_army = False         # econ_first: an early enemy army (EARLY_ARMY_S)
+        self.two_barracks = False       # econ_first: two enemy barracks seen before 2:30 (a rush tell)
         self.mode = "normal"            # endgame: normal / hold / careful / allin
         self.tag = "opening"
         self.v = None
@@ -122,6 +123,11 @@ class Army:
         if self.scout is not None and self.scout not in alive:
             # killed on its way out, far from the enemy base: something is coming our way
             last = self.scout_pos
+            for ev in v.events:                       # where it died (the unit_lost event), when the event says
+                if ev.get("kind") == "unit_lost" and ev.get("id") == self.scout and \
+                        isinstance(ev.get("x"), int) and isinstance(ev.get("y"), int) and \
+                        not isinstance(ev.get("x"), bool) and not isinstance(ev.get("y"), bool):
+                    last = (ev["x"], ev["y"])
             if v.game_s < 150:
                 self.scout_lost_early = True          # an army already stands in their base: more rifles early
                 self.pol.log_event(f"scout killed early at {v.game_s:.0f}s near {last}")
@@ -213,13 +219,18 @@ class Army:
         if bk > self._bk:
             self.fail_mult, self.last_fail_value = 1.0, 0.0      # razing a building resets the caution
         self._bk = bk
+        if v.game_s < 150 and not self.two_barracks:
+            barracks = sum(1 for b in self.enemy_blds.values() if b["type"] in ("tent", "barr"))
+            if barracks >= 2:
+                # two barracks this early: an infantry rush is likely (v4.5 tuning seed 506026: 35 rifles at 178 s)
+                self.two_barracks = self.early_army = True
+                self.pol.log_event(f"two enemy barracks at {v.game_s:.0f}s: infantry rush likely")
         if v.game_s < EARLY_ARMY_S and not self.early_army:
             seen = sum(self.cost(e["type"]) for e in self.enemy_units.values()
                        if is_combat(e["type"], rules) and e["type"] not in AIR)
-            barracks = sum(1 for b in self.enemy_blds.values() if b["type"] in ("tent", "barr"))
-            if seen >= EARLY_ARMY_VALUE or barracks >= 2:
+            if seen >= EARLY_ARMY_VALUE:
                 self.early_army = True
-                self.pol.log_event(f"early enemy army at {v.game_s:.0f}s (seen {seen}, barracks {barracks})")
+                self.pol.log_event(f"early enemy army at {v.game_s:.0f}s (seen {seen})")
 
     def enemy_army(self, v, secs: float = 60.0) -> float:
         """Cost of the enemy combat units seen recently: full weight up to half of `secs`, fading out by `secs`."""
@@ -1129,4 +1140,5 @@ class Army:
     def summary(self) -> dict:
         return {"state": self.state, "waves": self.waves, "home": len(self.home), "main": len(self.main),
                 "reinf": len(self.reinf), "rush": self.rush, "mode": self.mode, "hunt_seen": len(self.hunt_seen),
-                "harv_pulls": self.harv_pulls, "harv_helps": self.harv_helps, "rescouts": self.rescouts}
+                "harv_pulls": self.harv_pulls, "harv_helps": self.harv_helps, "rescouts": self.rescouts,
+                "early_army": self.early_army}

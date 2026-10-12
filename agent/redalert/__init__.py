@@ -275,4 +275,6 @@ class RedAlertPolicy:
                 f"waits={s['waits']} noops={s['noops']} anchors={s['anchors']} ms_p50={s['ms_p50']} ms_p99={s['ms_p99']} "
                 f"exceptions={s['exceptions']} safe_mode={s['safe_mode']} low_power_s={s['low_power_s']} "
                 f"waves={s['army']['waves']} harv_emergencies={s['harv_emergencies']} sales={s['sales']} "
-                f"power_cancels={s['power_cancels']} hunt_seen={s['army']['hunt_seen']}")
+                f"power_cancels={s['power_cancels']} hunt_seen={s['army']['hunt_seen']} "
+                f"rescouts={s['army']['rescouts']} harv_pulls={s['army']['harv_pulls']} "
+                f"harv_helps={s['army']['harv_helps']} early_army={int(s['army']['early_army'])}")

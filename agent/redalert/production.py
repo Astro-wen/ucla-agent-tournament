@@ -127,7 +127,8 @@ class Production:
             # economy first: until the first war factory stands, a handful of rifles (scout + home guard) and the
             # rest of the money goes into the refineries and the war factory, unless a real attack is on
             target = min(target, int(p.pre_weap_infantry) + (2 if army.threatened else 0)
-                         + (int(p.early_army_infantry) if army.early_army else 0))
+                         + (int(p.early_army_infantry) if army.early_army else 0)
+                         + (int(p.early_army_infantry) if army.two_barracks else 0))
         elif p.econ_first and not late and self.pol.first.get("weap") and v.money > FLOAT_MONEY:
             # money piling up (one war factory cannot spend two refineries' income): more infantry rather than an
             # idle bank before the first big fight (v4.5 tuning seed 507008: 2500 floating at 4:30-6:00 and an army
@@ -220,7 +221,8 @@ class Production:
         if p.econ_first and v.remaining > 240 and harv < min(int(p.max_harvesters), 2 * procs) and \
                 "harv" in v.avail and not army.real_attack(v):
             # economy first: two harvesters per refinery as soon as the war factory stands (v4.5 tuning seed 507008:
-            # 2 harvesters until 4:00 and an army half the size of a double-refinery opponent's at 7:00)
+            # 2 harvesters until 4:00 and an army half the size of a double-refinery opponent's at 7:00). (Tried:
+            # two tanks first after signs of an early enemy army; tuning seeds 501 116 -> 111 / 120, 507 55 -> 51 / 60.)
             return "harv"
         if v.remaining > 240 and harv < target_harv and "harv" in v.avail and not army.threatened \
                 and v.money > 900:
