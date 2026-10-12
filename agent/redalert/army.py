@@ -368,7 +368,7 @@ class Army:
             want = max(want, int(p.early_army_towers))   # an early enemy army: towers against a rush
         if p.econ_first and not self.pol.first.get("weap"):
             floor = max(floor, p.real_threat)            # a light harass before the war factory: no tower money
-        elif p.econ_first and v.game_s >= p.safety_tower_s:
+        elif p.econ_first and v.game_s >= p.safety_tower_s and not (p.harv_first and self.pol.harv.serialized(v)):
             # economy first leaves a thinner army at home around 4:00, when a balanced opponent's first wave comes
             # (v4.5 tuning seed 501062: 29 infantry at 253 s razed a base with 20 rifles and 3 tanks): towers at the
             # front once the war factory stands

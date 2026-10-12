@@ -54,6 +54,19 @@ DEFAULTS: dict[str, float] = {
     "attack_3x_min": 2000,          # econ_first: "3x the enemy we saw" attacks only with this much (0: any size)
     "safety_tower_s": 150,          # econ_first: one tower at the front from here (war factory up), safety_towers
     "safety_towers": 2,             # a minute later
+    # v4.6 switches (1 on, 0 the v4.5 behaviour exactly); see docs/redalert_design.md section 17
+    "harv_first": 0,                # harvesters first: a harvester target over time, refineries for it, and spending
+    "harv_t4": 180,                 # serialised behind it. Target: 4 harvesters by harv_t4 (game s), 6 by harv_t6,
+    "harv_t6": 270,                 # 8 by harv_t8, never more than harv_cap (the map's ore near home lowers it:
+    "harv_t8": 390,                 # about one harvester per harv_cells_per ore cells within 15 cells of our spawn)
+    "harv_cap": 10,
+    "harv_cells_per": 12,
+    "harv_per_proc": 2.5,           # a refinery more when the target exceeds this many harvesters per refinery
+    "serial_infantry": 6,           # below the target and not really attacked: at most this much infantry, no new
+    "serial_threat": 300,           # tower beyond threat towers; a threat at home worth serial_threat (or a harvester /
+    "serial_half": 600,             # building hit, enemy army worth serial_half on our half, early-army signs) ends it
+    "harv_spread": 0,               # idle harvesters to the field with the most ore per harvester near our refineries;
+    "harv_share": 3,                # one harvester moves on when more than harv_share share a refinery's field
 }
 
 

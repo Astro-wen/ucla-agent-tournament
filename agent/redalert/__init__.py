@@ -20,6 +20,7 @@ from collections import deque
 from . import safe
 from .army import Army
 from .economy import Economy
+from .harvest import Harvest
 from .ledger import Ledger
 from .orders import MAX_ORDERS, Cand, anchor, finalize, noop
 from .params import load as load_params
@@ -45,6 +46,7 @@ class RedAlertPolicy:
         self.econ = Economy(self)
         self.prod = Production(self)
         self.army = Army(self)
+        self.harv = Harvest(self)
         self.opening: str | None = None
         self.view: View | None = None
         self.tag = "opening"
@@ -235,6 +237,12 @@ class RedAlertPolicy:
             if t not in self.first and v.have.get(t):
                 self.first[t] = round(v.game_s, 1)
         self.max_army = max(self.max_army, v.army_value)
+        if self.p.harv_first:
+            try:
+                self.harv.track(v)
+                self.harv.serialized(v)                     # once per view (army state of the previous view)
+            except Exception as e:                          # noqa: BLE001
+                self.note_exception("harvest", e)
         if self._prev_tick is not None and v.buildings and v.surplus < 0:
             self.low_power_s += max(0, v.tick - self._prev_tick) / 25.0
         self._prev_tick = v.tick
@@ -265,11 +273,16 @@ class RedAlertPolicy:
             "low_power_s": round(self.low_power_s, 1), "army": self.army.summary(),
             "game_s": round(v.game_s, 1) if v else None, "harv_emergencies": self.econ.emergencies,
             "sales": self.econ.sales, "power_cancels": self.econ.power_cancels, "army_skips": self.army_skipped,
+            "harv": self.harv.summary() if self.p.harv_first else None,
         }
 
     def summary_text(self) -> str:
         s = self.summary()
         rej = ",".join(f"{k}:{n}" for k, n in sorted(s["rejected"].items())) or "0"
+        h = s.get("harv")
+        harv = "" if not h else (f" harv_180={h['harv_180']} harv_270={h['harv_270']} harv_390={h['harv_390']} "
+                                 f"serial_s={h['serial_s']} harv_spreads={h['harv_spreads']} "
+                                 f"harv_rebalances={h['harv_rebalances']}")
         return (f"opening={s['opening']} first_powr_s={s['first_powr_s']} first_proc_s={s['first_proc_s']} "
                 f"first_weap_s={s['first_weap_s']} first_fix_s={s['first_fix_s']} max_army={s['max_army']} "
                 f"K={s['K']} D={s['D']} assets={s['assets']} game_s={s['game_s']} batches={s['batches']} "
@@ -279,4 +292,4 @@ class RedAlertPolicy:
                 f"waves={s['army']['waves']} harv_emergencies={s['harv_emergencies']} sales={s['sales']} "
                 f"power_cancels={s['power_cancels']} hunt_seen={s['army']['hunt_seen']} "
                 f"rescouts={s['army']['rescouts']} harv_pulls={s['army']['harv_pulls']} "
-                f"harv_helps={s['army']['harv_helps']} early_army={int(s['army']['early_army'])}")
+                f"harv_helps={s['army']['harv_helps']} early_army={int(s['army']['early_army'])}" + harv)
