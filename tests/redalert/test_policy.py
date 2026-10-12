@@ -458,3 +458,126 @@ def test_summary_has_the_match_metrics():
     assert s["first_powr_s"] is not None and s["batches"] >= 2 and s["ms_p99"] is not None
     text = pol.summary_text()
     assert "first_powr_s=" in text and "invalid_action=0" in text and "exceptions=0" in text
+
+
+# ---- v4.5: economy first, harvester guard, blind prior, counters ----------------------------------------------------
+INFANTRY_TYPES = ("e1", "e2", "e3")
+
+
+def _kill_scout_at(srv, pol, where):
+    """Our first scout is moved to `where` and killed there (as by an enemy picket)."""
+    for _ in range(400):
+        drive(srv, pol, 0.2)
+        if pol.army.scout is not None:
+            break
+    sid = pol.army.scout
+    assert sid is not None
+    w = srv.world
+    with srv.cv:
+        a = w.actors[sid]
+        a.x, a.y = float(where[0]), float(where[1])
+        a.order, a.oq = None, []
+    drive(srv, pol, 0.6)                                         # its new position is seen
+    with srv.cv:
+        w._kill(w.actors[sid], None)
+
+
+def _opening_after_scout_loss(where, env=None):
+    """sidestep, us at (23, 44), the enemy spawn at (74, 53): returns (policy, most infantry before the war factory,
+    war factory time)."""
+    srv = server()
+    pol = RedAlertPolicy(params=load_params(env or {}))
+    _kill_scout_at(srv, pol, where)
+    most, weap_s = 0, None
+    for _ in range(170):
+        drive(srv, pol, 1)
+        own = list(srv.world.own(0))
+        if weap_s is None and any(a.type == "weap" for a in own):
+            weap_s = pol.view.game_s
+        if weap_s is None:
+            most = max(most, sum(1 for a in own if a.type in INFANTRY_TYPES))
+    assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+    return pol, most, weap_s
+
+
+def test_econ_first_a_scout_killed_at_an_enemy_picket_does_not_stall_the_opening():
+    # the real loss of 10-11 (cb4bfc36): the scout died at an enemy picket 18 cells in front of its base, the bot
+    # called it a rush, built 24 rifles and 2 towers and had its war factory at 282 s
+    pol, most, weap_s = _opening_after_scout_loss((58, 50))
+    assert not pol.army.rush and not pol.army.early_army
+    assert most <= int(pol.p.pre_weap_infantry), most
+    assert weap_s is not None and weap_s <= 175, weap_s
+
+
+def test_econ_first_off_keeps_the_v4_3_reaction():
+    pol, most, weap_s = _opening_after_scout_loss((58, 50), {"ARENA_RA_ECON_FIRST": "0"})
+    assert pol.army.scout_lost_early and most > 12
+    assert weap_s is None or weap_s > 175
+
+
+def test_econ_first_a_scout_killed_on_our_half_still_means_a_rush():
+    pol, _most, _weap_s = _opening_after_scout_loss((40, 47))
+    assert pol.army.rush_tick > 0
+
+
+def test_a_scout_killed_inside_their_base_raises_the_guard_a_little():
+    pol, most, weap_s = _opening_after_scout_loss((72, 52))
+    assert pol.army.early_army and not pol.army.rush
+    assert int(pol.p.pre_weap_infantry) < most <= int(pol.p.pre_weap_infantry + pol.p.early_army_infantry)
+    assert weap_s is not None and weap_s <= 200, weap_s
+
+
+def test_a_harvester_under_attack_drives_away_and_the_home_guard_goes_to_it():
+    srv = server()
+    pol = RedAlertPolicy()
+    monkey_main = pol.army._main_step
+    pol.army._main_step = lambda v, out: None                     # the attack group stays home
+    drive(srv, pol, 150)
+    pol.army._main_step = monkey_main
+    w = srv.world
+    harv = next(a for a in w.own(0) if a.type == "harv")
+    proc = next(a for a in w.own(0) if a.type == "proc")
+    with srv.cv:
+        harv.x, harv.y = proc.x + 13.0, proc.y + 2.0            # out in the field, away from the base
+        harv.order, harv.oq = None, []
+        w._spawn_unit(1, "e1", harv.x + 2.0, harv.y)
+    orders = []
+    for _ in range(5):
+        st = srv.state(0)
+        out, _tag = pol.decide(st, CONFIG)
+        if out:
+            orders += out
+            pol.on_result(srv.play_action(0, st["state_version"], {"type": "orders", "orders": copy.deepcopy(out)}))
+        advance(srv)
+    assert any(o["cmd"] == "move" and o["units"] == [harv.id] for o in orders), orders
+    assert any(o["cmd"] == "attack_move" and set(o["units"]) & pol.army.home for o in orders), orders
+    assert pol.army.harv_pulls >= 1 and pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+
+
+def test_blind_the_enemy_army_is_assumed_until_we_look_at_their_base():
+    srv = server()
+    pol = RedAlertPolicy()
+    drive(srv, pol, 2)
+    v = pol.view
+    v.game_s, v.tick = 300.0, 300 * 25
+    pol.army.intel_tick = -10 ** 9
+    p = pol.p
+    assert pol.army.prior(v) == min(p.prior_cap, p.prior_rate * (300 - 90))
+    assert pol.army.enemy_strength(v) >= pol.army.prior(v)
+    pol.army.intel_tick = v.tick - 25 * 30                         # looked 30 s ago
+    assert pol.army.prior(v) == 0.0
+
+
+def test_counter_ratio():
+    from agent.redalert import counters
+    from agent.redalert.world import Rules as BotRules
+    r = BotRules(CONFIG)
+    # identical compositions: the cost ratio
+    assert abs(counters.ratio([("e1", 20, 1.0)], [("e1", 10, 1.0)], r) - 2.0) < 1e-9
+    assert abs(counters.ratio([("3tnk", 3, 1.0), ("e3", 2, 1.0)], [("3tnk", 3, 1.0), ("e3", 2, 1.0)], r) - 1.0) < 1e-9
+    # rockets against an equal cost of rifles lose, against tanks they do well
+    assert counters.ratio([("e3", 10, 1.0)], [("e1", 30, 1.0)], r) < 0.5
+    assert counters.ratio([("e3", 10, 1.0)], [("3tnk", 3, 0.87)], r) > 1.0
+    # nothing to shoot back: inf; nothing on our side: 0
+    assert counters.ratio([("e1", 1, 1.0)], [("harv", 2, 1.0)], r) == float("inf")
+    assert counters.ratio([], [("e1", 1, 1.0)], r) == 0.0

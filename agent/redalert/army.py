@@ -20,6 +20,8 @@ HARV_DANGER = 6            # harv_guard: an enemy combat unit this close to a ha
 HARV_HIT_TICKS = 3 * 25    # an under_attack event on a harvester counts this long
 HARV_HELP_RANGE = 40       # free combat units this close go help it
 HARV_FLEE = 7              # cells a harvester drives away from its attackers when its refinery is on their side
+EARLY_ARMY_S = 120         # econ_first: signs of an early enemy army before this (scout killed in their base, 2+
+EARLY_ARMY_VALUE = 700     # barracks, or this much of their combat units seen) -> a few more rifles and one tower
 
 
 def _centroid(pts):
@@ -55,6 +57,7 @@ class Army:
         self.wave_value = 0.0
         self.enemy_peak = 0.0
         self._peak_tick = 0
+        self._kills_seen = 0
         self._bk = 0
         self.waves = 0
         self.stuck_pos = None
@@ -93,6 +96,7 @@ class Army:
         self.intel_tick = -10 ** 9      # last time we saw enemy combat units or looked at the enemy base
         self.rescout_tick = -10 ** 9
         self.rescouts = 0
+        self.early_army = False         # econ_first: an early enemy army (EARLY_ARMY_S)
         self.mode = "normal"            # endgame: normal / hold / careful / allin
         self.tag = "opening"
         self.v = None
@@ -121,6 +125,12 @@ class Army:
             if v.game_s < 150:
                 self.scout_lost_early = True          # an army already stands in their base: more rifles early
                 self.pol.log_event(f"scout killed early at {v.game_s:.0f}s near {last}")
+            if v.game_s < EARLY_ARMY_S and last is not None and v.st.enemy_spawn is not None and \
+                    dist(last, v.st.enemy_spawn) <= 12 and not self.early_army:
+                # killed inside their base this early: an army stands at home (a rush may be coming); econ_first
+                # answers with a few more rifles and one tower, not a stalled opening
+                self.early_army = True
+                self.pol.log_event(f"early enemy army: scout killed in their base at {v.game_s:.0f}s")
             if self.scout_phase in ("out", "look", "back") and v.game_s < 240 and last is not None and \
                     dist(last, v.st.enemy_spawn) > 12:
                 # econ_first: only a scout killed on OUR half of the map means an army is on its way (the real loss
@@ -181,7 +191,11 @@ class Army:
         # after that army went back into the fog
         dt = max(0, v.tick - self._peak_tick)
         self._peak_tick = v.tick
-        self.enemy_peak = max(vis_val, self.enemy_peak * 0.5 ** (dt / (360 * 25.0)))
+        peak = self.enemy_peak * 0.5 ** (dt / (360 * 25.0))
+        if self.pol.p.econ_first and v.kills > self._kills_seen:
+            peak = max(0.0, peak - (v.kills - self._kills_seen))   # what we killed of it is gone
+        self._kills_seen = max(self._kills_seen, v.kills)
+        self.enemy_peak = max(vis_val, peak)
         for b in v.enemy_blds:
             self.enemy_blds[b["id"]] = {"type": b["type"], "tick": v.tick, "x": b["x"], "y": b["y"], "hp": b["hp"]}
         for k in [k for k, e in self.enemy_units.items() if v.tick - e["tick"] > 240 * 25]:
@@ -199,6 +213,13 @@ class Army:
         if bk > self._bk:
             self.fail_mult, self.last_fail_value = 1.0, 0.0      # razing a building resets the caution
         self._bk = bk
+        if v.game_s < EARLY_ARMY_S and not self.early_army:
+            seen = sum(self.cost(e["type"]) for e in self.enemy_units.values()
+                       if is_combat(e["type"], rules) and e["type"] not in AIR)
+            barracks = sum(1 for b in self.enemy_blds.values() if b["type"] in ("tent", "barr"))
+            if seen >= EARLY_ARMY_VALUE or barracks >= 2:
+                self.early_army = True
+                self.pol.log_event(f"early enemy army at {v.game_s:.0f}s (seen {seen}, barracks {barracks})")
 
     def enemy_army(self, v, secs: float = 60.0) -> float:
         """Cost of the enemy combat units seen recently: full weight up to half of `secs`, fading out by `secs`."""
@@ -229,6 +250,8 @@ class Army:
         if not self.blind(v):
             return 0.0
         p = self.pol.p
+        # (tried: minus what we killed in the last 3 minutes; tuning seed 501 116 -> 107 / 120 and 507 47 -> 34 / 60:
+        # a skirmish won early made the first attack go too soon)
         return min(float(p.prior_cap), max(0.0, p.prior_rate * (v.game_s - 90.0)))
 
     def enemy_towers(self) -> float:
@@ -259,12 +282,13 @@ class Army:
                 vals[t] = vals.get(t, 0.0) + self.cost(t) * w
         total = sum(vals.values())
         target = max(total, self.enemy_peak, self.prior(v))
-        if total > 0:
-            k = target / total
-            vals = {t: x * k for t, x in vals.items()}
-        elif target > 0:
+        if target > total:
+            # the part we have not seen is a typical army, not more of what we saw (v4.5 tuning seed 507056: a
+            # rifle / rocket picket scaled up to the prior looked easy prey for rifles; six tanks stood behind it)
             tank = "3tnk" if v.enemy_faction in ("russia", "ukraine", "soviet") else "2tnk"
-            vals = {"e1": 0.3 * target, "e3": 0.15 * target, tank: 0.55 * target}
+            rest = target - total
+            for t, share in (("e1", 0.3), ("e3", 0.15), (tank, 0.55)):
+                vals[t] = vals.get(t, 0.0) + share * rest
         force = [(t, x / max(1, self.cost(t)), 1.0) for t, x in vals.items()]
         force += [(b["type"], 1.0, max(0.1, b["hp"] / 100.0)) for b in self.enemy_blds.values()
                   if b["type"] in GROUND_DEFENSES]
@@ -327,6 +351,8 @@ class Army:
         p = self.pol.p
         if p.econ_first and not self.pol.first.get("weap"):
             floor = max(floor, p.real_threat)            # a light harass before the war factory: no tower money
+            if self.early_army:
+                want = max(want, int(p.early_army_towers))   # an early enemy army: towers against a rush
         elif p.econ_first and v.game_s >= p.safety_tower_s:
             # economy first leaves a thinner army at home around 4:00, when a balanced opponent's first wave comes
             # (v4.5 tuning seed 501062: 29 infantry at 253 s razed a base with 20 rifles and 3 tanks): towers at the

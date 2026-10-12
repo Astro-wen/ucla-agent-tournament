@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import math
 
-from .world import is_infantry
+from .world import NON_COMBAT, is_infantry
 
 # dps per 1000 credits vs armour: None (infantry), Light, Heavy (tanks, APC, harvester, towers), Wood (buildings)
 EFF = {
@@ -28,6 +28,7 @@ EFF = {
     "ftur": (12500, 6944, 3472, 6944), "tsla": (34722, 3472, 3472, 2083),
 }
 DEFAULT_EFF = (2000, 2000, 2000, 2000)
+NO_EFF = (0, 0, 0, 0)                  # harvesters, MCVs, engineers...: hit points, no damage
 ARMOR_INDEX = {"None": 0, "Light": 1, "Heavy": 2, "Wood": 3}
 LIGHT = frozenset({"jeep", "ftrk", "arty", "v2rl", "mcv", "truk", "dtrk", "mgg", "mrj", "heli", "mh60", "tran", "yak",
                    "mig", "pt"})
@@ -67,7 +68,7 @@ def _parts(force, rules):
         h = n * frac * hp(t, rules)
         tot_hp += h
         by_armor[ARMOR_INDEX[armor(t, rules)]] += h
-        e = EFF.get(t, DEFAULT_EFF)
+        e = EFF.get(t, NO_EFF if t in NON_COMBAT else DEFAULT_EFF)
         c = n * frac * rules.cost(t) / 1000.0
         for k in range(4):
             dmg[k] += c * e[k]
