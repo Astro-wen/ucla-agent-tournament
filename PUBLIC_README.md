@@ -176,6 +176,15 @@ typically produce. Text that tries to instruct the table is ignored and counts a
 comes from fixed templates (within the 50-word limit) and passes a guard that blocks any role, partner or
 night-plan leak.
 
+Evidence parsing distinguishes asserted results from questions, quotations, hypotheticals and negated checks;
+ambiguous display names cannot silently change seat references. A public seer death invalidates later seer claims
+even if the dead seer never spoke. Development-only alternative wolf tactics are opt-in through
+`ARENA_WW_TACTICS`; they are not enabled in the default policy and do not establish live tournament superiority.
+Defensive evidence guards count each speaker's accusation once, reject contradictory seer reports, and keep
+quotations, negated votes and grammar-like display names from manufacturing evidence. They apply to both default
+and optional tactics. A simple-opponent panel covers silence, abstention, fixed votes, copying and cheap chat bait;
+the [guard report](docs/werewolf_guard_strategy.md) records paired checks and remaining limits.
+
 ---
 
 ## Red Alert
@@ -376,7 +385,8 @@ safeguards.
 Every `ARENA_*` setting stays at its default; none is set deliberately. The defaults that matter: `ARENA_BATTLE=search`
 (engine search), damage calculator on (`ARENA_CALC`), `ARENA_REASONING=safe`, `ARENA_WW_DM=off` (no private Werewolf
 messages), `ARENA_WW_LISTEN=on` (after its opening chat the Werewolf policy keeps reading the discussion and may answer
-it once a day), `ARENA_RA=on` (the Red Alert bot plays; `off` would answer every Red Alert view with `WAIT`), no
+it once a day), `ARENA_WW_TACTICS=off` (experimental wolf tactics disabled),
+`ARENA_RA=on` (the Red Alert bot plays; `off` would answer every Red Alert view with `WAIT`), no
 `ARENA_RA_*` tuning override, `ARENA_RECORD=1` (states recorded), the per-match restart memory on,
 `ARENA_SEAT_BACKOFF_MAX_S=30`. `scripts/run_agent.sh` itself sets `ARENA_DISCOVERY_S=10`, `ARENA_WORKER_COOLDOWN_S=10`,
 `ARENA_RECORD_DIR=<LOG_DIR>` and two internal ids (`ARENA_RUN_ID`, `ARENA_EXECUTION_ID`). The emergency switches

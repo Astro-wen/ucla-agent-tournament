@@ -26,9 +26,9 @@ NAMES = ["alice", "bob", "carl", "dave", "erin", "fran", "gus"]
 # The audit's 20 named-wolf seer claims (docs/status_1003.md: 11/20 read before this change).
 AUDIT20 = {f"cache-{i}" for i in (2, 7, 8, 35, 38, 39, 40, 41, 107, 109, 122, 124, 129, 179, 182, 243, 244, 245, 260,
                                   261)}
-# Non-claims whose reported speech the older patterns read as a clear ("Player5 ... says Player3 is a villager"):
-# known, harmless (a non-claimer's clears are not used), and not made worse.
-KNOWN_CLEAR_READS = {"cache-82", "cache-90", "cache-98", "exp9-73"}
+# Legacy verdict patterns now apply the same attribution guards as the richer patterns. The four previously known
+# false clears (cache-82/90/98, exp9-73) must remain fixed as well.
+KNOWN_CLEAR_READS = set()
 
 
 def facts(row):
