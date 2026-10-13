@@ -194,3 +194,43 @@ def test_missing_latency_and_untracked_factories_cannot_look_verified(tmp_path):
     manifest = wb.source_manifest()
     assert "pyproject.toml" in manifest["files"]
     assert "altruagent/runner.py" in manifest["files"]
+
+
+def test_policy_internal_fallback_and_chat_errors_are_counted_after_refresh(monkeypatch):
+    from agent.werewolf.policy import WerewolfPolicy
+
+    def broken_vote(self, view, targets):
+        raise ValueError("silent internal decision failure")
+
+    def broken_plan(self, view):
+        raise ValueError("silent internal discussion failure")
+
+    monkeypatch.setattr(WerewolfPolicy, "_day_vote", broken_vote)
+    monkeypatch.setattr(WerewolfPolicy, "_plan", broken_plan)
+    seat = wb.MeasuredSeat(create_agent, {})
+    game = Game([seat] + [OfficialBaseline() for _ in range(6)], random.Random(1))
+    # Runtime refresh replaces .ww; instrumentation must follow that replacement.
+    previous = seat.agent.ww
+    seat.agent._fresh()
+    assert seat.agent.ww is not previous
+    result = seat.choose(game.state(0, "moving", "day_vote", [1, 7]))
+    assert result == "1"
+    assert seat.agent.fallbacks == seat.agent.overruns == 0
+    assert seat.policy_fallbacks == seat.policy_errors == 1
+    seat.message(game.state(0, "messaging", "day_vote"))
+    assert seat.policy_errors >= 2
+    assert seat.logged_errors == 0  # Those policy catch blocks really are silent.
+
+
+def test_generator_plan_errors_are_counted(monkeypatch):
+    from agent.werewolf.policy import WerewolfPolicy
+
+    def broken_generator(self, view):
+        yield from ()
+        raise ValueError("silent generator discussion failure")
+
+    monkeypatch.setattr(WerewolfPolicy, "_plan", broken_generator)
+    seat = wb.MeasuredSeat(create_agent, {})
+    game = Game([seat] + [OfficialBaseline() for _ in range(6)], random.Random(1))
+    seat.message(game.state(0, "messaging", "day_vote"))
+    assert seat.policy_errors > 0

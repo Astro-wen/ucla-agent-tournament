@@ -71,7 +71,7 @@
 
 模块和每个模拟任务强制 `ARENA_RECORD=0`、`ARENA_STATE=0`；不读取或写入真实比赛记录，也不保存状态恢复文件。默认没有详细动作轨迹。`--trace-games N` 只为前 N 对桌子保存合成轨迹，最多 10 对；每局最多 100 条合成聊天、每个我方座位最多 80 个决策，不写原始 observation、内部记忆或推理内容。所有数据来自本地随机产生的游戏。
 
-生产策略会把异常转成合法兜底，单看“非法动作=0”不够。本工具额外读取 `fallbacks`、`overruns`、`listen_stats.errors`、`last_decision.path`，并捕获策略调用期间的 ERROR 日志；任一出现就阻止通过。计数可能描述同一个事件，不能把它们相加当成独立事故数。
+生产策略会把异常转成合法兜底，单看“非法动作=0”不够。本工具额外读取 `fallbacks`、`overruns`、`listen_stats.errors`、`last_decision.path`，并捕获策略调用期间的 ERROR 日志。还包装 `WerewolfPolicy` 的辅助方法和 `fallback`，记录其 `act`/`chat` 静默捕获的辅助方法异常（`policy_errors`）和策略内部兜底（`policy_fallbacks`）；运行时重建策略后会重新包装，生成器内部异常也会计入。任一出现就阻止通过。计数可能描述同一个事件，不能把它们相加当成独立事故数。包装无法识别任意新辅助函数在自己内部完全吞掉且不触发兜底的错误；完整单元测试仍然必要。
 
 ## 已知模拟器差异
 

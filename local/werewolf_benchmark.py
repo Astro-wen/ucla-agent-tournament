@@ -11,6 +11,7 @@ from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 import hashlib
+import inspect
 import json
 import logging
 import math
@@ -85,12 +86,65 @@ class MeasuredSeat(ContestantSeat):
         self.logged_errors = 0
         self.trace = []
         self.trace_enabled = False
+        self.policy_fallbacks = 0
+        self.policy_errors = 0
+        self._instrumented_policy = None
 
     def reset(self):
         with environment(self.settings):
             super().reset()
+        self._instrument_policy()
+        fresh = getattr(self.agent, "_fresh", None)
+        if callable(fresh):
+            def audited_fresh(*args, **kwargs):
+                result = fresh(*args, **kwargs)
+                self._instrument_policy()
+                return result
+            self.agent._fresh = audited_fresh
+
+    def _instrument_policy(self):
+        """Count silent policy-level fallback/helper failures without changing their answers.
+
+        act/chat intentionally catch exceptions, so a successful outer decision does
+        not prove the strategy ran. Reattach if the Contestant refreshes its policy.
+        Several helper wrappers may see one exception: these are diagnostic counters,
+        not a count of distinct incidents. This cannot detect an arbitrary exception
+        swallowed wholly inside a new helper that never signals fallback.
+        """
+        policy = getattr(self.agent, "ww", None)
+        if policy is None or policy is self._instrumented_policy:
+            return
+        self._instrumented_policy = policy
+
+        def audited(name, method):
+            def call(*args, **kwargs):
+                if name == "fallback":
+                    self.policy_fallbacks += 1
+                try:
+                    result = method(*args, **kwargs)
+                except Exception:
+                    self.policy_errors += 1
+                    raise
+                if inspect.isgenerator(result):
+                    def iterate():
+                        try:
+                            yield from result
+                        except Exception:
+                            self.policy_errors += 1
+                            raise
+                    return iterate()
+                return result
+            return call
+
+        for name in dir(policy):
+            if name.startswith("__") or name in ("act", "chat"):
+                continue
+            method = getattr(policy, name)
+            if callable(method):
+                setattr(policy, name, audited(name, method))
 
     def _call(self, raw, kind, fn):
+        self._instrument_policy()
         errors = _Errors()
         logger = logging.getLogger()
         logger.addHandler(errors)
@@ -147,6 +201,8 @@ def play_variant(scenario, variant, candidate, reference, candidate_env, trace=F
     failures = {key: sum(game.stats[key][i] for i in ours) for key in ev.FAIL_KEYS}
     failures.update({"fallbacks": sum(getattr(s.agent, "fallbacks", 0) for s in controlled),
                      "overruns": sum(getattr(s.agent, "overruns", 0) for s in controlled),
+                     "policy_fallbacks": sum(s.policy_fallbacks for s in controlled),
+                     "policy_errors": sum(s.policy_errors for s in controlled),
                      "listen_errors": sum(getattr(s.agent, "listen_stats", {}).get("errors", 0) for s in controlled),
                      "logged_errors": sum(s.logged_errors for s in controlled),
                      "fallback_paths": sum(n for p, n in paths.items() if p.split("+")[0] in ("fallback", "crash", "busy", "overrun"))})
