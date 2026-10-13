@@ -30,6 +30,11 @@ def test_short_verdicts_require_the_senders_own_assertion(template, verdict):
     "Player5 is a villager or a careful wolf.",
     "I am the Seer. Player3 says Player5 is a wolf.",
     "I am the Seer. No proof Player5 is innocent.",
+    "I am the Seer. I doubt I checked Player5: wolf.",
+    "I am the Seer. I never checked Player5: wolf.",
+    "I am the Seer. I did not check Player5: wolf.",
+    "I am the Seer. I have not checked Player5: wolf.",
+    "I am the Seer. I haven't investigated Player5: wolf.",
 ])
 def test_qualified_and_attributed_verdicts_are_not_investigation_results(text):
     facts = read_chat(text, sender=0)
@@ -62,6 +67,9 @@ def test_mentioning_an_investigation_is_not_itself_a_seer_claim(text):
     ("I checked Player5, he is clean.", set(), {5}),
     ("I investigated Player5 last night: Player5 is a wolf.", {5}, set()),
     ("Player5 is a wolf, I checked them.", {5}, set()),
+    ("I am the Seer. Player5 is innocent because I checked him.", set(), {5}),
+    ("I am the Seer. Player5 is a wolf because I investigated him.", {5}, set()),
+    ("I am the Seer. Player5 is innocent since I investigated him.", set(), {5}),
 ])
 def test_explicit_first_person_results_remain_readable(text, wolves, clears):
     facts = read_chat(text, sender=0)

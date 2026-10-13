@@ -350,7 +350,7 @@ _DET = (r"(?:(?:a|an|the|one\s+of\s+the(?:\s+two)?|our|my)\s+)?"
 # a verdict word must end its phrase: "a wolf." / "a wolf too" / "a wolf, vote" but not "a wolf bluff" / "wolf's" /
 # "a wolf or a scared villager"
 _END = (r"(?=\s*(?:$|[.,!?;:)\]—–-]|(?:too|also|as\s+well|for\s+sure|for\s+certain|imo|tbh|then|now|confirmed|indeed|"
-        r"and|but|so|last\s+night|tonight|today|yesterday|here|btw|lol)\b))")
+        r"and|but|so|because|since|last\s+night|tonight|today|yesterday|here|btw|lol)\b))")
 _END_RE = re.compile(_END)
 _SEATS = r"player[0-6](?:\s*(?:,\s*(?:and\s+)?|and\s+|&\s*)player[0-6])*"
 _LIST = r"player[0-6](?:\s*(?:,\s*(?:and\s+)?|and\s+|&\s*)player[0-6])+"
@@ -440,7 +440,8 @@ _AGREE = re.compile(
 _NEG_CUE = re.compile(
     r"(?:(?<!\bno\s)(?<!\ba\s)\bdoubt(?:s|ed|ful)?|\bunlikely|\b(?:im)?possibl[ey]|\bunsure|\buncertain|"
     r"\bnot\s+(?:that|sure|convinced|certain|saying|necessarily|clear|positive)|\bno\s+idea|\bwho\s+knows|"
-    r"\bnever\s+(?:concluded|confirmed|established|proved|said|claimed)|"
+    r"\bnever\s+(?:concluded|confirmed|established|proved|said|claimed|checked|investigated|inspected)|"
+    r"\b(?:not|didn['’]t|haven['’]t|hadn['’]t)\s+(?:check(?:ed)?|investigat(?:e|ed)|inspect(?:ed)?)|"
     r"\bhard\s+to\s+(?:say|tell)|"
     r"\b(?:doesn['’]t|does\s+not|don['’]t|do\s+not|didn['’]t|did\s+not|won['’]t|wouldn['’]t|can['’]t|cannot|"
     r"isn['’]t|aren['’]t)\s+(?:\w+\s+)?(?:mean|means|prove|proves|make|makes|show|shows|think|believe|buy|say|"
@@ -596,7 +597,9 @@ def _verdicts(t: str) -> tuple[set[int], set[int]]:
     # A check report: the verdict after the checked seat(s), up to the sentence end or the next seat named.
     for opener in (_CHECK_OPEN, _REVEAL_OPEN):
         for m in opener.finditer(t):
-            if _NOT_OWN_VOICE.search(t[max(0, m.start() - 40):m.start()]) or _question(t, m.end()):
+            start, _ = _sentence(t, m.start())
+            if (_NOT_OWN_VOICE.search(t[max(start, m.start() - 40):m.start()]) or _question(t, m.end())
+                    or _hedged(t[start:m.start()])):
                 continue
             seats = seats_of(m.group("s"))
             win = t[m.end():m.end() + 80]
