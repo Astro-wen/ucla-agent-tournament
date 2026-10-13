@@ -22,11 +22,11 @@
 ```bash
 .venv/bin/python -m local.werewolf_benchmark \
   --split development --seeds 152 --games 200 --ks 1,3 --jobs 3 \
-  --candidate-env ARENA_WW_EXAMPLE=on --trace-games 3 \
-  --out logs/werewolf_benchmarks/ww-dev-152-example
+  --candidate-env ARENA_WW_TACTICS=public_vote --trace-games 3 \
+  --out logs/werewolf_benchmarks/ww-dev-152-public-vote
 ```
 
-上面的 `ARENA_WW_EXAMPLE` 是格式示例，须替换为实际策略开关。其他工厂可用 `--candidate module:factory`、`--reference module:factory` 指定，但模块必须位于源码清单覆盖的 `agent`、`champion`、`local`、`versions`、`altruagent` 或 `examples` 下；其他包会被拒绝。清单同时包含这些目录的 Python 源码、依赖声明/锁文件和冠军版本。策略开关应在构造或决策时读取；若两个工厂用相同模块但依赖导入时固定的开关，须改为不同模块或分别运行，因为 Python 会缓存导入。
+上面的 `public_vote` 是本轮可选狼人策略；默认行为可用 `ARENA_WW_TACTICS=off` 显式指定。其他工厂可用 `--candidate module:factory`、`--reference module:factory` 指定，但模块必须位于源码清单覆盖的 `agent`、`champion`、`local`、`versions`、`altruagent` 或 `examples` 下；其他包会被拒绝。清单同时包含这些目录的 Python 源码、依赖声明/锁文件和冠军版本。策略开关应在构造或决策时读取；若两个工厂用相同模块但依赖导入时固定的开关，须改为不同模块或分别运行，因为 Python 会缓存导入。
 
 冻结后的确认评测（两次运行使用同一批身份分配，不把两种时序重复算作独立样本）：
 

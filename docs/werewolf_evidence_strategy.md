@@ -124,6 +124,114 @@ Do not pool the same deals across the two timing models as independent samples.
 Keep the existing 2 pp aggregate improvement requirement and regression checks
 unchanged, even if an optional profile has large gains on selected opponents.
 
-Final confirmation and validation measurements will be appended after the
-source freeze. The current default is not claimed to be substantially stronger
-overall, and the optional public-vote strategy is explicitly a tradeoff.
+## Frozen confirmation results
+
+Realistic `rt` timing completed **264,000 simulated games** across the two
+profiles. Each profile's primary comparison contains 22,000 paired single-seat
+tables, including 6,312 wolf-seat tables. `public_vote` versus champion gained
+**0.927 percentage points overall** (conservative 95% CI [0.619, 1.236], exact
+p=7.23e-21) and **2.947 pp as a wolf** ([1.981, 3.908], p=5.37e-21).
+Both reserved seeds support the direction: overall +0.909/+0.945 pp; wolf
++2.761/+3.128 pp. These are absolute percentage-point changes, not relative gains.
+
+The full single-seat wolf comparison is below, including every loss:
+
+| Opponent | Public-vote win rate | Champion win rate | Change (pp) | Paired tables |
+|---|---:|---:|---:|---:|
+| first | 64.30% | 64.30% | 0.00 | 577 |
+| random | 92.27% | 93.13% | -0.86 | 582 |
+| heuristic | 46.91% | 41.58% | +5.33 | 582 |
+| llm | 95.33% | 97.75% | -2.42 | 578 |
+| llmx | 89.98% | 95.35% | -5.37 | 559 |
+| llmq | 92.08% | 95.21% | -3.13 | 543 |
+| mixed | 83.94% | 84.84% | -0.90 | 554 |
+| rt_wolfpack | 91.18% | 92.21% | -1.04 | 578 |
+| rt_talker | 74.09% | 63.48% | +10.61 | 575 |
+| rt_detective | 58.71% | 45.18% | +13.54 | 591 |
+| rt_chaos | 64.08% | 48.74% | +15.35 | 593 |
+
+The three large adversarial gains have conservative intervals entirely above
+zero: talker [7.20, 13.84], detective [9.85, 17.00], chaos [10.45, 19.99] pp.
+The llm/llmx/llmq losses are statistically significant too. Scripted LLM-style
+seats are not live language models. The separate k=3 stress results cannot be
+substituted for these single-seat outcomes.
+
+**No profile passes the full promotion gate.** The public-vote profile's aggregate
+gain is below the predeclared 2 pp threshold and there are opponent regressions.
+The default correctness fixes gain only +0.132 pp overall (conservative interval
+[-0.022, 0.285], exact p=.00815); they also have a significant k=3 wolf loss
+against chaos (-1.91 pp, p=.0093). The conservative interval uses a wider
+Bonferroni-Wilson construction rather than inverting the exact paired test;
+the gate requires both, so a positive exact result does not override a failed
+interval gate. Keep the frozen champion and deployed configuration;
+the branch provides a measured optional tradeoff, not evidence of overall or
+live-tournament superiority.
+
+Both `rt` runs have complete pairs, stable source, zero protocol errors,
+timeouts, internal strategy exceptions or fallbacks. p99 decision time is at
+most 0.5 ms and the largest observed decision is 75.8 ms.
+
+The `rounds` robustness comparison also completed: public-vote +0.818 pp
+overall ([0.408, 1.227], p=6.09e-10), +2.186 pp as a wolf ([1.010, 3.353],
+p=1.09e-8). Its promotion gate still fails. Directly comparing public-vote with
+the corrected default isolates the tactic's wolf gain: +2.772 pp in `rt` and
++1.952 pp in `rounds`; both conservative intervals exclude zero. All isolated
+villager/seer outcomes match exactly between the profiles, and all paired
+champion outcomes match between profiles within each timing model.
+
+Across four runs there are **369,600 simulations and 123,200 paired comparisons**.
+Deals repeat across profiles and timing models; this is not 123,200 independent
+draws. Every complete-pair, source-stability and runtime-failure check passes.
+Round-robin timing includes 6,782/6,783 normal discussion-window closures across
+the default/public-vote runs' branches, tracked separately from actual timeouts;
+there are no background protocol failures. An independent agent recomputed all
+672 candidate/champion metric slices and 336 direct-profile slices from the four
+runs' raw records, including exact integer-binomial tests and both confidence
+intervals, and matched the report. It also independently verified the 660-test
+multiplicity analysis, file checksums, configurations and counters.
+
+All slices are reported, not only winners. A secondary Bonferroni check over 660
+binary opponent comparisons still supports the `rt` wolf gains against heuristic,
+chaos, detective and talker, **and the loss against llmx**. In `rounds`, the wolf
+gains against chaos and talker survive that conservative correction. This is
+context for individual claims; the original promotion gates were never relaxed.
+Full metrics, confidence intervals, gates, counters, commands, source manifests
+and raw-log checksums are in [werewolf_confirmation.json](werewolf_confirmation.json).
+
+## Validation on the frozen source
+
+Source freeze: `cc95bb87edef32ae08afada2d443c6ff5eae9848`;
+source manifest digest:
+`9beb58f5a9722373edec484e7b1c92183144494963626e778bf22ced5b04fec2`.
+Documentation-only updates after this revision do not change the evaluated source.
+
+- Full local suite: **2,418 passed, 41 skipped**, 437.17 seconds. The skips are
+  platform-dependent checks on macOS. The frozen implementation also passed
+  [Linux CI](https://github.com/Astro-wen/ucla-agent-tournament/actions/runs/38344969208):
+  **2,458 passed, 1 skipped**, 1,037.14 seconds, with syntax/undefined-name lint
+  passing. Python 3.13.9 and Node 25.2.1 were used locally; CI uses Python 3.12 and
+  Node 22. An earlier run set `ARENA_NODE` explicitly and bypassed two tests'
+  deliberately slow PATH shim; removing that test-environment override resolved
+  both failures. The clean full run above used standard PATH discovery.
+- Syntax/undefined-name lint passed across the repository; `git diff --check`
+  passed. The official SDK and frozen champion have no changes.
+- Self-check: ready, zero failures. Both 80-decision replay passes (calculator
+  enabled/disabled) had zero rejected actions; slowest 0.89/0.86 seconds. The
+  isolated development checkout has no tournament key configured.
+- Full recorded-state replay: **2,349 real decisions from 142 files**, zero
+  failures, zero joint repairs, zero classic fallback on 1,296 engine-search
+  decisions. Overall p99 795.1 ms, maximum 1,072 ms. A separate calculator-off
+  pass also replayed all 2,349 decisions without failures or repairs. The corpus
+  contains no real Werewolf match, so these passes check cross-game regressions,
+  not the new Werewolf strategy's tournament strength.
+- Official SDK runner against the local platform: **62 games**, zero seat
+  errors, hung seats, idle auto-actions or rejected moves/chats. This includes
+  20 ten-second-window games for each profile, two normal 120-second-window
+  games with delayed scripted opponents, and 20 games with discussion disabled.
+  Slowest decision 8.1 ms. Expected phase-race `WRONG_PHASE_NOOP` responses were
+  40/48/7/0 respectively; there were no listening errors. These are protocol
+  checks, not a statistical playing-strength comparison.
+
+Full logs are saved under
+`logs/werewolf_benchmarks/validation-cc95bb8/`. Synthetic benchmark records live
+in neighboring named run directories; neither is mixed into real replay inputs.
