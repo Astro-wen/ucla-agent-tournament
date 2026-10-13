@@ -1,4 +1,4 @@
-"""Opt-in opening experiment: legality, claim precedence, unchanged ballots and safe rollback.
+"""Opt-in opening profiles: legality, public-information boundaries, claim precedence and safe rollback.
 
 The neutral line is still a template-level tell, so these checks do not establish general strategic strength.
 """
@@ -116,7 +116,7 @@ def test_named_experimental_tactic_is_explicitly_enabled(monkeypatch):
     assert 'Player' not in WerewolfPolicy().chat(make_state())[0]['content']
 
 
-@pytest.mark.parametrize('setting', ['on', 'off'])
+@pytest.mark.parametrize('setting', ['on', 'off', 'public_vote'])
 def test_tactic_never_changes_the_night_action(monkeypatch, setting):
     monkeypatch.setenv(P.TACTICS_ENV, setting)
     st = make_state(day=2)
@@ -125,3 +125,135 @@ def test_tactic_never_changes_the_night_action(monkeypatch, setting):
     st['phase'] = 'moving'
     st['legal_actions']['actions'] = [{'action_id': str(i)} for i in [1, 2, 4, 5, 6]]
     assert WerewolfPolicy().act(st)['action_id'] == ChampionPolicy().act(st)['action_id']
+
+
+@pytest.mark.parametrize('me,ally', [(me, ally) for me in range(7) for ally in range(7) if me != ally])
+def test_public_vote_opening_and_ballot_match_villager_for_every_wolf_pair(monkeypatch, me, ally):
+    monkeypatch.setenv(P.TACTICS_ENV, 'public_vote')
+    wolf, villager = WerewolfPolicy(), WerewolfPolicy()
+    wolf_state, village_state = make_state(me=me, ally=ally), make_state(role='villager', me=me)
+    messages = wolf.chat(wolf_state)
+    assert messages == villager.chat(village_state)
+    assert wolf.act(wolf_state)['action_id'] == villager.act(village_state)['action_id']
+    assert messages[0]['recipients'] == []
+    assert len(messages[0]['content'].split()) <= 50
+    assert len(messages[0]['content'].encode('utf-8')) <= 1024
+
+
+def test_public_vote_can_legally_vote_ally_without_revealing_the_relationship(monkeypatch):
+    monkeypatch.setenv(P.TACTICS_ENV, 'public_vote')
+    st = make_state(ally=0)
+    pol = WerewolfPolicy()
+    messages = pol.chat(st)
+    assert messages == WerewolfPolicy().chat(make_state(role='villager'))
+    assert 'Player0' in messages[0]['content']
+    assert pol.act(st)['action_id'] == '0'
+    assert '0' in pol._legal(st)
+    # no_skip/on keep the separate neutral-opening experiment and its original non-ally ballot.
+    monkeypatch.setenv(P.TACTICS_ENV, 'on')
+    assert WerewolfPolicy().act(st)['action_id'] == '1'
+
+
+@pytest.mark.parametrize('claim', [
+    (6, 'I am the Seer. Player0 is a wolf.'),
+    (6, 'I am the Seer. Player3 is a wolf.'),
+    (6, 'I am the Seer. Player0 is clear.'),
+    (0, 'I am the Seer. Player4 is a wolf.'),
+    (3, 'I am the Seer. Player4 is a wolf.'),
+])
+def test_any_public_seer_claim_restores_normal_wolf_tactics(monkeypatch, claim):
+    st = make_state(messages=[claim])
+    monkeypatch.setenv(P.TACTICS_ENV, 'off')
+    baseline = WerewolfPolicy()
+    expected_chat, expected_vote = baseline.chat(st), baseline.act(st)
+    monkeypatch.setenv(P.TACTICS_ENV, 'public_vote')
+    candidate = WerewolfPolicy()
+    assert candidate.chat(st) == expected_chat
+    assert candidate.act(st) == expected_vote
+
+
+def test_public_vote_reacts_to_a_late_claim_after_announcing_ally_vote(monkeypatch):
+    monkeypatch.setenv(P.TACTICS_ENV, 'public_vote')
+    pol = WerewolfPolicy()
+    opening = pol.chat(make_state())[0]
+    assert 'Player0' in opening['content']
+    later = make_state(messages=[(3, opening['content']), (6, 'I am the Seer. Player3 is a wolf.')])
+    response = pol.chat(later)
+    assert len(response) == 1
+    assert response[0]['content'].startswith('I am the Seer. Player6 is a WOLF')
+    # The runner echoes accepted broadcasts into the subsequent observation.
+    echoed = make_state(messages=[(3, opening['content']), (6, 'I am the Seer. Player3 is a wolf.'),
+                                  (3, response[0]['content'])])
+    assert pol.act(echoed)['action_id'] == '6'
+
+
+def test_public_persona_contains_no_wolf_private_information(monkeypatch):
+    monkeypatch.setenv(P.TACTICS_ENV, 'public_vote')
+    st = make_state()
+    pol = WerewolfPolicy()
+    v = pol._view(st)
+    v.investigations = {2: 'wolf'}
+    v.messages += [
+        {'seq': 7, 'sender': 0, 'content': 'Tonight: Player4.', 'visibility': 'direct', 'recipients': [3]},
+        {'seq': 8, 'sender': 0, 'content': 'I am the Seer. Player1 is a wolf.', 'recipients': [3]},
+        {'seq': 9, 'sender': 4, 'content': 'Player2 is a wolf.', 'recipients': []},
+    ]
+    seen = []
+    day_vote = WerewolfPolicy._day_vote
+
+    def inspect_persona(self, public, targets):
+        seen.append(public)
+        return day_vote(self, public, targets)
+
+    monkeypatch.setattr(WerewolfPolicy, '_day_vote', inspect_persona)
+    pick, _ = pol._wolf_vote(v, v.others_alive)
+    assert pick == 2  # only the public accusation reaches the decision
+    assert len(seen) == 1
+    public = seen[0]
+    assert public.role == 'villager'
+    assert public.allies == [] and public.investigations == {} and public.evidence is None
+    assert [m['seq'] for m in public.messages] == [9]
+    assert v.role == 'wolf' and v.allies == [0] and v.investigations == {2: 'wolf'}
+    assert v.evidence is not None and len(v.messages) == 3
+
+
+@pytest.mark.parametrize('role,day', [('villager', 1), ('seer', 1), ('wolf', 2), ('wolf', 3)])
+def test_public_vote_preserves_other_roles_and_later_days(monkeypatch, role, day):
+    st = make_state(role=role, day=day)
+    monkeypatch.setenv(P.TACTICS_ENV, 'off')
+    baseline = WerewolfPolicy()
+    expected_chat, expected_vote = baseline.chat(st), baseline.act(st)
+    monkeypatch.setenv(P.TACTICS_ENV, 'public_vote')
+    candidate = WerewolfPolicy()
+    assert candidate.chat(st) == expected_chat
+    assert candidate.act(st) == expected_vote
+
+
+def test_public_vote_respects_the_offered_legal_targets(monkeypatch):
+    monkeypatch.setenv(P.TACTICS_ENV, 'public_vote')
+    st = make_state()
+    st['legal_actions']['actions'] = [{'action_id': str(i)} for i in [2, 4]]
+    assert WerewolfPolicy().act(st)['action_id'] == '2'
+
+
+@pytest.mark.parametrize('setting,expected', [
+    ('public_vote', 'public_vote'), (' PUBLIC_VOTE ', 'public_vote'),
+    ('on', 'no_skip'), ('1', 'no_skip'), ('true', 'no_skip'), ('no_skip', 'no_skip'),
+    ('off', 'off'), ('unknown', 'off'), ('', 'off'),
+])
+def test_tactics_profiles_are_explicit_and_backward_compatible(monkeypatch, setting, expected):
+    monkeypatch.setenv(P.TACTICS_ENV, setting)
+    assert P.tactics_mode() == expected
+    assert P.tactics_enabled() == (expected == 'no_skip')
+
+
+def test_public_vote_can_be_rolled_back_without_resetting_match_memory(monkeypatch):
+    monkeypatch.setenv(P.TACTICS_ENV, 'public_vote')
+    st = make_state()
+    pol = WerewolfPolicy()
+    assert pol.act(st)['action_id'] == '0'
+    monkeypatch.setenv(P.TACTICS_ENV, 'off')
+    assert pol.act(st)['action_id'] == '1'
+    monkeypatch.delenv(P.TACTICS_ENV)
+    assert P.tactics_mode() == 'off'
+    assert pol.act(st)['action_id'] == '1'

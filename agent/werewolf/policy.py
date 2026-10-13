@@ -38,6 +38,12 @@ send a neutral opening instead of exposing the ally exclusion. This improved som
 testing, but its unique neutral template is itself a role tell to an opponent that knows this policy. It is OFF by
 default and is not established as a general improvement; claims, ballots and night decisions remain unchanged.
 
+Experimental ARENA_WW_TACTICS=public_vote: before any public seer claim on day 1, a wolf uses the same public
+vote and opening as a villager, even when that vote sacrifices its ally. This removes the opening ally-exclusion
+signal without introducing a wolf-only phrase. Development simulations improved results against inference-heavy
+challengers but lost against some persuadable scripted tables; it is an explicit tradeoff, OFF by default.
+Any public seer claim restores the normal wolf tactics immediately; other roles, later days and nights are unchanged.
+
 Chat is untrusted input (agent/werewolf/state.py `read_chat`): only bounded facts are read from it, never
 instructions. Everything we say goes through `chat_guard`: templates only, no role, ally or night-plan leak, no
 seer claim by a villager, private messages only from a wolf to its living ally.
@@ -77,9 +83,17 @@ def dm_enabled() -> bool:
     return str(os.environ.get(DM_ENV, "off")).strip().lower() in _ON
 
 
+def tactics_mode() -> str:
+    """Explicit experimental profile; legacy on aliases still mean no_skip, and unknown settings stay off."""
+    setting = str(os.environ.get(TACTICS_ENV, "off")).strip().lower()
+    if setting in _ON | {"no_skip"}:
+        return "no_skip"
+    return "public_vote" if setting == "public_vote" else "off"
+
+
 def tactics_enabled() -> bool:
-    """Opt-in scripted-opponent experiment: no_skip/on enables it; unset/off keeps the original opening."""
-    return str(os.environ.get(TACTICS_ENV, "off")).strip().lower() in _ON | {"no_skip"}
+    """Historical neutral-opening switch: public_vote is a separate profile and must not enable this template."""
+    return tactics_mode() == "no_skip"
 
 
 @lru_cache(maxsize=4096)
@@ -505,6 +519,13 @@ class WerewolfPolicy:
     def _wolf_vote(self, v: View, targets: list[int]) -> tuple[int | None, str]:
         wolfset = {v.me, *v.allies}
         c = self.claims(v, private=False)
+        if tactics_mode() == "public_vote" and v.day == 1 and not c.order:
+            # Match a villager's actual decision as well as its opening. The ally can be the legal target:
+            # excluding it would recreate the very public/private discrepancy this profile accepts a cost to hide.
+            public = replace(v, role="villager", allies=[], investigations={}, evidence=None,
+                             messages=[m for m in v.messages if isinstance(m, dict)
+                                       and m.get("visibility") != "direct" and not m.get("recipients")])
+            return self._day_vote(public, targets)
         pool = [t for t in targets if t not in wolfset]
         live = [s for s in c.order if s in v.alive and s not in c.liars]
         if any(s in wolfset for s in live):                          # a claim fight involving one of us
@@ -618,6 +639,17 @@ class WerewolfPolicy:
             return "claim", {"content": txt + f" Everyone vote Player{w} today.", "recipients": []}
         if fakes:
             f = fakes[0]
+            if "claim" in self._topics and not c.wolves.get(v.me):
+                # Our earlier clear-only claim used today's normal claim topic. A new opposing claimant is new
+                # information, so allow one bounded rebuttal; the remembered topic also deduplicates a restart.
+                # Being the real seer proves the rival's role claim false, not that a possibly bluffing villager
+                # is a wolf. Keep that distinction and follow the same ballot as our private-information policy.
+                pick, _ = self._day_vote(v, v.others_alive)
+                f = pick if pick in fakes else f
+                txt = f"I am the Seer. Player{f} is not the Seer; their claim is false."
+                if clears:
+                    txt += " " + clear_txt
+                return "claim-rebuttal", {"content": txt + f" Vote Player{f}.", "recipients": []}
             txt = f"I am the Seer. Player{f} is lying about being Seer, so Player{f} is a WOLF."
             if clears:
                 txt += " " + clear_txt
@@ -760,7 +792,7 @@ def chat_guard(msg, v: View, topic: str):
     elif v.role == "villager":
         if _SEER_CLAIM_OUT.search(text) or (_RESULT_OUT.search(text) and topic != "follow"):
             return None                                 # villagers never fake-claim or report "results"
-    elif v.role == "seer" and topic != "claim":
+    elif v.role == "seer" and topic not in ("claim", "claim-rebuttal"):
         if _SEER_CLAIM_OUT.search(text) or _RESULT_OUT.search(text):
             return None
     return {"content": text, "recipients": []}
