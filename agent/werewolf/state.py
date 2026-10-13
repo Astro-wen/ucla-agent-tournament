@@ -726,7 +726,7 @@ def normalize(text, names: dict[int, str] | None = None) -> str:
         if (len(n) >= 3 and sum(value == n for value in aliases.values()) == 1
                 and not _SEAT_TOKEN.fullmatch(n) and not _SEAT_WORD.fullmatch(n)
                 and not re.fullmatch(r"(?:player|seat|agent)?\s*\d+", n)
-                and not any(_NAME_STOP.search(word) for word in re.findall(r"\w+", n)) and not _hedged(n + " ")
+                and not any(_NAME_STOP.search(word) for word in re.split(r"[\W_]+", n)) and not _hedged(n + " ")
                 and not _NEG_ACTION.search(n + " ")
                 and not _CLAIM_IAM.fullmatch(n + " seer") and not _CLAIM_ROLE.fullmatch(n + " seer")):
             t = re.sub(r"(?<![\w])" + re.escape(n) + r"(?![\w])", f"player{seat}", t)
