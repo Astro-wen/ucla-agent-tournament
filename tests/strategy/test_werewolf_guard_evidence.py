@@ -205,3 +205,16 @@ def test_grammar_like_aliases_cannot_steal_the_subject_of_a_verdict(alias, text)
 @pytest.mark.parametrize('alias', ['never', "don't", "won't"])
 def test_a_name_cannot_erase_the_negation_of_a_vote(alias):
     assert not read_chat(f'{alias} vote Player5.', sender=3, names={1: alias}).sus
+
+
+@pytest.mark.parametrize('alias', ['is-a', 'is_a', 'is.a'])
+def test_punctuation_cannot_hide_reserved_grammar_in_an_alias(alias):
+    f = read_chat(f'I am the Seer. Player5 {alias} wolf.', sender=3, names={1: alias})
+    assert 1 not in f.wolves
+    if alias == 'is-a':
+        assert f.wolves == {5}
+
+
+def test_an_ordinary_hyphenated_name_remains_readable():
+    f = read_chat('I am the Seer. River-Stone is a wolf.', sender=3, names={5: 'River-Stone'})
+    assert f.claim and f.wolves == {5}
