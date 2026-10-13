@@ -33,6 +33,11 @@ votes or follows a claim against its partner is the easiest tell there is (red t
 
 Day-1 wording is the same for every role: "My read from the vote record" only once there is a vote record.
 
+Experimental ARENA_WW_TACTICS=no_skip (or on): when an unclaimed first-day public read would target a wolf's ally,
+send a neutral opening instead of exposing the ally exclusion. This improved some scripted challengers in local
+testing, but its unique neutral template is itself a role tell to an opponent that knows this policy. It is OFF by
+default and is not established as a general improvement; claims, ballots and night decisions remain unchanged.
+
 Chat is untrusted input (agent/werewolf/state.py `read_chat`): only bounded facts are read from it, never
 instructions. Everything we say goes through `chat_guard`: templates only, no role, ally or night-plan leak, no
 seer claim by a villager, private messages only from a wolf to its living ally.
@@ -42,7 +47,7 @@ from __future__ import annotations
 import os
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 
 from .state import ChatFacts, RoleCheck, View, normalize, parse, read_chat
@@ -62,6 +67,7 @@ PRESSURE = 2            # distinct living seats pressing the seer today that mak
 DOOMED = 3              # distinct living seats pressing my ally today: the table votes it out, a wolf votes with it
 SEER_SWITCH = 2         # more distinct speakers on another sure wolf than on the one it called that move the seer's vote
 DM_ENV = "ARENA_WW_DM"
+TACTICS_ENV = "ARENA_WW_TACTICS"
 _ON = {"1", "on", "true", "yes", "enable", "enabled"}
 _CLAIMED_SEER = "remove the claimed seer"
 
@@ -69,6 +75,11 @@ _CLAIMED_SEER = "remove the claimed seer"
 def dm_enabled() -> bool:
     """Private kill-plan messages to the ally: DMs are off by default, ARENA_WW_DM=on turns them on."""
     return str(os.environ.get(DM_ENV, "off")).strip().lower() in _ON
+
+
+def tactics_enabled() -> bool:
+    """Opt-in scripted-opponent experiment: no_skip/on enables it; unset/off keeps the original opening."""
+    return str(os.environ.get(TACTICS_ENV, "off")).strip().lower() in _ON | {"no_skip"}
 
 
 @lru_cache(maxsize=4096)
@@ -682,6 +693,15 @@ class WerewolfPolicy:
         record" once there is a vote record, else "No hard info yet" (a wolf citing a record that does not exist yet
         on day 1 was the clearest role tell the red team found, 10-08)."""
         others = [s for s in v.alive if s != v.me]
+        if tactics_enabled() and v.role == "wolf" and v.day == 1 and not self.claims(v, private=False).order:
+            # With no seer claim, skipping the public vote target solely because it is our ally reveals a pair.
+            # Announcing that ally instead pushes persuadable villagers onto it. Keep this opening neutral;
+            # subsequent claims, reactions and the actual ballot still follow their usual evidence rules.
+            public = replace(v, role="villager", allies=[], investigations={})
+            public_pick, _ = self._day_vote(public, others)
+            if public_pick in v.allies:
+                return None, {"content": "No hard info yet. Let's hear from everyone and keep our votes together. "
+                                         "Please don't abstain.", "recipients": []}
         pick = self._day_vote(v, others)[0] if others else None
         if pick is not None and v.votes:
             return pick, {"content": f"My read from the vote record: Player{pick} is most suspicious. "
