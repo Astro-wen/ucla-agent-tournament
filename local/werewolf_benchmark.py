@@ -466,6 +466,8 @@ def main(argv=None):
         module = ev.AGENTS.get(spec, spec).split(":", 1)[0]
         if module.split(".")[0] not in SOURCE_ROOTS:
             parser.error(f"factory {spec!r} is outside source-manifest roots {SOURCE_ROOTS}")
+    if args.out.resolve().parent == (ROOT / "logs").resolve():
+        parser.error("use logs/werewolf_benchmarks/<run>, not logs/<run>: the real-recording replay scans logs/*/*.jsonl")
     if args.out.exists():
         parser.error("output directory already exists; use a fresh name to preserve prior evidence")
     args.out.mkdir(parents=True)

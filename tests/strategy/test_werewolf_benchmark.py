@@ -234,3 +234,11 @@ def test_generator_plan_errors_are_counted(monkeypatch):
     game = Game([seat] + [OfficialBaseline() for _ in range(6)], random.Random(1))
     seat.message(game.state(0, "messaging", "day_vote"))
     assert seat.policy_errors > 0
+
+
+def test_output_cannot_pollute_production_recording_replay(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(wb, "ROOT", tmp_path)
+    with pytest.raises(SystemExit):
+        wb.main(["--out", str(tmp_path / "logs" / "unsafe-synthetic-run")])
+    assert "logs/werewolf_benchmarks/<run>" in capsys.readouterr().err
+    assert not (tmp_path / "logs" / "unsafe-synthetic-run").exists()

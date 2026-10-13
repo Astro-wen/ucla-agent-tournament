@@ -14,7 +14,7 @@
 ```bash
 .venv/bin/python -m local.werewolf_benchmark \
   --split development --seeds 151 --games 100 --ks 1 --jobs 3 \
-  --out logs/ww-dev-151
+  --out logs/werewolf_benchmarks/ww-dev-151
 ```
 
 候选开关只作用于候选座位，不会影响同一桌上的冻结冠军座位：
@@ -23,7 +23,7 @@
 .venv/bin/python -m local.werewolf_benchmark \
   --split development --seeds 152 --games 200 --ks 1,3 --jobs 3 \
   --candidate-env ARENA_WW_EXAMPLE=on --trace-games 3 \
-  --out logs/ww-dev-152-example
+  --out logs/werewolf_benchmarks/ww-dev-152-example
 ```
 
 上面的 `ARENA_WW_EXAMPLE` 是格式示例，须替换为实际策略开关。其他工厂可用 `--candidate module:factory`、`--reference module:factory` 指定，但模块必须位于源码清单覆盖的 `agent`、`champion`、`local`、`versions`、`altruagent` 或 `examples` 下；其他包会被拒绝。清单同时包含这些目录的 Python 源码、依赖声明/锁文件和冠军版本。策略开关应在构造或决策时读取；若两个工厂用相同模块但依赖导入时固定的开关，须改为不同模块或分别运行，因为 Python 会缓存导入。
@@ -33,18 +33,18 @@
 ```bash
 .venv/bin/python -m local.werewolf_benchmark \
   --split heldout --games 400 --ks 1,3 --jobs 3 --timing rt \
-  --trace-games 3 --out logs/ww-heldout-rt
+  --trace-games 3 --out logs/werewolf_benchmarks/ww-heldout-rt
 
 .venv/bin/python -m local.werewolf_benchmark \
   --split heldout --games 400 --ks 1,3 --jobs 3 --timing rounds \
-  --out logs/ww-heldout-rounds
+  --out logs/werewolf_benchmarks/ww-heldout-rounds
 ```
 
 每组默认对手：`first`（官方示例首个合法动作）、`random`、`heuristic`、`llmq`、`rt_wolfpack`、`rt_talker`、`rt_detective`、`rt_chaos`。`llmq` 是固定规则的语言模型替身，不是真实大模型。不会调用付费模型服务。默认 k=1、3；k=3 是多席位压力测试，不能替代 k=1。k=7 的背景没有对手意义，因此只计算一次。
 
 ## 输出和如何判断
 
-每次必须提供新的输出目录，旧结果不会被覆盖。
+每次必须提供新的输出目录，旧结果不会被覆盖。仓库内使用 `logs/werewolf_benchmarks/<run>`；工具拒绝 `logs/<run>`，因为真实重放脚本会把那一层的 `*.jsonl` 当成真实录制，混入合成数据会破坏重放。
 
 | 文件 | 内容 |
 |---|---|
