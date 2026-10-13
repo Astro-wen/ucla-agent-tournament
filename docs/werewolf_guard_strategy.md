@@ -34,3 +34,33 @@ unchanged. Production deployment and champion promotion are outside this change.
 ## Results
 
 Implementation and validation in progress.
+
+## Final confirmation design (registered before reserved-seed results)
+
+Freeze implementation at `cde8bc2`. Run seeds29301/29302 together, one controlled
+seat per table, realistic `rt` timing with400 deals per opponent/seed and `rounds`
+timing with200. Run both `ARENA_WW_TACTICS=off` and `public_vote`.
+
+The established panel contains all11 original backgrounds. The guard panel has
+9 homogeneous probes (silent, abstain, fixed, echo, single accusation, repeated
+accusation, fake seer, contradictory seer, quotation/conditional bait), plus
+15 one-attacker conditions: each of first/heuristic/llmq with one accuse/repeat/
+fake/contradict/bait seat. All35 conditions are reported, including negative ones.
+
+For each condition, measure both the guarded implementation and a pre-guard
+`1ff9c4c` source archive, each against the unchanged champion on identical deals.
+The archive receives only the same evaluator registration, guard-bot module and
+benchmark seed-registry files; its production agent remains byte-identical to
+`1ff9c4c`. All source files are hashed. Direct pre/post comparisons require exact
+matching deals and champion outcomes. Both sources, both profiles, both timings
+produce **336,000 simulated games**. Repeated deals are not extra independent
+samples. A strategy revision after seeing these results would require fresh
+confirmation seeds.
+
+Primary defense question: do the demonstrated cheap attacks lose their influence
+without a material regression against ordinary/strong opponents? Require unit-level
+invariants, no protocol/strategy failures, and report the direct paired effect of
+the guards with uncertainty for each role/opponent. Also retain the benchmark's
+unchanged2-point overall promotion gate; robustness fixes are not permission to
+promote the experimental public-vote profile. The current one-seat confirmation
+does not extend the earlier multi-seat strength claims to this revision.
