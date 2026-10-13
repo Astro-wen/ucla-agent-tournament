@@ -4,6 +4,11 @@ Base: `origin/main` at `cda2dd9`; branch: `strategy/werewolf-evidence-search`.
 The frozen `champion/` remains the comparison target. The production runtime and
 the other two game strategies are outside this change.
 
+Follow-up: the [defensive guard report](werewolf_guard_strategy.md) covers the
+current `cde8bc2` implementation and its separate 336,000-game confirmation. The
+369,600-game results below describe the earlier frozen research revision and
+must not be presented as a new measurement of the guarded implementation.
+
 ## Objective and game model
 
 Improve the probability that our single tournament seat wins, rather than its

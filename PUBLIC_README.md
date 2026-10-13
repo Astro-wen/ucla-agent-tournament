@@ -180,6 +180,10 @@ Evidence parsing distinguishes asserted results from questions, quotations, hypo
 ambiguous display names cannot silently change seat references. A public seer death invalidates later seer claims
 even if the dead seer never spoke. Development-only alternative wolf tactics are opt-in through
 `ARENA_WW_TACTICS`; they are not enabled in the default policy and do not establish live tournament superiority.
+Defensive evidence guards count each speaker's accusation once, reject contradictory seer reports, and keep
+quotations, negated votes and grammar-like display names from manufacturing evidence. They apply to both default
+and optional tactics. A simple-opponent panel covers silence, abstention, fixed votes, copying and cheap chat bait;
+the [guard report](docs/werewolf_guard_strategy.md) records paired checks and remaining limits.
 
 ---
 

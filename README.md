@@ -133,6 +133,8 @@ flowchart TD
 [`docs/werewolf_evidence_strategy.md`](docs/werewolf_evidence_strategy.md)。
 [`docs/werewolf_benchmark.md`](docs/werewolf_benchmark.md) 说明如何用相同身份和座位比较候选与冻结冠军，
 保存合成日志，并检查被合法兜底掩盖的异常。策略实验默认关闭；本地模拟成绩不能代表真实比赛成绩。
+新增的[防诱导保护与简单对手检查](docs/werewolf_guard_strategy.md)会限制重复喊票的影响，
+排除自相矛盾的预言家信息，并防止引文、否定句和伪装名字被误读；这些保护对默认策略和可选策略都生效。
 
 ### 红警：快、不闲着、成团作战
 
