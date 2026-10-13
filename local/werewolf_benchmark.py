@@ -33,6 +33,11 @@ from .werewolf_env import ContestantSeat, Game, deal_roles
 
 DEVELOPMENT_SEEDS = tuple(range(151, 160))
 HELDOUT_SEEDS = (28101, 28102)
+SEED_REGISTRIES = {
+    "evidence": (DEVELOPMENT_SEEDS, HELDOUT_SEEDS),
+    # Registered before the guarding-strategy search; original confirmation seeds are already consumed.
+    "guards": (tuple(range(161, 170)), (29301, 29302)),
+}
 DEFAULT_BACKGROUNDS = ("first", "random", "heuristic", "llmq", "rt_wolfpack", "rt_talker", "rt_detective", "rt_chaos")
 VARIANTS = ("reference", "candidate", "wolf_only", "village_only")
 LATENCY_BOUNDS_MS = (0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50, 100, 250, 500, 1000, 2000, 5000, 10000, 120000)
@@ -445,6 +450,7 @@ def main(argv=None):
     parser.add_argument("--reference", default="champion")
     parser.add_argument("--candidate-env", action="append", default=[])
     parser.add_argument("--split", choices=("development", "heldout"), default="development")
+    parser.add_argument("--seed-registry", choices=tuple(SEED_REGISTRIES), default="evidence")
     parser.add_argument("--seeds", nargs="+", type=int)
     parser.add_argument("--games", type=int, default=200, help="paired tables per seed/background/k")
     parser.add_argument("--backgrounds", default=",".join(DEFAULT_BACKGROUNDS))
@@ -457,11 +463,12 @@ def main(argv=None):
     parser.add_argument("--min-n", type=int, default=200)
     parser.add_argument("--out", type=Path, required=True, help="new directory; refuses overwrite")
     args = parser.parse_args(argv)
-    seeds = args.seeds or ([DEVELOPMENT_SEEDS[0]] if args.split == "development" else list(HELDOUT_SEEDS))
-    if args.split == "development" and any(s not in DEVELOPMENT_SEEDS for s in seeds):
-        parser.error(f"development seeds are registered as {DEVELOPMENT_SEEDS}")
-    if args.split == "heldout" and tuple(seeds) != HELDOUT_SEEDS:
-        parser.error(f"heldout must run the complete preregistered seeds {HELDOUT_SEEDS}")
+    development_seeds, heldout_seeds = SEED_REGISTRIES[args.seed_registry]
+    seeds = args.seeds or ([development_seeds[0]] if args.split == "development" else list(heldout_seeds))
+    if args.split == "development" and any(s not in development_seeds for s in seeds):
+        parser.error(f"development seeds are registered as {development_seeds}")
+    if args.split == "heldout" and tuple(seeds) != heldout_seeds:
+        parser.error(f"heldout must run the complete preregistered seeds {heldout_seeds}")
     if args.jobs < 1 or not 0 <= args.trace_games <= 10 or args.min_n < 1 or not 0 <= args.min_gain <= 1 or not 0 <= args.margin <= 1:
         parser.error("invalid jobs, trace count, minimum sample size or fraction")
     try:

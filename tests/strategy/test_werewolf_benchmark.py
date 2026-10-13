@@ -196,6 +196,21 @@ def test_missing_latency_and_untracked_factories_cannot_look_verified(tmp_path):
     assert "altruagent/runner.py" in manifest["files"]
 
 
+def test_guard_seed_registry_keeps_consumed_and_fresh_confirmation_separate(tmp_path):
+    assert wb.SEED_REGISTRIES["guards"] == (tuple(range(161, 170)), (29301, 29302))
+    for args in (["--seeds", "28101"], ["--seeds", "29301"],
+                 ["--split", "heldout", "--seeds", "29301"],
+                 ["--split", "heldout", "--seeds", "28101", "28102"]):
+        with pytest.raises(SystemExit):
+            wb.main(["--seed-registry", "guards", "--out", str(tmp_path / "rejected"), *args])
+    report = wb.main(["--seed-registry", "guards", "--games", "1", "--backgrounds", "first",
+                      "--ks", "1", "--candidate", "champion", "--out", str(tmp_path / "guard-smoke")])
+    assert report["gates"]["complete_pairs"]
+    manifest = json.loads((tmp_path / "guard-smoke" / "manifest.json").read_text())
+    assert manifest["config"]["seeds"] == [161]
+    assert manifest["config"]["seed_registry"] == "guards"
+
+
 def test_policy_internal_fallback_and_chat_errors_are_counted_after_refresh(monkeypatch):
     from agent.werewolf.policy import WerewolfPolicy
 
