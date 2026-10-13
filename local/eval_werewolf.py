@@ -78,6 +78,7 @@ from .redteam_detective import VARIANTS as DETECTIVE_VARIANTS
 from .redteam_talker import SEATS as TALKER_SEATS
 from .redteam_wolfpack import KINDS as WOLFPACK_KINDS
 from .werewolf_bots import HeuristicSeat, LLMQwenSeat, LLMSeat, LLMVariedSeat
+from .werewolf_guard_bots import GUARD_BACKGROUNDS
 from .werewolf_env import ContestantSeat, Game, OfficialBaseline, RandomSeat, deal_roles
 
 BACKGROUNDS = {"first": OfficialBaseline, "heuristic": HeuristicSeat, "random": RandomSeat, "llm": LLMSeat,
@@ -92,6 +93,7 @@ BACKGROUNDS.update(CHAOS_BACKGROUNDS)                   # chaos, chaosx, chaos1.
 RT_BACKGROUNDS = {"rt_wolfpack": WOLFPACK_KINDS["wolfpack"], "rt_talker": TALKER_SEATS["talker"],
                   "rt_detective": DETECTIVE_VARIANTS["detective"], "rt_chaos": CHAOS_BACKGROUNDS["chaos4"]}
 BACKGROUNDS.update(RT_BACKGROUNDS)
+BACKGROUNDS.update(GUARD_BACKGROUNDS)                  # cheap legal probes; use <ordinary>+1guard_* for one attacker
 MIXED = ("first", "heuristic", "random", "llm")       # what a `mixed` seat is drawn from (fixed: keeps old deals)
 LLM_REAL = "llm_real"                                   # the real examples/llm_agent.py (local/llm_seats.py), opt-in
 LOW_K = 3                                               # slice "k<=3": few of our seats at a table
