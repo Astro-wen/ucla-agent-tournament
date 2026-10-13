@@ -303,7 +303,7 @@ _CHAT_ACCUSE = [
     re.compile(r"\b" + _W + r"\s*(?:is|=|:)\s*" + _P + r"\b"),
 ]
 _CHAT_CLEAR = [
-    re.compile(_P + r"\s*(?:is|=|was|'s|’s|:)?\s*" + _ADV + r"(?:a\s+|an\s+)?(?:villager|clear|cleared|innocent|good|"
+    re.compile(_P + r"\s*(?:is|=|was|'s|’s|:)?\s*" + _ADV + r"(?:a\s+|an\s+)?(?:villager|clear|cleared|innocent(?:\s+villager)?|good|"
                r"town|clean|safe|not\s+(?:a\s+)?" + _W + r")\b"),
     re.compile(r"\b([0-6])\s+(?:is|=|was)\s+" + _ADV + r"(?:a\s+|an\s+)?(?:villager|clear|innocent|good|town|clean)\b"),
 ]
@@ -351,6 +351,7 @@ _DET = (r"(?:(?:a|an|the|one\s+of\s+the(?:\s+two)?|our|my)\s+)?"
 # "a wolf or a scared villager"
 _END = (r"(?=\s*(?:$|[.,!?;:)\]—–-]|(?:too|also|as\s+well|for\s+sure|for\s+certain|imo|tbh|then|now|confirmed|indeed|"
         r"and|but|so|last\s+night|tonight|today|yesterday|here|btw|lol)\b))")
+_END_RE = re.compile(_END)
 _SEATS = r"player[0-6](?:\s*(?:,\s*(?:and\s+)?|and\s+|&\s*)player[0-6])*"
 _LIST = r"player[0-6](?:\s*(?:,\s*(?:and\s+)?|and\s+|&\s*)player[0-6])+"
 _IS = r"\s*(?:is|=|was|['’]s|:)\s+"
@@ -439,6 +440,7 @@ _AGREE = re.compile(
 _NEG_CUE = re.compile(
     r"(?:(?<!\bno\s)(?<!\ba\s)\bdoubt(?:s|ed|ful)?|\bunlikely|\b(?:im)?possibl[ey]|\bunsure|\buncertain|"
     r"\bnot\s+(?:that|sure|convinced|certain|saying|necessarily|clear|positive)|\bno\s+idea|\bwho\s+knows|"
+    r"\bnever\s+(?:concluded|confirmed|established|proved|said|claimed)|"
     r"\bhard\s+to\s+(?:say|tell)|"
     r"\b(?:doesn['’]t|does\s+not|don['’]t|do\s+not|didn['’]t|did\s+not|won['’]t|wouldn['’]t|can['’]t|cannot|"
     r"isn['’]t|aren['’]t)\s+(?:\w+\s+)?(?:mean|means|prove|proves|make|makes|show|shows|think|believe|buy|say|"
@@ -488,13 +490,25 @@ def _claims_seer(t: str) -> bool:
     """Does normalized text `t` claim seer in the sender's own voice?"""
     for rx in (_CLAIM_IAM, _CLAIM_ROLE):
         for m in rx.finditer(t):
-            if not _NOT_OWN_VOICE.search(t[max(0, m.start() - 40):m.start()]):
+            start, _ = _sentence(t, m.start())
+            if not (_question(t, m.end()) or _hedged(t[start:m.start()])
+                    or _NOT_OWN_VOICE.search(t[max(start, m.start() - 40):m.start()])):
                 return True
-    if any(p.search(t) for p in _CHAT_CLAIM):
-        return True
+    for rx in _CHAT_CLAIM:
+        for m in rx.finditer(t):
+            start, _ = _sentence(t, m.start())
+            if not (_question(t, m.end()) or _hedged(t[start:m.start()])
+                    or _NOT_OWN_VOICE.search(t[max(start, m.start() - 40):m.start()])):
+                return True
     for m in _CHECK.finditer(t):
-        v = _VERDICT.search(m.group(2))
-        if v and all(x == m.group(1) for x in re.findall(r"player([0-6])", m.group(2)[:v.start()])):
+        start, _ = _sentence(t, m.start())
+        if (_question(t, m.end()) or _hedged(t[start:m.start()])
+                or _NOT_OWN_VOICE.search(t[max(start, m.start() - 40):m.start()])):
+            continue
+        # A role word anywhere after "checked" is not enough: villagers discuss checks hypothetically, ask about
+        # them, or inspect a seat's vote record. Require a verdict actually bound to this check's subject.
+        wolves, clears = _verdicts(m.group(0))
+        if int(m.group(1)) in wolves | clears:
             return True
     for m in _CLAIM_OPEN.finditer(t):
         if not _question(t, m.end()):
@@ -525,6 +539,9 @@ def _cued(before: str) -> bool:
     """Reported speech, a hypothetical or uncertainty right before a verdict ("Player2 says", "if", "maybe", "Player3
     keeps insisting", "according to Player2", "I suspect"); a first-person "I think" / "I know" stays the sender's own
     voice."""
+    # "Seer claim: Player3 is a wolf" is the sender's own result header, not reported speech by a person named Seer.
+    if re.fullmatch(r"\s*(?:hard\s+)?seer\s+claim\s*[:—–-]\s*", before):
+        return False
     m = _CUE.search(before)
     return (bool(m) and m.group("who") != "i") or bool(_REPORTED.search(before)) or bool(_HUNCH.search(before))
 
@@ -538,6 +555,19 @@ def _hedged(prefix: str) -> bool:
     """The part of a sentence before a verdict makes it not the sender's verdict: a hypothetical opening ("If ..."),
     reported speech or uncertainty right before it, or a negation / doubt."""
     return bool(_IF_START.search(prefix)) or _cued(prefix) or _negated(prefix)
+
+
+def _asserted_match(t: str, m: re.Match) -> bool:
+    """Legacy short verdicts use the same attribution and uncertainty guards as the richer patterns.
+
+    Without this check, a quoted-in-prose accusation such as "Player2 says Player3 is a wolf" bypasses all the
+    newer guards. A claimed seer's table talk would then become a false investigation and discredit their genuine
+    results. Requiring a phrase ending also rejects "a wolf or a villager" and "a wolf bluff".
+    """
+    start, end = _sentence(t, m.start())
+    prefix = t[start:m.start()]
+    return (not _question(t, m.end()) and not _hedged(prefix) and not _SPEAKER_LABEL.match(prefix)
+            and not _SOURCE_AFTER.match(t, m.end(), max(end, m.end())) and bool(_END_RE.match(t, m.end())))
 
 
 def _kind(word: str) -> str:
@@ -652,9 +682,14 @@ def normalize(text, names: dict[int, str] | None = None) -> str:
     t = _MARKUP.sub("", t)
     t = _OWN_QUOTE.sub(lambda m: f"{m.group(1)}{m.group(2)}. ", t)
     t = _QUOTED.sub(" ", t)
-    for seat, name in sorted((names or {}).items(), key=lambda x: -len(str(x[1]))):
-        n = str(name).casefold().strip()
-        if len(n) >= 3 and not re.fullmatch(r"(?:player|seat|agent)?\s*\d+", n) and not _NAME_STOP.search(n):
+    aliases = {seat: unicodedata.normalize("NFKC", str(name)).casefold().strip()
+               for seat, name in (names or {}).items()}
+    for seat, n in sorted(aliases.items(), key=lambda x: -len(x[1])):
+        # Duplicate display names cannot identify a seat. Names that look like a documented seat label must never
+        # rewrite that label to another seat (for example a player whose chosen name is "p5").
+        if (len(n) >= 3 and sum(value == n for value in aliases.values()) == 1
+                and not _SEAT_TOKEN.fullmatch(n) and not _SEAT_WORD.fullmatch(n)
+                and not re.fullmatch(r"(?:player|seat|agent)?\s*\d+", n) and not _NAME_STOP.search(n)):
             t = re.sub(r"(?<![\w])" + re.escape(n) + r"(?![\w])", f"player{seat}", t)
     t = _HYPHEN_WORDS.sub(" ", t)
     t = _ARROW.sub(" : ", t)
@@ -695,9 +730,9 @@ def read_chat(text, sender: int | None = None, names: dict[int, str] | None = No
     t = normalize(text, names)
     f.claim = _claims_seer(t) or (isinstance(sender, int) and _self_claim(t, sender))
     for p in _CHAT_ACCUSE:
-        f.wolves |= {int(x) for x in p.findall(t)}
+        f.wolves |= {int(m.group(1)) for m in p.finditer(t) if _asserted_match(t, m)}
     for p in _CHAT_CLEAR:
-        f.clears |= {int(x) for x in p.findall(t)}
+        f.clears |= {int(m.group(1)) for m in p.finditer(t) if _asserted_match(t, m)}
     for p in _CHAT_SUS:
         f.sus |= {int(x) for x in p.findall(t)}
     wolves, clears = _verdicts(t)

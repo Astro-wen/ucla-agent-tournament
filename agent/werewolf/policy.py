@@ -223,7 +223,9 @@ class WerewolfPolicy:
                     inv = v.investigations
                     if any(inv.get(t) == "villager" for t in wolves) or any(inv.get(t) == "wolf" for t in clears):
                         c.liars.add(s)
-        confirmed = [s for s in c.order if v.dead.get(s) == "seer"]
+        # Death reveals the unique seer even if they never spoke. A later claim
+        # cannot become trustworthy simply because the real seer stayed silent.
+        confirmed = sorted(s for s, role in v.dead.items() if role == "seer")
         if confirmed:
             c.trusted = confirmed[0]
             c.liars |= {s for s in c.order if s != c.trusted}
