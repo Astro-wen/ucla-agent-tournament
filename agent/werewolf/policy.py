@@ -112,13 +112,16 @@ class Claims:
     reactive: set[int] = field(default_factory=set)              # claimed only after being named wolf by a claimer
 
     def trusted_wolves(self, alive) -> list[int]:
-        if self.trusted is None:
+        if self.trusted is None or self.trusted in self.liars:
             return []
         return sorted(s for s in self.wolves.get(self.trusted, ()) if s in alive and s != self.trusted)
 
     def trusted_clears(self) -> set[int]:
         if self.trusted is None:
             return set()
+        if self.trusted in self.liars:
+            # A public death can authenticate the seer's identity without making contradictory reports reliable.
+            return {self.trusted}
         return set(self.clears.get(self.trusted, ())) | {self.trusted}
 
     def live(self, v: View) -> list[int]:
@@ -211,13 +214,18 @@ class WerewolfPolicy:
         (I am not a wolf; my own investigations; I am the only real seer)."""
         c = Claims()
         named_by_claimer: set[int] = set()           # seats some earlier claimer has already called wolf
+        self_wolves: set[int] = set()               # retain role contradictions even before a later seer claim
         for _seq, sender, f, _day in _chats(v):
             if f.injection:
                 continue
+            if getattr(f, "self_wolf", False):
+                self_wolves.add(sender)
             if not f.claim:
                 if sender in c.wolves:                # a claimer's later messages keep reporting results
                     c.wolves[sender] |= f.wolves
                     c.clears[sender] |= f.clears - f.wolves
+                    if getattr(f, "conflicts", ()) or getattr(f, "self_wolf", False):
+                        c.liars.add(sender)
                     named_by_claimer |= f.wolves
                 continue
             if sender not in c.wolves:
@@ -227,11 +235,16 @@ class WerewolfPolicy:
                     c.reactive.add(sender)
             c.wolves[sender] |= f.wolves
             c.clears[sender] |= f.clears - f.wolves
+            if getattr(f, "conflicts", ()) or getattr(f, "self_wolf", False):
+                c.liars.add(sender)
             named_by_claimer |= f.wolves
+        c.liars |= self_wolves & set(c.order)
         dead_wolves = sum(1 for r in v.dead.values() if r == "wolf")
         for s in c.order:
             wolves, clears = c.wolves[s], c.clears[s]
-            if v.dead.get(s) in ("wolf", "villager"):
+            if wolves & clears or s in wolves:
+                c.liars.add(s)          # immutable roles cannot be both wolf and clear; the seer cannot be a wolf
+            elif v.dead.get(s) in ("wolf", "villager"):
                 c.liars.add(s)          # died and was not the seer
             elif any(v.dead.get(t) not in (None, "wolf", "?") for t in wolves):
                 c.liars.add(s)          # called a revealed villager/seer a wolf
@@ -279,16 +292,26 @@ class WerewolfPolicy:
         # are not moved by them (measured: +1.5 villager / +0.8 seer win rate, most in tables of silent bots); wolves
         # use them to vote with the crowd (measured: +1.5 wolf win rate).
         sus_w = SUS if v.role == "wolf" else 0.0
+        # Repeating an accusation is not another witness. Count each speaker/target once across the transcript,
+        # taking the stronger of their accusation and vote suggestion. Otherwise five cheap messages can outweigh
+        # the actual vote record; rephrasing or echoing the same assertion must not increase its evidence weight.
+        accusations, suggestions, injectors = set(), set(), set()
         for _seq, sender, f, _day in _chats(v):
             if f.injection:
-                score[sender] += INJECT
+                injectors.add(sender)
                 continue
             if sender in claimers:
                 continue                  # claim results are weighed below
             for s in f.wolves:
-                score[s] += ACCUSE
+                accusations.add((sender, s))
             for s in f.sus - f.wolves:
-                score[s] += sus_w
+                suggestions.add((sender, s))
+        for sender in injectors:
+            score[sender] += INJECT
+        for _sender, target in accusations:
+            score[target] += ACCUSE
+        for _sender, target in suggestions - accusations:
+            score[target] += sus_w
         live_claimers = [s for s in c.order if s not in c.liars and (s in v.alive or v.dead.get(s) == "seer")]
         for s in c.liars:
             score[s] += LIAR
@@ -296,7 +319,7 @@ class WerewolfPolicy:
                 for t in c.clears.get(s, ()):
                     score[t] += LIAR_CLEAR
         if c.trusted is not None:
-            for t in c.wolves.get(c.trusted, ()):
+            for t in c.trusted_wolves(v.alive):
                 score[t] += TRUSTED_WOLF
             for t in c.trusted_clears():
                 score[t] += TRUSTED_CLEAR
@@ -434,10 +457,10 @@ class WerewolfPolicy:
     def _kill_plan(self, v: View, targets: list[int]) -> tuple[int | None, str]:
         wolfset = {v.me, *v.allies}
         c = self.claims(v, private=False)
-        claimers = [s for s in c.order if s in targets]
+        claimers = [s for s in c.order if s in targets and s not in c.liars]
         if claimers:
             real = [s for s in claimers if c.wolves.get(s, set()) & wolfset]     # named one of us: the real seer
-            pool = real or [s for s in claimers if s not in c.liars] or claimers
+            pool = real or claimers
             return min(pool), _CLAIMED_SEER
         # Kill whoever the table trusts most (lowest suspicion) — trusted villagers steer votes.
         sus = self.suspicion(v, exclude=set(v.allies))
@@ -519,7 +542,7 @@ class WerewolfPolicy:
     def _wolf_vote(self, v: View, targets: list[int]) -> tuple[int | None, str]:
         wolfset = {v.me, *v.allies}
         c = self.claims(v, private=False)
-        if tactics_mode() == "public_vote" and v.day == 1 and not c.order:
+        if tactics_mode() == "public_vote" and v.day == 1 and not c.live(v):
             # Match a villager's actual decision as well as its opening. The ally can be the legal target:
             # excluding it would recreate the very public/private discrepancy this profile accepts a cost to hide.
             public = replace(v, role="villager", allies=[], investigations={}, evidence=None,
@@ -556,7 +579,7 @@ class WerewolfPolicy:
             return a
         if c.trusted is None or c.trusted in (v.me, *v.allies):
             return None
-        named = c.wolves.get(c.trusted, set())
+        named = set(c.trusted_wolves(v.alive))
         if v.me in named:
             return None
         allies = [x for x in live_allies if x in named]
@@ -674,7 +697,8 @@ class WerewolfPolicy:
         c = self.claims(v, private=False)
         if v.me in c.order:
             return None
-        accusers = [s for s in c.order if s in v.alive and s != v.me and v.me in c.wolves.get(s, set())]
+        accusers = [s for s in c.order if s in v.alive and s != v.me and s not in c.liars
+                    and v.me in c.wolves.get(s, set())]
         if not accusers:
             others = [s for s in v.alive if s != v.me]
             ally = self._doomed_ally(v, c, others)
