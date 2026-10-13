@@ -48,10 +48,20 @@ def test_villager_never_abstains_and_follows_record():
 
 def test_wolf_never_targets_ally_and_kills_claimed_seer():
     st = ww_state("Your role: WOLF\nYour fellow wolves: Player0", "night_wolf", [1, 4, 6])
+    # A credible living seer claim requires that the public record has not already revealed a different seer.
+    st["game_state"]["dead"][1]["role"] = "villager"
     msgs = [{"seq": 1, "sender": 4, "type": "chat", "visibility": "broadcast",
              "content": "I am the seer. Player3 is a wolf."}]
     st["new_messages"] = msgs
     assert WerewolfPolicy().act(st)["action_id"] == "4"
+
+
+def test_wolf_does_not_prioritize_a_claim_disproven_by_the_revealed_seer():
+    st = ww_state("Your role: WOLF\nYour fellow wolves: Player0", "night_wolf", [1, 4, 6])
+    st["new_messages"] = [{"seq": 1, "sender": 4, "type": "chat", "visibility": "broadcast",
+                           "content": "I am the seer. Player3 is a wolf."}]
+    # The fixture publicly reveals Player5 as the dead seer. Player4's bait must not override the normal kill plan.
+    assert WerewolfPolicy().act(st)["action_id"] == "6"
 
 
 def test_seer_chat_claims_wolf():
