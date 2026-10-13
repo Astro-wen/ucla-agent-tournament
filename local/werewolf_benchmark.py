@@ -341,8 +341,10 @@ def summarize(records, expected, min_gain=0.02, margin=0.03, min_n=200):
              "significant_primary_gain": primary["conservative_ci95"][0] is not None and primary["conservative_ci95"][0] > 0
                  and primary["mcnemar_p"] < 0.05,
              "substantial_primary_gain": primary["delta"] is not None and primary["delta"] >= min_gain,
-             "zero_failures": all(not any(c.values()) for c in failures.values()),
-             "zero_background_failures": all(not any(c.values()) for c in background_failures.values()),
+             "zero_protocol_and_strategy_failures": all(not any(value for key, value in c.items() if key != "window_close")
+                                                      for c in failures.values()),
+             "zero_background_protocol_failures": all(not any(value for key, value in c.items() if key != "window_close")
+                                                     for c in background_failures.values()),
              "max_decision_under_10s": bool(maxima) and all(ms <= 10000 for ms in maxima.values()),
              "p99_decision_under_5s": bool(latency) and all((histogram_percentile(h, 0.99) or float("inf")) <= 5000 for h in latency.values())}
     role_checks = {}
@@ -364,6 +366,9 @@ def summarize(records, expected, min_gain=0.02, margin=0.03, min_n=200):
             "local_evidence_pass": all(gates.values()), "integrity_errors": integrity,
             "regressions": regressions, "failures": {k: dict(v) for k, v in failures.items()},
             "background_failures": {k: dict(v) for k, v in background_failures.items()},
+            "discussion_window_closures": {variant: {"controlled": counts.get("window_close", 0),
+                                                       "background": background_failures[variant].get("window_close", 0)}
+                                           for variant, counts in failures.items()},
             "latency": {k: {"max_ms": maxima[k], "histogram": dict(v), "p99_upper_ms": histogram_percentile(v, 0.99)}
                         for k, v in latency.items()}}
 
@@ -427,6 +432,8 @@ def print_report(summary):
             p = "n/a" if m["mcnemar_p"] is None else f"{m['mcnemar_p']:.5g}"
             print(f"{scope:6} {role:8} {m['candidate_rate']:.1%} vs {m['reference_rate']:.1%}; "
                   f"delta {100*m['delta']:+.2f} pp [{100*lo:+.2f}, {100*hi:+.2f}]; n={m['n']}; exact p={p}")
+    print("Automatic discussion-window closures (reported separately from protocol/strategy errors): "
+          + json.dumps(summary["discussion_window_closures"], sort_keys=True))
     print("Checks: " + ", ".join(f"{key}={'PASS' if value else 'FAIL'}" for key, value in summary["gates"].items()))
     print(f"Local evidence pass: {summary['local_evidence_pass']}; regressions: {len(summary['regressions'])}. "
           "Real-platform validation remains required.")

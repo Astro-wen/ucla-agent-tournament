@@ -78,7 +78,7 @@ def test_missing_duplicate_mismatched_and_failed_pairs_block_verdict():
     assert wb.summarize(mismatch, [s])["integrity_errors"]
     failed = copy.deepcopy(rows)
     failed[1]["failures"]["fallbacks"] = 1
-    assert not wb.summarize(failed, [s])["gates"]["zero_failures"]
+    assert not wb.summarize(failed, [s])["gates"]["zero_protocol_and_strategy_failures"]
     errors = [{**r, "harness_error": "construction failed"} for r in rows]
     assert wb.summarize(errors, [s])["integrity_errors"]
 
@@ -242,3 +242,19 @@ def test_output_cannot_pollute_production_recording_replay(monkeypatch, tmp_path
         wb.main(["--out", str(tmp_path / "logs" / "unsafe-synthetic-run")])
     assert "logs/werewolf_benchmarks/<run>" in capsys.readouterr().err
     assert not (tmp_path / "logs" / "unsafe-synthetic-run").exists()
+
+
+def test_window_closure_is_reported_separately_from_real_timeout():
+    scenario = wb.Scenario(151, 0, "first", 1)
+    rows = [record(scenario, "reference", [True]), record(scenario, "candidate", [True])]
+    for row in rows:
+        row["failures"]["window_close"] = 3
+        row["background_failures"]["window_close"] = 2
+    report = wb.summarize(rows, [scenario])
+    assert report["gates"]["zero_protocol_and_strategy_failures"]
+    assert report["gates"]["zero_background_protocol_failures"]
+    assert report["discussion_window_closures"]["candidate"] == {"controlled": 3, "background": 2}
+    rows[1]["failures"]["timeout"] = 1
+    assert not wb.summarize(rows, [scenario])["gates"]["zero_protocol_and_strategy_failures"]
+    rows[1]["background_failures"]["illegal"] = 1
+    assert not wb.summarize(rows, [scenario])["gates"]["zero_background_protocol_failures"]
