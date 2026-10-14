@@ -70,9 +70,13 @@ def test_off_is_the_v43_drafter_exactly(monkeypatch):
                 assert new.info[k] == old.info[k], k
 
 
-def test_the_defaults_are_the_v44_draft():
+def test_the_defaults_are_the_1013_draft(monkeypatch):
     d = Drafter(prior_score=lambda c: card_score(c, []))
-    assert d.opp_mode == "meta" and d.opp_prior == pytest.approx(0.2) and d.resid == 1.0
+    assert d.opp_mode == "meta" and d.resid == 1.0 and d.meta_set == "1013"
+    assert d.opp_prior == pytest.approx(0.5) and d.opp_ctr == 1.0 and d.meta.gamma > 0
+    monkeypatch.setenv("ARENA_DRAFT_METASET", "v44")          # the fallback switch: the v4.4 opponent model
+    d = Drafter(prior_score=lambda c: card_score(c, []))
+    assert d.opp_prior == pytest.approx(0.2) and d.opp_ctr == 0.0 and d.meta.gamma == 0.0
 
 
 def test_meta_mode_is_legal_and_within_the_node_budget():
@@ -107,7 +111,8 @@ def _play_out(opp_picker, our_seat_first: bool, n_opp_picks: int, seed=3):
     raise AssertionError("draft ended")
 
 
-def test_the_weight_follows_how_the_opponent_drafts():
+def test_the_weight_follows_how_the_opponent_drafts(monkeypatch):
+    monkeypatch.setenv("ARENA_DRAFT_METASET", "v44")          # the v4.4 prior: the meta-like picker below uses it
     meta = DraftMeta.load()
     if not meta:
         pytest.skip("no draft meta prior")

@@ -104,7 +104,9 @@ OPP_CTR = 0.0            # scales the file's gamma; 0 = off. A prior file withou
 #         counter term on (used only if the file carries gamma)
 META_PATH_1013 = Path(__file__).resolve().parent / "draft_meta_1013.json"
 META_SETS = {"v44": (META_PATH, 0.2, 0.0), "1013": (META_PATH_1013, 0.5, 1.0)}
-META_SET = "v44"
+# 1013 (default since 10-13): vs a Dragonfly stand-in on fresh seed 173, 121/160 vs v4.4 106/160 (+9.4, McNemar
+# p 0.04); docs/progress.md. ARENA_DRAFT_METASET=v44 restores the v4.4 opponent model exactly.
+META_SET = "1013"
 
 # ---- v4-pilot residual strengths (ARENA_DRAFT_RESID=1; off = v4.3) ------------------------------------------------
 # The model above was fitted on v3 self-play (classic battle pilot); since v4 both seats battle with the engine search.
