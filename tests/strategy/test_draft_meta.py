@@ -14,7 +14,7 @@ from agent.pokemon.policy import card_score
 @pytest.fixture(autouse=True)
 def _no_draft_knobs(monkeypatch):
     for k in ("ARENA_DRAFT_OPP", "ARENA_DRAFT_OPPPRIOR", "ARENA_DRAFT_OPPTEMP", "ARENA_DRAFT_OPPK", "ARENA_DRAFT_OPPW",
-              "ARENA_DRAFT_META"):
+              "ARENA_DRAFT_META", "ARENA_DRAFT_OPPCTR", "ARENA_DRAFT_METASET"):
         monkeypatch.delenv(k, raising=False)
 
 
@@ -70,9 +70,13 @@ def test_off_is_the_v43_drafter_exactly(monkeypatch):
                 assert new.info[k] == old.info[k], k
 
 
-def test_the_defaults_are_the_v44_draft():
+def test_the_defaults_are_the_1013_draft(monkeypatch):
     d = Drafter(prior_score=lambda c: card_score(c, []))
-    assert d.opp_mode == "meta" and d.opp_prior == pytest.approx(0.2) and d.resid == 1.0
+    assert d.opp_mode == "meta" and d.resid == 1.0 and d.meta_set == "1013"
+    assert d.opp_prior == pytest.approx(0.5) and d.opp_ctr == 1.0 and d.meta.gamma > 0
+    monkeypatch.setenv("ARENA_DRAFT_METASET", "v44")          # the fallback switch: the v4.4 opponent model
+    d = Drafter(prior_score=lambda c: card_score(c, []))
+    assert d.opp_prior == pytest.approx(0.2) and d.opp_ctr == 0.0 and d.meta.gamma == 0.0
 
 
 def test_meta_mode_is_legal_and_within_the_node_budget():
@@ -107,7 +111,8 @@ def _play_out(opp_picker, our_seat_first: bool, n_opp_picks: int, seed=3):
     raise AssertionError("draft ended")
 
 
-def test_the_weight_follows_how_the_opponent_drafts():
+def test_the_weight_follows_how_the_opponent_drafts(monkeypatch):
+    monkeypatch.setenv("ARENA_DRAFT_METASET", "v44")          # the v4.4 prior: the meta-like picker below uses it
     meta = DraftMeta.load()
     if not meta:
         pytest.skip("no draft meta prior")
@@ -132,6 +137,72 @@ def test_the_weight_follows_how_the_opponent_drafts():
     rest, mine, opp, legal, taken = states(1, 1)[0]
     d.pick(rest + mine + opp, [], [], {c["card_id"] for c in rest + mine + opp}, n_taken=0)
     assert d.info["opp_w"] == pytest.approx(0.3, abs=1e-3)
+
+
+def _meta_with_gamma(gamma):
+    base = DraftMeta.load()
+    if not base:
+        pytest.skip("no draft meta prior")
+    return DraftMeta({"u": dict(base.u), "mu": base.mu, "gamma": gamma})
+
+
+def test_counter_term_off_is_the_v44_opponent_model_exactly():
+    """OPP_CTR 0 ignores a prior file's gamma, and OPP_CTR 1 with gamma 0 changes nothing: both search exactly like
+    the v4.4 opponent model (same pick, root values, depth and nodes)."""
+    for rest, mine, opp, legal, taken in states(8, 21):
+        ref = Drafter(prior_score=lambda c: card_score(c, []), opp_mode="meta", opp_prior=0.5,
+                      meta=_meta_with_gamma(0.0), opp_ctr=0)
+        a = ref.pick(rest, mine, opp, legal, n_taken=taken)
+        for gamma, ctr in ((3.0, 0), (0.0, 1)):
+            d = Drafter(prior_score=lambda c: card_score(c, []), opp_mode="meta", opp_prior=0.5,
+                        meta=_meta_with_gamma(gamma), opp_ctr=ctr)
+            assert d.pick(rest, mine, opp, legal, n_taken=taken) == a
+            assert d.root_values == ref.root_values
+            for k in ("depth", "nodes", "opp_w"):
+                assert d.info[k] == ref.info[k], k
+
+
+def test_counter_term_on_is_legal_within_budget_and_matters(monkeypatch):
+    changed = 0
+    for rest, mine, opp, legal, taken in states(10, 22):
+        off = Drafter(prior_score=lambda c: card_score(c, []), opp_mode="meta", opp_prior=0.5,
+                      meta=_meta_with_gamma(3.0), opp_ctr=0)
+        on = Drafter(prior_score=lambda c: card_score(c, []), opp_mode="meta", opp_prior=0.5,
+                     meta=_meta_with_gamma(3.0), opp_ctr=1)
+        off.pick(rest, mine, opp, legal, n_taken=taken)
+        cid = on.pick(rest, mine, opp, legal, n_taken=taken)
+        assert cid in legal and 0.0 <= on.info["opp_w"] <= 1.0
+        assert on.info["nodes"] <= drafter.NODE_BUDGET + 200
+        changed += on.root_values != off.root_values or on.info["opp_w"] != off.info["opp_w"]
+    assert changed >= 3
+    monkeypatch.setenv("ARENA_DRAFT_OPPCTR", "1")
+    assert Drafter().opp_ctr == 1.0
+
+
+def test_meta_sets_select_file_prior_and_counter_term(monkeypatch):
+    """ARENA_DRAFT_METASET picks the prior file, OPP_PRIOR and OPP_CTR together; the explicit knobs still override."""
+    if not drafter.META_PATH_1013.exists():
+        pytest.skip("no 1013 prior")
+    f13 = json.loads(drafter.META_PATH_1013.read_text())
+    assert f13["games"] >= 36 and f13["gamma"] > 0 and f13["u"]
+    monkeypatch.setenv("ARENA_DRAFT_METASET", "v44")
+    d = Drafter(prior_score=lambda c: card_score(c, []))
+    assert (d.opp_prior, d.opp_ctr) == (pytest.approx(0.2), 0.0) and d.meta.gamma == 0.0
+    assert d.meta.u == DraftMeta(json.loads(drafter.META_PATH.read_text())).u
+    monkeypatch.setenv("ARENA_DRAFT_METASET", "1013")
+    d = Drafter(prior_score=lambda c: card_score(c, []))
+    assert (d.opp_prior, d.opp_ctr) == (pytest.approx(0.5), 1.0)
+    assert d.meta.gamma == pytest.approx(f13["gamma"]) and d.meta.u == DraftMeta(f13).u
+    monkeypatch.setenv("ARENA_DRAFT_OPPPRIOR", "0.3")
+    monkeypatch.setenv("ARENA_DRAFT_OPPCTR", "0")
+    d = Drafter(prior_score=lambda c: card_score(c, []))
+    assert (d.opp_prior, d.opp_ctr) == (pytest.approx(0.3), 0.0)
+    rest, mine, opp, legal, taken = states(1, 23)[0]
+    monkeypatch.delenv("ARENA_DRAFT_OPPPRIOR")
+    monkeypatch.delenv("ARENA_DRAFT_OPPCTR")
+    d = Drafter(prior_score=lambda c: card_score(c, []))
+    assert d.pick(rest, mine, opp, legal, n_taken=taken) in legal
+    assert d.info["nodes"] <= drafter.NODE_BUDGET + 200
 
 
 def test_singles_and_a_missing_prior_turn_it_off(tmp_path, monkeypatch):
