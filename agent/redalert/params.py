@@ -74,6 +74,22 @@ DEFAULTS: dict[str, float] = {
     "deploy_pending_ticks": 375,    # an MCV deploy the platform accepted is not resent for this long (0: v4.5, 100)
     "harv_spread": 0,               # idle harvesters to the field with the most ore per harvester near our refineries;
     "harv_share": 3,                # one moves on when more than harv_share share a refinery's field (off: no gain)
+    # v4.7 switches (all four 0: the v4.6 behaviour exactly); see docs/redalert_design.md section 18
+    "attack_gate": 0,               # the attack decision: a larger margin while no enemy building was ever seen
+    "gate_unseen_ratio": 1.6,       # (instead of attack_ratio), the blind prior keeps growing after prior_cap up to
+    "prior_late_cap": 13000,        # prior_late_cap, and seen towers / artillery weigh gate_def_w (they shoot first)
+    "gate_def_w": 1.5,
+    "trade_retreat": 0,             # the attack group falls back when the running trade is clearly losing: over the
+    "trade_window_s": 12,           # last trade_window_s our losses >= trade_loss_ratio x our kills, >= trade_min_loss
+    "trade_loss_ratio": 1.5,        # and >= trade_min_frac of the wave's value
+    "trade_min_loss": 1500,
+    "trade_min_frac": 0.2,
+    "attack_comp": 0,               # attack waves take vehicles, rocket / grenade infantry and at most
+    "comp_rifles_per_veh": 0.5,     # comp_rifles_per_veh rifles per vehicle; the other rifles stay home as guards
+    "recover": 0,                   # after a failed wave: recover_s of defend-and-rebuild (next wave needs
+    "recover_s": 240,               # recover_mult x the failed wave, recover_towers towers at home)
+    "recover_mult": 1.6,
+    "recover_towers": 3,
 }
 
 
