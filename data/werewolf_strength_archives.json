@@ -1,0 +1,21 @@
+{
+  "scope": "synthetic local wolf-bluff development evidence only",
+  "archive": "logs/werewolf_benchmarks/strength-bluff-evidence.zip",
+  "sha256": "26efcbc8af0ef020b8d69dd949ee0e39f81771f0ca2e9ef3dbbe63815637e8ff",
+  "files": {
+    "manifest.json.gz": {
+      "sha256": "436bdf81d4c07fd4b6a2a471cbb9e03c90505ca49191f81adb699fc66240e1e1",
+      "bytes": 12166
+    },
+    "development.jsonl.gz": {
+      "sha256": "be9c6d16813ff947f6135beef6ded9fb684d4abd68a953520e5adda409fbec6b",
+      "bytes": 873131
+    },
+    "replication.jsonl.gz": {
+      "sha256": "08f51e97eeb01cdca92ee9fcd00a1b5ba6ca6183e699f91165a02ad7629cd1dc",
+      "bytes": 1178531
+    }
+  },
+  "source_directory": "/tmp/ww-bluff-231-232-20261013",
+  "no_source_or_results_deleted": true
+}

@@ -1,0 +1,1165 @@
+{
+  "status": "blocked_partial",
+  "plan": {
+    "scope": "Local14Blanguage-model sensitivity pilot for the frozen candidate selected by505/506ablation, not model-size training or formal strength confirmation",
+    "model": {
+      "name": "qwen2.5:14b-instruct-q4_K_M",
+      "sha256": "7cdf5a0187d5c58cc5d369b255592f7841d1c4696d45a8c8a9489440385b22f6",
+      "endpoint": "http://127.0.0.1:11437",
+      "context": 16384,
+      "encoding": "label_object",
+      "temperature": 0,
+      "decoder_seed": 1013,
+      "output_tokens": 192,
+      "rules": "exact public game rules supplied"
+    },
+    "opponent_guard": "Filter model legal choices by its own private seer checks/inferred clears and authenticated dead-seer reports; prefer unread checks. No access to actual hidden roles; arbitrary wolf daytime buses remain legal. The guard may improve factual reliability, but is not presumed to make a stronger overall opponent.",
+    "sample": {
+      "seed": 515,
+      "backgrounds": [
+        "llmq",
+        "rt_detective",
+        "pop_coordinated",
+        "pop_observed_switch"
+      ],
+      "controlled_role": "wolf",
+      "quota_per_background": 4,
+      "pairs": 16,
+      "other_model_seats": 2,
+      "selection": "first role-matching deals up to1000perbackground, no outcome filtering",
+      "placements": "two noncontrolled seats sampled with fixed evaluator-only RNG before outcomes"
+    },
+    "comparison": "B0 versus fixed selected factory, same deals and same initial otherplayers; reference then candidate; provider request cache reuses only identical model/config/prompt/schema keys",
+    "timing": "strictRT, existing post-termination observation adapter, model seats may be allies as well as opponents",
+    "metrics": "team wins paired, all invalid/schema/retry/fallback/context events, exact requests and cache keys, per-seat guards; complete and clean-pair summaries separately, never drop failures from primary raw result",
+    "limits": "wolf-only16pairs cannot estimate overall win rate or top-opponent strength; do not reselect candidate or tune prompt from this pilot",
+    "resources": {
+      "deadline": "2026-10-14T07:15:00-07:00",
+      "request_timeout_seconds": 20,
+      "max_model_requests": 600,
+      "min_free_disk_gib": 2,
+      "max_new_swap_mib": 1024,
+      "stop_at_critical_memory_pressure": true,
+      "unload_only_model_loaded_by_this_run": true
+    },
+    "external_cost_usd": 0,
+    "production_changes": false
+  },
+  "selected": "vote_only",
+  "scenarios": [
+    {
+      "id": "515/llmq/k1/0",
+      "game": 0,
+      "background": "llmq",
+      "seed": 4384022441222658751,
+      "ours": 3,
+      "types": {
+        "0": "llmq",
+        "1": "llmq",
+        "2": "llmq",
+        "4": "llmq",
+        "5": "llmq",
+        "6": "llmq"
+      },
+      "llm_seats": [
+        4,
+        6
+      ]
+    },
+    {
+      "id": "515/llmq/k1/2",
+      "game": 2,
+      "background": "llmq",
+      "seed": 3949419008301196119,
+      "ours": 5,
+      "types": {
+        "0": "llmq",
+        "1": "llmq",
+        "2": "llmq",
+        "3": "llmq",
+        "4": "llmq",
+        "6": "llmq"
+      },
+      "llm_seats": [
+        1,
+        6
+      ]
+    },
+    {
+      "id": "515/llmq/k1/7",
+      "game": 7,
+      "background": "llmq",
+      "seed": 4150284477416125627,
+      "ours": 2,
+      "types": {
+        "0": "llmq",
+        "1": "llmq",
+        "3": "llmq",
+        "4": "llmq",
+        "5": "llmq",
+        "6": "llmq"
+      },
+      "llm_seats": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "515/llmq/k1/8",
+      "game": 8,
+      "background": "llmq",
+      "seed": 48091632740317340,
+      "ours": 3,
+      "types": {
+        "0": "llmq",
+        "1": "llmq",
+        "2": "llmq",
+        "4": "llmq",
+        "5": "llmq",
+        "6": "llmq"
+      },
+      "llm_seats": [
+        1,
+        6
+      ]
+    },
+    {
+      "id": "515/rt_detective/k1/2",
+      "game": 2,
+      "background": "rt_detective",
+      "seed": 1174166722736147449,
+      "ours": 3,
+      "types": {
+        "0": "rt_detective",
+        "1": "rt_detective",
+        "2": "rt_detective",
+        "4": "rt_detective",
+        "5": "rt_detective",
+        "6": "rt_detective"
+      },
+      "llm_seats": [
+        0,
+        5
+      ]
+    },
+    {
+      "id": "515/rt_detective/k1/4",
+      "game": 4,
+      "background": "rt_detective",
+      "seed": 3953814091952151477,
+      "ours": 6,
+      "types": {
+        "0": "rt_detective",
+        "1": "rt_detective",
+        "2": "rt_detective",
+        "3": "rt_detective",
+        "4": "rt_detective",
+        "5": "rt_detective"
+      },
+      "llm_seats": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": "515/rt_detective/k1/9",
+      "game": 9,
+      "background": "rt_detective",
+      "seed": 4148943558605186117,
+      "ours": 0,
+      "types": {
+        "1": "rt_detective",
+        "2": "rt_detective",
+        "3": "rt_detective",
+        "4": "rt_detective",
+        "5": "rt_detective",
+        "6": "rt_detective"
+      },
+      "llm_seats": [
+        3,
+        6
+      ]
+    },
+    {
+      "id": "515/rt_detective/k1/10",
+      "game": 10,
+      "background": "rt_detective",
+      "seed": 3664102618955610587,
+      "ours": 1,
+      "types": {
+        "0": "rt_detective",
+        "2": "rt_detective",
+        "3": "rt_detective",
+        "4": "rt_detective",
+        "5": "rt_detective",
+        "6": "rt_detective"
+      },
+      "llm_seats": [
+        2,
+        5
+      ]
+    },
+    {
+      "id": "515/pop_coordinated/k1/2",
+      "game": 2,
+      "background": "pop_coordinated",
+      "seed": 1807463872311374536,
+      "ours": 2,
+      "types": {
+        "0": "pop_coordinated",
+        "1": "pop_coordinated",
+        "3": "pop_coordinated",
+        "4": "pop_coordinated",
+        "5": "pop_coordinated",
+        "6": "pop_coordinated"
+      },
+      "llm_seats": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "515/pop_coordinated/k1/15",
+      "game": 15,
+      "background": "pop_coordinated",
+      "seed": 2664325117957200830,
+      "ours": 5,
+      "types": {
+        "0": "pop_coordinated",
+        "1": "pop_coordinated",
+        "2": "pop_coordinated",
+        "3": "pop_coordinated",
+        "4": "pop_coordinated",
+        "6": "pop_coordinated"
+      },
+      "llm_seats": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "515/pop_coordinated/k1/16",
+      "game": 16,
+      "background": "pop_coordinated",
+      "seed": 4367913471718837878,
+      "ours": 0,
+      "types": {
+        "1": "pop_coordinated",
+        "2": "pop_coordinated",
+        "3": "pop_coordinated",
+        "4": "pop_coordinated",
+        "5": "pop_coordinated",
+        "6": "pop_coordinated"
+      },
+      "llm_seats": [
+        1,
+        3
+      ]
+    },
+    {
+      "id": "515/pop_coordinated/k1/20",
+      "game": 20,
+      "background": "pop_coordinated",
+      "seed": 1760272712003908089,
+      "ours": 5,
+      "types": {
+        "0": "pop_coordinated",
+        "1": "pop_coordinated",
+        "2": "pop_coordinated",
+        "3": "pop_coordinated",
+        "4": "pop_coordinated",
+        "6": "pop_coordinated"
+      },
+      "llm_seats": [
+        4,
+        6
+      ]
+    },
+    {
+      "id": "515/pop_observed_switch/k1/0",
+      "game": 0,
+      "background": "pop_observed_switch",
+      "seed": 4182107588142945716,
+      "ours": 1,
+      "types": {
+        "0": "pop_observed_switch",
+        "2": "pop_observed_switch",
+        "3": "pop_observed_switch",
+        "4": "pop_observed_switch",
+        "5": "pop_observed_switch",
+        "6": "pop_observed_switch"
+      },
+      "llm_seats": [
+        5,
+        6
+      ]
+    },
+    {
+      "id": "515/pop_observed_switch/k1/4",
+      "game": 4,
+      "background": "pop_observed_switch",
+      "seed": 708647559159999473,
+      "ours": 3,
+      "types": {
+        "0": "pop_observed_switch",
+        "1": "pop_observed_switch",
+        "2": "pop_observed_switch",
+        "4": "pop_observed_switch",
+        "5": "pop_observed_switch",
+        "6": "pop_observed_switch"
+      },
+      "llm_seats": [
+        2,
+        4
+      ]
+    },
+    {
+      "id": "515/pop_observed_switch/k1/6",
+      "game": 6,
+      "background": "pop_observed_switch",
+      "seed": 3414841658709592983,
+      "ours": 2,
+      "types": {
+        "0": "pop_observed_switch",
+        "1": "pop_observed_switch",
+        "3": "pop_observed_switch",
+        "4": "pop_observed_switch",
+        "5": "pop_observed_switch",
+        "6": "pop_observed_switch"
+      },
+      "llm_seats": [
+        0,
+        3
+      ]
+    },
+    {
+      "id": "515/pop_observed_switch/k1/10",
+      "game": 10,
+      "background": "pop_observed_switch",
+      "seed": 3690069006973357452,
+      "ours": 6,
+      "types": {
+        "0": "pop_observed_switch",
+        "1": "pop_observed_switch",
+        "2": "pop_observed_switch",
+        "3": "pop_observed_switch",
+        "4": "pop_observed_switch",
+        "5": "pop_observed_switch"
+      },
+      "llm_seats": [
+        1,
+        5
+      ]
+    }
+  ],
+  "selection_scan": [
+    {
+      "background": "llmq",
+      "game": 0,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "llmq",
+      "game": 1,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "llmq",
+      "game": 2,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "llmq",
+      "game": 3,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "llmq",
+      "game": 4,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "llmq",
+      "game": 5,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "llmq",
+      "game": 6,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "llmq",
+      "game": 7,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "llmq",
+      "game": 8,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "rt_detective",
+      "game": 0,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "rt_detective",
+      "game": 1,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "rt_detective",
+      "game": 2,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "rt_detective",
+      "game": 3,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "rt_detective",
+      "game": 4,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "rt_detective",
+      "game": 5,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "rt_detective",
+      "game": 6,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "rt_detective",
+      "game": 7,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "rt_detective",
+      "game": 8,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "rt_detective",
+      "game": 9,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "rt_detective",
+      "game": 10,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 0,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 1,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 2,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 3,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 4,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 5,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 6,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 7,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 8,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 9,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 10,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 11,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 12,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 13,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 14,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 15,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 16,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 17,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 18,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 19,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_coordinated",
+      "game": 20,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 0,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 1,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 2,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 3,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 4,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 5,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 6,
+      "role": "wolf",
+      "accepted": true
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 7,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 8,
+      "role": "seer",
+      "accepted": false
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 9,
+      "role": "villager",
+      "accepted": false
+    },
+    {
+      "background": "pop_observed_switch",
+      "game": 10,
+      "role": "wolf",
+      "accepted": true
+    }
+  ],
+  "source": {
+    "git_revision": "f813bc643dbbadd4a984f5e29e44a198923b4128",
+    "digest": "faea387b61d426e5ae98fb24764d3a961995657ed15f81f65b32ee1cea1aab3b",
+    "files": {
+      "agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/__main__.py": "9e167a157678d82d7f76630f6ee874b66c6f6660c17f3bf9b8c9e1c3528b3864",
+      "agent/agent.py": "ece20f3fcfb0f655ec2043a3c899b32c1872246d3aa013f89bd95d299ff2f953",
+      "agent/fallback.py": "de7bbf3d26838356ff69c57e10fae4d1ca88df7465d5bdddc7004cdafc278ee1",
+      "agent/health.py": "db4e1842ecfeffd654b193f0bdc30c2bf9c06cd6a7bcca0cb9172fc1aaf32302",
+      "agent/matchstate.py": "ca7efb044419af008cd3893358f58e0ee9e9b4a5c54a2257076333805d00c0d0",
+      "agent/pokemon/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/pokemon/battlelog.py": "a22d0a259c7d519a94d91899bb7ba14957ed37091c7d24d94182758fa467b3b7",
+      "agent/pokemon/battlestate.py": "cc4e09fa8e145a4c5eff86bd656c1f2916ff8fe3f7dafe0e4324e93ff79274b2",
+      "agent/pokemon/calc.py": "b1acb5ea0795e1fd06244be798f08bd148c89ea5606d7d2f33357be01b0ac242",
+      "agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "agent/pokemon/drafter.py": "bc730a5667bfe581b7427ebbc771b892a54468b66f776fb66f77a5cc155e110a",
+      "agent/pokemon/engine.py": "5ab618cbfce39b533fb7038dbad8366fdc1775362341cd2dda9446a003e01a5f",
+      "agent/pokemon/lookahead.py": "c1cf709b3a31cff4d65026bb19231d892121d3c39ce786c024e7f45bb24dcab0",
+      "agent/pokemon/matchup.py": "a236cacb061c19326c31b23659ba6475fd24be26faf451cfc800658a3a07e146",
+      "agent/pokemon/policy.py": "99708567c3715ad0495481e91a3e3fbd8a1058aab87d2c3bd35cbc6fe2f75ed2",
+      "agent/pokemon/preview.py": "2d8ecd8597167e725823a1d43387a9d7d06fe798a8a712b0e50c506eb88cbd65",
+      "agent/pokemon/singles.py": "4dbaae167655b463cf79a016adeefeb47ee8dfcf7482d9e5b57fb7a5084c8c28",
+      "agent/pokemon/stats.py": "1b78f0cdbf4e9b3d1b4364e1828f0663b0e6eb9cde0fd33bfa42be9d71e0c1a9",
+      "agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "agent/reasoning.py": "ae0738001984b67544cbd873af411ace0a238f46ca43b638ef02b5c889fa0184",
+      "agent/redalert/__init__.py": "7e8a3f2ed00227c4c6ac4f5c4c5b3dc2382450638ba49cb4d67e58eeb98a7072",
+      "agent/redalert/army.py": "5cdffe815e7d527e73c27ce2190360d8ddd579d35906e760647ecb1247292ee3",
+      "agent/redalert/counters.py": "6fd9a3fb449b09eafc90ae0aefd887cdb732b0374bffd09b59a01830bcef0ce9",
+      "agent/redalert/economy.py": "546543f8ab18db48df209a311211d2962455dcb264a593328dafa1abad947626",
+      "agent/redalert/harvest.py": "b34f1c46085837d9f7a69584974ed5515bc586e358ee25d4dd771b1af0d32ed0",
+      "agent/redalert/ledger.py": "d7aab57638688d4697dffa2446b8d230e6057f56eba3ef56b33429e4f53afab0",
+      "agent/redalert/orders.py": "ae79298292d4eac66d9edddb7c845fcca6b038c2836b163c392aea1d243a1e27",
+      "agent/redalert/params.py": "3966a2879db78bc50571658f62047ff43ffe5b8e857d7f7415dd9783aaf83124",
+      "agent/redalert/production.py": "58ffa094b143cc3bbd3c082764a85a5805cea3d8c5e6ff2ea8d35230aeb4a7f4",
+      "agent/redalert/safe.py": "de90c2b082c9cc28e0b8ef3f9d39ae351b28705e7bb79d06ff18a05df71dc67b",
+      "agent/redalert/world.py": "2b5ea94ba8d943a975ca783b8764bbc50227ac89da568224f70630957c8a93dc",
+      "agent/timecontrol.py": "960b99d826cb3ae5241f0b00bb77c9d05ca087fda275afd787a6786cf556f251",
+      "agent/werewolf/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/werewolf/policy.py": "537b6bdb9f376bce2f23ebf193746eda11d956122f66f874e56a2520c0eec0a6",
+      "agent/werewolf/state.py": "104d80f8f30d7c254a75b9b7616bef300be5f9c1c6db266ea5653eb352cf498e",
+      "altruagent/__init__.py": "beef58fcd51ee785601102172e047b2e4256a97cbf2325e76adae47c73e58f4b",
+      "altruagent/_responses.py": "c637f615b10fecc385a43ccf752c582591f9d0adab5628aa8725f1eac2859abb",
+      "altruagent/agent_loader.py": "e4909a4df0748404e3505769aa1ddb142148a03af6c0c4027e1851721d14fe41",
+      "altruagent/auth.py": "ee739ee3ef3366aaafe79b3cd57c78c6b45466ba4ddd6330c1c5096531bf703e",
+      "altruagent/client.py": "a99551c291254cd55ab2f49f2c66c3318194572bd41f5bf36ca5c68b101dfa8a",
+      "altruagent/console.py": "ca77b99fd349af1b627888c627989f6c15219a551c3df53e66087c214dfe21a8",
+      "altruagent/errors.py": "a49ccba38f468333dc15b1419f626bed22a24c1cd8cca32eaa33e536873da9ec",
+      "altruagent/game.py": "dee97503cad19af9e5a2cfbbccaedc73b21916a24646c451ddc2d585db1acbdd",
+      "altruagent/mcp_game.py": "6f3968a8f9208928cf16f4b5b56e43b425511fc7b54b925f6f5fa0937b437dbb",
+      "altruagent/mcp_transport.py": "d3fdcf5ea9b615e5194f4e5028c8e8f4f9f9ddabb7ae1c086568888660ec1bff",
+      "altruagent/models.py": "ba7a3411ac53f5831185d308f550ed5afe2ef346d24746837ab6118287aab8a1",
+      "altruagent/notices.py": "f803c6ad8bca054b4a9f65f1eb8f16782d572c3300cfb497e8debb9527aa69cd",
+      "altruagent/official.py": "8562dab0be39708995700484e0c924ab4110d1f5f52e7e2404389852b85b30e0",
+      "altruagent/runner.py": "29f45f8fdc4757551ac54c828756e3321df05a4ded5dc1db5af741239b9b736a",
+      "altruagent/runtime.py": "2f14b54f11f2365ab089098ab396bd072531fc3cf215e521270f1d47fd8e5756",
+      "altruagent/supervisor.py": "ad6cdeba2b64347da96f5646e5493f86b01460d0e0c76e1372f5b0703bf374d8",
+      "altruagent/worker.py": "c1fc1678c50f169c6b56f7529acc5b327d84ec18b8bdb0731b4e87a4dc308b7a",
+      "champion/VERSION": "a31b4456de6099c2b4dc3808d53116d42a720a9471f11f38451bfd8f70996921",
+      "champion/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "champion/agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "champion/agent/__main__.py": "9e167a157678d82d7f76630f6ee874b66c6f6660c17f3bf9b8c9e1c3528b3864",
+      "champion/agent/agent.py": "ece20f3fcfb0f655ec2043a3c899b32c1872246d3aa013f89bd95d299ff2f953",
+      "champion/agent/fallback.py": "de7bbf3d26838356ff69c57e10fae4d1ca88df7465d5bdddc7004cdafc278ee1",
+      "champion/agent/health.py": "db4e1842ecfeffd654b193f0bdc30c2bf9c06cd6a7bcca0cb9172fc1aaf32302",
+      "champion/agent/matchstate.py": "ca7efb044419af008cd3893358f58e0ee9e9b4a5c54a2257076333805d00c0d0",
+      "champion/agent/pokemon/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "champion/agent/pokemon/battlelog.py": "a22d0a259c7d519a94d91899bb7ba14957ed37091c7d24d94182758fa467b3b7",
+      "champion/agent/pokemon/battlestate.py": "cc4e09fa8e145a4c5eff86bd656c1f2916ff8fe3f7dafe0e4324e93ff79274b2",
+      "champion/agent/pokemon/calc.py": "b1acb5ea0795e1fd06244be798f08bd148c89ea5606d7d2f33357be01b0ac242",
+      "champion/agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "champion/agent/pokemon/drafter.py": "bc730a5667bfe581b7427ebbc771b892a54468b66f776fb66f77a5cc155e110a",
+      "champion/agent/pokemon/engine.py": "5ab618cbfce39b533fb7038dbad8366fdc1775362341cd2dda9446a003e01a5f",
+      "champion/agent/pokemon/lookahead.py": "c1cf709b3a31cff4d65026bb19231d892121d3c39ce786c024e7f45bb24dcab0",
+      "champion/agent/pokemon/matchup.py": "a236cacb061c19326c31b23659ba6475fd24be26faf451cfc800658a3a07e146",
+      "champion/agent/pokemon/policy.py": "99708567c3715ad0495481e91a3e3fbd8a1058aab87d2c3bd35cbc6fe2f75ed2",
+      "champion/agent/pokemon/preview.py": "2d8ecd8597167e725823a1d43387a9d7d06fe798a8a712b0e50c506eb88cbd65",
+      "champion/agent/pokemon/singles.py": "4dbaae167655b463cf79a016adeefeb47ee8dfcf7482d9e5b57fb7a5084c8c28",
+      "champion/agent/pokemon/stats.py": "1b78f0cdbf4e9b3d1b4364e1828f0663b0e6eb9cde0fd33bfa42be9d71e0c1a9",
+      "champion/agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "champion/agent/reasoning.py": "ae0738001984b67544cbd873af411ace0a238f46ca43b638ef02b5c889fa0184",
+      "champion/agent/redalert/__init__.py": "7e8a3f2ed00227c4c6ac4f5c4c5b3dc2382450638ba49cb4d67e58eeb98a7072",
+      "champion/agent/redalert/army.py": "5cdffe815e7d527e73c27ce2190360d8ddd579d35906e760647ecb1247292ee3",
+      "champion/agent/redalert/counters.py": "6fd9a3fb449b09eafc90ae0aefd887cdb732b0374bffd09b59a01830bcef0ce9",
+      "champion/agent/redalert/economy.py": "546543f8ab18db48df209a311211d2962455dcb264a593328dafa1abad947626",
+      "champion/agent/redalert/harvest.py": "b34f1c46085837d9f7a69584974ed5515bc586e358ee25d4dd771b1af0d32ed0",
+      "champion/agent/redalert/ledger.py": "d7aab57638688d4697dffa2446b8d230e6057f56eba3ef56b33429e4f53afab0",
+      "champion/agent/redalert/orders.py": "ae79298292d4eac66d9edddb7c845fcca6b038c2836b163c392aea1d243a1e27",
+      "champion/agent/redalert/params.py": "3966a2879db78bc50571658f62047ff43ffe5b8e857d7f7415dd9783aaf83124",
+      "champion/agent/redalert/production.py": "58ffa094b143cc3bbd3c082764a85a5805cea3d8c5e6ff2ea8d35230aeb4a7f4",
+      "champion/agent/redalert/safe.py": "de90c2b082c9cc28e0b8ef3f9d39ae351b28705e7bb79d06ff18a05df71dc67b",
+      "champion/agent/redalert/world.py": "2b5ea94ba8d943a975ca783b8764bbc50227ac89da568224f70630957c8a93dc",
+      "champion/agent/timecontrol.py": "960b99d826cb3ae5241f0b00bb77c9d05ca087fda275afd787a6786cf556f251",
+      "champion/agent/werewolf/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "champion/agent/werewolf/policy.py": "459a4e54f04f05ca91e3bd394f1763d46ab752a1a8139ddf116d4c27603cd082",
+      "champion/agent/werewolf/state.py": "1529cfae71b7fba83d508d387a8204af14b8eddd6fc3a24cf16cfc8f66a8980d",
+      "data/werewolf_learned_likelihoods.json": "e8d339943a5fb1db48598357d06934312dee39708994225210a4040d47d77725",
+      "examples/basic_agent.py": "8c459d8215d421e79e245ca40423007baacc6fef1a18d37366835bbf25017eb0",
+      "examples/llm/__init__.py": "ec2c1e002e2e521288be0c11571efe52e0f60c528490855a6419574a2767ca4c",
+      "examples/llm/base.py": "8dfd4c4554cf625c286fbdeaf27dc74947e43fa71c36124854c96b0e0a52000a",
+      "examples/llm/pokemon.py": "5e8996cae908e703369a8eeb64686a96adf803c4384c990f2b384d1e4c0b1ede",
+      "examples/llm/providers.py": "b9eb393f6d8b1865609229b6ee89be81a4fb0c553ffa53e08b935b97a3b5a517",
+      "examples/llm/redalert.py": "1be0b34f91ba492638246ebf804f3fce80671186c5679e3b395e07e55561b206",
+      "examples/llm_agent.py": "06b801a8537e419a416d9ed76bcc878e0e3395dde22495c121212f330a2d9e62",
+      "examples/messaging_agent.py": "a5faf6d7ad3f37a350643cb430f5228884d7c36e9d2179bb4dca062efe17d2fe",
+      "examples/smoke_agent.py": "e16c55f6023007be971d1f90528b303b5938559719895d525b233e3244b1cac3",
+      "local/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "local/benchmark.py": "fd6bd3e639de9154276edaeb7a47c335424cc30d7c4dc94ace561a1562a5520e",
+      "local/eval_pokemon.py": "8b7f6fa89965413e2777922070ab4577b059e24eb9a502a09277a7cd1358142a",
+      "local/eval_werewolf.py": "fdb7d270946f891b42691c27a248f14b33f3d5edff9fad1412b73b6202adb04f",
+      "local/ext_opp.py": "a2865f39df6022ca5de4a37fc04092c1d521101df2960399fbfd236ef02750dc",
+      "local/fake_official.py": "72bf08b7a1742d908671910096d9b01ef81d691998346d00d328e4bf9225d9b6",
+      "local/fake_platform.py": "39a05ec336580048fcb317590532d097cf819cee94ef05c65b62a669f8040760",
+      "local/fake_redalert.py": "ec7ee87ce0a86bc05a6c22df2f5839278750de93b8ede975cf539bc5b434b596",
+      "local/field_opps.py": "6a615a35ec2151a19a37498355ac8b9b767a589f339cb71b098dccbc0cd6e77c",
+      "local/js/node_modules/node-gyp/gyp/gyp_main.py": "4ca6a9dfdbb18041c11bbd4bd841ec0cd96aeab8cee750dfc48a8d02a99551e4",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/MSVSNew.py": "335451fca5ae01e0300e7f8ae8faf61491000804ce44a44c7c731dfcc00451f7",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/MSVSProject.py": "e8c98d8cecc87c36c394e7a1153b5977c08cb946764f3d41234c0e3856cb1ac8",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/MSVSSettings.py": "ac626f3caa5060ac4148023d27fe3b95e074a56d6f1b9fd8f2b86d30329c9f0e",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/MSVSSettings_test.py": "f7f6ab5c5291d776caba64221dbe8db71e4b5ecf602949d7c44181206a007cf5",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/MSVSToolFile.py": "9f87e663ecad69e0f123e749ba127436b670c88e1c3c5ae022acb5ff2664d7af",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/MSVSUserFile.py": "f5b26e5831a2aa284e540da6daf8d63123f71b28085bd49453dc1a5fbaf53924",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/MSVSUtil.py": "fc384ac06eb66c7dccee116db7d4857e5ccdcca43c5609c36e717afb35fcf6f4",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/MSVSVersion.py": "80523ccae55b01deaf680828b5620ebb7fd8280fd2d6a76e7b0904f52a0b4ad2",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/__init__.py": "d5a04879a10166d1f4857baa4719351fbbe5417be97090d0efe2c67cc824fc0e",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/common.py": "27281f12f674c122a4ee571e8b008e0b53dc2d131480530310f4c29129d063d4",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/common_test.py": "044f51b104bf0adafa76f618be708fc1ecebdca1c6d13c2e3b717ddd1313440d",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/easy_xml.py": "34cb72f8bdf511e79b90148716c4eb34fe74fe0d990e8038060d2db4983bd795",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/easy_xml_test.py": "2ea64cc7baddd528bbd00e222e7e6c9fab38f80720397d251eeab74dcddc5570",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/flock_tool.py": "bf583973d69b2417e8b635459ff9880422e512e915e80c46b8dcb9aaa1ffb083",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/analyzer.py": "78608eed439d56e9d8653ecff61e8e35620e37c5c21f78b47f2c8d3c35289d6b",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/android.py": "0feb8ccd3e6819134252b5142bcf0dd7ac1442445d7c51722595b42023cca1ef",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/cmake.py": "71a141ac5435dcc7f0ba99f33ac94f3f81e8d4a4b1ebd679c59e8652b37de4b3",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/compile_commands_json.py": "c6b654088d7e21b9a4672c00d5d227539005a068c463423f9ffed6fdb22224ff",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/dump_dependency_json.py": "3d5da711e2c0dfa37651640e2ee5b90f0627bdf30ea856c4700f6992a29c61a5",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/eclipse.py": "2817e34e5467c70f1e4ada7c5c1654c7e8eea18fad08cf04ebafcabaf180d8d7",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/gypd.py": "909d07de26ca5155aa40096e8ce0e06ed12b0e05fa2dc98b7ffbfa50274da5d1",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/gypsh.py": "d66f5231d2b47c0d971e6324c1a6640310b30c8effcb6e1602622358b4d48ba1",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/make.py": "9a047742326ebd0c1191b0df702b4b57046dbbf951b79eef46878e800a54d0af",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/msvs.py": "ea02f2a38c87730cee02cf8b9236306de48f2c0e1c9ec6b510a7603baa9314af",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/msvs_test.py": "7972d92171b970576fc66f6c1795524f8224dcd20dd37f9f1b3add25bbaaa1a2",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/ninja.py": "897150b8ccd21adacefc572d8d4b1bbb4422f2d525e507460e569a7a23fba5ac",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/ninja_test.py": "d775c83c23d04131f2667702702828e2a2cb1869eefeded04fe3bb42cf876602",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/xcode.py": "6bf1e8b06e6558fc1ef007349f4ae6d1386692dafa0d26b556c84899c7773e14",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/generator/xcode_test.py": "aa6cdaaf2d3eb73fcae3c706462570c999ef6d0520139333aaa6e57e3b3e4636",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/input.py": "50b6f74f703f52f7436d6aa11807c8374e6f4cb0f9851ea21dc2e9c7fb6e17ce",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/input_test.py": "e1ec5b80522f47d01875b402f063ad470301c1fe3bfc5ff53a96dee3a9d0665e",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/mac_tool.py": "b6eea085dc72511681be84a41c6612e0bdc9e116af5d02fe12e442bf06bdc76f",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/msvs_emulation.py": "a4cdf6ff7571cb4c5a4ba7d23e45f75b07302213f243d9a2b86a45ae38696f3a",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/ninja_syntax.py": "ccc1e407c9743bba1192e605a1a37d768b676c04c11d9804ad0cedc04fd6eb8f",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/simple_copy.py": "d95fb054c27d4d0f7868043d3a6a61e30ff80c50a6fd41a61bf2f86a5ca507cd",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/win_tool.py": "955bb43c5c9e543bb5138a09fa882fd07ae188db791fa640daef8a20ca53ce86",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/xcode_emulation.py": "f2eb448fee55b564d1939494ea0561ecbb2d3acea4b024fe79be6c556307b181",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/xcode_ninja.py": "433d7f7503d730ff4cfa145dea0a8157b719ac1bd3d4fd593f6bd4e7fe33cb30",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/xcodeproj_file.py": "26841ab4c5e247f22d4b93853dfc54ab7df87adb6adda2efb849976c60aa4892",
+      "local/js/node_modules/node-gyp/gyp/pylib/gyp/xml_fix.py": "fb3d277f752765aeef370d2ec31618848487acde9e48720456c1a3884680b818",
+      "local/js/node_modules/node-gyp/gyp/setup.py": "0f8b19f341f697cc3d477bc510c37e8aa9ac01bdd17a225471be2f0241a83b0e",
+      "local/js/node_modules/node-gyp/gyp/test_gyp.py": "f7b17cb6648bc3724bf7fa1323ca493ee42c4f122c80091d408683998b05ae0a",
+      "local/js/node_modules/node-gyp/gyp/tools/graphviz.py": "15807b32b2db7f8ca871d02f340977ac8c4229223128615450f3eb5a2a5eab80",
+      "local/js/node_modules/node-gyp/gyp/tools/pretty_gyp.py": "d990913d6f8c65f2bb81d9c221aaa11fda9cf1a4112db3293aa2644b75960b70",
+      "local/js/node_modules/node-gyp/gyp/tools/pretty_sln.py": "6ff1719be4975023cbdd38b1e04c8dc1936643ece4791205166b8bd11e70161c",
+      "local/js/node_modules/node-gyp/gyp/tools/pretty_vcproj.py": "03042bc4ad45fa3863b1b6d3df95d08ebbd635b73720115a297a09a20a8c87fa",
+      "local/js/node_modules/node-gyp/test/fixtures/test-charmap.py": "e6b697cda4273b67899eb945b650ed59fb6bca1657ec58f46a6156de17529e11",
+      "local/js/node_modules/node-gyp/update-gyp.py": "67ab5842c49c059be24d8a0f37f0b96e559126cfcb579b6b4271c3033dd050e3",
+      "local/js/node_modules/pokemon-showdown/server/artemis/model.py": "b5d3327825482396d21ead2f230d7a521eed4740ae9df4acf4637976ef7000bb",
+      "local/ladder.py": "2c3655e1769ae1f9374ba20d77d4c1545638b3af011ef54a447c2ba3a47d271b",
+      "local/llm_client.py": "8c2913206a18ffa56174c11625a1e9a3941c533a5e3087dcaf0cef174eddc770",
+      "local/llm_seats.py": "d103445613f4d3c9731fc306eee71ea27181bfebcf71e55e1a4eed267eeffbf6",
+      "local/meta_opp.py": "65de2a960b38c2aca9eacc07db0ced19caf9f3b9f98f3d725cf4b09c6396869f",
+      "local/panel.py": "abed1e8d62e31c39ac907701f4951f03c09ba0ffebe7df0c938ababc6f8bd5a0",
+      "local/panel_bots.py": "86c656634694a878a79d80fd52a7e89c2b2ecf9326be2024534657862e169693",
+      "local/pokemon_env.py": "06809343a10319aec35a26a4a77956b0c64ba3691e0290cdfec1289671841678",
+      "local/pool.py": "dd306caac132ed0a1e5388588f5c03c153c35dba3a10109d278d6ef40142d4e9",
+      "local/ra_bots.py": "378bc5ac7843734edf93922bc2bdea54b0a1ca7e21caf42395697f0d3b95d7d9",
+      "local/ra_bots_strong.py": "d23f864f697a88b78b8621996d097631f2d67f5401be1848226ba7099e2656c4",
+      "local/ra_platform.py": "6d9b5ffc4cb6d8c66fe3ae3714c564aee921ddc9c1a15de2bd982bac0143c90f",
+      "local/ra_rules.py": "e37f008482bc737d9f5e4f5113c41c0f9befd628f39798c42d154c8a11d9c1cf",
+      "local/ra_server.py": "56253598979821c26f7ff0b698f58b4d0071edd2fce70105bd884296bfad1022",
+      "local/ra_sim.py": "7c110ae24612aedb2119ee3bddfedac2e27e7624b073547d2ef275927ecfce6b",
+      "local/redteam_chaos.py": "2c32ff92aa45df207b11ac20bd1992ec7e85110971c1c3ed7798f2be2cc40ec9",
+      "local/redteam_detective.py": "824af98dbf07536fcdabd41d0bc99f72dff762e23182a27648f820c4ade04f8c",
+      "local/redteam_measure.py": "1b612626290e0fe0745ee60aa000918861d0ff82770fbed3dfee9c9000569e35",
+      "local/redteam_talker.py": "bbfbe13f50ce9049c6fb0a66742ffce33444fafe50a6475f4d0bca45e6f355c6",
+      "local/redteam_wolfpack.py": "9f1c084a8c5df144e8095bcfec539bc326045ea2360027a47ebcb2f74a0b4f45",
+      "local/showdown.py": "d40dc6e30021767cf33255691aeac4a26ea2be4db480beab4b75bb9fe31ca5e9",
+      "local/singles_env.py": "572c2c5fa8bfd28fa97743b49779a98b7aa19da49451ef8c6a4c10e702d72d66",
+      "local/singles_eval.py": "253706de66d928c669223f432f948aa8f2729302b3028deea0e8f2b4dafbe940",
+      "local/singles_replay.py": "a4182a6309b3099260d4b4d6606d65969cbb173fd321a0d480cf71085d0c0131",
+      "local/sparring/__init__.py": "4fd88f513b91dbccb02ff3b3438d2ff53c036906b4a6019bf68ee5e5960650ad",
+      "local/sparring/v2_cautious/__init__.py": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+      "local/sparring/v2_cautious/agent/__init__.py": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+      "local/sparring/v2_cautious/agent/__main__.py": "b1da2849aa2ffadb11e49c741c9f8ce989a2334abee6f52298319087fb960e83",
+      "local/sparring/v2_cautious/agent/agent.py": "05690c44725bc1503189dca1cdc59c96a49dbac7592a1329861b245b38d563e0",
+      "local/sparring/v2_cautious/agent/pokemon/__init__.py": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+      "local/sparring/v2_cautious/agent/pokemon/calc.py": "a28b9e20da2e7cdd831dc66983b3c87f94c5cc7344e5b655163ab469c2fd4620",
+      "local/sparring/v2_cautious/agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "local/sparring/v2_cautious/agent/pokemon/lookahead.py": "268cc567ded76ddf018cdf21751400e9666d6dc28221428dd79770e7c32c6877",
+      "local/sparring/v2_cautious/agent/pokemon/policy.py": "da152b69cb75d702196d5d70d9e159ab4c782262149fdcf4032b555d08fc5c91",
+      "local/sparring/v2_cautious/agent/pokemon/stats.py": "66cdd5980b19a9ff29c6746c70f50177463889412f6583b3045436e0295ea8ab",
+      "local/sparring/v2_cautious/agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "local/sparring/v2_cautious/agent/werewolf/__init__.py": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+      "local/sparring/v2_cautious/agent/werewolf/policy.py": "b271c8f2b731bac127f27116c933e87b00c587bce2dbb5787455160ecef38a4c",
+      "local/sparring/v2_cautious/agent/werewolf/state.py": "628c3ad5b6d5ed43dda51c29435285f5757b505d5b2cf573960b8b891c537ffc",
+      "local/vgcbench_opp.py": "d059e0466dc3fd29f6030ade73f37b7e558eede18822c6333dfe482a9c87ff26",
+      "local/vgcbench_worker.py": "354e4a7d1f816a2d1eb3e55d72fdda2ee0002f25e2b73c71c745c1b30f1f427b",
+      "local/werewolf_adaptation_research.py": "0c4384df50454dcf511cf39a0659c9242a452e05a13177bd1b5278a99054fe2c",
+      "local/werewolf_balanced_night_research.py": "0d7c3475f2c8a272ec4f97f9af0fd0ae2edbb21dc7777a758be1de50dbf44d0c",
+      "local/werewolf_belief_research.py": "b3161c9467bddbcbf21f90c02d42383495d0896b4782ba880b5d3239b89f9a8e",
+      "local/werewolf_benchmark.py": "c3cc2c680ed59a103348db4790d6b99841a0273c788d54c946d0b13874150862",
+      "local/werewolf_bluff_research.py": "8321fb571789b9889f9f30a1b620ba1f31933cec35a2e6a4c56d0426f3c83b65",
+      "local/werewolf_bots.py": "bf58c419ab7e4058706f21aee3131e2f8676c75a1a75a8ad8cef9507230cb2a0",
+      "local/werewolf_commitment_research.py": "2828921941e670de13547e429e5ffa2437289aa999c36784e6a4da1060aef310",
+      "local/werewolf_coordination_research.py": "9a5bf6c1741cb073e2209a567f76bd294df0c9c06724d56eaa3a7f802d53eaad",
+      "local/werewolf_counterfactual_research.py": "4898fcf4bb2fb14abdd1e5ce94827308be47e121ad0ba115a9525bba4633026b",
+      "local/werewolf_endgame_research.py": "1827942ce0daf5d3ddb1fbce635fbe055414e31ed5422fe04db250f2a451f371",
+      "local/werewolf_env.py": "a0f878d86d2c7e5acbee74e1c0f43e4180d31717b342b8b1d806c2567c04fb0f",
+      "local/werewolf_evolution_ablation.py": "f9fa2ba23d10fe74f481d7bcfbfa5791e798f4dfbacdabfeedb79d8f1cba40dd",
+      "local/werewolf_evolution_research.py": "aad71c3b6418da6a36fbf5b7e386df368503be6a2531400c1d2b426126b30e52",
+      "local/werewolf_factorial_research.py": "55e630c2fd13083d11fd69d3504177baa7cc88d78dfe6211f930b9547d3a765a",
+      "local/werewolf_guard_bots.py": "dc82645a22f919318d950cea7fc8d1712afe25511b9409a552e224749db4dc82",
+      "local/werewolf_initial_value_research.py": "ec071cf1b2ab2dfd42b13e7ac3aa67b08b2166e1d8a4d21b071ccb0435db6657",
+      "local/werewolf_learned_research.py": "de2523e5a35de7a98c95fcff5b37d08fc4ec17ec88d16a0506ee7b6593862e4e",
+      "local/werewolf_minimal_research.py": "cee02ea48da47ff96a5e4a46e216131fe86e593a6a7f120c24f2d305702d32d1",
+      "local/werewolf_night_inference_research.py": "4e77278c56c012744145fa6e94421494298d3fd4160cdcf5ca6aabe789affc2c",
+      "local/werewolf_night_priority_research.py": "24f5e7723302a09de95e0ceb034291100ac612642c31c2109066c964f16764db",
+      "local/werewolf_planning_free_research.py": "1bcd13b7ab3d83175e9c8110983c13622335d1ae1b776b127ce7752bb19ecb21",
+      "local/werewolf_planning_research.py": "b77b1e19b6be356facb598d2e0c23a5cb5b381faf0f9b58d0f73e2ad5205764e",
+      "local/werewolf_platform.py": "48405ba5c8da9eb6f3e53fe699a35aa8f99cc64186f769cd3c474e0e11a72828",
+      "local/werewolf_population_research.py": "9d434ccd53d47f3a2c0f20b7c80a0f73b909c686f3ca529b88eed8444184b3b1",
+      "local/werewolf_research.py": "421335562f6fcc34724e22e8d383e3af32b3938f62663e8ae9991fe593c79baa",
+      "local/werewolf_research_metrics.py": "550ea8a7e2d043aced7e95e5c6225c3f597fbd8f6dc3968151e82025620c7afb",
+      "local/werewolf_seer_design_research.py": "bdd5b5d6e45f77bf6608ab72863661817c627bad00080953a9dd2d165b613503",
+      "local/werewolf_shielded_night_research.py": "4e3cf4489d6e10af80b25c84624e6874ad91f9a35e315558f2c6c7053492eb96",
+      "local/werewolf_simple.py": "d9ed9179a9462a91542554e2b7a84ae6e71c4d5d9b6b8f0bcf9d24e2ae9de21f",
+      "pyproject.toml": "cd10e2a8b8547fc4226bfda76c87e3c99384a520b467e5dc2adbcb3fd154100e",
+      "requirements.lock": "289c57efce4f71145323de705ce611a70a5698d929408ac3d1bd7d409d2b0539",
+      "versions/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v0_heuristic/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v0_heuristic/agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v0_heuristic/agent/__main__.py": "b1da2849aa2ffadb11e49c741c9f8ce989a2334abee6f52298319087fb960e83",
+      "versions/v0_heuristic/agent/agent.py": "590fba955473db3703395f94363f0ca8a991fdf0cb920f7104972560bd0469a9",
+      "versions/v0_heuristic/agent/pokemon/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v0_heuristic/agent/pokemon/calc.py": "7d6f991151e6f99c905df1a938976308a752b2bcc511255fd7253412dd1a91f3",
+      "versions/v0_heuristic/agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "versions/v0_heuristic/agent/pokemon/policy.py": "399b14a5802b9e892752b78021ec14f05d7fa03c81fa320fcec117db7d4604bf",
+      "versions/v0_heuristic/agent/pokemon/stats.py": "66cdd5980b19a9ff29c6746c70f50177463889412f6583b3045436e0295ea8ab",
+      "versions/v0_heuristic/agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "versions/v0_heuristic/agent/werewolf/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v0_heuristic/agent/werewolf/policy.py": "b271c8f2b731bac127f27116c933e87b00c587bce2dbb5787455160ecef38a4c",
+      "versions/v0_heuristic/agent/werewolf/state.py": "628c3ad5b6d5ed43dda51c29435285f5757b505d5b2cf573960b8b891c537ffc",
+      "versions/v1_exact_damage/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v1_exact_damage/agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v1_exact_damage/agent/__main__.py": "b1da2849aa2ffadb11e49c741c9f8ce989a2334abee6f52298319087fb960e83",
+      "versions/v1_exact_damage/agent/agent.py": "590fba955473db3703395f94363f0ca8a991fdf0cb920f7104972560bd0469a9",
+      "versions/v1_exact_damage/agent/pokemon/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v1_exact_damage/agent/pokemon/calc.py": "a28b9e20da2e7cdd831dc66983b3c87f94c5cc7344e5b655163ab469c2fd4620",
+      "versions/v1_exact_damage/agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "versions/v1_exact_damage/agent/pokemon/policy.py": "c9147bc284845274f2c4ec3cd14008becc3114dc2ca598338eb2cd79c3ab4466",
+      "versions/v1_exact_damage/agent/pokemon/stats.py": "66cdd5980b19a9ff29c6746c70f50177463889412f6583b3045436e0295ea8ab",
+      "versions/v1_exact_damage/agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "versions/v1_exact_damage/agent/werewolf/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v1_exact_damage/agent/werewolf/policy.py": "b271c8f2b731bac127f27116c933e87b00c587bce2dbb5787455160ecef38a4c",
+      "versions/v1_exact_damage/agent/werewolf/state.py": "628c3ad5b6d5ed43dda51c29435285f5757b505d5b2cf573960b8b891c537ffc",
+      "versions/v2_joint_lookahead/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v2_joint_lookahead/agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v2_joint_lookahead/agent/__main__.py": "b1da2849aa2ffadb11e49c741c9f8ce989a2334abee6f52298319087fb960e83",
+      "versions/v2_joint_lookahead/agent/agent.py": "05690c44725bc1503189dca1cdc59c96a49dbac7592a1329861b245b38d563e0",
+      "versions/v2_joint_lookahead/agent/pokemon/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v2_joint_lookahead/agent/pokemon/calc.py": "20ecd7f334e9a99947dd1f9eaf520faaf15cd35604d16ab1c62be6a251eca8ea",
+      "versions/v2_joint_lookahead/agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "versions/v2_joint_lookahead/agent/pokemon/lookahead.py": "19601e615707481b562d3177cd5e361a9c8025053e450c3a5b5b13f1d3a1d145",
+      "versions/v2_joint_lookahead/agent/pokemon/policy.py": "f33c50e44624ac735e8836271c71ae8c6ca4c3037abe0585450a644568c2b6c8",
+      "versions/v2_joint_lookahead/agent/pokemon/stats.py": "66cdd5980b19a9ff29c6746c70f50177463889412f6583b3045436e0295ea8ab",
+      "versions/v2_joint_lookahead/agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "versions/v2_joint_lookahead/agent/werewolf/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v2_joint_lookahead/agent/werewolf/policy.py": "b271c8f2b731bac127f27116c933e87b00c587bce2dbb5787455160ecef38a4c",
+      "versions/v2_joint_lookahead/agent/werewolf/state.py": "628c3ad5b6d5ed43dda51c29435285f5757b505d5b2cf573960b8b891c537ffc",
+      "versions/v3_draft_preview/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v3_draft_preview/agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v3_draft_preview/agent/__main__.py": "d2b686a3310658c153367d2bbee497e10e526951965f8d3d34c24db357671e88",
+      "versions/v3_draft_preview/agent/agent.py": "05690c44725bc1503189dca1cdc59c96a49dbac7592a1329861b245b38d563e0",
+      "versions/v3_draft_preview/agent/pokemon/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v3_draft_preview/agent/pokemon/calc.py": "e84edecba29e1b470a8cd59f372f542841e195c13ce7b74a44dd5ee456a95e3c",
+      "versions/v3_draft_preview/agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "versions/v3_draft_preview/agent/pokemon/drafter.py": "d8552cf5374ff9447ec6b5a5db19ea41b388af5621e06ba777018a399f00e400",
+      "versions/v3_draft_preview/agent/pokemon/lookahead.py": "c3431cc8a8f010640eef0805bcd2cd264b17abbd1f1c07153505214ead7313d0",
+      "versions/v3_draft_preview/agent/pokemon/matchup.py": "0fa9b2f206d00a139173b0ca3a908e9f25fd1d6e2c5fa7f20412b172a4e4a308",
+      "versions/v3_draft_preview/agent/pokemon/policy.py": "042ee6bd286b82c1007b27fbb3b4a1cbe979ee0a380be684081ab987d9646de2",
+      "versions/v3_draft_preview/agent/pokemon/preview.py": "2d8ecd8597167e725823a1d43387a9d7d06fe798a8a712b0e50c506eb88cbd65",
+      "versions/v3_draft_preview/agent/pokemon/stats.py": "1b78f0cdbf4e9b3d1b4364e1828f0663b0e6eb9cde0fd33bfa42be9d71e0c1a9",
+      "versions/v3_draft_preview/agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "versions/v3_draft_preview/agent/werewolf/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v3_draft_preview/agent/werewolf/policy.py": "b271c8f2b731bac127f27116c933e87b00c587bce2dbb5787455160ecef38a4c",
+      "versions/v3_draft_preview/agent/werewolf/state.py": "628c3ad5b6d5ed43dda51c29435285f5757b505d5b2cf573960b8b891c537ffc",
+      "versions/v4_engine_search/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v4_engine_search/agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v4_engine_search/agent/__main__.py": "819fb6881c2e9f652fa676cf0fdf12d5ced31ac9e899f6a9358c27207aec9051",
+      "versions/v4_engine_search/agent/agent.py": "82aae06dd551c561c927e52ca4f3ebfbbcb8602ceffdf193257d56efe7a044f4",
+      "versions/v4_engine_search/agent/fallback.py": "799062093fffd8c1e72f8f33a7c030554757670c9a8bdc86cfa814288541fdc0",
+      "versions/v4_engine_search/agent/pokemon/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v4_engine_search/agent/pokemon/battlelog.py": "a22d0a259c7d519a94d91899bb7ba14957ed37091c7d24d94182758fa467b3b7",
+      "versions/v4_engine_search/agent/pokemon/battlestate.py": "61c88c9ff9d37b39c807772ce8a8c34db816a8f45028f77a25eca7eaf4c68024",
+      "versions/v4_engine_search/agent/pokemon/calc.py": "2a09dd99a1b089722cd6e19abe1b2a43457343c60039e13b20eec5db2756d30f",
+      "versions/v4_engine_search/agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "versions/v4_engine_search/agent/pokemon/drafter.py": "51cd2a1f41a43504bf7c9be31e05e0180e6fb339de8361a96acd0393d7a24742",
+      "versions/v4_engine_search/agent/pokemon/engine.py": "9780c9ae948c21c8588fbe5ffc1d2c4bb2d0e7ecf7212719de8e97d5c60f9d7a",
+      "versions/v4_engine_search/agent/pokemon/lookahead.py": "c1cf709b3a31cff4d65026bb19231d892121d3c39ce786c024e7f45bb24dcab0",
+      "versions/v4_engine_search/agent/pokemon/matchup.py": "a236cacb061c19326c31b23659ba6475fd24be26faf451cfc800658a3a07e146",
+      "versions/v4_engine_search/agent/pokemon/policy.py": "904bdba3ff918b265cc173252b5a1aa05ac5273b3578aeae239e52ef7591f8b3",
+      "versions/v4_engine_search/agent/pokemon/preview.py": "2d8ecd8597167e725823a1d43387a9d7d06fe798a8a712b0e50c506eb88cbd65",
+      "versions/v4_engine_search/agent/pokemon/singles.py": "4dbaae167655b463cf79a016adeefeb47ee8dfcf7482d9e5b57fb7a5084c8c28",
+      "versions/v4_engine_search/agent/pokemon/stats.py": "1b78f0cdbf4e9b3d1b4364e1828f0663b0e6eb9cde0fd33bfa42be9d71e0c1a9",
+      "versions/v4_engine_search/agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "versions/v4_engine_search/agent/reasoning.py": "eec809593c57e69738f394742095c3123a17c0802b4e58527fc827947f435f17",
+      "versions/v4_engine_search/agent/timecontrol.py": "73a0929166b8648e1831a94eaaf41267492d3533d77b07c544d56ac2b98309c5",
+      "versions/v4_engine_search/agent/werewolf/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "versions/v4_engine_search/agent/werewolf/policy.py": "d632d152be82d475822436d378fe2dc7ea6444036488607095fbcbb750432e5f",
+      "versions/v4_engine_search/agent/werewolf/state.py": "304ae5e75fa9df640ad7233155dc7edb8da11aaa4e330e9121b8cc4947d2e5f0",
+      "scripts/werewolf_local_model_eval.py": "992328fe843dfb0273e0bddb83aa9ac97ba06afd21db8e16d97683417c3a7418",
+      "tests/strategy/test_werewolf_local_model.py": "6a602a1b73e2368d42670fa3e53d7bbc56580886ceb202c1b429354842de9387",
+      "data/werewolf_local_model_setup.json": "9583ff597ee74770cc982a43da3a00713a4dec016b654dacca532a49a6f635ee",
+      "scripts/werewolf_evolution_llm_eval.py": "1d8216d2552a96c1f933983317d09ea0fa81b2b699a84e75e77bbe8726b70659",
+      "tests/strategy/test_werewolf_evolution_llm.py": "9fe3ed3a3d5ae904e9f269d678feb390b210ad7b45918b8c64513cadc87fa67c"
+    },
+    "loaded_python_files": {
+      "scripts/werewolf_evolution_llm_eval.py": "1d8216d2552a96c1f933983317d09ea0fa81b2b699a84e75e77bbe8726b70659",
+      "altruagent/_responses.py": "c637f615b10fecc385a43ccf752c582591f9d0adab5628aa8725f1eac2859abb",
+      "altruagent/errors.py": "a49ccba38f468333dc15b1419f626bed22a24c1cd8cca32eaa33e536873da9ec",
+      "altruagent/models.py": "ba7a3411ac53f5831185d308f550ed5afe2ef346d24746837ab6118287aab8a1",
+      "altruagent/notices.py": "f803c6ad8bca054b4a9f65f1eb8f16782d572c3300cfb497e8debb9527aa69cd",
+      "altruagent/auth.py": "ee739ee3ef3366aaafe79b3cd57c78c6b45466ba4ddd6330c1c5096531bf703e",
+      "altruagent/client.py": "a99551c291254cd55ab2f49f2c66c3318194572bd41f5bf36ca5c68b101dfa8a",
+      "altruagent/game.py": "dee97503cad19af9e5a2cfbbccaedc73b21916a24646c451ddc2d585db1acbdd",
+      "altruagent/mcp_transport.py": "d3fdcf5ea9b615e5194f4e5028c8e8f4f9f9ddabb7ae1c086568888660ec1bff",
+      "altruagent/mcp_game.py": "6f3968a8f9208928cf16f4b5b56e43b425511fc7b54b925f6f5fa0937b437dbb",
+      "altruagent/official.py": "8562dab0be39708995700484e0c924ab4110d1f5f52e7e2404389852b85b30e0",
+      "altruagent/runner.py": "29f45f8fdc4757551ac54c828756e3321df05a4ded5dc1db5af741239b9b736a",
+      "altruagent/runtime.py": "2f14b54f11f2365ab089098ab396bd072531fc3cf215e521270f1d47fd8e5756",
+      "altruagent/console.py": "ca77b99fd349af1b627888c627989f6c15219a551c3df53e66087c214dfe21a8",
+      "altruagent/worker.py": "c1fc1678c50f169c6b56f7529acc5b327d84ec18b8bdb0731b4e87a4dc308b7a",
+      "altruagent/supervisor.py": "ad6cdeba2b64347da96f5646e5493f86b01460d0e0c76e1372f5b0703bf374d8",
+      "altruagent/__init__.py": "beef58fcd51ee785601102172e047b2e4256a97cbf2325e76adae47c73e58f4b",
+      "local/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "local/werewolf_env.py": "a0f878d86d2c7e5acbee74e1c0f43e4180d31717b342b8b1d806c2567c04fb0f",
+      "local/werewolf_bots.py": "bf58c419ab7e4058706f21aee3131e2f8676c75a1a75a8ad8cef9507230cb2a0",
+      "local/redteam_chaos.py": "2c32ff92aa45df207b11ac20bd1992ec7e85110971c1c3ed7798f2be2cc40ec9",
+      "local/redteam_detective.py": "824af98dbf07536fcdabd41d0bc99f72dff762e23182a27648f820c4ade04f8c",
+      "local/redteam_talker.py": "bbfbe13f50ce9049c6fb0a66742ffce33444fafe50a6475f4d0bca45e6f355c6",
+      "local/redteam_wolfpack.py": "9f1c084a8c5df144e8095bcfec539bc326045ea2360027a47ebcb2f74a0b4f45",
+      "local/werewolf_guard_bots.py": "dc82645a22f919318d950cea7fc8d1712afe25511b9409a552e224749db4dc82",
+      "local/werewolf_population_research.py": "9d434ccd53d47f3a2c0f20b7c80a0f73b909c686f3ca529b88eed8444184b3b1",
+      "local/eval_werewolf.py": "fdb7d270946f891b42691c27a248f14b33f3d5edff9fad1412b73b6202adb04f",
+      "local/werewolf_benchmark.py": "c3cc2c680ed59a103348db4790d6b99841a0273c788d54c946d0b13874150862",
+      "agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/matchstate.py": "ca7efb044419af008cd3893358f58e0ee9e9b4a5c54a2257076333805d00c0d0",
+      "agent/pokemon/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "agent/reasoning.py": "ae0738001984b67544cbd873af411ace0a238f46ca43b638ef02b5c889fa0184",
+      "agent/timecontrol.py": "960b99d826cb3ae5241f0b00bb77c9d05ca087fda275afd787a6786cf556f251",
+      "agent/fallback.py": "de7bbf3d26838356ff69c57e10fae4d1ca88df7465d5bdddc7004cdafc278ee1",
+      "agent/pokemon/drafter.py": "bc730a5667bfe581b7427ebbc771b892a54468b66f776fb66f77a5cc155e110a",
+      "agent/pokemon/calc.py": "b1acb5ea0795e1fd06244be798f08bd148c89ea5606d7d2f33357be01b0ac242",
+      "agent/pokemon/stats.py": "1b78f0cdbf4e9b3d1b4364e1828f0663b0e6eb9cde0fd33bfa42be9d71e0c1a9",
+      "agent/pokemon/lookahead.py": "c1cf709b3a31cff4d65026bb19231d892121d3c39ce786c024e7f45bb24dcab0",
+      "agent/pokemon/preview.py": "2d8ecd8597167e725823a1d43387a9d7d06fe798a8a712b0e50c506eb88cbd65",
+      "agent/pokemon/policy.py": "99708567c3715ad0495481e91a3e3fbd8a1058aab87d2c3bd35cbc6fe2f75ed2",
+      "agent/werewolf/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/werewolf/state.py": "104d80f8f30d7c254a75b9b7616bef300be5f9c1c6db266ea5653eb352cf498e",
+      "agent/werewolf/policy.py": "537b6bdb9f376bce2f23ebf193746eda11d956122f66f874e56a2520c0eec0a6",
+      "agent/agent.py": "ece20f3fcfb0f655ec2043a3c899b32c1872246d3aa013f89bd95d299ff2f953",
+      "local/werewolf_minimal_research.py": "cee02ea48da47ff96a5e4a46e216131fe86e593a6a7f120c24f2d305702d32d1",
+      "local/werewolf_research_metrics.py": "550ea8a7e2d043aced7e95e5c6225c3f597fbd8f6dc3968151e82025620c7afb",
+      "local/werewolf_research.py": "421335562f6fcc34724e22e8d383e3af32b3938f62663e8ae9991fe593c79baa",
+      "local/werewolf_counterfactual_research.py": "4898fcf4bb2fb14abdd1e5ce94827308be47e121ad0ba115a9525bba4633026b",
+      "examples/llm/__init__.py": "ec2c1e002e2e521288be0c11571efe52e0f60c528490855a6419574a2767ca4c",
+      "examples/llm/providers.py": "b9eb393f6d8b1865609229b6ee89be81a4fb0c553ffa53e08b935b97a3b5a517",
+      "examples/smoke_agent.py": "e16c55f6023007be971d1f90528b303b5938559719895d525b233e3244b1cac3",
+      "examples/llm/base.py": "8dfd4c4554cf625c286fbdeaf27dc74947e43fa71c36124854c96b0e0a52000a",
+      "examples/llm/pokemon.py": "5e8996cae908e703369a8eeb64686a96adf803c4384c990f2b384d1e4c0b1ede",
+      "examples/llm/redalert.py": "1be0b34f91ba492638246ebf804f3fce80671186c5679e3b395e07e55561b206",
+      "examples/llm_agent.py": "06b801a8537e419a416d9ed76bcc878e0e3395dde22495c121212f330a2d9e62",
+      "scripts/werewolf_local_model_eval.py": "992328fe843dfb0273e0bddb83aa9ac97ba06afd21db8e16d97683417c3a7418",
+      "scripts/werewolf_model_scale_eval.py": "a9a269b954f0c17f23e2eefa0164889d28637a8dcab3fc9ceba50f7b63daa4b9",
+      "scripts/werewolf_minimal_model_eval.py": "c31055fe02e37f6d1df03d55cf74b71cfd7a6e8f49b539cee113726026e9f5fb"
+    },
+    "dependency_scope": {
+      "httpx_version": "0.28.1",
+      "python": "3.13.9 | packaged by Anaconda, Inc. | (main, Oct 21 2025, 19:11:29) [Clang 20.1.8 ]",
+      "note": "Repository source files and dependency lockfiles hashed. External stdlib/site-packages source not re-read: an initial pre-request attempt blocked on an unavailable anyio source file."
+    }
+  },
+  "resources": [
+    {
+      "pressure": 1,
+      "swap_used_mib": 10023.0,
+      "disk_free": 6710120448,
+      "time": "2026-10-14T05:37:57.533880-07:00"
+    }
+  ],
+  "games": [],
+  "external_cost_usd": 0,
+  "error": "TimeoutError: ",
+  "provider": {
+    "stats": {},
+    "request_scope": {
+      "attempts": 0,
+      "network_calls": 0,
+      "unique_network_keys": 0,
+      "unique_attempt_keys": 0,
+      "cache_hits": 0,
+      "errors": {},
+      "note": "Run-local exact-request memoization, not independent model samples; no cache imported from prior runs. Smoke and diagnostics caches cleared before games. Network keys may repeat after cache clears or failures."
+    },
+    "latencies_s": [],
+    "max_s": 0,
+    "mean_s": 0.0,
+    "health": [
+      {
+        "at": "2026-10-14T05:41:31.329488-07:00",
+        "responses": {
+          "/api/version": {
+            "version": "0.34.4"
+          },
+          "/api/tags": {
+            "models": [
+              {
+                "name": "qwen2.5:14b-instruct-q4_K_M",
+                "model": "qwen2.5:14b-instruct-q4_K_M",
+                "modified_at": "2026-10-13T13:32:28.410562826-07:00",
+                "size": 8988124069,
+                "digest": "7cdf5a0187d5c58cc5d369b255592f7841d1c4696d45a8c8a9489440385b22f6",
+                "details": {
+                  "parent_model": "",
+                  "format": "gguf",
+                  "family": "qwen2",
+                  "families": [
+                    "qwen2"
+                  ],
+                  "parameter_size": "14.8B",
+                  "quantization_level": "Q4_K_M",
+                  "context_length": 32768,
+                  "embedding_length": 5120
+                },
+                "capabilities": [
+                  "completion",
+                  "tools"
+                ]
+              },
+              {
+                "name": "qwen2.5:7b-instruct-q4_K_M",
+                "model": "qwen2.5:7b-instruct-q4_K_M",
+                "modified_at": "2026-10-13T02:46:26.734480182-07:00",
+                "size": 4683087332,
+                "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+                "details": {
+                  "parent_model": "",
+                  "format": "gguf",
+                  "family": "qwen2",
+                  "families": [
+                    "qwen2"
+                  ],
+                  "parameter_size": "7.6B",
+                  "quantization_level": "Q4_K_M",
+                  "context_length": 32768,
+                  "embedding_length": 3584
+                },
+                "capabilities": [
+                  "completion",
+                  "tools"
+                ]
+              }
+            ]
+          },
+          "/api/ps": {
+            "models": []
+          }
+        }
+      }
+    ],
+    "model": "qwen2.5:14b-instruct-q4_K_M",
+    "model_digest": "7cdf5a0187d5c58cc5d369b255592f7841d1c4696d45a8c8a9489440385b22f6",
+    "options": {
+      "temperature": 0,
+      "seed": 205,
+      "num_ctx": 16384,
+      "num_predict": 192,
+      "num_thread": 4
+    },
+    "encoding": "label_object",
+    "all_errors": [],
+    "first_response_examples": []
+  },
+  "unloaded": true,
+  "source_unchanged": true,
+  "ended": "2026-10-14T05:44:27.606834-07:00"
+}

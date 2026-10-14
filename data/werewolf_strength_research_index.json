@@ -1,0 +1,26 @@
+{
+  "scope": "Local Werewolf-only strength search after B0; not a deployment or tournament-strength claim",
+  "baseline": "data/werewolf_current_baseline.json",
+  "registry": {"name": "strength", "development": [231,232,233,234,235,236,237,238,239], "confirmation": [37301,37302]},
+  "decision": {"candidate": "local.werewolf_night_priority_research:tie_high", "frozen_before_confirmation": true, "combine_other_components": false, "why": "Positive mean on all six observed development seeds; additional commitment/bluff/position rules were not reliable improvements. Known background regression retained.", "deployment": "unchanged", "statistical_and_substantial_gates_are_distinct": true, "substantial_gain_required": 0.02},
+  "experiments": [
+    {"name": "own_public_commitment", "report": "data/werewolf_commitment_development.json", "seeds": [231,232], "strength_simulations": 22400, "additional_diagnostic_simulations": 140, "result": "All three variants had zero observed win changes; the small diagnosis found no eligible pivotal override."},
+    {"name": "proactive_wolf_claim", "report": "data/werewolf_bluff_development.json", "seeds": [231,232], "simulations": 30800, "result": "Unconditional claim lost; ally-target gating had zero development mean and +0.232pp replication mean with conservative interval crossing zero; not combined."},
+    {"name": "night_priority", "report": "data/werewolf_night_priority_development.json", "seeds": [231,232], "simulations": 25200, "result": "Tie-high positive; always-high noisy; preserving daytime target very small gain. Claimed-seer priority and other-role behavior preserved."},
+    {"name": "strict_extreme_reduction", "report": "data/werewolf_balanced_night_development.json", "seeds": [235,236], "simulations": 33600, "result": "Requiring fewer exposed extreme wolf seats removed almost all gains; balanced/extremes0pp then+0.054/+0.161pp; tie-high control remained positive."},
+    {"name": "endpoint_nonincrease_guard", "report": "data/werewolf_shielded_night_development.json", "seeds": [237,238], "simulations": 25200, "result": "Shielded+0.143/+0.321pp, below tie-high+0.179/+0.661pp, still had losses; not selected."}
+  ],
+  "development_total_simulations_including_diagnostic": 137340,
+  "development_unique_deal_seeds_planned": 25200,
+  "selected_candidate_development_delta_percentage_points": {"231": 0.4642857143, "232": 0.6607142857, "235": 0.3571428571, "236": 0.8392857143, "237": 0.1785714286, "238": 0.6607142857},
+  "confirmation_plan": "data/werewolf_strength_confirmation_plan.json",
+  "confirmation_runner_report": "data/werewolf_strength_confirmation_runner.json",
+  "confirmation_audit": "data/werewolf_strength_confirmation_audit.json",
+  "status": "confirmation_completed_not_adopted",
+  "confirmation": {"simulations": 112000, "unique_deal_seeds": 28000, "rt_delta": 0.005857142857142857, "rt_conservative_ci95": [0.004081195741300938,0.0076309885201014255], "rounds_delta": 0.006321428571428572, "rounds_conservative_ci95": [0.0044045447176132265,0.008236044393778348], "average_benefit_confirmed": true, "substantial_gain_gate_passed": false, "background_regression_gate_passed": false, "adopt": false, "k3_tested": false, "live_platform_tested": false},
+  "source_archive": "data/werewolf_strength_source_archive.json",
+  "bluff_raw_archive": "data/werewolf_strength_archives.json",
+  "verification": {"related_werewolf_tests_passed": 847, "related_werewolf_tests_skipped": 1, "additional_benchmark_and_metrics_tests_passed": 128, "new_research_pyflakes_passed_after_cleanup": true, "skip_reason": "optional commitment raw artifact audit; explicitly enabled and passed by its subtask", "independent_audit_self_tests": 12, "protocol_or_internal_failures": 0, "normal_window_closures_are_separate": true},
+  "postfreeze_cleanup": "After audit and exact308-file source archive, removed one unused os import from the unselected bluff study CLI; selected strategy and B0 untouched.",
+  "limits": ["Development profiles and diagnostic replays reuse deals; raw simulation count is not independent sample size.", "No candidate has achieved the2pp development gain threshold.", "Some earlier reference lookup uses public-suspicion scores containing our own previous messages; simple rank geometry alone is not a sufficient outcome model.", "No live-platform games or new paid-model calls.", "Other game issues are recorded and deferred by owner instruction.", "Production agent, champion and SDK not modified; no commits or pushes."]
+}

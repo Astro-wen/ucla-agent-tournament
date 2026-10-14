@@ -1,0 +1,15 @@
+{
+  "scope": "Werewolf research verification only; not full-repository green, no other-game fixes or production promotion",
+  "tests": {"earlier_complete_run": {"passed": 4013, "skipped": 1}, "final_complete_run": {"passed": 4015, "skipped": 1, "elapsed_seconds": 1459.36, "command": ".venv/bin/python -m pytest -q -o cache_dir=/tmp/ww-until8-final-pytest tests/strategy/test_werewolf*.py"}, "optional_commitment_raw_audit": {"passed": 1, "env": {"ARENA_WW_COMMITMENT_AUDIT": "1"}}, "temporary_process_environment": {"PYTHONPATH": "/Users/szh/anaconda3/lib/python3.13/site-packages", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1", "PYTHONDONTWRITEBYTECODE": "1"}},
+  "read_stall": {"native_sample": "/tmp/ww-pytest-0711-native-sample.txt", "sample_time_pdt": "2026-10-14T07:34:06.879-07:00", "observed_stack": "_io__Buffered_read -> _io_FileIO_readall_impl -> _Py_read -> read(libsystem_kernel)", "cpu_seconds_at_process_check": 3.69, "process_elapsed_at_check": "21:34", "resolved_without_assertion_timeout_or_project_config_changes": true},
+  "new_code_pyflakes": "pass",
+  "production_agent_champion_sdk_diff": "empty",
+  "independent_audits": ["data/werewolf_evolution_development_audit.json", "data/werewolf_evolution_confirmation_audit.json", "data/werewolf_evolution_mixture_audit.json", "data/werewolf_evolution_llm_audit.json", "data/werewolf_robust_vote_audit.json"],
+  "policy_input_probe": {"file": "data/werewolf_evolution_isolation_probe.json", "games": 560, "unique_deals": 280, "actions": 1647, "restarts_equal": 1647, "unavailable_metadata_invariant": 1647},
+  "model_service": {"endpoint": "http://127.0.0.1:11437", "loaded_models_after_pilot": [], "weights_deleted": false, "server_stopped": false},
+  "research_window_closed": true,
+  "research_cutoff_check": "2026-10-14T08:00:06.560484-07:00",
+  "independent_auditor_self_tests_passed": 12,
+  "source_archive_integrity": {"archives": 10, "members": 1935, "status": "pass", "report": "data/werewolf_until8_archive_verification.json"},
+  "commits_or_pushes_before08": false
+}

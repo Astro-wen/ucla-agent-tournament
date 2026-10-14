@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 
 from .werewolf_bots import _legal, _private
-from .werewolf_env import ABSTAIN, Seat
+from .werewolf_env import ABSTAIN, OfficialBaseline, Seat
 
 _SEAT = re.compile(r"Player([0-6])\b", re.I)
 _VOTE = re.compile(r"\b(?:I(?:'ll| will)?\s+)?vote\s+(?:for\s+)?Player([0-6])\b", re.I)
@@ -192,7 +192,36 @@ class BaitSeat(AccuseSeat):
         return f"If I were the Seer, I might suspect Player{target} is a wolf; this is only a hypothetical."
 
 
+class FirstHighNightSeat(OfficialBaseline):
+    name = "first_high_night"
+
+    def choose(self, raw):
+        if (raw.get("game_state") or {}).get("phase") == "night_wolf":
+            return max(_legal(raw), key=int)
+        return super().choose(raw)
+
+
+class FirstRandomNightSeat(OfficialBaseline):
+    name = "first_random_night"
+
+    def choose(self, raw):
+        if (raw.get("game_state") or {}).get("phase") == "night_wolf":
+            return self.rng.choice(_legal(raw))
+        return super().choose(raw)
+
+
+class FirstSwitchSeat(OfficialBaseline):
+    name = "first_switch"
+
+    def choose(self, raw):
+        gs = raw.get("game_state") or {}
+        if gs.get("phase") == "day_vote" and gs.get("day", 1) >= 2:
+            return max((a for a in _legal(raw) if a != str(ABSTAIN)), key=int)
+        return super().choose(raw)
+
+
 GUARD_BACKGROUNDS = {cls.name: cls for cls in (
+    FirstHighNightSeat, FirstRandomNightSeat, FirstSwitchSeat,
     GuardSeat, AbstainSeat, FixedVoteSeat, VoteEchoSeat, AccuseSeat, RepeatAccuseSeat,
     FakeSeerSeat, ContradictSeerSeat, BaitSeat,
 )}

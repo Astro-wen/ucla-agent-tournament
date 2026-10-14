@@ -1,0 +1,8 @@
+{
+  "created": "2026-10-14T00:51:55.643104-07:00",
+  "source_digest": "27129e33cba2d1c3ae6a3a08dfd3fdc8715b00495476c84dfd8c16fdcd2d1ace",
+  "files": 310,
+  "archive": "/Users/szh/Documents/SZH/Project/Agent Competition SAIR/logs/werewolf_benchmarks/initial-value-frozen-source.zip",
+  "archive_sha256": "96baaf3271103526af4708fca363df2aab4d866adbd467a51b105eb5b65ac2b8",
+  "scope": "Exact source files of the local initial-action-value training and development replication; not a heldout strength confirmation, later additions, credentials, model weights or a standalone deployment bundle"
+}

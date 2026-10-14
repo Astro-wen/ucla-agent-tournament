@@ -1,0 +1,8 @@
+{
+  "created": "2026-10-14T02:51:29.327616-07:00",
+  "source_digest": "3c040f86336fdf57c70181288e39ac1e0ed19c5858152c8939d7cf597e7500b3",
+  "files": 311,
+  "archive": "/Users/szh/Documents/SZH/Project/Agent Competition SAIR/logs/werewolf_benchmarks/planning-preregistered-source.zip",
+  "archive_sha256": "656925c243dde5176075daaca9847efe74ecec08bdc63dda1abf67cd3bdd3e5b",
+  "scope": "Original bounded-planning development source snapshot, not a strength confirmation"
+}

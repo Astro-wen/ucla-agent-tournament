@@ -1,0 +1,12 @@
+{
+  "candidate": "local.werewolf_night_priority_research:tie_high",
+  "candidate_sha256": "24f5e7723302a09de95e0ceb034291100ac612642c31c2109066c964f16764db",
+  "declared_before_confirmation": "2026-10-13T21:05:48.855895-07:00",
+  "seeds": [
+    37301,
+    37302
+  ],
+  "min_gain": 0.02,
+  "role_margin": 0.03,
+  "runs": {}
+}

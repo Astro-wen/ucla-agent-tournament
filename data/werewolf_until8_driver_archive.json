@@ -1,0 +1,123 @@
+{
+  "archive": "logs/werewolf_benchmarks/until8-drivers-model-and-tests.zip",
+  "sha256": "a5883b9246b8df2af69ece158a05ab4c191b51d990055b8c38b4c8af24cd9b18",
+  "files": {
+    "scripts/werewolf_evolution_eval.py": {
+      "sha256": "17a9d0b9906a23d9dd137cf6a89d8c89bf3336123cfeda1476d03ecc64d7feb9",
+      "bytes": 12124
+    },
+    "scripts/werewolf_evolution_confirm.py": {
+      "sha256": "12e8dae6a6b968c9a0726718627f810c013e294cb51bcd6c982526614d58f32f",
+      "bytes": 4159
+    },
+    "scripts/werewolf_evolution_llm_eval.py": {
+      "sha256": "e3d0cf6de17649d17804ea709703d69eccd2d3f442bc89a270329f8e1c6bde5a",
+      "bytes": 9678
+    },
+    "scripts/werewolf_evolution_mixture_eval.py": {
+      "sha256": "4d3535cc1eedafa6d9ec821167f38800c76d9021db9adc75c1cf1efafd94c96f",
+      "bytes": 1744
+    },
+    "scripts/werewolf_evolution_cases.py": {
+      "sha256": "f7655fe16a378d954ef52333e802690439d073c7bd148c8d4e52dbdcffdb08ba",
+      "bytes": 2989
+    },
+    "scripts/werewolf_evolution_isolation_probe.py": {
+      "sha256": "7a6ca9a687d1bed2a3f0423fcde3f662f6461a5c9068569bcbd5fa807db1d98b",
+      "bytes": 4206
+    },
+    "scripts/werewolf_robust_vote_eval.py": {
+      "sha256": "d6625321fa4377b91c7448b41de36653c463fa90882912d6496c083b639580ba",
+      "bytes": 9566
+    },
+    "scripts/audit_werewolf_evolution.py": {
+      "sha256": "ec8fe1e5a18664fc97aa00038f254805306cf43a3a36897403e5a54b9ea88042",
+      "bytes": 8132
+    },
+    "scripts/audit_werewolf_evolution_confirmation.py": {
+      "sha256": "65dc6638ceced2e03cff50048644897d41ca4f740138fe18072d4f8a6a12221f",
+      "bytes": 4825
+    },
+    "scripts/audit_werewolf_evolution_llm.py": {
+      "sha256": "d2df29d3067c1cf163861e62c253d091ba468be40860c9c386ea59a636b264df",
+      "bytes": 3255
+    },
+    "scripts/audit_werewolf_evolution_mixture.py": {
+      "sha256": "563d1eb9f0b2cd29064be702829715b9480a0f0e61ef24a45738bdd4c776281a",
+      "bytes": 903
+    },
+    "scripts/audit_werewolf_robust_vote.py": {
+      "sha256": "b39543a3f20940f70f17aa536359659c62786c69e8689765ad87185c8711f775",
+      "bytes": 5984
+    },
+    "scripts/audit_werewolf_strength.py": {
+      "sha256": "2531ab6a0cffc1c85595269dfc0622d77e8541c9bdc2137acd7ac61de2f5a9c5",
+      "bytes": 43605
+    },
+    "scripts/audit_werewolf_counterfactual.py": {
+      "sha256": "0b240de182597f83d93cafe3d97d5bcd2ffde260c6c7074de186ca8bfdb05001",
+      "bytes": 10956
+    },
+    "scripts/werewolf_counterfactual_eval.py": {
+      "sha256": "ad977dd810834fe542d707617be4a18620dc2a4463b4c99bb01abeace4eb999f",
+      "bytes": 11892
+    },
+    "scripts/werewolf_local_model_eval.py": {
+      "sha256": "992328fe843dfb0273e0bddb83aa9ac97ba06afd21db8e16d97683417c3a7418",
+      "bytes": 49035
+    },
+    "scripts/werewolf_model_scale_eval.py": {
+      "sha256": "a9a269b954f0c17f23e2eefa0164889d28637a8dcab3fc9ceba50f7b63daa4b9",
+      "bytes": 15003
+    },
+    "scripts/werewolf_minimal_model_eval.py": {
+      "sha256": "c31055fe02e37f6d1df03d55cf74b71cfd7a6e8f49b539cee113726026e9f5fb",
+      "bytes": 29216
+    },
+    "tests/strategy/test_werewolf_evolution_research.py": {
+      "sha256": "6e083d15325941074e58816f9b0aafff687139ca728ea90f8f94efaecf3b8954",
+      "bytes": 7462
+    },
+    "tests/strategy/test_werewolf_evolution_ablation.py": {
+      "sha256": "46ccf4036eca1b8a662b84bbe30eb03410187d96429c0eae3bd39b75543c1f23",
+      "bytes": 1241
+    },
+    "tests/strategy/test_werewolf_evolution_llm.py": {
+      "sha256": "7971038a8e92bd33c062f101ded2ea478d760d567bf94711b68baead3a4c12e4",
+      "bytes": 2350
+    },
+    "tests/strategy/test_werewolf_robust_vote.py": {
+      "sha256": "772ffe276ef48459d215c0f8f4a2012d4cbfc374c27849a531f1f19a6d8cc276",
+      "bytes": 1454
+    },
+    "data/werewolf_until8_plan.json": {
+      "sha256": "a9c15ae0d27509f3add4460720b46b6911e365924a61dfb4378be9a890576de2",
+      "bytes": 4209
+    },
+    "data/werewolf_evolution_model.json": {
+      "sha256": "1fafeafb51c24d60d4242a27a67744c841a591fd08a0507f4865d0d479440d4a",
+      "bytes": 72
+    },
+    "data/werewolf_evolution_ablation_plan.json": {
+      "sha256": "3440f9ffc3ddf7f9b26fdae373a3fcec7440363a7adcfe436b8522259b733d18",
+      "bytes": 1374
+    },
+    "data/werewolf_evolution_llm_plan.json": {
+      "sha256": "3cb34d8b7858f19479e03eae175361526dd2992e23dbe02a501f1be1d2514892",
+      "bytes": 2202
+    },
+    "data/werewolf_evolution_mixture_plan.json": {
+      "sha256": "e6092a4b3fc8039bfbb76f76e8340c99658c97cd028d91279f42a789eb06c541",
+      "bytes": 968
+    },
+    "data/werewolf_robust_vote_plan.json": {
+      "sha256": "b99b1cb602e59566a24ffd1862b64111a628ec7dd571b6fbae2c27258850949e",
+      "bytes": 2013
+    },
+    "replay_driver/ww_evolution_model_retry1_1014.py": {
+      "sha256": "9040d3275d2c834d09718b88f9abf079c459fe3241418837a20d2b96fcbd0135",
+      "bytes": 364
+    }
+  },
+  "scope": "Verified evaluation/audit drivers,tests,plans,andfixed15integer program; complements separately frozen runtime source archives; no secrets or model weights"
+}

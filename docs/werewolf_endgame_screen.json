@@ -1,0 +1,2315 @@
+{
+  "scope": "preserved exploratory screen, not heldout confirmation",
+  "source_capture": "/var/folders/9z/p1gz0bbj52b5_g9bs9k_3dfr0000gn/T/devin-overflows-501/shell-b75036-919869e0d0d825e1/content.txt",
+  "source_sha256": "1c72c7bf35c5f4a0df082c1afa3ec6ecddcf8c8df71324c6738bf939bbdadc64",
+  "paired_comparisons": 3720,
+  "simulations": 7440,
+  "records": [
+    {
+      "scope": "exploratory; k=1; combined equals side-isolated factories by role",
+      "local_frozen": {
+        "policy": "1827942ce0daf5d3ddb1fbce635fbe055414e31ed5422fe04db250f2a451f371",
+        "tests": "c656b4408a5317da2565ac2a7d975d7ba636a4ddf9f8f6f20596d04395304993"
+      },
+      "global_start": "6ef98ff284e23a5bb09f07601bdeb76f4023b02b27b332f1d212d22b38cc6dbf",
+      "config": {
+        "screen": true,
+        "games": 20,
+        "seeds": [
+          197,
+          198,
+          199
+        ],
+        "timings": [
+          "rt",
+          "rounds"
+        ]
+      },
+      "backgrounds": [
+        "first",
+        "random",
+        "heuristic",
+        "llm",
+        "llmx",
+        "llmq",
+        "mixed",
+        "first_high_night",
+        "first_random_night",
+        "first_switch",
+        "guard_silent",
+        "guard_abstain",
+        "guard_fixed",
+        "guard_echo",
+        "guard_accuse",
+        "guard_repeat",
+        "guard_fake",
+        "guard_contradict",
+        "guard_bait",
+        "rt_wolfpack",
+        "rt_talker",
+        "rt_detective",
+        "rt_chaos",
+        "pop_coordinated",
+        "pop_prompt_seer",
+        "pop_late_claim",
+        "pop_pressure_bus",
+        "pop_distance",
+        "pop_observed_switch",
+        "pop_survivor_kill",
+        "pop_anti_majority"
+      ]
+    },
+    {
+      "timing": "rt",
+      "background": "first",
+      "roles": {
+        "villager": {
+          "n": 32,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 11,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 17,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "random",
+      "roles": {
+        "villager": {
+          "n": 43,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 9,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 8,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "heuristic",
+      "roles": {
+        "villager": {
+          "n": 33,
+          "reference": 21,
+          "candidate": 21,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 11,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 16,
+          "reference": 4,
+          "candidate": 4,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "llm",
+      "roles": {
+        "villager": {
+          "n": 35,
+          "reference": 17,
+          "candidate": 17,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 12,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 13,
+          "reference": 12,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "llmx",
+      "roles": {
+        "villager": {
+          "n": 27,
+          "reference": 11,
+          "candidate": 11,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 9,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 24,
+          "reference": 23,
+          "candidate": 23,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "llmq",
+      "roles": {
+        "villager": {
+          "n": 39,
+          "reference": 21,
+          "candidate": 21,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 5,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 16,
+          "reference": 15,
+          "candidate": 15,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "mixed",
+      "roles": {
+        "villager": {
+          "n": 35,
+          "reference": 14,
+          "candidate": 14,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 6,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 19,
+          "reference": 17,
+          "candidate": 17,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "first_high_night",
+      "roles": {
+        "villager": {
+          "n": 37,
+          "reference": 6,
+          "candidate": 6,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 6,
+          "reference": 1,
+          "candidate": 1,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 17,
+          "reference": 14,
+          "candidate": 14,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "first_random_night",
+      "roles": {
+        "villager": {
+          "n": 34,
+          "reference": 13,
+          "candidate": 13,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 8,
+          "reference": 1,
+          "candidate": 1,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 18,
+          "reference": 14,
+          "candidate": 14,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "first_switch",
+      "roles": {
+        "villager": {
+          "n": 29,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 12,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 19,
+          "reference": 18,
+          "candidate": 18,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "guard_silent",
+      "roles": {
+        "villager": {
+          "n": 27,
+          "reference": 13,
+          "candidate": 13,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 11,
+          "reference": 6,
+          "candidate": 6,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 22,
+          "reference": 17,
+          "candidate": 17,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "guard_abstain",
+      "roles": {
+        "villager": {
+          "n": 40,
+          "reference": 11,
+          "candidate": 11,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 9,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 11,
+          "reference": 11,
+          "candidate": 11,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "guard_fixed",
+      "roles": {
+        "villager": {
+          "n": 33,
+          "reference": 15,
+          "candidate": 15,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 8,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 19,
+          "reference": 13,
+          "candidate": 13,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "guard_echo",
+      "roles": {
+        "villager": {
+          "n": 35,
+          "reference": 21,
+          "candidate": 21,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 10,
+          "reference": 9,
+          "candidate": 9,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 15,
+          "reference": 15,
+          "candidate": 15,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "guard_accuse",
+      "roles": {
+        "villager": {
+          "n": 31,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 7,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 22,
+          "reference": 15,
+          "candidate": 15,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "guard_repeat",
+      "roles": {
+        "villager": {
+          "n": 36,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 10,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 14,
+          "reference": 13,
+          "candidate": 13,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "guard_fake",
+      "roles": {
+        "villager": {
+          "n": 40,
+          "reference": 10,
+          "candidate": 10,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 7,
+          "reference": 1,
+          "candidate": 1,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 13,
+          "reference": 12,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "guard_contradict",
+      "roles": {
+        "villager": {
+          "n": 33,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 11,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 16,
+          "reference": 14,
+          "candidate": 14,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "guard_bait",
+      "roles": {
+        "villager": {
+          "n": 37,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 12,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 11,
+          "reference": 9,
+          "candidate": 9,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "rt_wolfpack",
+      "roles": {
+        "villager": {
+          "n": 33,
+          "reference": 9,
+          "candidate": 9,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 7,
+          "reference": 1,
+          "candidate": 1,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 20,
+          "reference": 19,
+          "candidate": 19,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "rt_talker",
+      "roles": {
+        "villager": {
+          "n": 39,
+          "reference": 30,
+          "candidate": 30,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 10,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 11,
+          "reference": 4,
+          "candidate": 4,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "rt_detective",
+      "roles": {
+        "villager": {
+          "n": 25,
+          "reference": 23,
+          "candidate": 23,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 10,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 25,
+          "reference": 16,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 4
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 4
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "rt_chaos",
+      "roles": {
+        "villager": {
+          "n": 35,
+          "reference": 28,
+          "candidate": 28,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 8,
+          "reference": 6,
+          "candidate": 6,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 17,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "pop_coordinated",
+      "roles": {
+        "villager": {
+          "n": 33,
+          "reference": 20,
+          "candidate": 20,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 7,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 20,
+          "reference": 10,
+          "candidate": 10,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 1
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "pop_prompt_seer",
+      "roles": {
+        "villager": {
+          "n": 42,
+          "reference": 24,
+          "candidate": 24,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 1,
+          "reference": 1,
+          "candidate": 1,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 17,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "pop_late_claim",
+      "roles": {
+        "villager": {
+          "n": 35,
+          "reference": 29,
+          "candidate": 29,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 12,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 13,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "pop_pressure_bus",
+      "roles": {
+        "villager": {
+          "n": 32,
+          "reference": 12,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 8,
+          "reference": 6,
+          "candidate": 6,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 20,
+          "reference": 15,
+          "candidate": 15,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "pop_distance",
+      "roles": {
+        "villager": {
+          "n": 34,
+          "reference": 24,
+          "candidate": 24,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 4,
+          "reference": 4,
+          "candidate": 4,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 22,
+          "reference": 12,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "pop_observed_switch",
+      "roles": {
+        "villager": {
+          "n": 41,
+          "reference": 29,
+          "candidate": 29,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 8,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 11,
+          "reference": 6,
+          "candidate": 6,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "pop_survivor_kill",
+      "roles": {
+        "villager": {
+          "n": 37,
+          "reference": 21,
+          "candidate": 21,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 10,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 13,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "background": "pop_anti_majority",
+      "roles": {
+        "villager": {
+          "n": 34,
+          "reference": 15,
+          "candidate": 15,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 9,
+          "reference": 9,
+          "candidate": 9,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 17,
+          "reference": 11,
+          "candidate": 11,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "first",
+      "roles": {
+        "villager": {
+          "n": 32,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 11,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 17,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "random",
+      "roles": {
+        "villager": {
+          "n": 43,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 9,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 8,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "heuristic",
+      "roles": {
+        "villager": {
+          "n": 33,
+          "reference": 21,
+          "candidate": 21,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 11,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 16,
+          "reference": 4,
+          "candidate": 4,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "llm",
+      "roles": {
+        "villager": {
+          "n": 35,
+          "reference": 18,
+          "candidate": 18,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 12,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 13,
+          "reference": 12,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "llmx",
+      "roles": {
+        "villager": {
+          "n": 27,
+          "reference": 12,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 9,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 24,
+          "reference": 23,
+          "candidate": 23,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "llmq",
+      "roles": {
+        "villager": {
+          "n": 39,
+          "reference": 18,
+          "candidate": 18,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 5,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 16,
+          "reference": 16,
+          "candidate": 16,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "mixed",
+      "roles": {
+        "villager": {
+          "n": 35,
+          "reference": 14,
+          "candidate": 14,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 6,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 19,
+          "reference": 16,
+          "candidate": 16,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "first_high_night",
+      "roles": {
+        "villager": {
+          "n": 37,
+          "reference": 6,
+          "candidate": 6,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 6,
+          "reference": 1,
+          "candidate": 1,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 17,
+          "reference": 14,
+          "candidate": 14,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "first_random_night",
+      "roles": {
+        "villager": {
+          "n": 34,
+          "reference": 13,
+          "candidate": 13,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 8,
+          "reference": 1,
+          "candidate": 1,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 18,
+          "reference": 14,
+          "candidate": 14,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "first_switch",
+      "roles": {
+        "villager": {
+          "n": 29,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 12,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 19,
+          "reference": 18,
+          "candidate": 18,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "guard_silent",
+      "roles": {
+        "villager": {
+          "n": 27,
+          "reference": 13,
+          "candidate": 13,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 11,
+          "reference": 6,
+          "candidate": 6,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 22,
+          "reference": 17,
+          "candidate": 17,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "guard_abstain",
+      "roles": {
+        "villager": {
+          "n": 40,
+          "reference": 11,
+          "candidate": 11,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 9,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 11,
+          "reference": 11,
+          "candidate": 11,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "guard_fixed",
+      "roles": {
+        "villager": {
+          "n": 33,
+          "reference": 15,
+          "candidate": 15,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 8,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 19,
+          "reference": 13,
+          "candidate": 13,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "guard_echo",
+      "roles": {
+        "villager": {
+          "n": 35,
+          "reference": 12,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 10,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 15,
+          "reference": 10,
+          "candidate": 10,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "guard_accuse",
+      "roles": {
+        "villager": {
+          "n": 31,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 7,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 22,
+          "reference": 18,
+          "candidate": 18,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "guard_repeat",
+      "roles": {
+        "villager": {
+          "n": 36,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 10,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 14,
+          "reference": 13,
+          "candidate": 13,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "guard_fake",
+      "roles": {
+        "villager": {
+          "n": 40,
+          "reference": 10,
+          "candidate": 10,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 7,
+          "reference": 1,
+          "candidate": 1,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 13,
+          "reference": 12,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "guard_contradict",
+      "roles": {
+        "villager": {
+          "n": 33,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 11,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 16,
+          "reference": 14,
+          "candidate": 14,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "guard_bait",
+      "roles": {
+        "villager": {
+          "n": 37,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 12,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 11,
+          "reference": 9,
+          "candidate": 9,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "rt_wolfpack",
+      "roles": {
+        "villager": {
+          "n": 33,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 7,
+          "reference": 2,
+          "candidate": 2,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 20,
+          "reference": 18,
+          "candidate": 18,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "rt_talker",
+      "roles": {
+        "villager": {
+          "n": 39,
+          "reference": 23,
+          "candidate": 23,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 10,
+          "reference": 10,
+          "candidate": 10,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 11,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "rt_detective",
+      "roles": {
+        "villager": {
+          "n": 25,
+          "reference": 22,
+          "candidate": 22,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 10,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 25,
+          "reference": 11,
+          "candidate": 10,
+          "improved": 0,
+          "worsened": 1
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 6
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "rt_chaos",
+      "roles": {
+        "villager": {
+          "n": 35,
+          "reference": 27,
+          "candidate": 27,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 8,
+          "reference": 6,
+          "candidate": 6,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 17,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "pop_coordinated",
+      "roles": {
+        "villager": {
+          "n": 33,
+          "reference": 15,
+          "candidate": 15,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 7,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 20,
+          "reference": 12,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "pop_prompt_seer",
+      "roles": {
+        "villager": {
+          "n": 42,
+          "reference": 24,
+          "candidate": 24,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 1,
+          "reference": 1,
+          "candidate": 1,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 17,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "pop_late_claim",
+      "roles": {
+        "villager": {
+          "n": 35,
+          "reference": 29,
+          "candidate": 29,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 12,
+          "reference": 5,
+          "candidate": 5,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 13,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "pop_pressure_bus",
+      "roles": {
+        "villager": {
+          "n": 32,
+          "reference": 12,
+          "candidate": 12,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 8,
+          "reference": 6,
+          "candidate": 6,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 20,
+          "reference": 14,
+          "candidate": 14,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "pop_distance",
+      "roles": {
+        "villager": {
+          "n": 34,
+          "reference": 22,
+          "candidate": 22,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 4,
+          "reference": 4,
+          "candidate": 4,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 22,
+          "reference": 13,
+          "candidate": 13,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "pop_observed_switch",
+      "roles": {
+        "villager": {
+          "n": 41,
+          "reference": 30,
+          "candidate": 30,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 8,
+          "reference": 8,
+          "candidate": 8,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 11,
+          "reference": 6,
+          "candidate": 6,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "pop_survivor_kill",
+      "roles": {
+        "villager": {
+          "n": 37,
+          "reference": 20,
+          "candidate": 20,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 10,
+          "reference": 7,
+          "candidate": 7,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 13,
+          "reference": 3,
+          "candidate": 3,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rounds",
+      "background": "pop_anti_majority",
+      "roles": {
+        "villager": {
+          "n": 34,
+          "reference": 21,
+          "candidate": 21,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 9,
+          "reference": 9,
+          "candidate": 9,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 17,
+          "reference": 13,
+          "candidate": 13,
+          "improved": 0,
+          "worsened": 0
+        }
+      },
+      "overrides": {
+        "villager": 0,
+        "seer": 0,
+        "wolf": 0
+      }
+    },
+    {
+      "timing": "rt",
+      "group": "ALL",
+      "roles": {
+        "villager": {
+          "n": 1076,
+          "reference": 469,
+          "candidate": 469,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 268,
+          "reference": 132,
+          "candidate": 132,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 516,
+          "reference": 368,
+          "candidate": 364,
+          "improved": 0,
+          "worsened": 4
+        }
+      }
+    },
+    {
+      "timing": "rt",
+      "group": "197",
+      "roles": {
+        "villager": {
+          "n": 367,
+          "reference": 147,
+          "candidate": 147,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 88,
+          "reference": 41,
+          "candidate": 41,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 165,
+          "reference": 119,
+          "candidate": 119,
+          "improved": 0,
+          "worsened": 0
+        }
+      }
+    },
+    {
+      "timing": "rt",
+      "group": "198",
+      "roles": {
+        "villager": {
+          "n": 356,
+          "reference": 164,
+          "candidate": 164,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 93,
+          "reference": 49,
+          "candidate": 49,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 171,
+          "reference": 118,
+          "candidate": 116,
+          "improved": 0,
+          "worsened": 2
+        }
+      }
+    },
+    {
+      "timing": "rt",
+      "group": "199",
+      "roles": {
+        "villager": {
+          "n": 353,
+          "reference": 158,
+          "candidate": 158,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 87,
+          "reference": 42,
+          "candidate": 42,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 180,
+          "reference": 131,
+          "candidate": 129,
+          "improved": 0,
+          "worsened": 2
+        }
+      }
+    },
+    {
+      "timing": "rounds",
+      "group": "ALL",
+      "roles": {
+        "villager": {
+          "n": 1076,
+          "reference": 448,
+          "candidate": 448,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 268,
+          "reference": 129,
+          "candidate": 129,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 516,
+          "reference": 363,
+          "candidate": 362,
+          "improved": 0,
+          "worsened": 1
+        }
+      }
+    },
+    {
+      "timing": "rounds",
+      "group": "197",
+      "roles": {
+        "villager": {
+          "n": 367,
+          "reference": 141,
+          "candidate": 141,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 88,
+          "reference": 42,
+          "candidate": 42,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 165,
+          "reference": 117,
+          "candidate": 117,
+          "improved": 0,
+          "worsened": 0
+        }
+      }
+    },
+    {
+      "timing": "rounds",
+      "group": "198",
+      "roles": {
+        "villager": {
+          "n": 356,
+          "reference": 163,
+          "candidate": 163,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 93,
+          "reference": 47,
+          "candidate": 47,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 171,
+          "reference": 118,
+          "candidate": 118,
+          "improved": 0,
+          "worsened": 0
+        }
+      }
+    },
+    {
+      "timing": "rounds",
+      "group": "199",
+      "roles": {
+        "villager": {
+          "n": 353,
+          "reference": 144,
+          "candidate": 144,
+          "improved": 0,
+          "worsened": 0
+        },
+        "seer": {
+          "n": 87,
+          "reference": 40,
+          "candidate": 40,
+          "improved": 0,
+          "worsened": 0
+        },
+        "wolf": {
+          "n": 180,
+          "reference": 128,
+          "candidate": 127,
+          "improved": 0,
+          "worsened": 1
+        }
+      }
+    },
+    {
+      "local_final": {
+        "policy": "1827942ce0daf5d3ddb1fbce635fbe055414e31ed5422fe04db250f2a451f371",
+        "tests": "c656b4408a5317da2565ac2a7d975d7ba636a4ddf9f8f6f20596d04395304993"
+      },
+      "local_unchanged": true,
+      "global_final": "6ef98ff284e23a5bb09f07601bdeb76f4023b02b27b332f1d212d22b38cc6dbf",
+      "failures": {
+        "reference.crash": 0,
+        "reference.illegal": 0,
+        "reference.bad_chat": 0,
+        "reference.timeout": 0,
+        "reference.chat_after_terminate": 0,
+        "reference.window_close": 83,
+        "reference.fallbacks": 0,
+        "reference.overruns": 0,
+        "reference.policy_fallbacks": 0,
+        "reference.policy_errors": 0,
+        "reference.listen_errors": 0,
+        "reference.logged_errors": 0,
+        "reference.fallback_paths": 0,
+        "reference.background.crash": 0,
+        "reference.background.illegal": 0,
+        "reference.background.bad_chat": 0,
+        "reference.background.timeout": 0,
+        "reference.background.chat_after_terminate": 0,
+        "reference.background.window_close": 0,
+        "candidate.crash": 0,
+        "candidate.illegal": 0,
+        "candidate.bad_chat": 0,
+        "candidate.timeout": 0,
+        "candidate.chat_after_terminate": 0,
+        "candidate.window_close": 83,
+        "candidate.fallbacks": 0,
+        "candidate.overruns": 0,
+        "candidate.policy_fallbacks": 0,
+        "candidate.policy_errors": 0,
+        "candidate.listen_errors": 0,
+        "candidate.logged_errors": 0,
+        "candidate.fallback_paths": 0,
+        "candidate.background.crash": 0,
+        "candidate.background.illegal": 0,
+        "candidate.background.bad_chat": 0,
+        "candidate.background.timeout": 0,
+        "candidate.background.chat_after_terminate": 0,
+        "candidate.background.window_close": 0
+      },
+      "max_ms": 36.69558296678588,
+      "elapsed_s": 70.61506250000093,
+      "pairs": 3720
+    }
+  ],
+  "other_output": []
+}

@@ -1,0 +1,516 @@
+{
+  "schema_version": "1.0",
+  "purpose_zh": "公开网络核验的狼人杀策略证据目录；不是已证明适用于本地规则的最优策略，也不是部署指令。",
+  "research_window": {
+    "date_pdt": "2026-10-13",
+    "requested_deadline_pdt": "2026-10-13T08:00:00-07:00",
+    "first_http_utc": "2026-10-13T09:21:26.819089Z",
+    "last_http_utc": "2026-10-13T09:41:58.016038Z",
+    "note": "This is a completed research snapshot, not a claim to have worked until 08:00 PDT. Parent may continue research/evaluation until the requested deadline."
+  },
+  "method": {
+    "network": "Public unauthenticated GET requests made by /usr/local/bin/python3 using requests.Session, allow_redirects=True, trust_env=False; no credentials, accounts, payments, private APIs, repository code downloads or execution.",
+    "extraction": "HTML: BeautifulSoup text extraction. PDFs: pdfminer in memory. Atom: XML metadata. Full documents were retrieved; review means substantive selected methods/results/limitations passages, not a claim to have read every appendix or proved every theorem.",
+    "hash_definition": "SHA-256 of response.content bytes after HTTP transfer/content decoding, before HTML/PDF text extraction. Every received redirect response is included. Null status/hash means no HTTP response received.",
+    "time_definition": "UTC timestamp recorded after GET completed; redirect-hop timestamps are recorded when the completed response chain is inspected, not exact wire-arrival timestamps.",
+    "quote_normalization": "Exact retrieved wording with whitespace/line breaks and PDF typographic ligatures normalized where necessary; excerpts are short, locators identify sections rather than invented PDF line numbers.",
+    "counting": "55 requested URLs: 54 completed GET chains, one connection failure; 71 audit rows including 16 redirects. 32 distinct paper/team-document full texts plus the local platform rule document were retrieved and substantively inspected. Two additional official results pages verify champions. Discovery pages, metadata-only matches, redirects and duplicate landing pages are not counted as independent studies.",
+    "independence": "24 research papers and 8 team documents are distinct texts, not 32 independent replications. Takeda 2019/2020/daisyo, Basket/ioh, Hachi2/takoyaki, SLA/LSPO, and ISES/CSP4SDG have shared ancestry/authors. These dependencies are explicitly marked. Even after grouping these, the catalog exceeds 12 useful independent source families.",
+    "arxiv_search": "all:werewolf returned 45 entries in this actual retrieval, not the earlier estimate of 29. Search metadata were screened; irrelevant entries were not treated as game evidence.",
+    "permissions": "Only this new catalog and temporary research/validation scripts in /tmp are owned by this task. No source or documentation modifications, commits, pushes, live-agent operations, or implementation subagents; code_search was used for mandated local code discovery only."
+  },
+  "counts": {
+    "requested_urls": 55,
+    "http_response_rows": 70,
+    "redirect_responses": 16,
+    "successful_200_responses": 54,
+    "failed_requests_without_response": 1,
+    "audit_rows": 71,
+    "paper_full_texts_reviewed": 24,
+    "team_document_full_texts_reviewed": 8,
+    "platform_rule_full_texts_reviewed": 1,
+    "official_champion_result_pages_reviewed": 2,
+    "prior_four_papers_refetched": 4,
+    "new_papers_beyond_prior_four": 20,
+    "catalog_source_entries": 35,
+    "nonofficial_independence_groups": 26,
+    "strategy_families": 40,
+    "proposed_experiments": 11
+  },
+  "validation": {
+    "result": "PASS",
+    "script": "/tmp/validate_werewolf_strategy_catalog.py",
+    "command": "/usr/local/bin/python3 /tmp/validate_werewolf_strategy_catalog.py",
+    "checks": ["JSON syntax", "all 71 audit records exactly match the in-memory collector audit printed in tool output", "URL/status/time/SHA-256/byte-count equality", "35 source metadata entries and full-text character counts", "source URLs have successful fetches", "source/strategy/experiment cross-references", "40 strategy families and 11 experiments", "per-source excerpt word limits", "role-world counts", "count-only parity/stall and wrong-lynch-versus-tie counterexample"],
+    "not_claimed": "This is catalog and count-only logical validation, not a local simulator test, policy benchmark, full formal proof, or independent reproduction of literature results."
+  },
+  "local_rule_contract": {
+    "source_id": "RULES",
+    "local_references": ["docs/platform/werewolf.md:15-31", "docs/platform/werewolf.md:99-109", "docs/platform/werewolf.md:181-207", "docs/platform/werewolf.md:269-278", "docs/HANDOFF.md:103-108"],
+    "players": 7,
+    "roles": {"wolf": 2, "seer": 1, "villager": 4},
+    "doctor_or_guard": false,
+    "night_1": "Peaceful; seer investigates, no wolf kill.",
+    "death_roles": "Public true role on death; dead cannot speak or act.",
+    "vote": "Hidden until resolution, simultaneous-information plurality, self-vote illegal, tied maximum eliminates nobody, all abstain eliminates nobody.",
+    "wolf_victory": "Parity (wolves >= living nonwolves), or three consecutive days without an elimination. Day resignations reset the stall count; resigning personally loses and is not proposed as a tactic.",
+    "night_kill": "Only living nonwolves are legal; two wolves disagreeing choose the lower target seat. No doctor/save mechanic.",
+    "seer": "One check per night, wolf/villager result; a targeted seer still investigates before dawn but cannot publish after death.",
+    "communication": "At most 5 messages per discussion window, at most 50 whitespace-separated words and 1024 characters each; open asynchronous discussion, not simultaneous commitment or auction bidding.",
+    "policy_information_boundary": "Use only own seat role, own private seer results or wolf ally, own received legal messages, public deaths, public past votes and legal actions. No other seat memories, simulator truth, spectator stream, live leaderboard, account identity history or cross-game opponent memory.",
+    "safety_boundary": "In-game false role claims, false investigation reports and ordinary persuasion are strategic deception. Opponent-prompt attacks, system/organizer impersonation, tool instructions, secret extraction, collusion outside the game and platform exploits are prohibited. A cited paper using broader deception does not authorize those tactics here."
+  },
+  "critical_rejections": [
+    {"claim": "三人存活、其中两狼时可以再组织一次白天投票或演戏。", "verdict": "错误：这已经是终局；两狼四人时即达到狼人与非狼人相等的条件。", "basis": ["RULES"], "kind": "local_rule_deduction"},
+    {"claim": "错杀好人总比平票更好。", "verdict": "错误：四人一狼、stall_count<=1、无其他离场事件时，错杀好人后夜刀会到两人一狼而立即输；平票后夜刀仍是三人一狼，有下一次正确放逐而赢的可能。平票也可能触发第三次停滞，必须按人数、夜刀、信息和停滞计数逐状态比较。", "basis": ["RULES"], "kind": "local_rule_counterexample"},
+    {"claim": "2408.17177 的最优预言家策略和 random strategy+ 可以原样使用。", "verdict": "拒绝：该文的 honesty rule 禁止假预言家；random strategy+ 在人数相等时继续游戏并随机解决平票，本地此时已经终局且平票无人出局。公开同时报数也不是本地异步聊天。", "basis": ["P03", "RULES"], "kind": "verified_rule_mismatch"},
+    {"claim": "Finding Friends and Flipping Frenemies 是 DeepRole 的阿瓦隆论文。", "verdict": "错误：arXiv 2011.01856 是自动改写数据扩充论文。DeepRole 的正确论文是 Finding Friend and Foe in Multi-Agent Games，arXiv 1906.02330v1。另核验的 1902.01365 是配电网拓扑论文，不能引用为博弈来源。", "basis": ["P04"], "fetches": ["F002", "F003"], "kind": "bibliographic_correction"},
+    {"claim": "高角色预测准确率、雄辩程度或长生存时间本身证明更高阵营胜率。", "verdict": "拒绝：它们是不同指标；有论文出现角色估计伤害好人胜率、强制采纳信念失败、按敌意反投不如基线的情况。", "basis": ["P08", "P18", "P24"], "kind": "evidence_limitation"},
+    {"claim": "论文说 attack/credibility/deception 就可以攻击对手提示词或冒充官方。", "verdict": "拒绝：只保留游戏内指控、反驳、角色伪装和投票协调；剔除伪造裁判权威、越权工具指示、注入攻击和私密信息索取。", "basis": ["RULES", "P16", "P18"], "kind": "competition_compliance"},
+    {"claim": "AIWolf 的 possessed、medium、bodyguard、假报查验后 power play 适用于这里。", "verdict": "拒绝：本地只有2W1S4V；没有狂人、灵媒和护卫。尤其不能照抄五人单狼局中真预言家白查后给另一人黑查的策略。", "basis": ["RULES", "A01", "A08"], "kind": "verified_rule_mismatch"}
+  ],
+  "sources": [
+    {
+      "id": "RULES", "kind": "official_rules", "title": "werewolf — Werewolf (simplified 7-player ruleset)", "authors": ["AltruAgent platform documentation"], "date": "2026-10-13", "date_basis": "retrieval date; page has no publication date", "url": "https://api.altruagent-game.com/skill/werewolf", "fetches": ["F050"], "read_scope": "Full rule document retrieved; setup, information boundary, night, voting, death and discussion sections inspected alongside local mirror.", "extracted_characters": 38069,
+      "excerpts": [{"locator": "§6 The day vote", "quote": "A tie eliminates nobody."}, {"locator": "§6 The stalling rule", "quote": "Three consecutive days with no elimination hands the game to the wolves."}, {"locator": "§3 Round structure", "quote": "A seer targeted tonight still gets tonight's investigation."}],
+      "bounded_summary_zh": "本目录所有迁移判断的硬约束。讨论先于隐藏投票；角色死亡公开；夜刀无保护。夜间仍查验不等于死后有发言权。阵营胜利比本人存活重要。",
+      "portable_mechanisms": ["精确终局/停滞状态机", "公开事实与私有查验隔离", "有限发言预算", "合法动作兜底"],
+      "rule_mismatches": [], "evidence_limitations": ["文档是规则，不是已测过的策略胜率；实现仍须和本地仿真/真实负载核对。"], "independence_group": "platform_rules"
+    },
+    {
+      "id": "A01", "kind": "team_document", "title": "team takeda Agent Discription — 1st international aiwolf contest", "authors": ["Team takeda (individual author not stated in PDF)"], "date": "2019-08", "date_basis": "contest and verified hosting path", "url": "https://aiwolf.org/control-panel/wp-content/uploads/2019/08/takeda.pdf", "fetches": ["F064", "F065"], "read_scope": "Entire 2-page algorithm document.", "extracted_characters": 3189,
+      "excerpts": [{"locator": "§1 Agent Overview", "quote": "In Role Estimation part, the agent calculates the probability distribution of each players’ role by Bayesian inference."}, {"locator": "§2 Role Estimation", "quote": "Here, we assume that actions are independent to each other."}],
+      "bounded_summary_zh": "已核验的2019协议赛冠军（另见C01）。先对整桌身份组合计算行为似然，再求每人角色概率，最后用简单规则选发言、票和刀。似然由角色对、局势、行为的频率构成；不是每人各自猜一个独立角色。",
+      "portable_mechanisms": ["联合身份分布及边缘概率", "角色对/行为似然", "推断与动作选择分层", "公开嫌疑与投票一致"],
+      "rule_mismatches": ["5/15人、狂人/灵媒/护卫与本地不同。五人真预言家白查后假报另一人黑查不应直接移植。", "原始跨局频数学习不可变成比赛中跨局记忆；只允许赛前固定模型和本局合法观察。"],
+      "evidence_limitations": ["冠军说明整套系统有效，不证明某个技巧的因果增益；独立行为/只看两人关系会重复计算相关证据。"], "independence_group": "takeda_lineage"
+    },
+    {
+      "id": "A02", "kind": "team_document", "title": "Team takeda Agent Description — 2nd International AIWolf Competition", "authors": ["Team takeda (individual author not stated in PDF)"], "date": "2021-03-19", "date_basis": "official publication index date for 2020 competition document", "url": "https://aiwolf.org/control-panel/wp-content/uploads/2021/03/ats-tkd-takeda.pdf", "fetches": ["F060", "F061", "F059"], "read_scope": "Entire update document.", "extracted_characters": 1596,
+      "excerpts": [{"locator": "5-player villager update", "quote": "it votes for the agent for whom more than 70% of the alive agents seems to vote."}, {"locator": "speech update", "quote": "For any role, if more than half of the alive player seems to vote our agent, it repeats its statement that it will vote for the player it wants to vote for."}],
+      "bounded_summary_zh": "顺序聊天改版后使用当前轮已到达发言；将预测票势和自身风险用于协调。多数已支持目标时不继续重复动员；受到多数压力时重申目标。夜刀把角色价值和对手强度混合。",
+      "portable_mechanisms": ["票势模型与角色模型分开", "濒危时自救沟通", "已形成共识时节省消息", "夜刀目标价值"],
+      "rule_mismatches": ["70%阈值来自5人局，不是本地隐藏复数票制的最优阈值。", "跨局win rate项、狂人/灵媒/护卫项不可原样使用。"],
+      "evidence_limitations": ["没有控制消融或置信区间；同A01系统演进，不算独立复现。"], "independence_group": "takeda_lineage"
+    },
+    {
+      "id": "A03", "kind": "team_document", "title": "Baguette code description", "authors": ["Ruben Moreno", "Victor Josso"], "date": "2022-10-04", "date_basis": "official index date; PDF undated", "url": "https://aiwolf.org/control-panel/wp-content/uploads/2022/10/Baguette.pdf", "fetches": ["F018", "F019", "F009"], "read_scope": "Entire one-page document.", "extracted_characters": 1359,
+      "excerpts": [{"locator": "§3 Examples", "quote": "If an agent votes against us, its trust coef will be decreased by 10."}, {"locator": "§3 Examples", "quote": "If an agent declares its role as the same as mine, its trust coef will be lowered by 40."}],
+      "bounded_summary_zh": "用0–100信任分连接发言、投票和夜刀，提供非常廉价、可解释的规则基线。特别值得用作反例：反对我不等于狼，角色冲突强度也取决于自己角色是否唯一。",
+      "portable_mechanisms": ["可解释证据台账", "已知真查验覆盖软分数", "对照基线"],
+      "rule_mismatches": ["未区分5/15人；本地村民有四个，因此同称村民不是冲突。"], "evidence_limitations": ["文档无胜率实验；信任系数不是校准概率；报复性减分易被狼利用。"], "independence_group": "baguette"
+    },
+    {
+      "id": "A04", "kind": "team_document", "title": "Agent Documentation of Basket for the 4th International AI Werewolf Contest", "authors": ["Team Basket (individual author not stated)"], "date": "2022-10-04", "date_basis": "official index date", "url": "https://aiwolf.org/control-panel/wp-content/uploads/2022/10/Basket.pdf", "fetches": ["F012", "F013", "F009"], "read_scope": "Entire two-page document.", "extracted_characters": 2583,
+      "excerpts": [{"locator": "§3-1 role estimation", "quote": "a lying player who CO the same role as oneself is unlikely to be in the villager team"}, {"locator": "§3-6 WEREWOLF", "quote": "voting for other werewolf on the same team (line cutting)"}],
+      "bounded_summary_zh": "在TOKU框架上增加与自身角色/狼同伴知识相容的角色判断，增加避免三人同时跳身份、受压跳身份和给狼队友投票的断联行为。",
+      "portable_mechanisms": ["把自己的合法私有信息用于校验", "反跳条件选择", "狼队友关系切割"],
+      "rule_mismatches": ["护卫成功、反复袭击保护目标、灵媒/狂人不可迁移。", "自称同角色只有在唯一角色时构成冲突；发言仍可能是好人策略性谎言。"], "evidence_limitations": ["只是实现说明；无独立胜率消融。文档称TOKU曾获胜，未用该叙述替代官方结果核验。"], "independence_group": "toku_basket_ioh"
+    },
+    {
+      "id": "A05", "kind": "team_document", "title": "Agent Documentation of ioh for the 4th International AI Werewolf Contest", "authors": ["Team ioh (individual author not stated)"], "date": "2022-10-04", "date_basis": "official index date", "url": "https://aiwolf.org/control-panel/wp-content/uploads/2022/10/ioh.pdf", "fetches": ["F014", "F015", "F009"], "read_scope": "Entire document; compared with Basket.", "extracted_characters": 3274,
+      "excerpts": [{"locator": "§1 Overview", "quote": "The proposal of full-open and some other statements may not be read by opponents in this tournament."}],
+      "bounded_summary_zh": "增加全员首轮亮身份倡议与不同角色同样活跃的发言方式，并明确承认对手可能根本不解析这些新句式。其余大段设计与Basket相同。",
+      "portable_mechanisms": ["先测对手是否能理解消息", "角色间语言分布一致", "有目标的发言而非堆数量"],
+      "rule_mismatches": ["没有医生的本地局里，鼓励预言家首轮无条件暴露可能立即损失唯一查验者。"], "evidence_limitations": ["与A04高度重复，不算独立证据；所谓多话增加生存率没有给出充分控制实验。"], "independence_group": "toku_basket_ioh"
+    },
+    {
+      "id": "A06", "kind": "team_document", "title": "The 4th International AIWolf Competition — team Hachi2", "authors": ["Shunsuke Hatta"], "date": "2022-10-04", "date_basis": "official index date", "url": "https://aiwolf.org/control-panel/wp-content/uploads/2022/10/Hachi2.pdf", "fetches": ["F020", "F021", "F009"], "read_scope": "Entire bilingual parameter report, especially English overview and role tables.", "extracted_characters": 6177,
+      "excerpts": [{"locator": "English §1 Agent Overview", "quote": "multiple agents were created and the strongest agent was selected from among them."}, {"locator": "English §1 Agent Overview", "quote": "The concept was to hide, and we chose a tactic to act in accordance with the surroundings so as not to be suspected when becoming a werewolf."}],
+      "bounded_summary_zh": "从KP22生成不同参数的候选，强调狼与周围好人保持相似的发言和投票习惯。可迁移的是角色可识别性测试和候选策略筛选，而不是固定伪装模板。",
+      "portable_mechanisms": ["候选策略组合搜索", "狼的公开行为模仿", "分角色参数化"],
+      "rule_mismatches": ["5/15人、狂人/护卫/灵媒，且涉及跨局习惯学习；这些部分不适用于本地。"], "evidence_limitations": ["与takoyaki共享KP22祖先；没有足够结果支持某一项单独有效。"], "independence_group": "kp22_generator"
+    },
+    {
+      "id": "A07", "kind": "team_document", "title": "4th International Werewolf Intelligence Convention — Team takoyaki", "authors": ["Team takoyaki (individual author not stated)"], "date": "2022-10-04", "date_basis": "official index date", "url": "https://aiwolf.org/control-panel/wp-content/uploads/2022/10/takoyaki.pdf", "fetches": ["F016", "F017", "F009"], "read_scope": "Entire experiment/parameter description.", "extracted_characters": 4061,
+      "excerpts": [{"locator": "§2.1 How to play agent", "quote": "play 5 sets of 1000 matches (to avoid position bias)."}, {"locator": "§4.1 Werewolf", "quote": "Cutting off one’s own people in voting"}],
+      "bounded_summary_zh": "一次修改一个角色策略、与原版和多种旧参赛者在同样环境对局，再按分角色胜率选择参数。强调对白查/黑查比例、投票伪装和断联的联合调参。",
+      "portable_mechanisms": ["配对种子和座位平衡", "分角色胜率", "参数搜索后独立留出测试"],
+      "rule_mismatches": ["不能照搬单狼五人局的黑查比例和狂人策略；不能使用跨局对手胜率/习惯记忆。"], "evidence_limitations": ["相关性调参可能过拟合原对手；文档对KP22名次的描述与Hachi2不一致，目录不把它当冠军事实。"], "independence_group": "kp22_generator"
+    },
+    {
+      "id": "A08", "kind": "team_document", "title": "2nd International Werewolf AI Competition — daisyo", "authors": ["Team daisyo (PDF does not state an individual byline)"], "date": "2021-03-19", "date_basis": "official index date", "url": "https://aiwolf.org/control-panel/wp-content/uploads/2021/03/Taisei-Kojima-daisyo.pdf", "fetches": ["F062", "F063", "F059"], "read_scope": "Entire two-page document.", "extracted_characters": 1552,
+      "excerpts": [{"locator": "§2 Concept", "quote": "I guessed that there would be a lot of agents similar to ”takeda” in this contest."}, {"locator": "§4.2 SEER", "quote": "report species of werewolf, regardless of the divination result"}],
+      "bounded_summary_zh": "明确针对预计大量出现的takeda衍生对手修改参数与行动模式。这支持建立对手混合测试，而不是只打自对弈；同时它展示规则不匹配的危险：真预言家也会故意报假黑查。",
+      "portable_mechanisms": ["对手类型敏感的评估", "策略可被识别后的反适应测试"],
+      "rule_mismatches": ["五人单狼/狂人局的预言家谎报不能直接迁移；本地死后身份公开会使错误报告长期污染可信链。"], "evidence_limitations": ["takeda衍生系统，非独立方法验证；没有结果表证明这些变化泛化。"], "independence_group": "takeda_lineage"
+    },
+    {
+      "id": "P01", "kind": "paper", "title": "A mathematical model of the Mafia game", "authors": ["Piotr Migdał"], "date": "2013-03-12", "date_basis": "arXiv v3 update; first submission 2010-09-06; extracted PDF header says November 26, 2024, a noted metadata discrepancy", "url": "https://arxiv.org/pdf/1009.1031v3", "fetches": ["F005", "F001"], "read_scope": "Model assumptions, random-death recurrence, terminal convention and parity passages; not every derivation appendix.", "extracted_characters": 33503,
+      "excerpts": [{"locator": "Introduction", "quote": "we focus on a game where all killings are at random, with decisions unaffected by the previous game course."}, {"locator": "§2 Model", "quote": "The game continues until there is only one group (either the citizens or the mafia) left."}],
+      "bounded_summary_zh": "把无特殊角色、无有效行为推断的局建成离散死亡过程，得到胜率递推、闭式表达和人数奇偶效应。价值是教我们先把边界条件写准，再比较投票/夜刀对人数的影响。",
+      "portable_mechanisms": ["精确人数动态规划基线", "对夜刀与昼票分别建模", "检查奇偶/终局边界"],
+      "rule_mismatches": ["无预言家、历史不影响选择、平票随机淘汰且不在本地的平等人数节点立即终止。"], "evidence_limitations": ["不能用平方根人口平衡结论预测本地2W1S4V胜率；这里不是随机死亡局。"], "independence_group": "migdal_theory"
+    },
+    {
+      "id": "P02", "kind": "paper", "title": "Mafia: A Theoretical Study of Players and Coalitions in a Partial Information Environment", "authors": ["Mark Braverman", "Omid Etesami", "Elchanan Mossel"], "date": "2008-06-16", "date_basis": "arXiv math/0609534v4; journal Annals of Applied Probability 18(3), 825–846 (2008)", "url": "https://arxiv.org/pdf/math/0609534v4", "fetches": ["F048", "F049"], "read_scope": "Rules, secure communication/liveness assumptions and staged detective coalition strategy.", "extracted_characters": 46610,
+      "excerpts": [{"locator": "Communication assumptions", "quote": "we need to assume that residents can securely exchange messages"}, {"locator": "Detective strategy, Stage 2", "quote": "The detective then asks everyone to eliminate him/her (during the day phase)."}],
+      "bounded_summary_zh": "说明侦探信息和可信好人联盟可改变少数对多数的力量关系；理论策略通过侦探积累名单、向名单成员传递信息并用死亡确认身份建立联盟。",
+      "portable_mechanisms": ["可信好人集合有投票协调价值", "身份死后确认可反向认证历史报告", "信息是否能活着发布需进入价值函数"],
+      "rule_mismatches": ["安全私信、同步随机化、随机平票和大人口渐近分析不是本地消息规则；自我牺牲式策略不能直接移植，也绝不提议resign。"], "evidence_limitations": ["是特定模型下的存在性/渐近论证，不是七人对异质LLM的可执行最优策略。"], "independence_group": "braverman_theory"
+    },
+    {
+      "id": "P03", "kind": "paper", "title": "Optimal Strategy in the Werewolf Game: A Theoretical Study", "authors": ["Shitong Wang"], "date": "2025-10-16", "date_basis": "arXiv 2408.17177v2 update", "url": "https://arxiv.org/html/2408.17177v2", "fetches": ["F043"], "read_scope": "Game rules, random strategy+, equality all-in example and §4 honesty-rule/PBE derivation setup.", "extracted_characters": 79805, "previously_known": true,
+      "excerpts": [{"locator": "§4.1 Game under honesty rule", "quote": "Assume that neither the villagers nor the werewolves can convey false information when announcing messages publicly during the day."}, {"locator": "random strategy+ description", "quote": "when the number of werewolves equals the number of remaining citizens during the voting phase"}],
+      "bounded_summary_zh": "推导禁止谎报信息时预言家的信息发布决策，并在同票随机出局的模型中研究狼人相等人数时抱团。它启发状态依赖的发布/投票动态规划，但其“最优”前提恰恰排除了本地最重要的假预言家问题。",
+      "portable_mechanisms": ["把预言家发布视为有生存风险的决策", "按身份可能世界计算后续收益", "先明确对手策略和通信假设"],
+      "rule_mismatches": ["honesty rule不允许假预言家；本地允许游戏内虚假身份。", "相等人数继续投票、随机解决平票；本地相等人数已终局、平票无人出局。", "同时公开报数机制不等价于异步可见聊天。"], "evidence_limitations": ["PBE仅对所定义的简化游戏成立；不能声称本地七人局已解。"], "independence_group": "wang_theory"
+    },
+    {
+      "id": "P04", "kind": "paper", "title": "Finding Friend and Foe in Multi-Agent Games", "authors": ["Jack Serrino", "Max Kleiman-Weiner", "David C. Parkes", "Joshua B. Tenenbaum"], "date": "2019-06-05", "date_basis": "arXiv 1906.02330v1", "url": "https://arxiv.org/pdf/1906.02330v1", "fetches": ["F003", "F006"], "read_scope": "Avalon rules, public-history/joint-belief construction, impossible-world pruning, value-network architecture and evaluation setup.", "extracted_characters": 51882,
+      "excerpts": [{"locator": "§2 Avalon", "quote": "In this work, we do not consider the strategic implications of natural language communication."}, {"locator": "§3.1 deduction", "quote": "This zeroing removes any impact these impossible outcomes would have had on the value and regret calculations in CFR"}],
+      "bounded_summary_zh": "DeepRole把反事实遗憾最小化（CFR：迭代减少没选其他行动造成的后悔）与自对弈价值网络结合；对整桌身份组合和公开历史做一致性剪枝，避免各玩家局部似然产生逻辑不可能的世界。",
+      "portable_mechanisms": ["联合身份信念", "硬事实排除不可能世界", "从信息集而非全知状态选动作", "小动作空间的后悔最小化试验"],
+      "rule_mismatches": ["五人Avalon任务/组队/刺杀，无昼夜死亡和本地平票规则；不处理自然语言策略。"], "evidence_limitations": ["胜过基线/人类的结果只在该Avalon设置；CFR不能直接当作多玩家狼人杀的纳什收敛证明。"], "independence_group": "deeprole"
+    },
+    {
+      "id": "P05", "kind": "paper", "title": "Hidden-Role Games: Equilibrium Concepts and Computation", "authors": ["Luca Carminati", "Brian Hu Zhang", "Gabriele Farina", "Nicola Gatti", "Tuomas Sandholm"], "date": "2026-03-02", "date_basis": "arXiv 2308.16017v5 update", "url": "https://arxiv.org/pdf/2308.16017v5", "fetches": ["F001", "F031"], "read_scope": "Equilibrium motivation, bounded authenticated communication, mediator/private-communication reduction and computation discussion.", "extracted_characters": 140159,
+      "excerpts": [{"locator": "Comparison with Nash equilibrium", "quote": "This notion is unsuitable for our purposes because it fails to capture team coordination."}, {"locator": "Simulating mediators", "quote": "when private communication is allowed, one can efficiently simulate the existence of a mediator using secure multi-party computation"}],
+      "bounded_summary_zh": "隐藏队友的团队博弈不能简单等同双人零和扑克。解的定义依赖有没有私密通信、协调者和消息长度限制；论文给出特定条件下可计算的团队策略概念。",
+      "portable_mechanisms": ["明确团队目标与通信边界", "不要把全知团队控制器当合法单座策略", "用小型受限元博弈研究策略组合"],
+      "rule_mismatches": ["安全多方计算/协调者及可用通信轮数不是本地5条50词的自然交互，不能部署额外私有侧信道。"], "evidence_limitations": ["理论计算结果依赖条件；不能从其存在性结论推断我们有足够预算求解完整狼人杀。"], "independence_group": "carminati_hidden_role"
+    },
+    {
+      "id": "P06", "kind": "paper", "title": "Competing in a Complex Hidden Role Game with Information Set Monte Carlo Tree Search", "authors": ["Jack Reinhardt"], "date": "2020-05-14", "date_basis": "arXiv 2005.07156v1", "url": "https://arxiv.org/pdf/2005.07156v1", "fetches": ["F028", "F029"], "read_scope": "Secret Hitler representation, SO-ISMCTS motivation, experiments and computational comparison.", "extracted_characters": 44751,
+      "excerpts": [{"locator": "Abstract", "quote": "SO-ISMCTS plays as well as simpler rule based agents"}, {"locator": "Results discussion", "quote": "SO-ISMCTS on the other hand takes up to 20 seconds to choose an action."}],
+      "bounded_summary_zh": "在Secret Hitler中对信息集采样并搜索；10108场对局并未建立搜索全面胜过简单规则的结论。结果提醒：复杂规划有成本，模型错误和 rollout 对手错误可能抵消收益。",
+      "portable_mechanisms": ["隐藏世界采样", "有时限的浅层搜索", "强规则对照而非只对随机"],
+      "rule_mismatches": ["牌堆、选举和政策目标不同；没有本地预言家/夜刀/停滞规则。"], "evidence_limitations": ["论文用重叠置信区间讨论差异，不能当严谨等效性证明；20秒开销也不能外推本地。"], "independence_group": "reinhardt_ismcts"
+    },
+    {
+      "id": "P07", "kind": "paper", "title": "Re-determinizing Information Set Monte Carlo Tree Search in Hanabi", "authors": ["James Goodman"], "date": "2019-05-14", "date_basis": "arXiv 1902.06075v2", "url": "https://arxiv.org/pdf/1902.06075v2", "fetches": ["F028", "F030"], "read_scope": "Strategy fusion/non-locality, opponent information leakage, re-determinization, mixed-track Bayesian models and time budget.", "extracted_characters": 69310,
+      "excerpts": [{"locator": "Determinization discussion", "quote": "Strategy fusion occurs when an agent makes different decisions from the same information set due to implicit or explicit use of hidden information."}, {"locator": "§VIII", "quote": "Information leaks from the root player to its opponent models and causes strategy fusion in the opponent’s decisions in the tree."}],
+      "bounded_summary_zh": "策略融合是模拟中偷用了当时看不到的信息：同样观察下，因为采样世界不同而作出本不可能区分的行动。重采样对手视角、按本局动作更新对手类型，能帮助发现这种错误。",
+      "portable_mechanisms": ["每个模拟座位独立观察", "信息等价状态的动作一致性测试", "本局贝叶斯对手类型模型", "预算内叶节点评估"],
+      "rule_mismatches": ["Hanabi是完全合作卡牌游戏，沟通约定和收益不同。"], "evidence_limitations": ["重确定化也可能产生不一致虚构世界；是可用方法和风险提醒，不是本地必胜或最优性证明。"], "independence_group": "goodman_hanabi"
+    },
+    {
+      "id": "P08", "kind": "paper", "title": "A Novel Weighted Ensemble Learning Based Agent for the Werewolf Game", "authors": ["Mohiuddeen Khan", "Claus Aranha"], "date": "2022-05-19", "date_basis": "arXiv 2205.09813v1", "url": "https://arxiv.org/pdf/2205.09813v1", "fetches": ["F001", "F004"], "read_scope": "Data attributes, weighted forests, vote predictor, hate-score action rule, Tables V–VII and analysis.", "extracted_characters": 27151,
+      "excerpts": [{"locator": "§III Proposed Method", "quote": "anticipate which agent in the competition will vote for him at the end of the day in the game"}, {"locator": "§IV action rule", "quote": "Try to eliminate any agent who is going to vote for us as stated by the ensemble function."}],
+      "bounded_summary_zh": "根据支持/负面句数和长度预测谁会投自己，多个随机森林按表现加权。必须区分预测器和随后采用的报复策略：五人结果ensemble平均0.453，Takeda为0.653；15人ensemble0.506，Takeda为0.526。摘要的强表述不等于全面胜出。",
+      "portable_mechanisms": ["预测投票而非只预测身份", "用多种对手训练/校验", "受压检测服务预言家自救"],
+      "rule_mismatches": ["5/15人协议语言；对话长度与本地5x50限制不同。"], "evidence_limitations": ["五人每轮100局、15人每轮50局、各3轮；较小样本且策略评价混合多角色。敌意不是狼身份的可靠证据。"], "independence_group": "khan_vote_ensemble"
+    },
+    {
+      "id": "P09", "kind": "paper", "title": "Exploring Large Language Models for Communication Games: An Empirical Study on Werewolf", "authors": ["Yuzhuang Xu", "Shuo Wang", "Peng Li", "Fuwen Luo", "Xiaolong Wang", "Weidong Liu", "Yang Liu"], "date": "2024-05-11", "date_basis": "arXiv 2309.04658v2; first submission 2023-09", "url": "https://arxiv.org/html/2309.04658v2", "fetches": ["F002", "F022"], "read_scope": "§3 retrieval/reflection framework and §5 trust analysis; limitations around context and transfer.", "extracted_characters": 109046,
+      "excerpts": [{"locator": "§3 history retrieval", "quote": "freshness, informativeness, and completeness"}, {"locator": "§3.2 Overall Framework", "quote": "the suggestions extracted from past experiences"}],
+      "bounded_summary_zh": "冻结语言模型，通过近期消息、重要事件、反思与经验建议组织上下文。可借鉴保留死者真身份、查验与承诺的结构化记忆；不能把模型写的反思当新事实。",
+      "portable_mechanisms": ["近期消息加关键事实记忆", "事件/发言分离", "离线失败归纳", "本局信任关系图"],
+      "rule_mismatches": ["游戏环境、角色及跨对局经验流程并非本地合同；正式赛每局清空，不能在线跨局积累经验。"], "evidence_limitations": ["观察到信任/欺骗等行为不等于稳定最优策略；本目录未复现实验。"], "independence_group": "yuzhuang_xu_retrieval"
+    },
+    {
+      "id": "P10", "kind": "paper", "title": "Enhance Reasoning for Large Language Models in the Game Werewolf", "authors": ["Shuang Wu", "Liwen Zhu", "Tao Yang", "Shiwei Xu", "Qiang Fu", "Wei Yang", "Haobo Fu"], "date": "2024-03-29", "date_basis": "arXiv 2402.02330v2", "url": "https://arxiv.org/html/2402.02330v2", "fetches": ["F002", "F023"], "read_scope": "Listener/Thinker/Presenter architecture, §4.1–4.3 inference, human speech ratings and online evaluation.", "extracted_characters": 116339,
+      "excerpts": [{"locator": "Architecture", "quote": "The Thinker produces policies such as planning and actions, and generates strategic instructions for the Presenter."}, {"locator": "§4.3", "quote": "the skill level of participants can significantly affect the evaluation results."}],
+      "bounded_summary_zh": "将语言理解、策略计算、文本表达分层；Thinker用18800场人类数据和强化学习训练。离线身份判断、约400段发言人工打分、三种九人混合各约600轮是不同评价，不能互相代替。",
+      "portable_mechanisms": ["语言只负责抽取/表达，策略内核负责选择", "消息和行动一致性检查", "异质对手混合评估"],
+      "rule_mismatches": ["九人有女巫/猎人，行为分包含毒药/开枪，与本地不同。"], "evidence_limitations": ["规模化训练和外部模型不是临近截止的低风险实现；结果不能保证轻量本地模仿同样提高。"], "independence_group": "tencent_thinker"
+    },
+    {
+      "id": "P11", "kind": "paper", "title": "An Implementation of Werewolf Agent That does not Truly Trust LLMs", "authors": ["Takehiro Sato", "Shintaro Ozaki", "Daisaku Yokoyama"], "date": "2024-09-03", "date_basis": "arXiv 2409.01575v1", "url": "https://arxiv.org/html/2409.01575v1", "fetches": ["F007"], "read_scope": "Extraction, rule/template gating, accused-wolf example, termination policy, qualitative evaluation and conclusion.", "extracted_characters": 37615,
+      "excerpts": [{"locator": "Introduction: Rule-based algorithm with LLMs", "quote": "If the talk is inappropriate, the rule-based algorithm uses a predefined template utterance."}, {"locator": "§6 Conclusion", "quote": "on average, there is one contradictory utterance in five games."}],
+      "bounded_summary_zh": "用结构化聊天抽取加规则选择模板/LLM输出；被查杀的狼可反跳而非一味否认；共识完成时终止讨论。作者仍报告长对话导致自我矛盾，因此模板和记忆都需要检查。",
+      "portable_mechanisms": ["规则保护层", "自身说法持久台账", "受压反跳条件", "有条件终止/保留反应机会"],
+      "rule_mismatches": ["五人局包含狂人；本地两狼、角色死后公开和限消息不同。"], "evidence_limitations": ["主要是实现案例和主观质量评估，非本地胜率提升证据。"], "independence_group": "sato_hybrid"
+    },
+    {
+      "id": "P12", "kind": "paper", "title": "CSP4SDG: Constraint and Information-Theory Based Role Identification in Social Deduction Games with LLM-Enhanced Inference", "authors": ["Kaijie Xu", "Fandi Meng", "Clark Verbrugge", "Simon Lucas"], "date": "2025-11-09", "date_basis": "arXiv 2511.06175v1", "url": "https://arxiv.org/html/2511.06175v1", "fetches": ["F001", "F036"], "read_scope": "Evidence/phenomenon/assertion/hypothesis classes, pruning/scoring, entropy weights, dataset extraction and Tables 2–3.", "extracted_characters": 76245,
+      "excerpts": [{"locator": "Inference Procedure", "quote": "Prune Apply all hard constraints"}, {"locator": "Experiments", "quote": "we report exact per-player role accuracy, a much harder target."}, {"locator": "Dialogue Datasets Analysis", "quote": "the Lying‑Good split contains only a handful of games (n = 4)"}],
+      "bounded_summary_zh": "把硬证据与可撒谎的陈述/猜测区分，对可行整桌角色组合加权后求角色概率。信息增益用于软假设权重。实验是三个语料上的角色识别，不是完整游戏胜率；强断言权重及真话好人假设必须谨慎。",
+      "portable_mechanisms": ["硬约束排除与软证据打分分层", "完整角色组合归一化", "冲突解释", "低置信证据限权"],
+      "rule_mismatches": ["Avalon/Mafia语料角色和公开信息不同，不能把其事件语法直接套入本地。"], "evidence_limitations": ["高信息增益不等于真实；给不可信发言巨大权重会使模型自信地错。谎言好人仅4局；无本地对战验证。"], "independence_group": "lucas_information_inference"
+    },
+    {
+      "id": "P13", "kind": "paper", "title": "Do LLMs Trust the Accuser or the Accusation? Measuring Belief Shifts in Werewolf", "authors": ["Yu-Yu Yang", "Ti-Rong Wu", "Hung Guei", "Hsing-Yu Chen", "I-Chen Wu"], "date": "2026-09-11", "date_basis": "arXiv 2609.12446v1", "url": "https://arxiv.org/html/2609.12446v1", "fetches": ["F001", "F037"], "read_scope": "Observer belief-shift setup, §4 results, §5 discussion and limitations.", "extracted_characters": 69034,
+      "excerpts": [{"locator": "§5 Discussion", "quote": "models generally shift suspicion toward the accused target and away from the accuser"}, {"locator": "Limitations", "quote": "we measure only the receiver side of belief updating."}],
+      "bounded_summary_zh": "用冻结游戏历史比较一条指控前后，观察模型对说话者和被指控者的信念。发现更大模型仍易采纳指控，尤其当说话者先前被信任时。它支持测试“指控被重复当事实”的失败模式。",
+      "portable_mechanisms": ["记录每条消息的信念增量", "区分来源可信度与指控证据", "限制无证据重复指控的影响"],
+      "rule_mismatches": ["观察者评测不等于本地在线策略；只测1B–120B开源权重模型。"], "evidence_limitations": ["不含GPT/Claude/Gemini前沿闭源系统；不证明主动重复指控能提高狼人真实胜率；不授权提示注入。"], "independence_group": "yang_accusation"
+    },
+    {
+      "id": "P14", "kind": "paper", "title": "RLupus: Cooperation through emergent communication in The Werewolf social deduction game", "authors": ["Nicolo' Brandizzi", "Davide Grossi", "Luca Iocchi"], "date": "2021-11-08", "date_basis": "arXiv 2106.05018v2", "url": "https://arxiv.org/pdf/2106.05018v2", "fetches": ["F001", "F044"], "read_scope": "Signal/action environment, scripted wolf policies, nine-player results and conclusions.", "extracted_characters": 60815,
+      "excerpts": [{"locator": "§7 Conclusions", "quote": "a Boolean signal range is preferred to an integer one."}, {"locator": "§7 Conclusions", "quote": "much of the villagers’ winning rate is determined by the agents not voting for themselves while keeping the accord value to a maximum."}],
+      "bounded_summary_zh": "在合成通信信号环境训练好人，对随机/报复/统一目标的脚本狼做比较。通信可带来协调收益，但部分改进来自避免自投和集中票，不能解释为学会高级测谎。",
+      "portable_mechanisms": ["把共同目标作为显式消息", "集中票与独立身份准确率分开测", "小型离散沟通动作空间"],
+      "rule_mismatches": ["九人三狼、仅两类角色；合成信号而非自由自然语言；本地本来就禁止自投。"], "evidence_limitations": ["弱脚本对手下的大收益不代表异质强对手收益；大量提升机制在本地已不存在。"], "independence_group": "rlupus"
+    },
+    {
+      "id": "P15", "kind": "paper", "title": "Learning to Discuss Strategically: A Case Study on One Night Ultimate Werewolf", "authors": ["Xuanfa Jin", "Ziyan Wang", "Yali Du", "Meng Fang", "Haifeng Zhang", "Jun Wang"], "date": "2025-01-12", "date_basis": "arXiv 2405.19946v2", "url": "https://arxiv.org/html/2405.19946v2", "fetches": ["F001", "F045"], "read_scope": "ONUW assumptions, PBE with/without discussion and §5.1 learned discussion-tactic controller.", "extracted_characters": 112513,
+      "excerpts": [{"locator": "§5.1 Learning Discussion Policy by RL", "quote": "we only need to learn the discussion policy"}, {"locator": "Abstract", "quote": "the potential role changes that increase the uncertainty and complexity of the game"}],
+      "bounded_summary_zh": "把选择讨论策略与生成句子分开：强化学习选战术，LLM按信念表达。讨论改变他人信念，因而本身应视为动作，而不只是对最终投票的解释。",
+      "portable_mechanisms": ["话术意图控制器", "信息披露/询问/指控等有限策略空间", "按信念和公共历史选沟通动作"],
+      "rule_mismatches": ["One Night角色可换、单夜终局，没有多夜死亡、平安首夜和三次停滞机制。"], "evidence_limitations": ["PBE只针对论文的小场景；不能沿用其信念状态和收益边界求本地最优。"], "independence_group": "jin_onuw"
+    },
+    {
+      "id": "P16", "kind": "paper", "title": "Enhancing Dialogue Generation in Werewolf Game Through Situation Analysis and Persuasion Strategies", "authors": ["Zhiyang Qi", "Michimasa Inaba"], "date": "2024-09-04", "date_basis": "arXiv 2408.16586v2", "url": "https://arxiv.org/html/2408.16586v2", "fetches": ["F001", "F046"], "read_scope": "Situation analysis, logical/credibility/emotional appeal taxonomy and response examples.", "extracted_characters": 33933,
+      "excerpts": [{"locator": "Abstract", "quote": "logical appeal, credibility appeal, and emotional appeal"}],
+      "bounded_summary_zh": "提供可操作的说服分类：以证据推理、建立可信度、诉诸情绪。可在相同策略动作下比较简短事实式和合作式表达。文中某些“我是裁判/冠军”权威例句不纳入本地策略。",
+      "portable_mechanisms": ["证据-结论-投票请求的短发言", "合作式说明与直接指控对照", "先分析局势再生成表达"],
+      "rule_mismatches": ["AIWolfDial语言/角色/轮次不同；本地不能冒充系统或赛事权威，也不能攻击对手程序。"], "evidence_limitations": ["系统描述与示例不是独立对照的胜率证据；情绪化未必适合纯规则对手。"], "independence_group": "qi_inaba_persuasion"
+    },
+    {
+      "id": "P17", "kind": "paper", "title": "Learning Strategic Language Agents in the Werewolf Game with Iterative Latent Space Policy Optimization", "authors": ["Zelai Xu", "Wanjun Gu", "Chao Yu", "Yi Wu", "Yu Wang"], "date": "2025-06-18", "date_basis": "arXiv 2502.04686v3", "url": "https://arxiv.org/html/2502.04686v3", "fetches": ["F001", "F047"], "read_scope": "§3.1 latent strategy generation/clustering, §3.2 finite-game CFR, proof-of-concept evaluation and discussion of PSRO.", "extracted_characters": 94470,
+      "excerpts": [{"locator": "§3.1", "quote": "abstract the vast language action space into a finite set of latent strategies"}, {"locator": "§3.2", "quote": "we replace the free-form discussion actions with the discrete latent strategies"}],
+      "bounded_summary_zh": "把无限文本空间压缩成有限战术意图，用CFR调整选择概率，再迭代扩充和微调语言模型。启发我们先实现小而安全的策略菜单，不要在每句原始文本上搜索。",
+      "portable_mechanisms": ["离散策略库", "混合策略而非固定模板顺序", "候选战术覆盖审计", "离线策略扩充"],
+      "rule_mismatches": ["训练环境不是本地规则；语言聚类后的抽象也会丢掉50词内关键差别。"], "evidence_limitations": ["五选一手势游戏中的纳什结果不证明狼人杀也达到均衡；与P19同一研究线，不算独立复制。"], "independence_group": "zelai_xu_strategic_agents"
+    },
+    {
+      "id": "P18", "kind": "paper", "title": "Strategy Adaptation in Large Language Model Werewolf Agents", "authors": ["Nakamori Fuya", "Yin Jou Huang", "Fei Cheng"], "date": "2025-07-17", "date_basis": "arXiv 2507.12732v1 author spelling as retrieved", "url": "https://arxiv.org/html/2507.12732v1", "fetches": ["F040"], "read_scope": "Eight-player setup, Support/Attack controller, 30-game settings and §5.2 ablations.", "extracted_characters": 26735, "previously_known": true,
+      "excerpts": [{"locator": "§5.2 Ablation Study", "quote": "for Villagers, agents with only adaptation achieved the highest win rate, while agents incorporating role estimation performed worse."}],
+      "bounded_summary_zh": "在支持潜在队友与攻击潜在对手之间切换，狼人收益较稳定，好人不一定获益。角色估计错误可能使自适应控制器放大错误，值得测试置信度门控而非始终相信一个排序。",
+      "portable_mechanisms": ["支持/指控按局势切换", "角色专用控制器", "推断不确定时回退保守行为"],
+      "rule_mismatches": ["八人2W4V1S1Doctor且沿用Arena；无医生本地的预言家暴露代价不同。"], "evidence_limitations": ["各设置约30场，样本小；角色估计准确率差导致坏结果，不能概括为自适应必优。"], "independence_group": "nakamori_adaptation"
+    },
+    {
+      "id": "P19", "kind": "paper", "title": "Language Agents with Reinforcement Learning for Strategic Play in the Werewolf Game", "authors": ["Zelai Xu", "Chao Yu", "Fei Fang", "Yu Wang", "Yi Wu"], "date": "2025-05-29", "date_basis": "arXiv 2310.18940v4", "url": "https://arxiv.org/html/2310.18940v4", "fetches": ["F041"], "read_scope": "§3 rules, §4.1–4.3 fact/deduction/candidate-action pipeline and population RL, §5.2 round robin and Appendix E.4 limitations.", "extracted_characters": 115488, "previously_known": true,
+      "excerpts": [{"locator": "§4.1", "quote": "facts, potential truths, and potential deceptions"}, {"locator": "§4.3", "quote": "learns a smaller RL policy to optimize the action distribution"}],
+      "bounded_summary_zh": "先整理事实与可能谎言，再生成多种策略动作，最后用小型策略模型选择，不让LLM的默认偏好固定行为。对多种基线组成的种群训练和循环对战，比只与自己的镜像对局更有说服力。",
+      "portable_mechanisms": ["事实/断言类型区分", "不同战略的候选动作", "低成本选择器", "多对手种群训练与评估"],
+      "rule_mismatches": ["虽然也是七人，但为2W1S1Doctor3V，不是本地2W1S4V。"], "evidence_limitations": ["生成的人类风格代理不是真人；只对适配后基线评估，训练算力和转移收益未知。"], "independence_group": "zelai_xu_strategic_agents"
+    },
+    {
+      "id": "P20", "kind": "paper", "title": "Werewolf Arena: A Case Study in LLM Evaluation via Social Deduction", "authors": ["Suma Bailis", "Jane Friedhoff", "Feiyang Chen"], "date": "2024-07-18", "date_basis": "arXiv 2407.13943v1", "url": "https://arxiv.org/html/2407.13943v1", "fetches": ["F042"], "read_scope": "Bidding-based discussion and evaluation/limitations sections.", "extracted_characters": 42395, "previously_known": true,
+      "excerpts": [{"locator": "Abstract", "quote": "a dynamic turn-taking system based on bidding"}, {"locator": "§8 Limitations", "quote": "the limited number of games played, 10 for each model pair, may not provide statistically robust results."}],
+      "bounded_summary_zh": "把何时争取发言视为策略并提供模型竞技场；适合启发有限消息的机会成本分析。论文自己强调每模型配对10局不足以稳健排名。",
+      "portable_mechanisms": ["消息时机与剩余预算", "只在新证据/受压/协调时发言", "区分模型排名与机制证据"],
+      "rule_mismatches": ["含医生、竞价决定发言权；本地无竞价且异步最多5条。"], "evidence_limitations": ["小样本不能证明某一模型或话术普遍更强。"], "independence_group": "bailis_arena"
+    },
+    {
+      "id": "P21", "kind": "paper", "title": "Strategies for an Autonomous Agent Playing the Werewolf game as a Stealth Werewolf", "authors": ["Shoji Nagayama", "Jotaro Abe", "Kosuke Oya", "Kotaro Sakamoto", "Hideyuki Shibuki", "Tatsunori Mori", "Noriko Kando"], "date": "2019-10", "date_basis": "ACL Anthology W19-8305; pages 20–24", "url": "https://aclanthology.org/W19-8305.pdf", "fetches": ["F032", "F033", "F034", "F038"], "read_scope": "Corpus setup, §4 utterance/mention decision trees and §5 whisper coordination.", "extracted_characters": 17905,
+      "excerpts": [{"locator": "§5 Influence of whispers", "quote": "“Asking” increases the utterance number of a specific player intentionally by seeking a response by speaking to a specific player."}],
+      "bounded_summary_zh": "分析人类论坛局中发言次数、被提及次数、狼密语与输赢的关联，提出有目标地询问和狼间协调。潜伏狼不等于永远少说话：数据里活跃狼也可能赢。",
+      "portable_mechanisms": ["定向提问", "让声明可在后续核验", "合法狼队内协调", "测发言可识别性而非盲目沉默"],
+      "rule_mismatches": ["9–15人长论坛局，很多发言和密语；本地短窗口更稀缺。只允许本局同伴合法私信。"], "evidence_limitations": ["观察相关性：活得久自然说得更多；不能把发言量与胜率关联当作多说一句的因果收益。"], "independence_group": "nagayama_stealth"
+    },
+    {
+      "id": "P22", "kind": "paper", "title": "AIWolfDial 2023: Summary of Natural Language Division of 5th International AIWolf Contest", "authors": ["Yoshinobu Kano", "Neo Watanabe", "Kaito Kagaminuma", "Claus Aranha", "Jaewon Lee", "Benedek Hauer", "Hisaichi Shibata", "Soichiro Miki", "Yuta Nakamura", "Takuya Okubo", "Soga Shigemura", "Rei Ito", "Kazuki Takashima", "Tomoki Fukuda", "Masahiro Wakutani", "Tomoya Hatanaka", "Mami Uchida", "Mikio Abe", "Akihiro Mikami", "Takashi Otsuki", "Zhiyang Qi", "Michimasa Inaba", "Kei Harada", "Daisuke Katagami", "Hirotaka Osawa", "Fujio Toriumi"], "date": "2023-09", "date_basis": "ACL Anthology 2023.inlg-genchal.13, pages 84–100", "url": "https://aclanthology.org/2023.inlg-genchal.13.pdf", "fetches": ["F035", "F039", "F053"], "read_scope": "Contest rules, system descriptions, memory/consistency passages and report conclusions; not every transcript.", "extracted_characters": 66604,
+      "excerpts": [{"locator": "Abstract", "quote": "the generated talks are sometimes inconsistent with the game actions"}, {"locator": "§2.2", "quote": "the agents cannot refer to other agents’ talks of the same turn."}],
+      "bounded_summary_zh": "联合主办者/参赛者报告区分了语言自然度和真正推理能力；记录生成文本与动作冲突。适合为本地建立承诺-投票一致性、角色故事一致性和合法性指标，而非只看漂亮话。",
+      "portable_mechanisms": ["消息与行动一致性审计", "声明/真实私有状态双台账", "语言评估与阵营胜率分开"],
+      "rule_mismatches": ["五人1W1S1Possessed2V；最多10同步轮，每轮看不到同轮他人发言；本地异步规则不同。"], "evidence_limitations": ["人类主观评估和日志分析，不是某策略因果胜率试验。"], "independence_group": "aiwolfdial_report"
+    },
+    {
+      "id": "P23", "kind": "paper", "title": "Deduction Game Framework and Information Set Entropy Search", "authors": ["Fandi Meng", "Simon Lucas"], "date": "2024-07-30", "date_basis": "arXiv 2407.21178v1", "url": "https://arxiv.org/html/2407.21178v1", "fetches": ["F027", "F068"], "read_scope": "Information-state representations, entropy equations, sampled ISES algorithm and eight-game results.", "extracted_characters": 20323,
+      "excerpts": [{"locator": "§V Results", "quote": "The goal of these games is to decipher the game’s secret efficiently"}, {"locator": "§V Results", "quote": "each of the four agents undergoing 500 trials for each variant."}],
+      "bounded_summary_zh": "对每个候选查询计算查验后可能世界的平均剩余不确定性（熵），选平均最能缩小未知的动作；还给定时采样版本。八个单人推理游戏中与随机和SO-ISMCTS比较。",
+      "portable_mechanisms": ["查验的期望信息增益基线", "按结果分支更新后验", "限时穷举/采样"],
+      "rule_mismatches": ["单人目标就是解谜，本地目标是阵营获胜，查到的信息还可能随自己死亡无法发布。"], "evidence_limitations": ["最大熵减并非多玩家狼人杀最优；必须对比赢面增量和信息可发布概率。与P12共享研究者但为不同任务。"], "independence_group": "lucas_information_inference"
+    },
+    {
+      "id": "P24", "kind": "paper", "title": "Auditing Belief-Conditioned LLM Agents in Hidden-Information Social Deduction Games", "authors": ["Yuan Gao", "Jiangyi Yang", "Yao Zhao", "Yichi Zhang"], "date": "2026-07-12", "date_basis": "arXiv 2607.10814v1", "url": "https://arxiv.org/html/2607.10814v1", "fetches": ["F001", "F071"], "read_scope": "Information isolation, belief/action audit, paired evaluation, forced-consumption/load confounds and §8 limitations.", "extracted_characters": 97347,
+      "excerpts": [{"locator": "Introduction", "quote": "when belief is flat, forcing consumption can be counterproductive and should be rejected"}, {"locator": "§8 Discussion", "quote": "leave open whether the effect comes from belief content, prompt structure, or indirect behavioral change."}],
+      "bounded_summary_zh": "九人环境1080场多组审计；200配对种子里好人胜率0.205到0.390，但行动与信念直接一致率仅约0.21，且只给狼信念也会帮助好人。作者明确不把胜率关联归因于更好推理，拒绝强制采纳不可靠信念。",
+      "portable_mechanisms": ["信念-行动偏离日志", "按阵营/信念内容/强制使用做消融", "把服务负载故障与策略效果隔离", "只在离线审查后改策略"],
+      "rule_mismatches": ["九人女巫等机制不同，毒药错误收益不适用于无医生/无女巫的本地。"], "evidence_limitations": ["预印本、未独立复现；研究自身保留混杂解释，不能把其胜率差当本地收益承诺。"], "independence_group": "gao_belief_audit"
+    },
+    {
+      "id": "C01", "kind": "official_competition_results", "title": "Final Results of the 1st International AIWolf competition at ANAC 2019", "authors": ["AIWolf Project organizers"], "date": "2019-08-15", "date_basis": "page publication date", "url": "https://aiwolf.org/en/archives/2262", "fetches": ["F069", "F070"], "read_scope": "Entire official results content, not comments/navigation.", "extracted_characters": 3424,
+      "excerpts": [{"locator": "Final Results", "quote": "1st place：takeda"}, {"locator": "Evaluation description", "quote": "Each agent ran a minimum of 10000 games"}],
+      "bounded_summary_zh": "正式核验takeda是2019协议赛第一，不依赖后续队伍自述。总胜率0.60024，分角色表现不同；三队因崩溃被取消资格也说明可靠性是竞争力的一部分。",
+      "portable_mechanisms": ["强基线选择", "分角色报告", "稳定性与策略一起评估"], "rule_mismatches": ["5/15人协议赛，非本地7人自然语言。"], "evidence_limitations": ["排行榜不能隔离算法组件因果贡献；不证明今天对手分布相同。"], "independence_group": "official_aiwolf_results"
+    },
+    {
+      "id": "C02", "kind": "official_competition_results", "title": "The 5th International AI Werewolf Competition Protocol Division — Final Results", "authors": ["AIWolf Project organizers"], "date": "2023", "date_basis": "competition schedule on page; exact publication day not stated", "url": "https://aiwolf.github.io/CompetitionProtocolDivision/en/", "fetches": ["F054", "F052"], "read_scope": "Entire results table and competition schedule.", "extracted_characters": 2437,
+      "excerpts": [{"locator": "Final Results", "quote": "approximately 360,000 games were played"}, {"locator": "Ranking table", "quote": "1 pronto Java 63.8%"}],
+      "bounded_summary_zh": "2023协议赛冠军是pronto，第二gotsumori、第三ddhb；15人和5人各约180000局，15人有三个替代dummy。未取得pronto算法说明，因此不冒称其具体机制。",
+      "portable_mechanisms": ["核对冠军身份而非引用传闻", "大样本/不同角色和对手组成的报告"], "rule_mismatches": ["人工协议、多角色、混合5/15人；不是本地成绩预测。"], "evidence_limitations": ["只核验名次和评估规模；不能用pronto名次支持未读取的算法描述。"], "independence_group": "official_aiwolf_results"
+    }
+  ],
+  "strategy_taxonomy": [
+    {"id": "T01", "name_zh": "整桌身份组合的贝叶斯推断", "supports": ["A01", "P04", "P12"], "evidence_level": "verified_mechanism_local_transfer_untested", "mechanism_zh": "先列出满足2W1S4V的身份组合，再按本座信息与公共历史更新权重；每人狼概率由组合求和，避免七个独立分数违反狼总数。", "local_design_zh": "总分配105种；已知自己是村民时60种、预言家时15种、狼且知道同伴时5种预言家位置。死亡/本人查验继续剪枝。", "failure_zh": "把猜测当硬证据、忘记组合中的角色数量、使用其他座位私有结果。"},
+    {"id": "T02", "name_zh": "硬事实与软断言分层", "supports": ["P04", "P12", "P19", "RULES"], "evidence_level": "verified_mechanism_and_local_rule", "mechanism_zh": "引擎公布死亡身份、本人查验及狼同伴是硬约束；自称预言家、黑查、投票承诺只是说话者的断言。", "local_design_zh": "每条证据记录来源、日期、目标、否定/转述关系、是否可被公开核验。", "failure_zh": "未被反跳的预言家直接升为概率1；群众复述同一谎言被算成多份独立证据。"},
+    {"id": "T03", "name_zh": "校准可信度与相关证据限权", "supports": ["A01", "P12", "P13", "P18", "P24"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "将不确定语言证据的似然比截断，重复/同源证据只记有限增量；低置信时退回硬事实先验。", "local_design_zh": "用离线合法观察轨迹计算Brier分数和校准图；测试一次强指控是否能把世界权重压到不合理的零。", "failure_zh": "软分数伪装成概率，错误估计被决策层放大；熵低不代表正确。"},
+    {"id": "T04", "name_zh": "角色声明和查验时间线", "supports": ["P11", "P22", "A04"], "evidence_level": "verified_mechanism_local_design", "mechanism_zh": "记录首次跳身份、每夜声称查谁、报告颜色及更正；区分主动跳、被查杀后反跳和他人转述。", "local_design_zh": "每夜最多一个本人查验；同夜相互矛盾报告和已死亡目标等形成可解释异常。", "failure_zh": "把迟跳自动等同狼；忽略引述、否定或纠正；凭发言猜不存在的医生身份。"},
+    {"id": "T05", "name_zh": "竞争预言家多假设推断", "supports": ["P04", "P12", "P11", "RULES"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "并行保留不同真预言家/无人可信的世界，按硬事实校验各报告，而不是把所有claimers加固定嫌疑。", "local_design_zh": "考虑村民战略谎报或解析错误的非零可能；死者真身份可靠但不自动保证其每句报告正确。", "failure_zh": "误把某假预言家猜中一只狼当绝对认证；两狼互相配合黑查制造认证。"},
+    {"id": "T06", "name_zh": "投票关系与反断联模型", "supports": ["A01", "A04", "A07"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "分析谁救谁、追随谁和投给谁，但允许狼投狼、狼跟真预言家，不能简单按同票聚成同阵营。", "local_design_zh": "只用已结算vote_history，按当时可见压力和存活数解释行为。", "failure_zh": "忽略身内切/巴士票，或把今日未公开选票当已知。"},
+    {"id": "T07", "name_zh": "票势预测与身份预测分离", "supports": ["P08", "A02"], "evidence_level": "verified_mechanism_local_transfer_untested", "mechanism_zh": "单独预测每位活人可能投谁；此分布用于自救、协调和避免分票，不等同狼概率。", "local_design_zh": "输入本局声明、已公开往日票、接收消息；输出混合策略下的目标分布而非确定票数。", "failure_zh": "报复反对自己的人；将承诺当保证；非同款代理不会按我们的模板投票。"},
+    {"id": "T08", "name_zh": "夜刀选择反推与反向栽赃防御", "supports": ["A01", "A02", "RULES"], "evidence_level": "own_conjecture_with_related_mechanisms", "mechanism_zh": "夜死者已证明非狼，可看其此前查验/协调价值，但不要断言狼一定只杀最准确者。", "local_design_zh": "使用多种狼刀模型的混合似然，包括杀预言家、杀可信票源、栽赃、低座位失配。", "failure_zh": "把未死预言家直接判假，或把被夜刀者所有怀疑当遗言真相。"},
+    {"id": "T09", "name_zh": "预言家查验的期望信息增益", "supports": ["P23", "P12"], "evidence_level": "verified_general_mechanism_local_transfer_untested", "mechanism_zh": "对每个合法未查目标，按狼/好两个结果算后验平均熵，选最能减少身份组合不确定性的目标。", "local_design_zh": "穷举15个或更少的预言家可行狼组合；与随机未查、最可疑目标作对照。", "failure_zh": "最高信息量不等于最快获胜；查验收益可能无法活着发布。"},
+    {"id": "T10", "name_zh": "预言家查验的阵营赢面价值", "supports": ["P02", "P03", "P23", "RULES"], "evidence_level": "own_conjecture", "mechanism_zh": "选能改变下一次有效投票的目标，而非单纯熵减；将发布机会、是否本已被放逐、清白联盟大小和终局算进去。", "local_design_zh": "比较E[查验后最优合法行动价值]与无查验信息的价值；未来模拟只给各座位其合法观察。", "failure_zh": "全知rollout虚增信息价值；假设死亡预言家仍能发言。"},
+    {"id": "T11", "name_zh": "预言家条件式公开身份", "supports": ["P02", "P03", "P10", "RULES"], "evidence_level": "verified_question_not_local_optimum", "mechanism_zh": "在黑查、反跳、自己将出局、清白者将误出局或临近必胜票阈值时比较公开与隐藏。", "local_design_zh": "首夜必有一查且无医生；必须同时评估夜死风险和当日挽救的票。", "failure_zh": "把有医生环境的首日公开默认移植；隐藏到死亡使信息永久丢失。"},
+    {"id": "T12", "name_zh": "清白集合与公开信息排序", "supports": ["P02", "P10", "RULES"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "真预言家优先发布能改变当日结果的黑查或关键白查，用清白集合组织同一目标。", "local_design_zh": "一条短消息可包含身份、夜次、目标、结果、今日建议；仅公布本座实际可知的真查验。", "failure_zh": "以本人存活替代阵营收益；公布顺序诱发狼先杀关键协调者；清白不等于会合作。"},
+    {"id": "T13", "name_zh": "争议身份的有成本验证", "supports": ["P03", "P04", "RULES"], "evidence_level": "own_conjecture", "mechanism_zh": "放逐claimant会公开真身份，但付出一票和后续夜刀；比较放逐声明者、其查杀目标及其他人的完整后续收益。", "local_design_zh": "绝不设“两个预言家一定先杀其中一个”的普适规则；先查4/5/6人终局边界。", "failure_zh": "牺牲真预言家后在可获得验证价值前已经达到狼胜条件。"},
+    {"id": "T14", "name_zh": "死亡认证与报告追溯", "supports": ["P02", "P12", "RULES"], "evidence_level": "verified_rule_and_inference", "mechanism_zh": "死亡身份是硬事实，用它回溯所有角色声明、查验报告、投票关系并重算世界。", "local_design_zh": "区分角色被确认与话语正确性；只保留确实说过且解析可靠的结果，不补造死者最后一夜查验。", "failure_zh": "把聊天臆测写回引擎事实，或想当然给死去预言家增加未发表结果。"},
+    {"id": "T15", "name_zh": "复数票制下的集中票与枢纽选票", "supports": ["A02", "P08", "P14", "RULES"], "evidence_level": "verified_general_mechanism_local_design", "mechanism_zh": "区分最高狼嫌疑目标与最能改变淘汰结果的票；在收益相近的目标间选择能汇合好人票的一个。", "local_design_zh": "整合概率票势而非假设绝对多数；声明目标清楚且与最终行动一致。", "failure_zh": "盲目跟随狼制造的多数；所有座位一起追逐变化目标产生振荡。"},
+    {"id": "T16", "name_zh": "平票/弃票/错杀的状态依赖比较", "supports": ["RULES", "P01", "P03"], "evidence_level": "local_rule_deduction_plus_own_solver_design", "mechanism_zh": "把无淘汰日也作为真实动作后果，传播夜刀、停滞计数和下一白天信息；不用“永不弃票”替代计算。", "local_design_zh": "最小反例4人1狼：错杀后夜刀终局，平票后还有3人白天；第三次停滞另行直接判狼胜。", "failure_zh": "错用随机平票淘汰文献或忽略stall_count，导致错误效用。"},
+    {"id": "T17", "name_zh": "狼人合法分票与停滞施压", "supports": ["RULES"], "evidence_level": "own_conjecture_derived_from_local_rules", "mechanism_zh": "当无法推动好人出局时，比较制造平票、延长不确定性和靠第三次停滞获胜的收益。", "local_design_zh": "只通过游戏允许的聊天和投票行动；需要概率建模其他选票。", "failure_zh": "以为两狼自动控制7人票；公开分票暴露同伴；利用resign或超时不属于本策略。"},
+    {"id": "T18", "name_zh": "小残局精确状态搜索", "supports": ["P01", "P03", "P04", "RULES"], "evidence_level": "own_local_design", "mechanism_zh": "先解3–5人合法状态和少量投票模型，显式终局检查比直接实现巨型LLM搜索更可靠。", "local_design_zh": "两个狼人四人即终局；三人一狼日必须放逐狼才可赢。输出在本座信息集上的混合决策。", "failure_zh": "穷举的是隐藏身份而非可观察信息导致全知作弊；投票承诺被当已知动作。"},
+    {"id": "T19", "name_zh": "多世界保守规划", "supports": ["P04", "P07", "P12"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "对每个可行世界估计同一合法动作的效果，再按后验或保守风险指标聚合；不得先知道世界再各选不同动作。", "local_design_zh": "联合信念很小，优先枚举而非蒙特卡洛；对手的未来判断也只能基于其可能获得的信息。", "failure_zh": "策略融合、错误共享私有查验、乐观假设对方像自己一样理性。"},
+    {"id": "T20", "name_zh": "信息集蒙特卡洛树搜索", "supports": ["P06", "P07"], "evidence_level": "verified_algorithm_local_transfer_unproven", "mechanism_zh": "从本座信念采样世界，在有限消息/投票宏动作上逐步搜索；每层维护行动者的信息隔离。", "local_design_zh": "先限制深度和毫秒预算；与不搜索的强规则及精确小残局对照。", "failure_zh": "20秒搜索也可能不如简单规则；重采样产生不可能世界；模拟聊天模型成本过高。"},
+    {"id": "T21", "name_zh": "CFR与有限策略元博弈", "supports": ["P04", "P05", "P17"], "evidence_level": "verified_method_with_restricted_scope", "mechanism_zh": "把候选发言意图、声明时机和投票策略当有限动作，离线学习概率混合，减少可利用的固定偏好。", "local_design_zh": "先解受限残局或策略菜单；完整多人隐藏团队均衡保证不自动成立。", "failure_zh": "把双人零和收敛结论误用于七人局；抽象丢失决定胜负的发言差异。"},
+    {"id": "T22", "name_zh": "可解释的受控随机化", "supports": ["P17", "P19", "A01"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "在近似同价值策略间随机，避免固定座位/模板成为狼身份特征；不是在明显劣行动上均匀乱选。", "local_design_zh": "对好人协调用明确公共承诺，对狼夜刀确保两人理解同一目标；随机性只来源于本座合法状态。", "failure_zh": "独立随机导致好人分票或两狼夜刀分歧；公开固定随机种子被对手利用。"},
+    {"id": "T23", "name_zh": "狼人公开行为与村民一致", "supports": ["A06", "A04", "P19"], "evidence_level": "verified_strategy_description_local_transfer_untested", "mechanism_zh": "相同公共历史下，狼尽量复用村民式措辞和承诺分布，避免绕开同伴或专用沉默句暴露身份。", "local_design_zh": "离线盲测仅凭首日消息能否猜阵营；在模仿导致队友必死时计算是否值得。", "failure_zh": "为了隐藏而无条件送掉同伴；只替换词面而保留稳定目标选择侧信道。"},
+    {"id": "T24", "name_zh": "主动跳/被查杀反跳的策略选择", "supports": ["A01", "A04", "P11"], "evidence_level": "verified_strategy_description_local_transfer_untested", "mechanism_zh": "比较潜伏、主动假预言家、被真实黑查后反跳；声明必须与当前可行故事及历史陈述一致。", "local_design_zh": "平安首夜允许一个结果；无医生使真实预言家更脆弱但死后立即认证。", "failure_zh": "首次跳晚等于狼的确定规则；同伴同时反跳；造出多夜不存在的结果。"},
+    {"id": "T25", "name_zh": "狼人真实状态与伪装故事双台账", "supports": ["P11", "P22"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "真实私有狼知识与公开自称身份/假查验分开保存；每次生成发言检验前后一致和当日可说信息。", "local_design_zh": "假查验可在游戏内合法说谎，但不能泄露同伴字段或给对手程序下指令。", "failure_zh": "LLM忘记旧谎言、称自己做了不可能的夜间动作、公开内部信息。"},
+    {"id": "T26", "name_zh": "断联、卖队友与救队友的条件选择", "supports": ["A04", "A07"], "evidence_level": "verified_strategy_description_local_transfer_untested", "mechanism_zh": "队友已不可救时投它以降低日后关联；能改变结果时比较救票和信誉收益，不设永远保护或永远卖队友。", "local_design_zh": "用票势、剩余人数、已揭露狼数和夜刀后局势估值。", "failure_zh": "学习到狼从不投狼而被反利用；信誉收益尚未兑现就因少一狼失去控制。"},
+    {"id": "T27", "name_zh": "狼人夜刀多目标效用", "supports": ["A02", "A06", "P18", "RULES"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "比较杀真实预言家、已确认白人、最能集票的人或关键异议者；也计入死后角色公开给好人的新证据。", "local_design_zh": "只依据本局公开发言和本人已知狼队友；不得用对手账号历史战绩。", "failure_zh": "把声称预言家者一律刀掉；杀死假预言家反而证明其非狼/身份；两狼下达不同目标。"},
+    {"id": "T28", "name_zh": "合法狼队内夜刀协调", "supports": ["P21", "RULES"], "evidence_level": "verified_mechanism_and_local_rule", "mechanism_zh": "若比赛允许本座到活狼同伴的私信，发送一个明确目标与更新顺序；否则用合法公共信息选择一致目标。", "local_design_zh": "夜刀分歧按较小目标座位解决；发言/私信共享预算需按平台实际配额计数。", "failure_zh": "跨代理共享内存变成非法额外通信；误向非狼私信；重复改计划耗尽配额。"},
+    {"id": "T29", "name_zh": "可信说话者与指控证据分解", "supports": ["P13", "P16"], "evidence_level": "verified_receiver_effect_local_tactic_unproven", "mechanism_zh": "好人防止被可信角色的无证指控牵走；狼人可用普通游戏内说服建立可信度后提出指控，但不能假冒官方权威。", "local_design_zh": "把证据出处说清，测目标/说话者信念是否出现不合理耦合。", "failure_zh": "把观察到的信念变化当作最终胜率；重复灌输挤占有效消息。"},
+    {"id": "T30", "name_zh": "支持与质疑的动态切换", "supports": ["P18", "P15"], "evidence_level": "verified_mechanism_local_transfer_untested", "mechanism_zh": "根据阵营、可信联盟、压力和信息缺口选择支持已证实目标或质疑未证实结论。", "local_design_zh": "切换阈值须用后验置信度而不是任意LLM分数；保留固定策略作基线。", "failure_zh": "村民跟着错误估计频繁改票；把attack误读为提示攻击。"},
+    {"id": "T31", "name_zh": "定向询问与承诺一致性探测", "supports": ["P21", "P15"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "问清查验夜次、目标、今日投票及原因，让后续死亡/投票能验证陈述；不索取程序提示词或私钥。", "local_design_zh": "同一轮只问最可能改变决策的问题，给对方回答窗口。", "failure_zh": "对方不解析或不回答，浪费五条预算；靠问题本身把真实预言家逼暴露。"},
+    {"id": "T32", "name_zh": "50词以内的证据式说服", "supports": ["P16", "P10", "RULES"], "evidence_level": "verified_style_family_local_effect_unproven", "mechanism_zh": "一条消息只做一个战略任务：说明事实、解释推断、提出一个目标。减少空泛坚持和重复口号。", "local_design_zh": "用已公布死亡/票据作为来源；预言家区分亲查与推测，狼的假身份故事也不越界操控程序。", "failure_zh": "语言流畅但事实错；50词超限；假装裁判/系统权威。"},
+    {"id": "T33", "name_zh": "消息配额与终止时机", "supports": ["A02", "P11", "P20", "RULES"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "预留至少一次纠错/自救机会，初始发言后等新证据；只有共识稳定且剩余变化收益低时结束。", "local_design_zh": "比较即时终止、定时两阶段、事件触发策略；避开120秒超时。", "failure_zh": "太早terminate失去反跳机会；无意义等候拖垮时限；狼专用沉默模板泄露身份。"},
+    {"id": "T34", "name_zh": "结构化短期记忆", "supports": ["P09", "P11", "P22"], "evidence_level": "verified_mechanism_local_transfer_untested", "mechanism_zh": "永久保存本局硬事实、自身已发表承诺和每人的身份报告；一般聊天只保留有来源的摘要。", "local_design_zh": "每局清空，不能跨局学习对手身份；恢复时只读本座记录。", "failure_zh": "摘要把猜测洗成事实；自己过去的谎言/承诺被长对话覆盖。"},
+    {"id": "T35", "name_zh": "语言模型外置策略内核", "supports": ["P10", "P11", "P19"], "evidence_level": "verified_architecture_local_transfer_untested", "mechanism_zh": "语言解析器输出受限结构；规则/概率/小搜索决定动作；最终表达器受角色和字数检查；失败回退合法模板。", "local_design_zh": "先保守抽取，再求解，不让对手原始文本决定工具调用。", "failure_zh": "抽取错误变成硬事实；生成器擅自换目标；外部模型超时导致非法动作。"},
+    {"id": "T36", "name_zh": "对手种群与异质桌测试", "supports": ["P19", "P17", "A07", "A08"], "evidence_level": "verified_evaluation_method", "mechanism_zh": "同时面对跟票型、顽固型、假预言家型、断联狼、沉默型、推断型和自然语言型代理，避免只赢镜像自己。", "local_design_zh": "赛前固定分布、座位/角色配平、留出新种子与新代理；线上比赛不读跨局账号画像。", "failure_zh": "在同一池反复调参导致过拟合；把同阵营多座成绩当独立样本。"},
+    {"id": "T37", "name_zh": "风险敏感的置信度门控", "supports": ["P18", "P24"], "evidence_level": "inspired_hypothesis", "mechanism_zh": "后验平坦时不因微小分差做不可逆高风险行动；后验尖锐但来自单条聊天时要求来源检查。", "local_design_zh": "门控对象是策略改动幅度，不是无条件弃票；每次仍需比较终局与停滞。", "failure_zh": "保守过度造成三次停滞，或把低熵误认为可靠。"},
+    {"id": "T38", "name_zh": "语言事实抽取的否定/引述测试", "supports": ["P09", "P10", "P11", "P22"], "evidence_level": "own_local_test_design", "mechanism_zh": "用普通游戏内多语言、别名、否定、转述、纠正、条件句测试解析器，要求不能把“我不是预言家”解析成跳预言家。", "local_design_zh": "事件有sender/target/day/claim_type/confidence；名字仅通过平台座位表解析。", "failure_zh": "错误身份认证、投票错座位、把引用他人谎话记在说话者名下。"},
+    {"id": "T39", "name_zh": "信念、话语、行动三者一致性审计", "supports": ["P11", "P22", "P24"], "evidence_level": "verified_diagnostic_mechanism", "mechanism_zh": "记录为什么投某人、此前承诺谁、哪些事实改变判断；离线区分合理改票和无理由跳变。", "local_design_zh": "不要求永远跟最大狼概率：枢纽票与终局可能有正当例外，但须可解释。", "failure_zh": "强制服从错误信念；只追求表面一致而拒绝新事实。"},
+    {"id": "T40", "name_zh": "座位对称性与公开侧信道审计", "supports": ["A07", "P07", "RULES"], "evidence_level": "own_local_test_design", "mechanism_zh": "对同一局面置换座位和同伴位置，检查不应变化的概率/动作是否变化；测仅凭公开首日消息能否识别狼。", "local_design_zh": "保留真正的规则不对称：狼夜刀分歧取低座位；不要把普遍低座位优先误当无害协调。", "failure_zh": "把固定座位/模板偏好当证据；自对弈合作模式掩盖被异质对手识破。"}
+  ],
+  "prioritized_experiments": [
+    {
+      "id": "E01", "priority": "P0", "name_zh": "先做精确终局与信息隔离审计", "families": ["T02", "T16", "T18", "T19", "T40"],
+      "design_zh": "枚举小局面：3/1、4/1、4/2、5/2、6/2，分别日票、夜刀、stall=0/1/2；检查首夜不刀、死人不能发言和隐藏票。相同本座观察下改变不可见真身份，策略输入/输出不得变化。",
+      "metrics": ["错误终局数", "非法动作数", "隐藏信息依赖次数", "状态相同而决策不一致的非随机差异"],
+      "failure_mechanism_zh": "模拟器边界错或rollout偷看会制造虚假的显著提升。", "promotion_gate_zh": "所有断言通过才允许任何策略胜率结论。", "status": "proposed_not_run"
+    },
+    {
+      "id": "E02", "priority": "P0", "name_zh": "联合身份台账对比独立嫌疑分", "families": ["T01", "T02", "T03", "T04", "T05", "T14"],
+      "design_zh": "固定同一动作策略，仅换信念层：独立启发式、硬约束均匀世界、硬约束+限权软证据。加入反跳、假黑查猜中狼、村民假跳、转述/否定、死后角色矛盾样例。",
+      "metrics": ["狼概率Brier分数", "真实世界被错误剪掉率", "角色总数一致性", "分角色阵营胜率"],
+      "failure_mechanism_zh": "漂亮后验如果把真世界删掉就不可恢复；推断准确率提升也可能不改善票。", "promotion_gate_zh": "先保证硬约束零误删，再在留出桌上检查胜率，不强制采纳低置信后验。", "status": "proposed_not_run"
+    },
+    {
+      "id": "E03", "priority": "P0", "name_zh": "票势模型与平票价值", "families": ["T07", "T15", "T16", "T17"],
+      "design_zh": "对比最高嫌疑票、固定集中票、概率枢纽票三种选择器；分别遇到跟票型/不跟票型/狼抱团/狼断联，记录每次平票和错杀后的完整终局。",
+      "metrics": ["当天正确淘汰率", "分票/平票率", "第三次停滞输局数", "阵营胜率", "票势预测交叉熵"],
+      "failure_mechanism_zh": "把承诺当票、把不跟票当狼，或把任意错杀优于平票写死。", "promotion_gate_zh": "必须在4人1狼等反例和全部stall边界上正确；只在目标接近同价值时引入协调偏置。", "status": "proposed_not_run"
+    },
+    {
+      "id": "E04", "priority": "P0", "name_zh": "声明解析和自我承诺不丢失", "families": ["T04", "T25", "T34", "T35", "T38", "T39"],
+      "design_zh": "重放公开聊天：否定、引用、假设、名字近似、日期省略、纠错、多语言；逐事件核对角色/目标/颜色及自身已发言。生成文本不得改变内核选定动作。",
+      "metrics": ["事实抽取精确率/召回率", "假认证次数", "承诺-行动无理由矛盾率", "50词/1024字符违规数", "兜底率"],
+      "failure_mechanism_zh": "基础抽取错会让再强的CFR或概率模型做错；长上下文覆盖自身谎言/承诺。", "promotion_gate_zh": "安全类和座位映射错误必须为0；不确定句降为软证据或忽略。", "status": "proposed_not_run"
+    },
+    {
+      "id": "E05", "priority": "P1", "name_zh": "预言家公开时机与查验目标联合消融", "families": ["T09", "T10", "T11", "T12", "T13"],
+      "design_zh": "公开时机比较立即/黑查或受压/后续赢面门控；查验比较随机未查/最大狼概率/最大期望熵减/下一票赢面价值。全部按无医生和平安首夜执行。",
+      "metrics": ["未公开信息随死亡丢失量", "首日错杀seer率", "seer存活夜数", "关键白查挽救次数", "阵营胜率"],
+      "failure_mechanism_zh": "最大信息量目标不一定能改变投票；拖延公开时可能死亡；先杀claimant验证可能立即输。", "promotion_gate_zh": "用角色配平的独立种子验证，不能只追求seer个人存活或命中率。", "status": "proposed_not_run"
+    },
+    {
+      "id": "E06", "priority": "P1", "name_zh": "狼公开伪装与断联的代价", "families": ["T22", "T23", "T24", "T25", "T26", "T40"],
+      "design_zh": "比较村民同款开局、专用中性开局、默认保护同伴和按局势卖队友。用只读公开首日行为的离线判别器，留出代理家族测试角色可识别性。",
+      "metrics": ["首日消息阵营AUC", "狼/村民分角色胜率", "同伴被无谓送出率", "被对手识破后的鲁棒胜率"],
+      "failure_mechanism_zh": "减少身份泄露却牺牲队友过多；中性模板反而成为狼专用标记。", "promotion_gate_zh": "AUC降低只是诊断；必须同时验证阵营赢面，尤其异质桌而非仅镜像。", "status": "proposed_not_run"
+    },
+    {
+      "id": "E07", "priority": "P1", "name_zh": "夜刀目标与狼间协作", "families": ["T08", "T27", "T28"],
+      "design_zh": "比较刀声称seer、刀高后验seer、刀可信集票者、分数混合；加异构狼同伴，检查分歧低座位规则和合法私信能否降低错误目标。",
+      "metrics": ["击杀真实seer率", "杀后好人信息增益", "两狼目标分歧率", "消息预算开销", "狼阵营胜率"],
+      "failure_mechanism_zh": "目标价值基于声称而非证据；杀人公开角色反而认证对方故事；协作假设只对相同代码成立。", "promotion_gate_zh": "私信仅在规则许可、正确活同伴且预算足够时；不增加跨座共享通道。", "status": "proposed_not_run"
+    },
+    {
+      "id": "E08", "priority": "P1", "name_zh": "有限消息预算下的反应窗口", "families": ["T29", "T30", "T31", "T32", "T33"],
+      "design_zh": "固定动作内核，对比一句后terminate、两阶段等待、事件触发消息。每条选择事实发布/询问/解释/协调之一，至少比较有无为临时黑查或反跳保留预算。",
+      "metrics": ["每条消息导致的目标/信念变化", "有效应答覆盖率", "反跳未应答次数", "超时率", "阵营胜率"],
+      "failure_mechanism_zh": "太早结束或发满五条无法自救；过晚终止耗尽120秒；对脚本代理多说无效。", "promotion_gate_zh": "合法性与时间上限优先，按是否会理解自然语言的对手分别报告。", "status": "proposed_not_run"
+    },
+    {
+      "id": "E09", "priority": "P1", "name_zh": "信念使用程度而非只测有无信念", "families": ["T03", "T30", "T37", "T39"],
+      "design_zh": "同样提示长度对照真实后验、均匀后验、打乱后验、只给好人/只给狼、强制采纳/门控采纳；若使用外部模型，把并发负载固定。",
+      "metrics": ["阵营胜率", "信念-动作一致率", "Brier分数", "超时/解析失败率", "按置信区间分桶的决策收益"],
+      "failure_mechanism_zh": "仅加结构化提示、服务负载下降或狼被错误信念误导，也会让好人胜率看似提升。", "promotion_gate_zh": "要求内容对照和负载对照后仍有收益，避免把关联写成推理提升。", "status": "proposed_not_run"
+    },
+    {
+      "id": "E10", "priority": "P2", "name_zh": "小宏动作搜索/CFR，不直接重造大模型系统", "families": ["T18", "T19", "T20", "T21", "T22", "T35"],
+      "design_zh": "只在3–5人局对有限投票/声明/等待宏动作比较精确枚举、浅层信息集搜索、规则；先用已验证的合法观察转移。CFR先用于受限元博弈而非声称求解全局。",
+      "metrics": ["同预算胜率", "每决策耗时p95/p99", "信息泄漏断言", "相对强规则的条件收益", "估值误差"],
+      "failure_mechanism_zh": "错误模拟器加大计算只会更自信地错；对手模型不准、不可见状态泄漏或语言抽象丢信息。", "promotion_gate_zh": "短预算内胜过强规则且全部信息隔离测试通过；若不满足就保留规则，不因算法名先进而上线。", "status": "proposed_not_run"
+    },
+    {
+      "id": "E11", "priority": "P0_evaluation_gate", "name_zh": "所有新策略共用的离线晋级门槛", "families": ["T36", "T39", "T40"],
+      "design_zh": "固定开发/留出种子，按整桌对局为统计单位；角色、座位、对手家族配平，分别报告狼/预言家/村民。先离线正确性与重放，再按仓库既有晋级标准做足量配对测试和第二种子复核。",
+      "metrics": ["整桌聚类的95%置信区间", "分角色胜率", "最差对手家族差值", "非法动作/超时/兜底", "跨座位波动"],
+      "failure_mechanism_zh": "同桌好人五个返回值不是五个独立样本；反复挑种子/策略会产生选择偏差；小样本误当显著提升。", "promotion_gate_zh": "满足现有champion流程且无稳定性回退；研究任务不自动改动或重启生产agent。", "status": "proposed_not_run"
+    }
+  ],
+  "evidence_gaps": [
+    "No retrieved work proves an optimal policy for the exact local 7-player, no-doctor, peaceful-N1, death-reveal, hidden-plurality, tie-none, parity, three-stall, 5x50-word rules.",
+    "No new local win-rate experiments were run in this research-only task. Suggested gains are hypotheses, not measurements.",
+    "Protocol champions compete in 5/15-player variants and artificial language, while NLP contests often evaluate human-rated dialogue rather than win rate. Neither ranking transfers automatically.",
+    "The 2026 papers are verified public arXiv full texts, not independently reproduced results or proof of peer review.",
+    "Only metadata were retrieved for Cowling/Powley/Whitehouse Information Set Monte Carlo Tree Search (2012); it is not counted as a full-text evidence source. Applied ISMCTS and re-determinization papers provide the inspected mechanism evidence.",
+    "ACL search returned a client-side Google search wrapper, not a usable result list. ACL primary papers were found via verified references and DOI redirects instead.",
+    "One ACL landing-page connection closed without response; a subsequent trailing-slash URL and the PDF succeeded. All attempts remain in the audit.",
+    "The Crossref query for Exploring Large Language Models returned a different Unity Werewolf paper. That near-match was not misattributed or counted.",
+    "Braverman/Migdal theoretical models and Wang's honesty-rule model make strong communication/randomization assumptions. Their asymptotic thresholds and equilibrium claims are not finite seven-seat predictions."
+  ],
+  "audit_columns": ["id", "url", "http_status", "retrieved_at_utc", "sha256", "response_bytes"],
+  "http_audit": [
+    ["F001", "https://export.arxiv.org/api/query?search_query=all%3Awerewolf&start=0&max_results=100&sortBy=submittedDate&sortOrder=descending", 200, "2026-10-13T09:21:26.819089Z", "ada75f047b3dfabd99060d098de0cc2dae5cbe916521cc549078eb4d89ed3a43", 102231],
+    ["F002", "https://export.arxiv.org/api/query?id_list=2309.04658,2402.02330,1902.01365&max_results=10", 200, "2026-10-13T09:21:48.206533Z", "124c1a0a5769bf38f7e1fa90c8f742fddb9503311725ec7466b07e6df1e34fe6", 6974],
+    ["F003", "https://export.arxiv.org/api/query?search_query=ti%3A%22Finding%20Friends%22&max_results=10", 200, "2026-10-13T09:21:48.372954Z", "666dc9837a5d6577fe811608f04f3ba665f4f9ba5c29a3cddae78306e16f751f", 6318],
+    ["F004", "https://arxiv.org/pdf/2205.09813v1", 200, "2026-10-13T09:22:17.418431Z", "fe892e6fdee0d000bc17e5e3567f7d095e465408a0dee4d4998f8e1807803773", 1015622],
+    ["F005", "https://arxiv.org/pdf/1009.1031v3", 200, "2026-10-13T09:22:17.658444Z", "659129c440d1cb225bc196bdef9e79b885598e174f8b3ef35eecf69371940802", 411845],
+    ["F006", "https://arxiv.org/pdf/1906.02330v1", 200, "2026-10-13T09:22:18.232973Z", "6fbe92daee062b32e7e550095b970bf7b229eb6b5b84ff5132934eab78cb30a1", 951257],
+    ["F007", "https://arxiv.org/html/2409.01575v1", 200, "2026-10-13T09:22:18.736019Z", "d0ef042c80b3343e947e0d67bec079d173aba632bb7f4d7ac82e9e7b17cdc6cc", 136776],
+    ["F008", "https://aiwolf.org/en/", 200, "2026-10-13T09:22:21.657658Z", "85f44ffdbb48b0b1d8e2e7d1e6aa69732930119277df9578cab335390607af78", 19431],
+    ["F009", "https://aiwolf.org/en/archives/2840", 200, "2026-10-13T09:23:21.942323Z", "39b556d56f150e7867a2168f737ebd186c9ba1097b96ee1f7d1259c0dd5d8ec8", 26063],
+    ["F010", "https://aiwolf.org/en/publication/", 301, "2026-10-13T09:23:24.425055Z", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0],
+    ["F011", "https://aiwolf.org/en/publication", 200, "2026-10-13T09:23:24.425074Z", "78cfde821f91a4829e8f4ab436b8d82ec71372f11a52789a06d266869a34e329", 9628],
+    ["F012", "http://aiwolf.org/control-panel/wp-content/uploads/2022/10/Basket.pdf", 302, "2026-10-13T09:23:59.302936Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F013", "https://aiwolf.org/control-panel/wp-content/uploads/2022/10/Basket.pdf", 200, "2026-10-13T09:23:59.302958Z", "03f0ca90f0bafce9a22b95d313a93cb0396a2e1d32eb3f6876987ea004ccddf6", 139307],
+    ["F014", "http://aiwolf.org/control-panel/wp-content/uploads/2022/10/ioh.pdf", 302, "2026-10-13T09:24:00.109723Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F015", "https://aiwolf.org/control-panel/wp-content/uploads/2022/10/ioh.pdf", 200, "2026-10-13T09:24:00.109746Z", "180869fb4879a529d5b98895278db4e54d359652288f94088dad8ee40d29941f", 138879],
+    ["F016", "http://aiwolf.org/control-panel/wp-content/uploads/2022/10/takoyaki.pdf", 302, "2026-10-13T09:24:20.601886Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F017", "https://aiwolf.org/control-panel/wp-content/uploads/2022/10/takoyaki.pdf", 200, "2026-10-13T09:24:20.601914Z", "5971ec5b2d208d16d7779521abdfc0aa090a91fc30f10b19261c6dc535422d0a", 462544],
+    ["F018", "http://aiwolf.org/control-panel/wp-content/uploads/2022/10/Baguette.pdf", 302, "2026-10-13T09:24:21.482086Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F019", "https://aiwolf.org/control-panel/wp-content/uploads/2022/10/Baguette.pdf", 200, "2026-10-13T09:24:21.482127Z", "39dd81931986c7851fef28885f5cc987603efe9e227cd4e6ae0d2381d46ed804", 228760],
+    ["F020", "http://aiwolf.org/control-panel/wp-content/uploads/2022/10/Hachi2.pdf", 302, "2026-10-13T09:24:42.447816Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F021", "https://aiwolf.org/control-panel/wp-content/uploads/2022/10/Hachi2.pdf", 200, "2026-10-13T09:24:42.447835Z", "470fd5440d6a578b9c6f2703cc3c8804696250e40224d7cb6c4a0305a0671a34", 597460],
+    ["F022", "https://arxiv.org/html/2309.04658v2", 200, "2026-10-13T09:25:05.093864Z", "58fa30189611c0bd8c81d403ecb4d75322b9f87d578852bc01d88c4e306f64f7", 297594],
+    ["F023", "https://arxiv.org/html/2402.02330v2", 200, "2026-10-13T09:25:05.352396Z", "4493c2ed7d99b828e615be6c10c29a29a949c50a2778a493016cbd6d663241e7", 459678],
+    ["F024", "https://aclanthology.org/search/?q=werewolf", 200, "2026-10-13T09:25:06.063620Z", "6e48306a731f447dccf83974f611b7b47d818a49dbfa8f7c940a963b60b54705", 11259],
+    ["F025", "https://api.crossref.org/works?query.title=Information%20Set%20Monte%20Carlo%20Tree%20Search&rows=1", 200, "2026-10-13T09:25:25.888520Z", "a1895e670a53a62a5300859aa0aaeb673752cfb87d361e587925929c970b145d", 7479],
+    ["F026", "https://api.crossref.org/works?query.title=Exploring%20Large%20Language%20Models%20for%20Communication%20Games%20An%20Empirical%20Study%20on%20Werewolf&rows=1&select=title,author,DOI,URL,published,link", 200, "2026-10-13T09:25:45.038766Z", "3c16679deaad4d0294ee4995f7ab58ecd0562f4ee639e729c942f9b5f86a4c40", 1576],
+    ["F027", "https://export.arxiv.org/api/query?search_query=ti%3A%22Information%20Set%22&max_results=30", 200, "2026-10-13T09:25:45.292120Z", "4ef9ca06dab483655156a7fb9ac796ab9c676a95d443100461bd3f5d36df9818", 56629],
+    ["F028", "https://export.arxiv.org/api/query?search_query=ti%3A%22Monte%20Carlo%22%20AND%20all%3A%22information%20set%22&max_results=5", 200, "2026-10-13T09:26:07.565588Z", "5ab4cc4c03f90826485f95c229ae620c3a762bf03d2d0930c85a8068a80cacfb", 9895],
+    ["F029", "https://arxiv.org/pdf/2005.07156v1", 200, "2026-10-13T09:26:57.577126Z", "7982688188a6cca5e1d2ef1cc875912cbdc09c49410fbc450ac9dbe8222a946b", 3405380],
+    ["F030", "https://arxiv.org/pdf/1902.06075v2", 200, "2026-10-13T09:26:57.894440Z", "135dcb1d6b9e2f52826287dd4786057cf558f5cf7039ae1b85934076106ff77b", 365468],
+    ["F031", "https://arxiv.org/pdf/2308.16017v5", 200, "2026-10-13T09:26:58.367013Z", "236c79ce465afd7d8f3e9a5fb4b1ddbfaf74b594e71554517eb068707a664cb6", 767802],
+    ["F032", "https://doi.org/10.18653/v1/W19-8305", 302, "2026-10-13T09:27:45.023211Z", "f42cac2840192f4116e51396df351a1aca8d29d836e4f854fbb2abb180f5fba5", 151],
+    ["F033", "https://aclanthology.org/W19-8305", 301, "2026-10-13T09:27:45.023233Z", "5070270a534aa727ba9252a8359845d525d9d964f4cece4ce9a7e460e42246d5", 325],
+    ["F034", "https://aclanthology.org/W19-8305/", 200, "2026-10-13T09:27:45.023237Z", "ab598c456c4581c2d0d32f6064b519f8e71a0887cddd8d81cdce8c3fabc4f9ec", 39895],
+    ["F035", "https://aclanthology.org/2023.inlg-genchal.13", null, "2026-10-13T09:27:45.245066Z", null, 0],
+    ["F036", "https://arxiv.org/html/2511.06175v1", 200, "2026-10-13T09:27:45.268535Z", "2d22d88ec57a00e77ea653f37ab298bb9b5ab9464a9f9b4e528f5155e23a65c2", 406725],
+    ["F037", "https://arxiv.org/html/2609.12446v1", 200, "2026-10-13T09:27:45.421822Z", "789dc0d5877b787235815fe15f420aea2f13abee1d0e1f8b9b5b2210d91d0bb6", 342076],
+    ["F038", "https://aclanthology.org/W19-8305.pdf", 200, "2026-10-13T09:29:06.813696Z", "a2237cc8721affdadac63d669f9526081589acf3db44016797320677600bee03", 217853],
+    ["F039", "https://aclanthology.org/2023.inlg-genchal.13/", 200, "2026-10-13T09:29:07.034887Z", "8a7f4f5d8dbf1b0a186f663f224d6b7bba7b1fdaa92914a6c91f1f134aaaaadf", 56056],
+    ["F040", "https://arxiv.org/html/2507.12732v1", 200, "2026-10-13T09:29:07.056953Z", "8d93e66c12aa4b4516509d8b764bebbdda59d3a8e471e198a1e9d2ae8384c36a", 95974],
+    ["F041", "https://arxiv.org/html/2310.18940v4", 200, "2026-10-13T09:29:07.100452Z", "ad7a2e1e6eb8537150881529c4939534882ce220ed8531bbdcf96f78bfa2ae6a", 328293],
+    ["F042", "https://arxiv.org/html/2407.13943v1", 200, "2026-10-13T09:29:07.155819Z", "ba4c7731273a5fc00b09e6382f38f444df9d1fd595e92441b740f97488dac626", 150193],
+    ["F043", "https://arxiv.org/html/2408.17177v2", 200, "2026-10-13T09:29:07.205462Z", "ee96553503f435fccf975e7cf96f4e6c30fcb0a67da457413b04c3ae56fd5701", 446779],
+    ["F044", "https://arxiv.org/pdf/2106.05018v2", 200, "2026-10-13T09:30:58.748004Z", "0a77ea828034daeeb3548ed4df96267ae9e279191b77a5eaa1b26eed954ffc43", 513707],
+    ["F045", "https://arxiv.org/html/2405.19946v2", 200, "2026-10-13T09:30:59.252748Z", "186855a1c5bb960bd2a45ddb6b7f3dc152131a88d6433f054a3e5d9b84a2e851", 478577],
+    ["F046", "https://arxiv.org/html/2408.16586v2", 200, "2026-10-13T09:30:59.495511Z", "acc2c6dd82ff614a911220d0a289f65fa04799b2f9145cf5c6bb93d9dcda3248", 97682],
+    ["F047", "https://arxiv.org/html/2502.04686v3", 200, "2026-10-13T09:30:59.531479Z", "c4655794f269f35eaea8afb97ab304e7a98534a4a074d94bcf20b9483f5087cb", 295559],
+    ["F048", "https://export.arxiv.org/api/query?search_query=ti%3Amafia%20AND%20au%3ABraverman&max_results=5", 200, "2026-10-13T09:31:20.205925Z", "420996d4a37e4a555afa8e07e9e8b6b53d5e9df525e55574c8b826a2bd67eecc", 4017],
+    ["F049", "https://arxiv.org/pdf/math/0609534v4", 200, "2026-10-13T09:31:39.084241Z", "71e3a699c691bead0b14038a8c23e116be899ef4c6245e9d0da58583accbf958", 286857],
+    ["F050", "https://api.altruagent-game.com/skill/werewolf", 200, "2026-10-13T09:34:31.833758Z", "245f3b91232b7f43d17b8cdec433be9be872d72a2c15a07e0744a041c367e324", 38417],
+    ["F051", "https://aiwolf.org/en/5th-international-ai-werewolf-competition/", 301, "2026-10-13T09:35:55.100652Z", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0],
+    ["F052", "https://aiwolf.org/en/5th-international-ai-werewolf-competition", 200, "2026-10-13T09:35:55.100675Z", "b95b56d32a3899d54370a91e08b98470327470424e116c14827261a8c60f953b", 11549],
+    ["F053", "https://aclanthology.org/2023.inlg-genchal.13.pdf", 200, "2026-10-13T09:36:40.586767Z", "9974871a25f38c740fd0c6dfa8787a8b2c4d43175599bce48903f27d5f79fcff", 257721],
+    ["F054", "https://aiwolf.github.io/CompetitionProtocolDivision/en/", 200, "2026-10-13T09:37:00.381463Z", "5b4bdf53bab53cf8b0c72d266a2ba52101b8faa1c84cd810bd6a08a827bd5a2d", 8076],
+    ["F055", "http://aiwolf.org/en/3rd-international-aiwolf-contest", 302, "2026-10-13T09:37:01.856457Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F056", "https://aiwolf.org/en/3rd-international-aiwolf-contest", 200, "2026-10-13T09:37:01.856475Z", "343a43ef59c36c85fbf00b2cd367b6fb7bc114751154662b8e14be57f13c2ec6", 17779],
+    ["F057", "http://aiwolf.org/en/resource", 302, "2026-10-13T09:37:41.911801Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F058", "https://aiwolf.org/en/resource", 200, "2026-10-13T09:37:41.911819Z", "1f5bdd4c90b85a08b06f43f14e1c7b4f1ca25bb14fe3b2f4034bdccd0bdbeda6", 26931],
+    ["F059", "https://aiwolf.org/en/archives/2404", 200, "2026-10-13T09:38:43.972631Z", "20b367ae2f434beaf961611565f715d8052f982ba1eed9df8daa1c2f9f9ba6b0", 25253],
+    ["F060", "http://aiwolf.org/control-panel/wp-content/uploads/2021/03/ats-tkd-takeda.pdf", 302, "2026-10-13T09:39:41.116556Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F061", "https://aiwolf.org/control-panel/wp-content/uploads/2021/03/ats-tkd-takeda.pdf", 200, "2026-10-13T09:39:41.116616Z", "f42a9a606372892b56c42669907c5190bd9731711ce56183af5d10d6d6ed2698", 263431],
+    ["F062", "http://aiwolf.org/control-panel/wp-content/uploads/2021/03/Taisei-Kojima-daisyo.pdf", 302, "2026-10-13T09:39:41.522975Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F063", "https://aiwolf.org/control-panel/wp-content/uploads/2021/03/Taisei-Kojima-daisyo.pdf", 200, "2026-10-13T09:39:41.522993Z", "a72595dd45e6ad39554dae694284754b6294895ac7f9d272243fdc775c04b8a9", 20810],
+    ["F064", "http://aiwolf.org/control-panel/wp-content/uploads/2019/08/takeda.pdf", 302, "2026-10-13T09:39:59.399763Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F065", "https://aiwolf.org/control-panel/wp-content/uploads/2019/08/takeda.pdf", 200, "2026-10-13T09:39:59.399808Z", "36dc8c3fc80ffbf96cafbaa9740afd5050678c1bbe00d0b386dd36001ae82430", 182825],
+    ["F066", "http://aiwolf.org/en/1st-international-aiwolf-contest", 302, "2026-10-13T09:40:17.297254Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F067", "https://aiwolf.org/en/1st-international-aiwolf-contest", 200, "2026-10-13T09:40:17.297312Z", "d3be91c39a676bb400a76376f58c4d67ff957c1b296c97bf8fb2fbf982569b10", 13383],
+    ["F068", "https://arxiv.org/html/2407.21178v1", 200, "2026-10-13T09:40:37.982050Z", "e7eeef5d07f5f3e500240a7c2d0b5ff78c73b13bba1a29c7cdddd9304e9602ff", 84336],
+    ["F069", "http://aiwolf.org/en/archives/2262", 302, "2026-10-13T09:40:57.537194Z", "753e0dd54f28c4f7009b9c0b18a68aed175416bd8b7d134858264586eaac56f0", 138],
+    ["F070", "https://aiwolf.org/en/archives/2262", 200, "2026-10-13T09:40:57.537215Z", "f78e4824e67a0da65eaf64bb369eb8185d28524f690fcf8c28b495f5ced7b9a6", 23953],
+    ["F071", "https://arxiv.org/html/2607.10814v1", 200, "2026-10-13T09:41:58.016038Z", "281ff021a858ca911e660e1ed7fc32f5d4f2a5b9d875c7d5150bb04079a4aeb2", 235829]
+  ],
+  "redirect_chains": [["F010", "F011"], ["F012", "F013"], ["F014", "F015"], ["F016", "F017"], ["F018", "F019"], ["F020", "F021"], ["F032", "F033", "F034"], ["F051", "F052"], ["F055", "F056"], ["F057", "F058"], ["F060", "F061"], ["F062", "F063"], ["F064", "F065"], ["F066", "F067"], ["F069", "F070"]],
+  "request_errors": [{"fetch_id": "F035", "error": "Connection aborted: RemoteDisconnected('Remote end closed connection without response')", "recovery": "F039 and F053 succeeded; no authentication or access-control bypass attempted."}]
+}

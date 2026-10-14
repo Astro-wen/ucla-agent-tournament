@@ -1,0 +1,76 @@
+{
+  "status": "pass",
+  "archives": [
+    {
+      "index": "data/werewolf_counterfactual_source_archive.json",
+      "archive": "logs/werewolf_benchmarks/causal-diagnostic-frozen-source.zip",
+      "sha256": "5cbf98973ff14db89bc06f856a1db45f400c2b64bc3fb7e5853f74f9f891bc0c",
+      "members": 310,
+      "valid": true
+    },
+    {
+      "index": "data/werewolf_initial_value_source_archive.json",
+      "archive": "logs/werewolf_benchmarks/initial-value-frozen-source.zip",
+      "sha256": "96baaf3271103526af4708fca363df2aab4d866adbd467a51b105eb5b65ac2b8",
+      "members": 311,
+      "valid": true
+    },
+    {
+      "index": "data/werewolf_causal_driver_archive.json",
+      "archive": "logs/werewolf_benchmarks/causal-drivers-and-audits.zip",
+      "sha256": "df2c1cd6adbe807240c2928efadf182be17001cd708c03935cc88aeb0090e745",
+      "members": 14,
+      "valid": true
+    },
+    {
+      "index": "data/werewolf_planning_source_archive.json",
+      "archive": "logs/werewolf_benchmarks/planning-preregistered-source.zip",
+      "sha256": "656925c243dde5176075daaca9847efe74ecec08bdc63dda1abf67cd3bdd3e5b",
+      "members": 312,
+      "valid": true
+    },
+    {
+      "index": "data/werewolf_planning_free_source_archive.json",
+      "archive": "logs/werewolf_benchmarks/planning-free-frozen-source.zip",
+      "sha256": "cec9a711f9773ad842eb6c3e215c279afe212ac2c8e4937e52bcc97e8f741cd3",
+      "members": 313,
+      "valid": true
+    },
+    {
+      "index": "data/werewolf_planning_driver_archive.json",
+      "archive": "logs/werewolf_benchmarks/planning-drivers-tests-audit.zip",
+      "sha256": "b1a7103eadef1d7bb02ba9f4158fa1fe99024d8e8aed5e64b3d3fb039cf80c43",
+      "members": 11,
+      "valid": true
+    },
+    {
+      "index": "data/werewolf_evolution_source_archive.json",
+      "archive": "logs/werewolf_benchmarks/evolution-before-ablation-source.zip",
+      "sha256": "f875d5691a0969e55bb557498a34937211464147140f21f43132100f2de57c54",
+      "members": 314,
+      "valid": true
+    },
+    {
+      "index": "data/werewolf_evolution_confirm_source_archive.json",
+      "archive": "logs/werewolf_benchmarks/evolution-confirmation-frozen-source.zip",
+      "sha256": "4b0d571df27af6a5fc821ecdf1e142f8053a6eb536832eef2aa9a5b61e032bc5",
+      "members": 315,
+      "valid": true
+    },
+    {
+      "index": "data/werewolf_until8_driver_archive.json",
+      "archive": "logs/werewolf_benchmarks/until8-drivers-model-and-tests.zip",
+      "sha256": "a5883b9246b8df2af69ece158a05ab4c191b51d990055b8c38b4c8af24cd9b18",
+      "members": 30,
+      "valid": true
+    },
+    {
+      "index": "data/werewolf_evolution_llm_failure_archive.json",
+      "archive": "logs/werewolf_benchmarks/evolution-model-start-failure.zip",
+      "sha256": "61be7cec9fa6b2581cdd2d75e6b8481eba3d97f047fdd639160011dcededd289",
+      "members": 5,
+      "valid": true
+    }
+  ],
+  "scope": "complete bytehash/ZIPCRC/path checks of ten frozen source/evaluator/model artifacts; no extraction or deletion"
+}

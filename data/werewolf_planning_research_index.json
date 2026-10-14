@@ -1,0 +1,18 @@
+{
+  "route": "Information-set sampled full-terminal online planning, rather than B0 suspicion ranking or offline hindsight selection",
+  "status": "completed_no_supported_improvement",
+  "scope": "Offline research only after tournament freeze; no deployment or global optimality claim",
+  "plans": ["data/werewolf_planning_plan.json", "data/werewolf_planning_free_plan.json"],
+  "results": ["data/werewolf_planning_results.json", "data/werewolf_planning_free_results.json"],
+  "audit": "data/werewolf_planning_audit.json",
+  "baseline": "WW-B0-20261013",
+  "architecture": {"input": "own role/private checks and public history only", "worlds": "hard-consistent hypotheses with bounded existing soft belief weights", "opponent_models": ["low", "high", "random", "informed", "pledge"], "particles": 16, "root_action_shared_across_hypotheses": true, "full_future_games": true, "actual_hidden_roles_or_opponent_type_used": false, "eligible": "good-role moving vote with3to5alive", "outside_scope": "B0 chat/night/other-role behavior retained"},
+  "comparisons": {"271_greedy_delta": -0.0035714285714285713, "271_fixed_rollout_delta": 0, "271_observed_rollout_delta": -0.0035714285714285713, "272_fixed_rollout_delta": -0.002857142857142857, "274_fixed_rollout_delta": -0.002857142857142857, "274_free_rollout_delta": -0.01, "275_free_rollout_delta": -0.009285714285714286, "275_free_conservative_ci95": [-0.016792619519045225,-0.001745547038488303]},
+  "interpretation": "Removing the reference-retention gate made results worse on the two new development seeds. This does not prove B0 locally/globally optimal; this particular world/behavior model, sampling and future-policy approximation did not support a stronger decision engine. Do not adopt or increase confidence by counting inner model games as independent evidence.",
+  "counts": {"outer_evaluation_games": 15400, "paired_scenarios": 6160, "hypothetical_inner_games": 275168},
+  "model_prediction_note": "Observed-model descriptive top1was74.33% versus65.80% for fixed prior in271, but policies visited somewhat different states; not a matched-state causal superiority claim and not a win-rate gain.",
+  "limitations": ["Only3to5living good-side voting was replaced, not an end-to-end replacement agent", "Other seer past checks are approximate sampled histories", "Modeled future communication/scheduling differs from actual opponent implementations", "Only16particles and model-selection noise", "The actual previous vote announcement may not match a changed ballot", "No new opponent-family or live-model generalization test", "No41901/41902heldout seeds consumed"],
+  "verification": {"specific_tests_passed": 25, "related_werewolf_tests_passed_including_specific": 753, "additional_benchmark_tests_passed": 17, "distinct_relevant_tests_passed": 770, "pyflakes_passed": true, "raw_pairing_statistics_audit": "pass", "actor_and_background_failures": 0, "wolf_games_trace_identical_to_B0": true},
+  "archives": ["data/werewolf_planning_source_archive.json", "data/werewolf_planning_free_source_archive.json", "data/werewolf_planning_driver_archive.json"],
+  "decision": "Retain B0; original and follow-up negative results preserved; no commits, pushes, runtime changes or other-game work."
+}

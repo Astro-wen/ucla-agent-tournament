@@ -1,0 +1,60 @@
+{
+  "archive": "logs/werewolf_benchmarks/causal-drivers-and-audits.zip",
+  "sha256": "df2c1cd6adbe807240c2928efadf182be17001cd708c03935cc88aeb0090e745",
+  "files": {
+    "scripts/werewolf_counterfactual_eval.py": {
+      "sha256": "ad977dd810834fe542d707617be4a18620dc2a4463b4c99bb01abeace4eb999f",
+      "bytes": 11892
+    },
+    "scripts/audit_werewolf_counterfactual.py": {
+      "sha256": "0b240de182597f83d93cafe3d97d5bcd2ffde260c6c7074de186ca8bfdb05001",
+      "bytes": 10956
+    },
+    "scripts/werewolf_initial_value_eval.py": {
+      "sha256": "088600307b21707b0ccf54b8345ee15e1031c42516c649c42bcfff21d4474215",
+      "bytes": 7668
+    },
+    "scripts/audit_werewolf_initial_value.py": {
+      "sha256": "d1e3009f8c862bac21a814df0722c730cd1ccd9ab19303f3afb884e16e24d193",
+      "bytes": 6339
+    },
+    "scripts/audit_werewolf_strength.py": {
+      "sha256": "2531ab6a0cffc1c85595269dfc0622d77e8541c9bdc2137acd7ac61de2f5a9c5",
+      "bytes": 43605
+    },
+    "scripts/archive_werewolf_research.py": {
+      "sha256": "d33f9f77dcf4a8a75f7620a2394b75c5efaededbef0dc03b837998c3f9d0fc9c",
+      "bytes": 2685
+    },
+    "tests/strategy/test_werewolf_counterfactual_research.py": {
+      "sha256": "987dc9dd79a168c92b6659ec49195c5339fb44979360299045f586101c7073a0",
+      "bytes": 9918
+    },
+    "tests/strategy/test_werewolf_initial_value_research.py": {
+      "sha256": "9eaaffbd603f00a0a7baf08dea794daf7bd74ea59017e11a6015b35a12e11032",
+      "bytes": 4434
+    },
+    "data/werewolf_counterfactual_plan.json": {
+      "sha256": "46c61f4fbfae3cbf73fb7e74aaa6b54ef34aa9710b9da5a336a3bfc730960a84",
+      "bytes": 4249
+    },
+    "data/werewolf_initial_value_plan.json": {
+      "sha256": "10acc8040aeb02746b1539b16d3634f3d4648ea083fc853157e1c8c16116597c",
+      "bytes": 2123
+    },
+    "posthoc/ww_causal_mechanism_1014.py": {
+      "sha256": "740a17539f4e2ade24551d7d6645477eabf6592fbd1ef69b4e0f01a92157eca2",
+      "bytes": 2230
+    },
+    "posthoc/ww_causal_focus_1014.py": {
+      "sha256": "6422372b12563bb335aa3be3e7015a9e065e2966f5752b869f1a27939cc46e85",
+      "bytes": 1920
+    },
+    "posthoc/ww_causal_coordination_case_1014.py": {
+      "sha256": "68d472fa1ebe8890a7ba30604a650ea620e0b916ddb435fbd885448f1755df6e",
+      "bytes": 1679
+    }
+  },
+  "distinct_base_deals_verified": 16800,
+  "scope": "Evaluator/test/plan/posthoc-code complement to separately archived policy/runtime sources; no secrets or model weights"
+}

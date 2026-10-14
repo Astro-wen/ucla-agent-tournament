@@ -1,0 +1,146 @@
+{
+  "status": "blocked_preflight_source_io",
+  "scope": "Development214 role-balanced local model pilot. No real model request or scored game occurred. This is a blocker report, not strength evidence.",
+  "report_origin": "Written after the evaluator exited during pre-request source freezing, following the instruction to stop without automatic repair or retry.",
+  "stopped_at": "2026-10-13T14:29:42-07:00",
+  "deadline": "2026-10-13T16:30:00-07:00",
+  "deadline_complete": false,
+  "deadline_stop_triggered": false,
+  "counts": {
+    "planned_unique_deals": 18,
+    "planned_games": 108,
+    "game_attempts": 0,
+    "completed_games": 0,
+    "complete_pair_groups": 0,
+    "common_clean_scenarios": 0,
+    "real_model_requests": 0,
+    "preload_requests": 0,
+    "unload_requests": 0,
+    "actual_wins": null,
+    "model_errors": null,
+    "preflight_io_errors": 1
+  },
+  "gates": {
+    "mock_tests_passed": true,
+    "parent_guard_complete": true,
+    "parent_guard_all_models_unloaded": true,
+    "full_source_manifest_frozen": false,
+    "plan_persisted": false,
+    "both_model_blocks_attempted": false,
+    "complete": false,
+    "no_model_load_requests": true,
+    "server_state_changed_by_this_pilot": false,
+    "fresh_server_unload_query_performed": false
+  },
+  "failure": {
+    "type": "OSError",
+    "errno": 89,
+    "message": "Operation canceled",
+    "stage": "source_manifest before plan/manifest persistence and before run_pilot",
+    "stack": [
+      "scripts/werewolf_minimal_model_eval.py:469 main -> source_manifest()",
+      "scripts/werewolf_minimal_model_eval.py:120 source_manifest -> lm.source_manifest()",
+      "scripts/werewolf_local_model_eval.py:655 -> wb.source_manifest()",
+      "local/werewolf_benchmark.py:404 -> hashlib.sha256(p.read_bytes())",
+      "pathlib/_abc.py:626 -> f.read()"
+    ],
+    "specific_unread_source_file": null,
+    "runner_shell_id": "9ad0af",
+    "exit_code": 1,
+    "automatic_retry_or_fix": false
+  },
+  "sampling_plan": {
+    "seed": 214,
+    "backgrounds": ["llmq", "pop_prompt_seer", "pop_coordinated"],
+    "controlled_role_quota": {"villager": 6, "seer": 6, "wolf": 6},
+    "per_background_role_quota": 2,
+    "llm_seats_per_game": 2,
+    "profiles": [
+      ["agent", "agent"],
+      ["firstclaim_highlook", "local.werewolf_minimal_research:firstclaim_highlook"],
+      ["firstclaim_direct", "local.werewolf_minimal_research:firstclaim_direct"]
+    ],
+    "definition": "scripts/werewolf_minimal_model_eval.py:59-92",
+    "sampling": "role_balanced, one-third per controlled role; not the natural4/7,1/7,2/7 mixture",
+    "skipped_indices": null,
+    "skipped_indices_note": "The deterministic plan builder and complete skipped-index accounting passed mock-only tests. The real invocation built the plan in memory but failed source freezing before saving plan.json. No model calls followed; no realized plan is claimed."
+  },
+  "models": [
+    {
+      "name": "qwen2.5:7b-instruct-q4_K_M",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "status": "not_started",
+      "games": 0,
+      "requests": 0,
+      "wins": null,
+      "model_error_counts": null
+    },
+    {
+      "name": "qwen2.5:14b-instruct-q4_K_M",
+      "digest": "7cdf5a0187d5c58cc5d369b255592f7841d1c4696d45a8c8a9489440385b22f6",
+      "status": "not_started",
+      "games": 0,
+      "requests": 0,
+      "wins": null,
+      "model_error_counts": null
+    }
+  ],
+  "planned_model_options": {
+    "endpoint": "http://127.0.0.1:11437",
+    "explicit_rules": true,
+    "encoding": "label_object",
+    "num_ctx": 16384,
+    "num_predict": 192,
+    "temperature": 0,
+    "seed": 205,
+    "num_thread": 4,
+    "schedule": "whole7B then whole14B; fresh exact-request cache per model; unscored preload and verified unload"
+  },
+  "paired_statistics": {
+    "status": "not_estimable",
+    "applies_to": "Every declared model, candidate profile and subset in every scope below",
+    "candidate_profiles": ["firstclaim_highlook", "firstclaim_direct"],
+    "reference_profile": "agent",
+    "subsets": ["all_attempts", "common_clean"],
+    "scopes": [
+      "all", "role:villager", "role:seer", "role:wolf",
+      "background:llmq", "background:pop_prompt_seer", "background:pop_coordinated",
+      "background:llmq/role:villager", "background:llmq/role:seer", "background:llmq/role:wolf",
+      "background:pop_prompt_seer/role:villager", "background:pop_prompt_seer/role:seer", "background:pop_prompt_seer/role:wolf",
+      "background:pop_coordinated/role:villager", "background:pop_coordinated/role:seer", "background:pop_coordinated/role:wolf"
+    ],
+    "n": 0,
+    "candidate_rate": null,
+    "reference_rate": null,
+    "delta": null,
+    "ci95": null,
+    "warning": "No observations; zero completed games does not mean zero win rate, zero model errors, equivalence or no effect."
+  },
+  "verification": {
+    "command": "perl -e 'alarm 1200; exec @ARGV' .venv/bin/python -m pytest -q tests/strategy/test_werewolf_minimal_model.py",
+    "passed": 23,
+    "elapsed_s": 411.75,
+    "network": "httpx.MockTransport only; fixture rejects any non-mock AsyncClient",
+    "pyflakes_passed": true,
+    "comments_or_trailing_whitespace_added": false,
+    "source_identifiers": {
+      "algorithm": "Git blob SHA-1; verified before launch and after the blocked run",
+      "scripts/werewolf_minimal_model_eval.py": "a81ccb9e33e1d0306fbb3ce5d561218a68a14170",
+      "tests/strategy/test_werewolf_minimal_model.py": "e7990776bfdf447024771825368550cb26fb06de"
+    },
+    "full_source_manifest_sha256": null
+  },
+  "artifacts": {
+    "parent_guard": "logs/werewolf_benchmarks/scale-simple-model-guard-213/summary.json",
+    "parent_guard_evidence_lines": [2580, 3552, 4504, 14102],
+    "intended_run_directory": "logs/werewolf_benchmarks/scale-simple-model-games-214",
+    "run_directory_state": "created but empty after preflight failure",
+    "game_logs": [],
+    "request_logs": []
+  },
+  "parent_action_required": "Decide whether and how to address the source-file read failure. No automatic repair, deletion or rerun occurred. The evaluator intentionally refuses existing output/report paths; any future continuation must explicitly preserve this blocker evidence and handle that refusal. Service was neither loaded nor stopped by this task.",
+  "promotion": "not assessed; no model strength results",
+  "heldout_used": false,
+  "production_sdk_champion_or_prior_research_edited": false,
+  "committed_or_pushed": false
+}

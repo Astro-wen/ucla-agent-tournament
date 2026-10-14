@@ -1,0 +1,11 @@
+{
+  "archive": "logs/werewolf_benchmarks/evolution-model-start-failure.zip",
+  "sha256": "61be7cec9fa6b2581cdd2d75e6b8481eba3d97f047fdd639160011dcededd289",
+  "files": {
+    "scripts/werewolf_evolution_llm_eval.py": "1d8216d2552a96c1f933983317d09ea0fa81b2b699a84e75e77bbe8726b70659",
+    "tests/strategy/test_werewolf_evolution_llm.py": "9fe3ed3a3d5ae904e9f269d678feb390b210ad7b45918b8c64513cadc87fa67c",
+    "data/werewolf_evolution_llm_plan.json": "3cb34d8b7858f19479e03eae175361526dd2992e23dbe02a501f1be1d2514892",
+    "data/werewolf_evolution_llm_results.json": "ad75cb788022681025f60a2b09d61677d9034e204c48431d55093b5cc285cb8b"
+  },
+  "scope": "pre-game failure, zero game outcomes, original seed mismatch retained"
+}

@@ -1,0 +1,2785 @@
+{
+  "status": "pass",
+  "ablation": {
+    "status": "pass",
+    "pairs": 5600,
+    "games": 22400,
+    "statistics_recomputed": 456,
+    "overall": {
+      "vote_only": {
+        "n": 5600,
+        "candidate_wins": 2980,
+        "reference_wins": 2872,
+        "improved": 129,
+        "worsened": 21,
+        "candidate_rate": 0.5321428571428571,
+        "reference_rate": 0.5128571428571429,
+        "delta": 0.019285714285714285,
+        "ci95": [
+          0.015028592456895602,
+          0.023542836114532967
+        ],
+        "conservative_ci95": [
+          0.012873636643758943,
+          0.025663219645524378
+        ],
+        "candidate_wilson_ci95": [
+          0.5190565713021811,
+          0.5451850732153942
+        ],
+        "reference_wilson_ci95": [
+          0.49976134349522733,
+          0.5259353143118028
+        ],
+        "mcnemar_p": 3.749616482509678e-20
+      },
+      "night_only": {
+        "n": 5600,
+        "candidate_wins": 2905,
+        "reference_wins": 2872,
+        "improved": 35,
+        "worsened": 2,
+        "candidate_rate": 0.51875,
+        "reference_rate": 0.5128571428571429,
+        "delta": 0.005892857142857143,
+        "ci95": [
+          0.0037693027192807066,
+          0.00801641156643358
+        ],
+        "conservative_ci95": [
+          0.002765486868145809,
+          0.009009663664690762
+        ],
+        "candidate_wilson_ci95": [
+          0.5056550367658555,
+          0.5318192558693967
+        ],
+        "reference_wilson_ci95": [
+          0.49976134349522733,
+          0.5259353143118028
+        ],
+        "mcnemar_p": 1.0244548320770264e-08
+      },
+      "combined": {
+        "n": 5600,
+        "candidate_wins": 2991,
+        "reference_wins": 2872,
+        "improved": 142,
+        "worsened": 23,
+        "candidate_rate": 0.5341071428571429,
+        "reference_rate": 0.5128571428571429,
+        "delta": 0.02125,
+        "ci95": [
+          0.016788354247773543,
+          0.02571164575222646
+        ],
+        "conservative_ci95": [
+          0.014539557566645583,
+          0.027922348900249926
+        ],
+        "candidate_wilson_ci95": [
+          0.5210229228503419,
+          0.5471445999433074
+        ],
+        "reference_wilson_ci95": [
+          0.49976134349522733,
+          0.5259353143118028
+        ],
+        "mcnemar_p": 3.959648901635067e-22
+      }
+    },
+    "raw_sha256": "83ada5c6df70851e227b8fcd32fad34609c2d64fc13270d11ebcead67b6eba5f"
+  },
+  "runs": {
+    "rt": {
+      "status": "pass",
+      "pairs": 28000,
+      "games": 56000,
+      "statistics_recomputed": 152,
+      "overall": {
+        "candidate": {
+          "n": 28000,
+          "candidate_wins": 15330,
+          "reference_wins": 14686,
+          "improved": 751,
+          "worsened": 107,
+          "candidate_rate": 0.5475,
+          "reference_rate": 0.5245,
+          "delta": 0.023,
+          "ci95": [
+            0.020967324727564653,
+            0.025032675272435346
+          ],
+          "conservative_ci95": [
+            0.019999133251315884,
+            0.025992614701995827
+          ],
+          "candidate_wilson_ci95": [
+            0.5416637478699114,
+            0.5533232199181081
+          ],
+          "reference_wilson_ci95": [
+            0.5186474542479234,
+            0.5303458238743182
+          ],
+          "mcnemar_p": 7.604290402400743e-120
+        }
+      },
+      "raw_sha256": "0499164640f7f1aa258f9f8c690ec04389619e3816439eaaae613f5e6af262e0",
+      "assessment": {
+        "gates": {
+          "average_benefit_conservative_lower_gt_zero": true,
+          "substantial_point_gain_ge_2pp": true,
+          "all_role_noninferiority_n_ge_200_lower_gt_minus_3pp": true,
+          "no_prespecified_unacceptable_background_role_regression": true
+        },
+        "average_statistical_success": true,
+        "local_strength_gates_pass": true,
+        "dominance": false,
+        "role_checks": {
+          "villager": {
+            "n": 15953,
+            "conservative_ci95": [
+              -0.00031481881610925653,
+              0.00031481881610925653
+            ],
+            "enough_samples": true,
+            "noninferiority_pass": true
+          },
+          "seer": {
+            "n": 4129,
+            "conservative_ci95": [
+              -0.0012152533041907808,
+              0.0012152533041907808
+            ],
+            "enough_samples": true,
+            "noninferiority_pass": true
+          },
+          "wolf": {
+            "n": 7918,
+            "conservative_ci95": [
+              0.0709757601100022,
+              0.0915884348869928
+            ],
+            "enough_samples": true,
+            "noninferiority_pass": true
+          }
+        },
+        "all_negative_background_role_slices": [
+          {
+            "background": "first_switch",
+            "role": "wolf",
+            "n": 283,
+            "candidate_wins": 241,
+            "reference_wins": 245,
+            "improved": 0,
+            "worsened": 4,
+            "candidate_rate": 0.8515901060070671,
+            "reference_rate": 0.8657243816254417,
+            "delta": -0.014134275618374558,
+            "ci95": [
+              -0.027911990050403047,
+              -0.0003565611863460671
+            ],
+            "conservative_ci95": [
+              -0.040353770332911015,
+              0.012578296201582007
+            ],
+            "candidate_wilson_ci95": [
+              0.8054711044361809,
+              0.8882915854944289
+            ],
+            "reference_wilson_ci95": [
+              0.8210665307216833,
+              0.9005861165930718
+            ],
+            "mcnemar_p": 0.125,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "random",
+            "role": "wolf",
+            "n": 283,
+            "candidate_wins": 258,
+            "reference_wins": 262,
+            "improved": 7,
+            "worsened": 11,
+            "candidate_rate": 0.911660777385159,
+            "reference_rate": 0.9257950530035336,
+            "delta": -0.014134275618374558,
+            "ci95": [
+              -0.04352372367388362,
+              0.015255172437134507
+            ],
+            "conservative_ci95": [
+              -0.06277643325998605,
+              0.03500095912865705
+            ],
+            "candidate_wilson_ci95": [
+              0.8728460431381065,
+              0.93944896567512
+            ],
+            "reference_wilson_ci95": [
+              0.889228545686306,
+              0.9509564205110657
+            ],
+            "mcnemar_p": 0.48068237304687506,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "llm",
+            "role": "wolf",
+            "n": 291,
+            "candidate_wins": 281,
+            "reference_wins": 285,
+            "improved": 2,
+            "worsened": 6,
+            "candidate_rate": 0.9656357388316151,
+            "reference_rate": 0.979381443298969,
+            "delta": -0.013745704467353952,
+            "ci95": [
+              -0.03276340473351626,
+              0.005271995798808354
+            ],
+            "conservative_ci95": [
+              -0.04736734664317041,
+              0.02034250042877256
+            ],
+            "candidate_wilson_ci95": [
+              0.9379085592643072,
+              0.9812290386865926
+            ],
+            "reference_wilson_ci95": [
+              0.9557537870935641,
+              0.9905170240809785
+            ],
+            "mcnemar_p": 0.28906250000000017,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "first_switch",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 341,
+            "reference_wins": 345,
+            "improved": 0,
+            "worsened": 4,
+            "candidate_rate": 0.341,
+            "reference_rate": 0.345,
+            "delta": -0.004,
+            "ci95": [
+              -0.007914109688633502,
+              -8.589031136649848e-05
+            ],
+            "conservative_ci95": [
+              -0.01158453513542311,
+              0.003624525318791599
+            ],
+            "candidate_wilson_ci95": [
+              0.3122768034224175,
+              0.37094015032805483
+            ],
+            "reference_wilson_ci95": [
+              0.3161799875785417,
+              0.3750063509832394
+            ],
+            "mcnemar_p": 0.125,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "llm",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 674,
+            "reference_wins": 678,
+            "improved": 2,
+            "worsened": 6,
+            "candidate_rate": 0.674,
+            "reference_rate": 0.678,
+            "delta": -0.004,
+            "ci95": [
+              -0.009540941836586669,
+              0.0015409418365866677
+            ],
+            "conservative_ci95": [
+              -0.013994316004788085,
+              0.006034306188156573
+            ],
+            "candidate_wilson_ci95": [
+              0.6443288638870206,
+              0.7023393754049156
+            ],
+            "reference_wilson_ci95": [
+              0.6484062333218128,
+              0.7062313907814324
+            ],
+            "mcnemar_p": 0.28906250000000017,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "random",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 336,
+            "reference_wins": 340,
+            "improved": 7,
+            "worsened": 11,
+            "candidate_rate": 0.336,
+            "reference_rate": 0.34,
+            "delta": -0.004,
+            "ci95": [
+              -0.012316038172765376,
+              0.004316038172765376
+            ],
+            "conservative_ci95": [
+              -0.018137995774954615,
+              0.010177985958323102
+            ],
+            "candidate_wilson_ci95": [
+              0.3074010775632927,
+              0.3658541451730435
+            ],
+            "reference_wilson_ci95": [
+              0.31130136795291313,
+              0.369923239594732
+            ],
+            "mcnemar_p": 0.48068237304687506,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "llmx",
+            "role": "wolf",
+            "n": 286,
+            "candidate_wins": 271,
+            "reference_wins": 272,
+            "improved": 10,
+            "worsened": 11,
+            "candidate_rate": 0.9475524475524476,
+            "reference_rate": 0.951048951048951,
+            "delta": -0.0034965034965034965,
+            "ci95": [
+              -0.03495399689179574,
+              0.02796098989878875
+            ],
+            "conservative_ci95": [
+              -0.055364408397797354,
+              0.048492120262957225
+            ],
+            "candidate_wilson_ci95": [
+              0.915279001806532,
+              0.9679620512376137
+            ],
+            "reference_wilson_ci95": [
+              0.919521051360486,
+              0.9706203224105668
+            ],
+            "mcnemar_p": 1.0,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "llmx",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 615,
+            "reference_wins": 616,
+            "improved": 10,
+            "worsened": 11,
+            "candidate_rate": 0.615,
+            "reference_rate": 0.616,
+            "delta": -0.001,
+            "ci95": [
+              -0.009986128694210256,
+              0.007986128694210254
+            ],
+            "conservative_ci95": [
+              -0.016212948289271025,
+              0.01422294583511315
+            ],
+            "candidate_wilson_ci95": [
+              0.5844549636309254,
+              0.6446648496942048
+            ],
+            "reference_wilson_ci95": [
+              0.5854657662994249,
+              0.6456463932285326
+            ],
+            "mcnemar_p": 1.0,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          }
+        ],
+        "unacceptable_background_role_slices": [],
+        "undersampled_background_role_slices": [
+          {
+            "background": "first",
+            "role": "seer",
+            "n": 137
+          },
+          {
+            "background": "random",
+            "role": "seer",
+            "n": 144
+          },
+          {
+            "background": "heuristic",
+            "role": "seer",
+            "n": 145
+          },
+          {
+            "background": "llm",
+            "role": "seer",
+            "n": 127
+          },
+          {
+            "background": "llmx",
+            "role": "seer",
+            "n": 163
+          },
+          {
+            "background": "llmq",
+            "role": "seer",
+            "n": 161
+          },
+          {
+            "background": "mixed",
+            "role": "seer",
+            "n": 171
+          },
+          {
+            "background": "rt_wolfpack",
+            "role": "seer",
+            "n": 138
+          },
+          {
+            "background": "rt_talker",
+            "role": "seer",
+            "n": 148
+          },
+          {
+            "background": "rt_detective",
+            "role": "seer",
+            "n": 159
+          },
+          {
+            "background": "rt_chaos",
+            "role": "seer",
+            "n": 151
+          },
+          {
+            "background": "guard_silent",
+            "role": "seer",
+            "n": 145
+          },
+          {
+            "background": "guard_abstain",
+            "role": "seer",
+            "n": 148
+          },
+          {
+            "background": "guard_fixed",
+            "role": "seer",
+            "n": 147
+          },
+          {
+            "background": "guard_echo",
+            "role": "seer",
+            "n": 141
+          },
+          {
+            "background": "guard_fake",
+            "role": "seer",
+            "n": 136
+          },
+          {
+            "background": "guard_contradict",
+            "role": "seer",
+            "n": 153
+          },
+          {
+            "background": "first_high_night",
+            "role": "seer",
+            "n": 136
+          },
+          {
+            "background": "first_random_night",
+            "role": "seer",
+            "n": 149
+          },
+          {
+            "background": "first_switch",
+            "role": "seer",
+            "n": 145
+          },
+          {
+            "background": "pop_coordinated",
+            "role": "seer",
+            "n": 155
+          },
+          {
+            "background": "pop_prompt_seer",
+            "role": "seer",
+            "n": 150
+          },
+          {
+            "background": "pop_late_claim",
+            "role": "seer",
+            "n": 146
+          },
+          {
+            "background": "pop_pressure_bus",
+            "role": "seer",
+            "n": 163
+          },
+          {
+            "background": "pop_distance",
+            "role": "seer",
+            "n": 143
+          },
+          {
+            "background": "pop_observed_switch",
+            "role": "seer",
+            "n": 150
+          },
+          {
+            "background": "pop_survivor_kill",
+            "role": "seer",
+            "n": 145
+          },
+          {
+            "background": "pop_anti_majority",
+            "role": "seer",
+            "n": 133
+          }
+        ],
+        "first_switch": {
+          "seat": {
+            "n": 1000,
+            "candidate_wins": 341,
+            "reference_wins": 345,
+            "improved": 0,
+            "worsened": 4,
+            "candidate_rate": 0.341,
+            "reference_rate": 0.345,
+            "delta": -0.004,
+            "ci95": [
+              -0.007914109688633502,
+              -8.589031136649848e-05
+            ],
+            "conservative_ci95": [
+              -0.01158453513542311,
+              0.003624525318791599
+            ],
+            "candidate_wilson_ci95": [
+              0.3122768034224175,
+              0.37094015032805483
+            ],
+            "reference_wilson_ci95": [
+              0.3161799875785417,
+              0.3750063509832394
+            ],
+            "mcnemar_p": 0.125
+          },
+          "villager": {
+            "n": 572,
+            "candidate_wins": 81,
+            "reference_wins": 81,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.14160839160839161,
+            "reference_rate": 0.14160839160839161,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.00870654804342371,
+              0.00870654804342371
+            ],
+            "candidate_wilson_ci95": [
+              0.11542228740254454,
+              0.17257635666901958
+            ],
+            "reference_wilson_ci95": [
+              0.11542228740254454,
+              0.17257635666901958
+            ],
+            "mcnemar_p": 1.0
+          },
+          "seer": {
+            "n": 145,
+            "candidate_wins": 19,
+            "reference_wins": 19,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.1310344827586207,
+            "reference_rate": 0.1310344827586207,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.03348724203171756,
+              0.03348724203171756
+            ],
+            "candidate_wilson_ci95": [
+              0.08551633457290873,
+              0.19559862253585658
+            ],
+            "reference_wilson_ci95": [
+              0.08551633457290873,
+              0.19559862253585658
+            ],
+            "mcnemar_p": 1.0
+          },
+          "wolf": {
+            "n": 283,
+            "candidate_wins": 241,
+            "reference_wins": 245,
+            "improved": 0,
+            "worsened": 4,
+            "candidate_rate": 0.8515901060070671,
+            "reference_rate": 0.8657243816254417,
+            "delta": -0.014134275618374558,
+            "ci95": [
+              -0.027911990050403047,
+              -0.0003565611863460671
+            ],
+            "conservative_ci95": [
+              -0.040353770332911015,
+              0.012578296201582007
+            ],
+            "candidate_wilson_ci95": [
+              0.8054711044361809,
+              0.8882915854944289
+            ],
+            "reference_wilson_ci95": [
+              0.8210665307216833,
+              0.9005861165930718
+            ],
+            "mcnemar_p": 0.125
+          }
+        },
+        "first_switch_negative_development_risk_persists": {
+          "seat": true,
+          "villager": false,
+          "seer": false,
+          "wolf": true
+        },
+        "all_negative_other_scopes": [],
+        "slice_caution": "A CI crossing zero, especially n<200, is not proof of safety. Bonferroni is descriptive; it does not erase the prespecified regression gate."
+      },
+      "role_metrics": {
+        "seat": {
+          "n": 28000,
+          "candidate_wins": 15330,
+          "reference_wins": 14686,
+          "improved": 751,
+          "worsened": 107,
+          "candidate_rate": 0.5475,
+          "reference_rate": 0.5245,
+          "delta": 0.023,
+          "ci95": [
+            0.020967324727564653,
+            0.025032675272435346
+          ],
+          "conservative_ci95": [
+            0.019999133251315884,
+            0.025992614701995827
+          ],
+          "candidate_wilson_ci95": [
+            0.5416637478699114,
+            0.5533232199181081
+          ],
+          "reference_wilson_ci95": [
+            0.5186474542479234,
+            0.5303458238743182
+          ],
+          "mcnemar_p": 7.604290402398671e-120
+        },
+        "seer": {
+          "n": 4129,
+          "candidate_wins": 2234,
+          "reference_wins": 2234,
+          "improved": 0,
+          "worsened": 0,
+          "candidate_rate": 0.5410511019617341,
+          "reference_rate": 0.5410511019617341,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "conservative_ci95": [
+            -0.0012152533041907808,
+            0.0012152533041907808
+          ],
+          "candidate_wilson_ci95": [
+            0.5258202644615305,
+            0.5562056230053397
+          ],
+          "reference_wilson_ci95": [
+            0.5258202644615305,
+            0.5562056230053397
+          ],
+          "mcnemar_p": 1.0
+        },
+        "wolf": {
+          "n": 7918,
+          "candidate_wins": 6127,
+          "reference_wins": 5483,
+          "improved": 751,
+          "worsened": 107,
+          "candidate_rate": 0.773806516797171,
+          "reference_rate": 0.6924728466784541,
+          "delta": 0.08133367011871685,
+          "ci95": [
+            0.07430726120396325,
+            0.08836007903347046
+          ],
+          "conservative_ci95": [
+            0.0709757601100022,
+            0.0915884348869928
+          ],
+          "candidate_wilson_ci95": [
+            0.7644598199721291,
+            0.7828876553926902
+          ],
+          "reference_wilson_ci95": [
+            0.6822169189643125,
+            0.702542099696197
+          ],
+          "mcnemar_p": 7.604290402398671e-120
+        },
+        "villager": {
+          "n": 15953,
+          "candidate_wins": 6969,
+          "reference_wins": 6969,
+          "improved": 0,
+          "worsened": 0,
+          "candidate_rate": 0.43684573434463736,
+          "reference_rate": 0.43684573434463736,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "conservative_ci95": [
+            -0.00031481881610925653,
+            0.00031481881610925653
+          ],
+          "candidate_wilson_ci95": [
+            0.4291650072461791,
+            0.4445568701458983
+          ],
+          "reference_wilson_ci95": [
+            0.4291650072461791,
+            0.4445568701458983
+          ],
+          "mcnemar_p": 1.0
+        }
+      },
+      "panels": {
+        "simple7": {
+          "seat": {
+            "n": 7000,
+            "candidate_wins": 3727,
+            "reference_wins": 3653,
+            "improved": 85,
+            "worsened": 11,
+            "candidate_rate": 0.5324285714285715,
+            "reference_rate": 0.5218571428571429,
+            "delta": 0.010571428571428572,
+            "ci95": [
+              0.007839005582436914,
+              0.01330385156042023
+            ],
+            "conservative_ci95": [
+              0.006490600553390274,
+              0.014637093285288944
+            ],
+            "candidate_wilson_ci95": [
+              0.5207253980434456,
+              0.5440961707367507
+            ],
+            "reference_wilson_ci95": [
+              0.510146314436229,
+              0.5335439940367668
+            ],
+            "mcnemar_p": 2.547339085237751e-15
+          },
+          "villager": {
+            "n": 3994,
+            "candidate_wins": 1675,
+            "reference_wins": 1675,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.41937906860290436,
+            "reference_rate": 0.41937906860290436,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.0012562781144282039,
+              0.0012562781144282039
+            ],
+            "candidate_wilson_ci95": [
+              0.40415980987404626,
+              0.4347532676225709
+            ],
+            "reference_wilson_ci95": [
+              0.40415980987404626,
+              0.4347532676225709
+            ],
+            "mcnemar_p": 1.0
+          },
+          "seer": {
+            "n": 1007,
+            "candidate_wins": 484,
+            "reference_wins": 484,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.48063555114200596,
+            "reference_rate": 0.48063555114200596,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.004964197244612231,
+              0.004964197244612231
+            ],
+            "candidate_wilson_ci95": [
+              0.449908498657272,
+              0.5115097888370299
+            ],
+            "reference_wilson_ci95": [
+              0.449908498657272,
+              0.5115097888370299
+            ],
+            "mcnemar_p": 1.0
+          },
+          "wolf": {
+            "n": 1999,
+            "candidate_wins": 1568,
+            "reference_wins": 1494,
+            "improved": 85,
+            "worsened": 11,
+            "candidate_rate": 0.784392196098049,
+            "reference_rate": 0.7473736868434218,
+            "delta": 0.03701850925462731,
+            "ci95": [
+              0.02754739435035318,
+              0.04648962415890144
+            ],
+            "conservative_ci95": [
+              0.02285230077079644,
+              0.050999114384525805
+            ],
+            "candidate_wilson_ci95": [
+              0.7658277085758931,
+              0.801865712611284
+            ],
+            "reference_wilson_ci95": [
+              0.7278631960505952,
+              0.7659352151667471
+            ],
+            "mcnemar_p": 2.547339085237751e-15
+          }
+        },
+        "other21": {
+          "seat": {
+            "n": 21000,
+            "candidate_wins": 11603,
+            "reference_wins": 11033,
+            "improved": 666,
+            "worsened": 96,
+            "candidate_rate": 0.5525238095238095,
+            "reference_rate": 0.5253809523809524,
+            "delta": 0.027142857142857142,
+            "ci95": [
+              0.024592680086417455,
+              0.02969303419929683
+            ],
+            "conservative_ci95": [
+              0.023373977908560856,
+              0.030898752566630536
+            ],
+            "candidate_wilson_ci95": [
+              0.5457895850282463,
+              0.5592388208229958
+            ],
+            "reference_wilson_ci95": [
+              0.5186230023155092,
+              0.5321296181003676
+            ],
+            "mcnemar_p": 8.708871519245961e-106
+          },
+          "villager": {
+            "n": 11959,
+            "candidate_wins": 5294,
+            "reference_wins": 5294,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.4426791537753993,
+            "reference_rate": 0.4426791537753993,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.0004199160947089799,
+              0.0004199160947089799
+            ],
+            "candidate_wilson_ci95": [
+              0.43379659793170644,
+              0.45159852424394786
+            ],
+            "reference_wilson_ci95": [
+              0.43379659793170644,
+              0.45159852424394786
+            ],
+            "mcnemar_p": 1.0
+          },
+          "seer": {
+            "n": 3122,
+            "candidate_wins": 1750,
+            "reference_wins": 1750,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.5605381165919282,
+            "reference_rate": 0.5605381165919282,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.0016066030737674434,
+              0.0016066030737674434
+            ],
+            "candidate_wilson_ci95": [
+              0.5430640973539217,
+              0.5778633354372983
+            ],
+            "reference_wilson_ci95": [
+              0.5430640973539217,
+              0.5778633354372983
+            ],
+            "mcnemar_p": 1.0
+          },
+          "wolf": {
+            "n": 5919,
+            "candidate_wins": 4559,
+            "reference_wins": 3989,
+            "improved": 666,
+            "worsened": 96,
+            "candidate_rate": 0.7702314580165569,
+            "reference_rate": 0.6739314073323196,
+            "delta": 0.0963000506842372,
+            "ci95": [
+              0.08749386994870814,
+              0.10510623141976627
+            ],
+            "conservative_ci95": [
+              0.08330873692802312,
+              0.10912802934803338
+            ],
+            "candidate_wilson_ci95": [
+              0.7593408666626958,
+              0.7807715010224371
+            ],
+            "reference_wilson_ci95": [
+              0.6618794626550422,
+              0.685757725548674
+            ],
+            "mcnemar_p": 8.708871519245961e-106
+          }
+        },
+        "strong_scripted_proxy8": {
+          "seat": {
+            "n": 8000,
+            "candidate_wins": 4742,
+            "reference_wins": 4720,
+            "improved": 106,
+            "worsened": 84,
+            "candidate_rate": 0.59275,
+            "reference_rate": 0.59,
+            "delta": 0.00275,
+            "ci95": [
+              -0.0006267652872942895,
+              0.006126765287294289
+            ],
+            "conservative_ci95": [
+              -0.0027044208384074536,
+              0.008200969084306158
+            ],
+            "candidate_wilson_ci95": [
+              0.5819414039693994,
+              0.6034695616848934
+            ],
+            "reference_wilson_ci95": [
+              0.5791815304701357,
+              0.6007320750165096
+            ],
+            "mcnemar_p": 0.12741313842801966
+          },
+          "villager": {
+            "n": 4466,
+            "candidate_wins": 2306,
+            "reference_wins": 2306,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.516345723242275,
+            "reference_rate": 0.516345723242275,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.0011236545174391555,
+              0.0011236545174391555
+            ],
+            "candidate_wilson_ci95": [
+              0.501681324505229,
+              0.5309820253548647
+            ],
+            "reference_wilson_ci95": [
+              0.501681324505229,
+              0.5309820253548647
+            ],
+            "mcnemar_p": 1.0
+          },
+          "seer": {
+            "n": 1218,
+            "candidate_wins": 617,
+            "reference_wins": 617,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.506568144499179,
+            "reference_rate": 0.506568144499179,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.004107758028303436,
+              0.004107758028303436
+            ],
+            "candidate_wilson_ci95": [
+              0.47851373909215994,
+              0.5345812480158252
+            ],
+            "reference_wilson_ci95": [
+              0.47851373909215994,
+              0.5345812480158252
+            ],
+            "mcnemar_p": 1.0
+          },
+          "wolf": {
+            "n": 2316,
+            "candidate_wins": 1819,
+            "reference_wins": 1797,
+            "improved": 106,
+            "worsened": 84,
+            "candidate_rate": 0.7854058721934369,
+            "reference_rate": 0.7759067357512953,
+            "delta": 0.009499136442141624,
+            "ci95": [
+              -0.0021622214684592304,
+              0.021160494352742476
+            ],
+            "conservative_ci95": [
+              -0.009049694055835639,
+              0.028006844933019442
+            ],
+            "candidate_wilson_ci95": [
+              0.7682201624896905,
+              0.8016463318433709
+            ],
+            "reference_wilson_ci95": [
+              0.7584750888535421,
+              0.7924245932626852
+            ],
+            "mcnemar_p": 0.12741313842801966
+          }
+        },
+        "population8": {
+          "seat": {
+            "n": 8000,
+            "candidate_wins": 5106,
+            "reference_wins": 4569,
+            "improved": 545,
+            "worsened": 8,
+            "candidate_rate": 0.63825,
+            "reference_rate": 0.571125,
+            "delta": 0.067125,
+            "ci95": [
+              0.061554179988428534,
+              0.07269582001157147
+            ],
+            "conservative_ci95": [
+              0.059913510977722455,
+              0.07425223484262322
+            ],
+            "candidate_wilson_ci95": [
+              0.6276563893324655,
+              0.6487108990956313
+            ],
+            "reference_wilson_ci95": [
+              0.5602480999853633,
+              0.5819336243506105
+            ],
+            "mcnemar_p": 1.4191604392625375e-149
+          },
+          "villager": {
+            "n": 4608,
+            "candidate_wins": 2490,
+            "reference_wins": 2490,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.5403645833333334,
+            "reference_rate": 0.5403645833333334,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.001089065721583551,
+              0.001089065721583551
+            ],
+            "candidate_wilson_ci95": [
+              0.5259472724075782,
+              0.554714647984484
+            ],
+            "reference_wilson_ci95": [
+              0.5259472724075782,
+              0.554714647984484
+            ],
+            "mcnemar_p": 1.0
+          },
+          "seer": {
+            "n": 1185,
+            "candidate_wins": 997,
+            "reference_wins": 997,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.8413502109704641,
+            "reference_rate": 0.8413502109704641,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.004221668359438318,
+              0.004221668359438318
+            ],
+            "candidate_wilson_ci95": [
+              0.8194495461834974,
+              0.8610448106761548
+            ],
+            "reference_wilson_ci95": [
+              0.8194495461834974,
+              0.8610448106761548
+            ],
+            "mcnemar_p": 1.0
+          },
+          "wolf": {
+            "n": 2207,
+            "candidate_wins": 1619,
+            "reference_wins": 1082,
+            "improved": 545,
+            "worsened": 8,
+            "candidate_rate": 0.733574988672406,
+            "reference_rate": 0.4902582691436339,
+            "delta": 0.2433167195287721,
+            "ci95": [
+              0.22506168309498256,
+              0.26157175596256166
+            ],
+            "conservative_ci95": [
+              0.21912696987128427,
+              0.2664012410610023
+            ],
+            "candidate_wilson_ci95": [
+              0.714736281811693,
+              0.7516019669348476
+            ],
+            "reference_wilson_ci95": [
+              0.46943676829832154,
+              0.5111136248189421
+            ],
+            "mcnemar_p": 1.4191604392625375e-149
+          }
+        }
+      },
+      "source_digest": "da2cb24add4209d73a26586a83ce43c15770de204b45cedeef9768d9e134d19e"
+    },
+    "rounds": {
+      "status": "pass",
+      "pairs": 28000,
+      "games": 56000,
+      "statistics_recomputed": 152,
+      "overall": {
+        "candidate": {
+          "n": 28000,
+          "candidate_wins": 14927,
+          "reference_wins": 14310,
+          "improved": 816,
+          "worsened": 199,
+          "candidate_rate": 0.5331071428571429,
+          "reference_rate": 0.5110714285714286,
+          "delta": 0.022035714285714287,
+          "ci95": [
+            0.01982052700763761,
+            0.024250901563790964
+          ],
+          "conservative_ci95": [
+            0.01864866523418524,
+            0.025414857261456574
+          ],
+          "candidate_wilson_ci95": [
+            0.5272592328565066,
+            0.5389459695040154
+          ],
+          "reference_wilson_ci95": [
+            0.505215126965787,
+            0.5169246925938267
+          ],
+          "mcnemar_p": 3.367601884907518e-89
+        }
+      },
+      "raw_sha256": "8a9eb86116c422e99c18f6f4f4b6bf41026fb2173ae5f1344877f6bcd08b1a64",
+      "assessment": {
+        "gates": {
+          "average_benefit_conservative_lower_gt_zero": true,
+          "substantial_point_gain_ge_2pp": true,
+          "all_role_noninferiority_n_ge_200_lower_gt_minus_3pp": true,
+          "no_prespecified_unacceptable_background_role_regression": false
+        },
+        "average_statistical_success": true,
+        "local_strength_gates_pass": false,
+        "dominance": false,
+        "role_checks": {
+          "villager": {
+            "n": 15953,
+            "conservative_ci95": [
+              -0.00031481881610925653,
+              0.00031481881610925653
+            ],
+            "enough_samples": true,
+            "noninferiority_pass": true
+          },
+          "seer": {
+            "n": 4129,
+            "conservative_ci95": [
+              -0.0012152533041907808,
+              0.0012152533041907808
+            ],
+            "enough_samples": true,
+            "noninferiority_pass": true
+          },
+          "wolf": {
+            "n": 7918,
+            "conservative_ci95": [
+              0.06626128038897816,
+              0.08948733500410558
+            ],
+            "enough_samples": true,
+            "noninferiority_pass": true
+          }
+        },
+        "all_negative_background_role_slices": [
+          {
+            "background": "rt_detective",
+            "role": "wolf",
+            "n": 291,
+            "candidate_wins": 102,
+            "reference_wins": 141,
+            "improved": 16,
+            "worsened": 55,
+            "candidate_rate": 0.35051546391752575,
+            "reference_rate": 0.4845360824742268,
+            "delta": -0.13402061855670103,
+            "ci95": [
+              -0.18873922774256524,
+              -0.07930200937083683
+            ],
+            "conservative_ci95": [
+              -0.21366290940132152,
+              -0.049829341189057574
+            ],
+            "candidate_wilson_ci95": [
+              0.2979655721657919,
+              0.40696073402709276
+            ],
+            "reference_wilson_ci95": [
+              0.4276913836843949,
+              0.5417837514390071
+            ],
+            "mcnemar_p": 3.7532376885928793e-06,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 0.000840725242244805,
+            "prespecified_regression_flag": true,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "rt_detective",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 607,
+            "reference_wins": 646,
+            "improved": 16,
+            "worsened": 55,
+            "candidate_rate": 0.607,
+            "reference_rate": 0.646,
+            "delta": -0.039,
+            "ci95": [
+              -0.055345571391178225,
+              -0.022654428608821775
+            ],
+            "conservative_ci95": [
+              -0.06427181349463601,
+              -0.013338282217521216
+            ],
+            "candidate_wilson_ci95": [
+              0.5763733387092698,
+              0.6368077049932426
+            ],
+            "reference_wilson_ci95": [
+              0.6158530546713419,
+              0.675029490941432
+            ],
+            "mcnemar_p": 3.7532376885928793e-06,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 0.000840725242244805,
+            "prespecified_regression_flag": true,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "llm",
+            "role": "wolf",
+            "n": 291,
+            "candidate_wins": 274,
+            "reference_wins": 283,
+            "improved": 2,
+            "worsened": 11,
+            "candidate_rate": 0.9415807560137457,
+            "reference_rate": 0.9725085910652921,
+            "delta": -0.030927835051546393,
+            "ci95": [
+              -0.05499263693422827,
+              -0.006863033168864517
+            ],
+            "conservative_ci95": [
+              -0.07009054002896534,
+              0.00928463604657018
+            ],
+            "candidate_wilson_ci95": [
+              0.9084447224218716,
+              0.9632097523876534
+            ],
+            "reference_wilson_ci95": [
+              0.9466988389279062,
+              0.986005365634815
+            ],
+            "mcnemar_p": 0.022460937499999993,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": true,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "llmx",
+            "role": "wolf",
+            "n": 286,
+            "candidate_wins": 272,
+            "reference_wins": 278,
+            "improved": 5,
+            "worsened": 11,
+            "candidate_rate": 0.951048951048951,
+            "reference_rate": 0.972027972027972,
+            "delta": -0.02097902097902098,
+            "ci95": [
+              -0.04833142700746059,
+              0.006373385049418631
+            ],
+            "conservative_ci95": [
+              -0.06623880432334937,
+              0.025005075514308528
+            ],
+            "candidate_wilson_ci95": [
+              0.919521051360486,
+              0.9706203224105668
+            ],
+            "reference_wilson_ci95": [
+              0.9457837489742437,
+              0.9857595491582535
+            ],
+            "mcnemar_p": 0.21011352539062506,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "first_switch",
+            "role": "wolf",
+            "n": 283,
+            "candidate_wins": 241,
+            "reference_wins": 245,
+            "improved": 0,
+            "worsened": 4,
+            "candidate_rate": 0.8515901060070671,
+            "reference_rate": 0.8657243816254417,
+            "delta": -0.014134275618374558,
+            "ci95": [
+              -0.027911990050403047,
+              -0.0003565611863460671
+            ],
+            "conservative_ci95": [
+              -0.040353770332911015,
+              0.012578296201582007
+            ],
+            "candidate_wilson_ci95": [
+              0.8054711044361809,
+              0.8882915854944289
+            ],
+            "reference_wilson_ci95": [
+              0.8210665307216833,
+              0.9005861165930718
+            ],
+            "mcnemar_p": 0.125,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "random",
+            "role": "wolf",
+            "n": 283,
+            "candidate_wins": 258,
+            "reference_wins": 262,
+            "improved": 7,
+            "worsened": 11,
+            "candidate_rate": 0.911660777385159,
+            "reference_rate": 0.9257950530035336,
+            "delta": -0.014134275618374558,
+            "ci95": [
+              -0.04352372367388362,
+              0.015255172437134507
+            ],
+            "conservative_ci95": [
+              -0.06277643325998605,
+              0.03500095912865705
+            ],
+            "candidate_wilson_ci95": [
+              0.8728460431381065,
+              0.93944896567512
+            ],
+            "reference_wilson_ci95": [
+              0.889228545686306,
+              0.9509564205110657
+            ],
+            "mcnemar_p": 0.48068237304687506,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "rt_wolfpack",
+            "role": "wolf",
+            "n": 296,
+            "candidate_wins": 251,
+            "reference_wins": 255,
+            "improved": 9,
+            "worsened": 13,
+            "candidate_rate": 0.847972972972973,
+            "reference_rate": 0.8614864864864865,
+            "delta": -0.013513513513513514,
+            "ci95": [
+              -0.04458602522827765,
+              0.017558998201250616
+            ],
+            "conservative_ci95": [
+              -0.06435819358275882,
+              0.037782229458029795
+            ],
+            "candidate_wilson_ci95": [
+              0.802630172746966,
+              0.88439924545251
+            ],
+            "reference_wilson_ci95": [
+              0.8174814177305774,
+              0.8962287545737326
+            ],
+            "mcnemar_p": 0.5234670639038085,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "llmq",
+            "role": "wolf",
+            "n": 276,
+            "candidate_wins": 258,
+            "reference_wins": 261,
+            "improved": 8,
+            "worsened": 11,
+            "candidate_rate": 0.9347826086956522,
+            "reference_rate": 0.9456521739130435,
+            "delta": -0.010869565217391304,
+            "ci95": [
+              -0.04185367233279647,
+              0.020114541898013864
+            ],
+            "conservative_ci95": [
+              -0.06205308947254117,
+              0.04070259118784658
+            ],
+            "candidate_wilson_ci95": [
+              0.8992754843362828,
+              0.9583525452347318
+            ],
+            "reference_wilson_ci95": [
+              0.912277176932773,
+              0.9667915533775168
+            ],
+            "mcnemar_p": 0.647605895996095,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "rt_talker",
+            "role": "wolf",
+            "n": 314,
+            "candidate_wins": 168,
+            "reference_wins": 171,
+            "improved": 42,
+            "worsened": 45,
+            "candidate_rate": 0.535031847133758,
+            "reference_rate": 0.5445859872611465,
+            "delta": -0.009554140127388535,
+            "ci95": [
+              -0.0678593218445701,
+              0.04875104158979302
+            ],
+            "conservative_ci95": [
+              -0.0968347918242676,
+              0.07802742265919661
+            ],
+            "candidate_wilson_ci95": [
+              0.47977252201258236,
+              0.5894443457605474
+            ],
+            "reference_wilson_ci95": [
+              0.48929406690715244,
+              0.5988001284404674
+            ],
+            "mcnemar_p": 0.8303730096857623,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "llm",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 667,
+            "reference_wins": 676,
+            "improved": 2,
+            "worsened": 11,
+            "candidate_rate": 0.667,
+            "reference_rate": 0.676,
+            "delta": -0.009,
+            "ci95": [
+              -0.016048355106669195,
+              -0.001951644893330805
+            ],
+            "conservative_ci95": [
+              -0.020745737956521574,
+              0.002835715869100674
+            ],
+            "candidate_wilson_ci95": [
+              0.6371992085584995,
+              0.6955226073136461
+            ],
+            "reference_wilson_ci95": [
+              0.6463672482447502,
+              0.7042856834528404
+            ],
+            "mcnemar_p": 0.022460937499999993,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "llmx",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 620,
+            "reference_wins": 626,
+            "improved": 5,
+            "worsened": 11,
+            "candidate_rate": 0.62,
+            "reference_rate": 0.626,
+            "delta": -0.006,
+            "ci95": [
+              -0.013835093559817336,
+              0.001835093559817336
+            ],
+            "conservative_ci95": [
+              -0.019305969754888602,
+              0.0073659550299413346
+            ],
+            "candidate_wilson_ci95": [
+              0.5895103176750073,
+              0.6495712266642589
+            ],
+            "reference_wilson_ci95": [
+              0.5955811892071059,
+              0.6554544323491238
+            ],
+            "mcnemar_p": 0.21011352539062506,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "first_switch",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 341,
+            "reference_wins": 345,
+            "improved": 0,
+            "worsened": 4,
+            "candidate_rate": 0.341,
+            "reference_rate": 0.345,
+            "delta": -0.004,
+            "ci95": [
+              -0.007914109688633502,
+              -8.589031136649848e-05
+            ],
+            "conservative_ci95": [
+              -0.01158453513542311,
+              0.003624525318791599
+            ],
+            "candidate_wilson_ci95": [
+              0.3122768034224175,
+              0.37094015032805483
+            ],
+            "reference_wilson_ci95": [
+              0.3161799875785417,
+              0.3750063509832394
+            ],
+            "mcnemar_p": 0.125,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "random",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 336,
+            "reference_wins": 340,
+            "improved": 7,
+            "worsened": 11,
+            "candidate_rate": 0.336,
+            "reference_rate": 0.34,
+            "delta": -0.004,
+            "ci95": [
+              -0.012316038172765376,
+              0.004316038172765376
+            ],
+            "conservative_ci95": [
+              -0.018137995774954615,
+              0.010177985958323102
+            ],
+            "candidate_wilson_ci95": [
+              0.3074010775632927,
+              0.3658541451730435
+            ],
+            "reference_wilson_ci95": [
+              0.31130136795291313,
+              0.369923239594732
+            ],
+            "mcnemar_p": 0.48068237304687506,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "rt_wolfpack",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 370,
+            "reference_wins": 374,
+            "improved": 9,
+            "worsened": 13,
+            "candidate_rate": 0.37,
+            "reference_rate": 0.374,
+            "delta": -0.004,
+            "ci95": [
+              -0.01319446967870756,
+              0.005194469678707559
+            ],
+            "conservative_ci95": [
+              -0.019464461467916066,
+              0.011504451651284556
+            ],
+            "candidate_wilson_ci95": [
+              0.34062614660286095,
+              0.4003688470296006
+            ],
+            "reference_wilson_ci95": [
+              0.34454556765087635,
+              0.40441881079289416
+            ],
+            "mcnemar_p": 0.5234670639038085,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "llmq",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 598,
+            "reference_wins": 601,
+            "improved": 8,
+            "worsened": 11,
+            "candidate_rate": 0.598,
+            "reference_rate": 0.601,
+            "delta": -0.003,
+            "ci95": [
+              -0.011545692157716336,
+              0.005545692157716335
+            ],
+            "conservative_ci95": [
+              -0.017515538493131005,
+              0.011545531130657372
+            ],
+            "candidate_wilson_ci95": [
+              0.5672916198330558,
+              0.6279583080440116
+            ],
+            "reference_wilson_ci95": [
+              0.5703176774386458,
+              0.6309092890469032
+            ],
+            "mcnemar_p": 0.647605895996095,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "rt_talker",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 578,
+            "reference_wins": 581,
+            "improved": 42,
+            "worsened": 45,
+            "candidate_rate": 0.578,
+            "reference_rate": 0.581,
+            "delta": -0.003,
+            "ci95": [
+              -0.021289864535986715,
+              0.015289864535986717
+            ],
+            "conservative_ci95": [
+              -0.032182902773964364,
+              0.026212895411490744
+            ],
+            "candidate_wilson_ci95": [
+              0.5471477640586072,
+              0.6082552397619158
+            ],
+            "reference_wilson_ci95": [
+              0.5501660560097688,
+              0.6112139864192359
+            ],
+            "mcnemar_p": 0.8303730096857623,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": false,
+            "below_200_not_evidence_of_safety": false
+          }
+        ],
+        "unacceptable_background_role_slices": [
+          {
+            "background": "llm",
+            "role": "wolf",
+            "n": 291,
+            "candidate_wins": 274,
+            "reference_wins": 283,
+            "improved": 2,
+            "worsened": 11,
+            "candidate_rate": 0.9415807560137457,
+            "reference_rate": 0.9725085910652921,
+            "delta": -0.030927835051546393,
+            "ci95": [
+              -0.05499263693422827,
+              -0.006863033168864517
+            ],
+            "conservative_ci95": [
+              -0.07009054002896534,
+              0.00928463604657018
+            ],
+            "candidate_wilson_ci95": [
+              0.9084447224218716,
+              0.9632097523876534
+            ],
+            "reference_wilson_ci95": [
+              0.9466988389279062,
+              0.986005365634815
+            ],
+            "mcnemar_p": 0.022460937499999993,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 1.0,
+            "prespecified_regression_flag": true,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "rt_detective",
+            "role": "seat",
+            "n": 1000,
+            "candidate_wins": 607,
+            "reference_wins": 646,
+            "improved": 16,
+            "worsened": 55,
+            "candidate_rate": 0.607,
+            "reference_rate": 0.646,
+            "delta": -0.039,
+            "ci95": [
+              -0.055345571391178225,
+              -0.022654428608821775
+            ],
+            "conservative_ci95": [
+              -0.06427181349463601,
+              -0.013338282217521216
+            ],
+            "candidate_wilson_ci95": [
+              0.5763733387092698,
+              0.6368077049932426
+            ],
+            "reference_wilson_ci95": [
+              0.6158530546713419,
+              0.675029490941432
+            ],
+            "mcnemar_p": 3.7532376885928793e-06,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 0.000840725242244805,
+            "prespecified_regression_flag": true,
+            "below_200_not_evidence_of_safety": false
+          },
+          {
+            "background": "rt_detective",
+            "role": "wolf",
+            "n": 291,
+            "candidate_wins": 102,
+            "reference_wins": 141,
+            "improved": 16,
+            "worsened": 55,
+            "candidate_rate": 0.35051546391752575,
+            "reference_rate": 0.4845360824742268,
+            "delta": -0.13402061855670103,
+            "ci95": [
+              -0.18873922774256524,
+              -0.07930200937083683
+            ],
+            "conservative_ci95": [
+              -0.21366290940132152,
+              -0.049829341189057574
+            ],
+            "candidate_wilson_ci95": [
+              0.2979655721657919,
+              0.40696073402709276
+            ],
+            "reference_wilson_ci95": [
+              0.4276913836843949,
+              0.5417837514390071
+            ],
+            "mcnemar_p": 3.7532376885928793e-06,
+            "family_size": 224,
+            "bonferroni_adjusted_p": 0.000840725242244805,
+            "prespecified_regression_flag": true,
+            "below_200_not_evidence_of_safety": false
+          }
+        ],
+        "undersampled_background_role_slices": [
+          {
+            "background": "first",
+            "role": "seer",
+            "n": 137
+          },
+          {
+            "background": "random",
+            "role": "seer",
+            "n": 144
+          },
+          {
+            "background": "heuristic",
+            "role": "seer",
+            "n": 145
+          },
+          {
+            "background": "llm",
+            "role": "seer",
+            "n": 127
+          },
+          {
+            "background": "llmx",
+            "role": "seer",
+            "n": 163
+          },
+          {
+            "background": "llmq",
+            "role": "seer",
+            "n": 161
+          },
+          {
+            "background": "mixed",
+            "role": "seer",
+            "n": 171
+          },
+          {
+            "background": "rt_wolfpack",
+            "role": "seer",
+            "n": 138
+          },
+          {
+            "background": "rt_talker",
+            "role": "seer",
+            "n": 148
+          },
+          {
+            "background": "rt_detective",
+            "role": "seer",
+            "n": 159
+          },
+          {
+            "background": "rt_chaos",
+            "role": "seer",
+            "n": 151
+          },
+          {
+            "background": "guard_silent",
+            "role": "seer",
+            "n": 145
+          },
+          {
+            "background": "guard_abstain",
+            "role": "seer",
+            "n": 148
+          },
+          {
+            "background": "guard_fixed",
+            "role": "seer",
+            "n": 147
+          },
+          {
+            "background": "guard_echo",
+            "role": "seer",
+            "n": 141
+          },
+          {
+            "background": "guard_fake",
+            "role": "seer",
+            "n": 136
+          },
+          {
+            "background": "guard_contradict",
+            "role": "seer",
+            "n": 153
+          },
+          {
+            "background": "first_high_night",
+            "role": "seer",
+            "n": 136
+          },
+          {
+            "background": "first_random_night",
+            "role": "seer",
+            "n": 149
+          },
+          {
+            "background": "first_switch",
+            "role": "seer",
+            "n": 145
+          },
+          {
+            "background": "pop_coordinated",
+            "role": "seer",
+            "n": 155
+          },
+          {
+            "background": "pop_prompt_seer",
+            "role": "seer",
+            "n": 150
+          },
+          {
+            "background": "pop_late_claim",
+            "role": "seer",
+            "n": 146
+          },
+          {
+            "background": "pop_pressure_bus",
+            "role": "seer",
+            "n": 163
+          },
+          {
+            "background": "pop_distance",
+            "role": "seer",
+            "n": 143
+          },
+          {
+            "background": "pop_observed_switch",
+            "role": "seer",
+            "n": 150
+          },
+          {
+            "background": "pop_survivor_kill",
+            "role": "seer",
+            "n": 145
+          },
+          {
+            "background": "pop_anti_majority",
+            "role": "seer",
+            "n": 133
+          }
+        ],
+        "first_switch": {
+          "seat": {
+            "n": 1000,
+            "candidate_wins": 341,
+            "reference_wins": 345,
+            "improved": 0,
+            "worsened": 4,
+            "candidate_rate": 0.341,
+            "reference_rate": 0.345,
+            "delta": -0.004,
+            "ci95": [
+              -0.007914109688633502,
+              -8.589031136649848e-05
+            ],
+            "conservative_ci95": [
+              -0.01158453513542311,
+              0.003624525318791599
+            ],
+            "candidate_wilson_ci95": [
+              0.3122768034224175,
+              0.37094015032805483
+            ],
+            "reference_wilson_ci95": [
+              0.3161799875785417,
+              0.3750063509832394
+            ],
+            "mcnemar_p": 0.125
+          },
+          "villager": {
+            "n": 572,
+            "candidate_wins": 81,
+            "reference_wins": 81,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.14160839160839161,
+            "reference_rate": 0.14160839160839161,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.00870654804342371,
+              0.00870654804342371
+            ],
+            "candidate_wilson_ci95": [
+              0.11542228740254454,
+              0.17257635666901958
+            ],
+            "reference_wilson_ci95": [
+              0.11542228740254454,
+              0.17257635666901958
+            ],
+            "mcnemar_p": 1.0
+          },
+          "seer": {
+            "n": 145,
+            "candidate_wins": 19,
+            "reference_wins": 19,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.1310344827586207,
+            "reference_rate": 0.1310344827586207,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.03348724203171756,
+              0.03348724203171756
+            ],
+            "candidate_wilson_ci95": [
+              0.08551633457290873,
+              0.19559862253585658
+            ],
+            "reference_wilson_ci95": [
+              0.08551633457290873,
+              0.19559862253585658
+            ],
+            "mcnemar_p": 1.0
+          },
+          "wolf": {
+            "n": 283,
+            "candidate_wins": 241,
+            "reference_wins": 245,
+            "improved": 0,
+            "worsened": 4,
+            "candidate_rate": 0.8515901060070671,
+            "reference_rate": 0.8657243816254417,
+            "delta": -0.014134275618374558,
+            "ci95": [
+              -0.027911990050403047,
+              -0.0003565611863460671
+            ],
+            "conservative_ci95": [
+              -0.040353770332911015,
+              0.012578296201582007
+            ],
+            "candidate_wilson_ci95": [
+              0.8054711044361809,
+              0.8882915854944289
+            ],
+            "reference_wilson_ci95": [
+              0.8210665307216833,
+              0.9005861165930718
+            ],
+            "mcnemar_p": 0.125
+          }
+        },
+        "first_switch_negative_development_risk_persists": {
+          "seat": true,
+          "villager": false,
+          "seer": false,
+          "wolf": true
+        },
+        "all_negative_other_scopes": [],
+        "slice_caution": "A CI crossing zero, especially n<200, is not proof of safety. Bonferroni is descriptive; it does not erase the prespecified regression gate."
+      },
+      "role_metrics": {
+        "seat": {
+          "n": 28000,
+          "candidate_wins": 14927,
+          "reference_wins": 14310,
+          "improved": 816,
+          "worsened": 199,
+          "candidate_rate": 0.5331071428571429,
+          "reference_rate": 0.5110714285714286,
+          "delta": 0.022035714285714287,
+          "ci95": [
+            0.01982052700763761,
+            0.024250901563790964
+          ],
+          "conservative_ci95": [
+            0.01864866523418524,
+            0.025414857261456574
+          ],
+          "candidate_wilson_ci95": [
+            0.5272592328565066,
+            0.5389459695040154
+          ],
+          "reference_wilson_ci95": [
+            0.505215126965787,
+            0.5169246925938267
+          ],
+          "mcnemar_p": 3.367601884904261e-89
+        },
+        "seer": {
+          "n": 4129,
+          "candidate_wins": 2149,
+          "reference_wins": 2149,
+          "improved": 0,
+          "worsened": 0,
+          "candidate_rate": 0.5204650036328409,
+          "reference_rate": 0.5204650036328409,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "conservative_ci95": [
+            -0.0012152533041907808,
+            0.0012152533041907808
+          ],
+          "candidate_wilson_ci95": [
+            0.5052146465097446,
+            0.5356773150887836
+          ],
+          "reference_wilson_ci95": [
+            0.5052146465097446,
+            0.5356773150887836
+          ],
+          "mcnemar_p": 1.0
+        },
+        "wolf": {
+          "n": 7918,
+          "candidate_wins": 5991,
+          "reference_wins": 5374,
+          "improved": 816,
+          "worsened": 199,
+          "candidate_rate": 0.7566304622379388,
+          "reference_rate": 0.6787067441273049,
+          "delta": 0.077923718110634,
+          "ci95": [
+            0.07022597327116933,
+            0.08562146295009868
+          ],
+          "conservative_ci95": [
+            0.06626128038897816,
+            0.08948733500410558
+          ],
+          "candidate_wilson_ci95": [
+            0.747055493149658,
+            0.7659565317310213
+          ],
+          "reference_wilson_ci95": [
+            0.668336361077,
+            0.6889038038866621
+          ],
+          "mcnemar_p": 3.367601884904261e-89
+        },
+        "villager": {
+          "n": 15953,
+          "candidate_wins": 6787,
+          "reference_wins": 6787,
+          "improved": 0,
+          "worsened": 0,
+          "candidate_rate": 0.4254372218391525,
+          "reference_rate": 0.4254372218391525,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "conservative_ci95": [
+            -0.00031481881610925653,
+            0.00031481881610925653
+          ],
+          "candidate_wilson_ci95": [
+            0.4177838496022955,
+            0.4331264959638346
+          ],
+          "reference_wilson_ci95": [
+            0.4177838496022955,
+            0.4331264959638346
+          ],
+          "mcnemar_p": 1.0
+        }
+      },
+      "panels": {
+        "simple7": {
+          "seat": {
+            "n": 7000,
+            "candidate_wins": 3482,
+            "reference_wins": 3399,
+            "improved": 106,
+            "worsened": 23,
+            "candidate_rate": 0.49742857142857144,
+            "reference_rate": 0.4855714285714286,
+            "delta": 0.011857142857142858,
+            "ci95": [
+              0.008688881948938701,
+              0.015025403765347015
+            ],
+            "conservative_ci95": [
+              0.006986358542202497,
+              0.01671091968226203
+            ],
+            "candidate_wilson_ci95": [
+              0.48572010904910934,
+              0.50913985465995
+            ],
+            "reference_wilson_ci95": [
+              0.47387418906070994,
+              0.49728449619567855
+            ],
+            "mcnemar_p": 6.260285489771425e-14
+          },
+          "villager": {
+            "n": 3994,
+            "candidate_wins": 1568,
+            "reference_wins": 1568,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.3925888833249875,
+            "reference_rate": 0.3925888833249875,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.0012562781144282039,
+              0.0012562781144282039
+            ],
+            "candidate_wilson_ci95": [
+              0.37755426253589686,
+              0.40782993077481355
+            ],
+            "reference_wilson_ci95": [
+              0.37755426253589686,
+              0.40782993077481355
+            ],
+            "mcnemar_p": 1.0
+          },
+          "seer": {
+            "n": 1007,
+            "candidate_wins": 415,
+            "reference_wins": 415,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.41211519364448856,
+            "reference_rate": 0.41211519364448856,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.004964197244612231,
+              0.004964197244612231
+            ],
+            "candidate_wilson_ci95": [
+              0.38210355399129375,
+              0.4427948277136144
+            ],
+            "reference_wilson_ci95": [
+              0.38210355399129375,
+              0.4427948277136144
+            ],
+            "mcnemar_p": 1.0
+          },
+          "wolf": {
+            "n": 1999,
+            "candidate_wins": 1499,
+            "reference_wins": 1416,
+            "improved": 106,
+            "worsened": 23,
+            "candidate_rate": 0.7498749374687343,
+            "reference_rate": 0.7083541770885443,
+            "delta": 0.0415207603801901,
+            "ci95": [
+              0.03053154151171701,
+              0.052509979248663186
+            ],
+            "conservative_ci95": [
+              0.02466280908286434,
+              0.05817053494269979
+            ],
+            "candidate_wilson_ci95": [
+              0.7304222919805148,
+              0.7683690253158704
+            ],
+            "reference_wilson_ci95": [
+              0.688044440812033,
+              0.7278646355722402
+            ],
+            "mcnemar_p": 6.260285489771425e-14
+          }
+        },
+        "other21": {
+          "seat": {
+            "n": 21000,
+            "candidate_wins": 11445,
+            "reference_wins": 10911,
+            "improved": 710,
+            "worsened": 176,
+            "candidate_rate": 0.545,
+            "reference_rate": 0.5195714285714286,
+            "delta": 0.02542857142857143,
+            "ci95": [
+              0.02267174001886213,
+              0.028185402838280728
+            ],
+            "conservative_ci95": [
+              0.021210330769104578,
+              0.02963464830765366
+            ],
+            "candidate_wilson_ci95": [
+              0.5382571823462836,
+              0.5517263566649799
+            ],
+            "reference_wilson_ci95": [
+              0.5128110062495209,
+              0.5263246916696634
+            ],
+            "mcnemar_p": 1.1489088045177255e-76
+          },
+          "villager": {
+            "n": 11959,
+            "candidate_wins": 5219,
+            "reference_wins": 5219,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.4364077263985283,
+            "reference_rate": 0.4364077263985283,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.0004199160947089799,
+              0.0004199160947089799
+            ],
+            "candidate_wilson_ci95": [
+              0.42754086949390263,
+              0.44531542578630906
+            ],
+            "reference_wilson_ci95": [
+              0.42754086949390263,
+              0.44531542578630906
+            ],
+            "mcnemar_p": 1.0
+          },
+          "seer": {
+            "n": 3122,
+            "candidate_wins": 1734,
+            "reference_wins": 1734,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.5554131966688021,
+            "reference_rate": 0.5554131966688021,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.0016066030737674434,
+              0.0016066030737674434
+            ],
+            "candidate_wilson_ci95": [
+              0.5379245278499453,
+              0.5727656619536584
+            ],
+            "reference_wilson_ci95": [
+              0.5379245278499453,
+              0.5727656619536584
+            ],
+            "mcnemar_p": 1.0
+          },
+          "wolf": {
+            "n": 5919,
+            "candidate_wins": 4492,
+            "reference_wins": 3958,
+            "improved": 710,
+            "worsened": 176,
+            "candidate_rate": 0.7589119783747255,
+            "reference_rate": 0.6686940361547559,
+            "delta": 0.0902179422199696,
+            "ci95": [
+              0.08063231091460621,
+              0.09980357352533298
+            ],
+            "conservative_ci95": [
+              0.0757117901364815,
+              0.10457107511161354
+            ],
+            "candidate_wilson_ci95": [
+              0.7478490738260581,
+              0.7696390183761712
+            ],
+            "reference_wilson_ci95": [
+              0.6565968760580336,
+              0.6805723637879213
+            ],
+            "mcnemar_p": 1.1489088045177255e-76
+          }
+        },
+        "strong_scripted_proxy8": {
+          "seat": {
+            "n": 8000,
+            "candidate_wins": 4625,
+            "reference_wins": 4670,
+            "improved": 114,
+            "worsened": 159,
+            "candidate_rate": 0.578125,
+            "reference_rate": 0.58375,
+            "delta": -0.005625,
+            "ci95": [
+              -0.009671440149268268,
+              -0.0015785598507317318
+            ],
+            "conservative_ci95": [
+              -0.012115664796379096,
+              0.0008727252024953759
+            ],
+            "candidate_wilson_ci95": [
+              0.5672678774213976,
+              0.5889071273413155
+            ],
+            "reference_wilson_ci95": [
+              0.5729103831567433,
+              0.594509221948885
+            ],
+            "mcnemar_p": 0.007630473240696557
+          },
+          "villager": {
+            "n": 4466,
+            "candidate_wins": 2264,
+            "reference_wins": 2264,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.5069413345275414,
+            "reference_rate": 0.5069413345275414,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.0011236545174391555,
+              0.0011236545174391555
+            ],
+            "candidate_wilson_ci95": [
+              0.4922786015784866,
+              0.521592136033334
+            ],
+            "reference_wilson_ci95": [
+              0.4922786015784866,
+              0.521592136033334
+            ],
+            "mcnemar_p": 1.0
+          },
+          "seer": {
+            "n": 1218,
+            "candidate_wins": 613,
+            "reference_wins": 613,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.5032840722495895,
+            "reference_rate": 0.5032840722495895,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.004107758028303436,
+              0.004107758028303436
+            ],
+            "candidate_wilson_ci95": [
+              0.47523818367984794,
+              0.5313093098741447
+            ],
+            "reference_wilson_ci95": [
+              0.47523818367984794,
+              0.5313093098741447
+            ],
+            "mcnemar_p": 1.0
+          },
+          "wolf": {
+            "n": 2316,
+            "candidate_wins": 1748,
+            "reference_wins": 1793,
+            "improved": 114,
+            "worsened": 159,
+            "candidate_rate": 0.7547495682210709,
+            "reference_rate": 0.7741796200345423,
+            "delta": -0.019430051813471502,
+            "ci95": [
+              -0.03339360790735689,
+              -0.005466495719586111
+            ],
+            "conservative_ci95": [
+              -0.041301186724782245,
+              0.002525196294179008
+            ],
+            "candidate_wilson_ci95": [
+              0.7368147608425583,
+              0.7718406576998113
+            ],
+            "reference_wilson_ci95": [
+              0.7567046310384098,
+              0.7907465397656659
+            ],
+            "mcnemar_p": 0.007630473240696557
+          }
+        },
+        "population8": {
+          "seat": {
+            "n": 8000,
+            "candidate_wins": 5065,
+            "reference_wins": 4497,
+            "improved": 581,
+            "worsened": 13,
+            "candidate_rate": 0.633125,
+            "reference_rate": 0.562125,
+            "delta": 0.071,
+            "ci95": [
+              0.06523473187184033,
+              0.07676526812815966
+            ],
+            "conservative_ci95": [
+              0.06339206109026714,
+              0.07851882089475397
+            ],
+            "candidate_wilson_ci95": [
+              0.6225022066225154,
+              0.6436200014931475
+            ],
+            "reference_wilson_ci95": [
+              0.5512259216188223,
+              0.5729644421684871
+            ],
+            "mcnemar_p": 5.087637629511819e-153
+          },
+          "villager": {
+            "n": 4608,
+            "candidate_wins": 2457,
+            "reference_wins": 2457,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.533203125,
+            "reference_rate": 0.533203125,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.001089065721583551,
+              0.001089065721583551
+            ],
+            "candidate_wilson_ci95": [
+              0.518776544753387,
+              0.5475743897626641
+            ],
+            "reference_wilson_ci95": [
+              0.518776544753387,
+              0.5475743897626641
+            ],
+            "mcnemar_p": 1.0
+          },
+          "seer": {
+            "n": 1185,
+            "candidate_wins": 985,
+            "reference_wins": 985,
+            "improved": 0,
+            "worsened": 0,
+            "candidate_rate": 0.8312236286919831,
+            "reference_rate": 0.8312236286919831,
+            "delta": 0.0,
+            "ci95": [
+              0.0,
+              0.0
+            ],
+            "conservative_ci95": [
+              -0.004221668359438318,
+              0.004221668359438318
+            ],
+            "candidate_wilson_ci95": [
+              0.8088348078351479,
+              0.8514718301559854
+            ],
+            "reference_wilson_ci95": [
+              0.8088348078351479,
+              0.8514718301559854
+            ],
+            "mcnemar_p": 1.0
+          },
+          "wolf": {
+            "n": 2207,
+            "candidate_wins": 1623,
+            "reference_wins": 1055,
+            "improved": 581,
+            "worsened": 13,
+            "candidate_rate": 0.7353874037154509,
+            "reference_rate": 0.4780244676030811,
+            "delta": 0.2573629361123697,
+            "ci95": [
+              0.23856531671154876,
+              0.2761605555131907
+            ],
+            "conservative_ci95": [
+              0.23196797126295848,
+              0.28158887009558664
+            ],
+            "candidate_wilson_ci95": [
+              0.7165855829963835,
+              0.7533711972632243
+            ],
+            "reference_wilson_ci95": [
+              0.45724038029082364,
+              0.49888492511323596
+            ],
+            "mcnemar_p": 5.087637629511819e-153
+          }
+        }
+      },
+      "source_digest": "da2cb24add4209d73a26586a83ce43c15770de204b45cedeef9768d9e134d19e"
+    }
+  },
+  "new_simulations_by_audit": 0,
+  "heldout_unique_deals": 28000,
+  "timings_reuse_deals": true,
+  "promoted": false,
+  "selected": "vote_only",
+  "all_local_strength_gates_pass": false,
+  "total_confirmation_outer_games": 112000,
+  "limits": [
+    "Predefined localpanel, not global optimality",
+    "No actual platform promotion",
+    "Modelpilot and timing stress are separate evidence",
+    "Ordinary and conservative intervals retained; multiple-comparison reporting does not erase adverse slices"
+  ],
+  "confirmation_report_sha256": "80633a563ef6252efb9106e192c7c22998a24d9473eef95426a28ee353cb42c1"
+}

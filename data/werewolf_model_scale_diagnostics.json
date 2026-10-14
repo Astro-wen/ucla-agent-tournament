@@ -1,0 +1,4436 @@
+{
+  "status": "complete",
+  "outcomes": {
+    "qwen2.5:14b-instruct-q4_K_M/explicit": {
+      "n": 70,
+      "correct": 52,
+      "legal": 70,
+      "fallbacks": 0,
+      "failures": [
+        {
+          "id": "private_over_false_claim/seat0/ascending",
+          "cluster": "private_over_false_claim/seat0",
+          "family": "private_over_false_claim",
+          "seat": 0,
+          "order": "ascending",
+          "expected": [
+            "1"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            72
+          ],
+          "network_latency_s": 5.126645167008974,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat0/descending",
+          "cluster": "private_over_false_claim/seat0",
+          "family": "private_over_false_claim",
+          "seat": 0,
+          "order": "descending",
+          "expected": [
+            "1"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            73
+          ],
+          "network_latency_s": 4.382699208974373,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat0/ascending",
+          "cluster": "clear_endgame/seat0",
+          "family": "clear_endgame",
+          "seat": 0,
+          "order": "ascending",
+          "expected": [
+            "5"
+          ],
+          "choice": "7",
+          "phase": "day_vote",
+          "selected_true_role": null,
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            74
+          ],
+          "network_latency_s": 6.36729975003982,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat1/ascending",
+          "cluster": "private_over_false_claim/seat1",
+          "family": "private_over_false_claim",
+          "seat": 1,
+          "order": "ascending",
+          "expected": [
+            "2"
+          ],
+          "choice": "3",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            82
+          ],
+          "network_latency_s": 4.775493082997855,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat1/ascending",
+          "cluster": "clear_endgame/seat1",
+          "family": "clear_endgame",
+          "seat": 1,
+          "order": "ascending",
+          "expected": [
+            "6"
+          ],
+          "choice": "7",
+          "phase": "day_vote",
+          "selected_true_role": null,
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            84
+          ],
+          "network_latency_s": 5.912683499976993,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat2/ascending",
+          "cluster": "private_over_false_claim/seat2",
+          "family": "private_over_false_claim",
+          "seat": 2,
+          "order": "ascending",
+          "expected": [
+            "3"
+          ],
+          "choice": "4",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            92
+          ],
+          "network_latency_s": 4.52754245797405,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat2/descending",
+          "cluster": "private_over_false_claim/seat2",
+          "family": "private_over_false_claim",
+          "seat": 2,
+          "order": "descending",
+          "expected": [
+            "3"
+          ],
+          "choice": "4",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            93
+          ],
+          "network_latency_s": 4.250064207997639,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat2/ascending",
+          "cluster": "clear_endgame/seat2",
+          "family": "clear_endgame",
+          "seat": 2,
+          "order": "ascending",
+          "expected": [
+            "0"
+          ],
+          "choice": "7",
+          "phase": "day_vote",
+          "selected_true_role": null,
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            94
+          ],
+          "network_latency_s": 6.199307292001322,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat2/descending",
+          "cluster": "clear_endgame/seat2",
+          "family": "clear_endgame",
+          "seat": 2,
+          "order": "descending",
+          "expected": [
+            "0"
+          ],
+          "choice": "7",
+          "phase": "day_vote",
+          "selected_true_role": null,
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            95
+          ],
+          "network_latency_s": 5.175207082997076,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat3/ascending",
+          "cluster": "private_over_false_claim/seat3",
+          "family": "private_over_false_claim",
+          "seat": 3,
+          "order": "ascending",
+          "expected": [
+            "4"
+          ],
+          "choice": "5",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            102
+          ],
+          "network_latency_s": 5.943522249988746,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat3/descending",
+          "cluster": "private_over_false_claim/seat3",
+          "family": "private_over_false_claim",
+          "seat": 3,
+          "order": "descending",
+          "expected": [
+            "4"
+          ],
+          "choice": "5",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            103
+          ],
+          "network_latency_s": 4.738937666988932,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat4/ascending",
+          "cluster": "private_over_false_claim/seat4",
+          "family": "private_over_false_claim",
+          "seat": 4,
+          "order": "ascending",
+          "expected": [
+            "5"
+          ],
+          "choice": "6",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            112
+          ],
+          "network_latency_s": 4.3211629160214216,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat4/descending",
+          "cluster": "private_over_false_claim/seat4",
+          "family": "private_over_false_claim",
+          "seat": 4,
+          "order": "descending",
+          "expected": [
+            "5"
+          ],
+          "choice": "6",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            113
+          ],
+          "network_latency_s": 4.911445459001698,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat4/ascending",
+          "cluster": "clear_endgame/seat4",
+          "family": "clear_endgame",
+          "seat": 4,
+          "order": "ascending",
+          "expected": [
+            "2"
+          ],
+          "choice": "7",
+          "phase": "day_vote",
+          "selected_true_role": null,
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            114
+          ],
+          "network_latency_s": 6.1381914999801666,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat5/ascending",
+          "cluster": "private_over_false_claim/seat5",
+          "family": "private_over_false_claim",
+          "seat": 5,
+          "order": "ascending",
+          "expected": [
+            "6"
+          ],
+          "choice": "0",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            122
+          ],
+          "network_latency_s": 4.253972792008426,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat5/ascending",
+          "cluster": "clear_endgame/seat5",
+          "family": "clear_endgame",
+          "seat": 5,
+          "order": "ascending",
+          "expected": [
+            "3"
+          ],
+          "choice": "7",
+          "phase": "day_vote",
+          "selected_true_role": null,
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            124
+          ],
+          "network_latency_s": 4.8108970830217,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat6/ascending",
+          "cluster": "private_over_false_claim/seat6",
+          "family": "private_over_false_claim",
+          "seat": 6,
+          "order": "ascending",
+          "expected": [
+            "0"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            132
+          ],
+          "network_latency_s": 3.788243125018198,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat6/descending",
+          "cluster": "private_over_false_claim/seat6",
+          "family": "private_over_false_claim",
+          "seat": 6,
+          "order": "descending",
+          "expected": [
+            "0"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            133
+          ],
+          "network_latency_s": 4.0144535840372555,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "explicit"
+        }
+      ],
+      "day_vote_count": 56,
+      "actual_wolf_votes_without_fallback": 38,
+      "families": {
+        "checked_wolf": {
+          "n": 14,
+          "correct": 14
+        },
+        "clear_endgame": {
+          "n": 14,
+          "correct": 8
+        },
+        "private_over_false_claim": {
+          "n": 14,
+          "correct": 2
+        },
+        "two_checked_wolves": {
+          "n": 14,
+          "correct": 14
+        },
+        "unread_investigation": {
+          "n": 14,
+          "correct": 14
+        }
+      }
+    },
+    "qwen2.5:14b-instruct-q4_K_M/generic": {
+      "n": 70,
+      "correct": 58,
+      "legal": 70,
+      "fallbacks": 0,
+      "failures": [
+        {
+          "id": "private_over_false_claim/seat0/ascending",
+          "cluster": "private_over_false_claim/seat0",
+          "family": "private_over_false_claim",
+          "seat": 0,
+          "order": "ascending",
+          "expected": [
+            "1"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            2
+          ],
+          "network_latency_s": 2.9820638750097714,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat0/descending",
+          "cluster": "private_over_false_claim/seat0",
+          "family": "private_over_false_claim",
+          "seat": 0,
+          "order": "descending",
+          "expected": [
+            "1"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            3
+          ],
+          "network_latency_s": 5.8464011659962125,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat1/ascending",
+          "cluster": "private_over_false_claim/seat1",
+          "family": "private_over_false_claim",
+          "seat": 1,
+          "order": "ascending",
+          "expected": [
+            "2"
+          ],
+          "choice": "3",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            12
+          ],
+          "network_latency_s": 4.588602166972123,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "two_checked_wolves/seat1/descending",
+          "cluster": "two_checked_wolves/seat1",
+          "family": "two_checked_wolves",
+          "seat": 1,
+          "order": "descending",
+          "expected": [
+            "2",
+            "5"
+          ],
+          "choice": "7",
+          "phase": "day_vote",
+          "selected_true_role": null,
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            17
+          ],
+          "network_latency_s": 5.382768584007863,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat2/ascending",
+          "cluster": "private_over_false_claim/seat2",
+          "family": "private_over_false_claim",
+          "seat": 2,
+          "order": "ascending",
+          "expected": [
+            "3"
+          ],
+          "choice": "4",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            22
+          ],
+          "network_latency_s": 5.082435833988711,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat2/descending",
+          "cluster": "private_over_false_claim/seat2",
+          "family": "private_over_false_claim",
+          "seat": 2,
+          "order": "descending",
+          "expected": [
+            "3"
+          ],
+          "choice": "4",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            23
+          ],
+          "network_latency_s": 5.226942165987566,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "two_checked_wolves/seat3/ascending",
+          "cluster": "two_checked_wolves/seat3",
+          "family": "two_checked_wolves",
+          "seat": 3,
+          "order": "ascending",
+          "expected": [
+            "0",
+            "4"
+          ],
+          "choice": "7",
+          "phase": "day_vote",
+          "selected_true_role": null,
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            36
+          ],
+          "network_latency_s": 5.045543458021712,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "two_checked_wolves/seat3/descending",
+          "cluster": "two_checked_wolves/seat3",
+          "family": "two_checked_wolves",
+          "seat": 3,
+          "order": "descending",
+          "expected": [
+            "0",
+            "4"
+          ],
+          "choice": "7",
+          "phase": "day_vote",
+          "selected_true_role": null,
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            37
+          ],
+          "network_latency_s": 4.8866950839874335,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat4/descending",
+          "cluster": "private_over_false_claim/seat4",
+          "family": "private_over_false_claim",
+          "seat": 4,
+          "order": "descending",
+          "expected": [
+            "5"
+          ],
+          "choice": "6",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            43
+          ],
+          "network_latency_s": 5.735856292012613,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "clear_endgame/seat4/ascending",
+          "cluster": "clear_endgame/seat4",
+          "family": "clear_endgame",
+          "seat": 4,
+          "order": "ascending",
+          "expected": [
+            "2"
+          ],
+          "choice": "7",
+          "phase": "day_vote",
+          "selected_true_role": null,
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            44
+          ],
+          "network_latency_s": 7.294162666017655,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat6/descending",
+          "cluster": "private_over_false_claim/seat6",
+          "family": "private_over_false_claim",
+          "seat": 6,
+          "order": "descending",
+          "expected": [
+            "0"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            63
+          ],
+          "network_latency_s": 5.448830541979987,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "clear_endgame/seat6/descending",
+          "cluster": "clear_endgame/seat6",
+          "family": "clear_endgame",
+          "seat": 6,
+          "order": "descending",
+          "expected": [
+            "4"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            65
+          ],
+          "network_latency_s": 7.519977458985522,
+          "model": "qwen2.5:14b-instruct-q4_K_M",
+          "rules": "generic"
+        }
+      ],
+      "day_vote_count": 56,
+      "actual_wolf_votes_without_fallback": 44,
+      "families": {
+        "checked_wolf": {
+          "n": 14,
+          "correct": 14
+        },
+        "clear_endgame": {
+          "n": 14,
+          "correct": 12
+        },
+        "private_over_false_claim": {
+          "n": 14,
+          "correct": 7
+        },
+        "two_checked_wolves": {
+          "n": 14,
+          "correct": 11
+        },
+        "unread_investigation": {
+          "n": 14,
+          "correct": 14
+        }
+      }
+    },
+    "qwen2.5:7b-instruct-q4_K_M/explicit": {
+      "n": 70,
+      "correct": 44,
+      "legal": 70,
+      "fallbacks": 0,
+      "failures": [
+        {
+          "id": "private_over_false_claim/seat0/ascending",
+          "cluster": "private_over_false_claim/seat0",
+          "family": "private_over_false_claim",
+          "seat": 0,
+          "order": "ascending",
+          "expected": [
+            "1"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            72
+          ],
+          "network_latency_s": 1.2624130840413272,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat0/descending",
+          "cluster": "private_over_false_claim/seat0",
+          "family": "private_over_false_claim",
+          "seat": 0,
+          "order": "descending",
+          "expected": [
+            "1"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            73
+          ],
+          "network_latency_s": 1.4244191250181757,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat0/ascending",
+          "cluster": "clear_endgame/seat0",
+          "family": "clear_endgame",
+          "seat": 0,
+          "order": "ascending",
+          "expected": [
+            "5"
+          ],
+          "choice": "3",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            74
+          ],
+          "network_latency_s": 2.2182995419716462,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat1/ascending",
+          "cluster": "private_over_false_claim/seat1",
+          "family": "private_over_false_claim",
+          "seat": 1,
+          "order": "ascending",
+          "expected": [
+            "2"
+          ],
+          "choice": "3",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            82
+          ],
+          "network_latency_s": 1.227348249987699,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat1/descending",
+          "cluster": "private_over_false_claim/seat1",
+          "family": "private_over_false_claim",
+          "seat": 1,
+          "order": "descending",
+          "expected": [
+            "2"
+          ],
+          "choice": "3",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            83
+          ],
+          "network_latency_s": 1.4173709159949794,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat1/ascending",
+          "cluster": "clear_endgame/seat1",
+          "family": "clear_endgame",
+          "seat": 1,
+          "order": "ascending",
+          "expected": [
+            "6"
+          ],
+          "choice": "4",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            84
+          ],
+          "network_latency_s": 2.1151565840118565,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "unread_investigation/seat1/descending",
+          "cluster": "unread_investigation/seat1",
+          "family": "unread_investigation",
+          "seat": 1,
+          "order": "descending",
+          "expected": [
+            "2",
+            "3",
+            "5",
+            "6"
+          ],
+          "choice": "4",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            89
+          ],
+          "network_latency_s": 1.7286093750153668,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat2/ascending",
+          "cluster": "private_over_false_claim/seat2",
+          "family": "private_over_false_claim",
+          "seat": 2,
+          "order": "ascending",
+          "expected": [
+            "3"
+          ],
+          "choice": "4",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            92
+          ],
+          "network_latency_s": 1.4456308330409229,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat2/descending",
+          "cluster": "private_over_false_claim/seat2",
+          "family": "private_over_false_claim",
+          "seat": 2,
+          "order": "descending",
+          "expected": [
+            "3"
+          ],
+          "choice": "4",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            93
+          ],
+          "network_latency_s": 1.5034738749964163,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat2/descending",
+          "cluster": "clear_endgame/seat2",
+          "family": "clear_endgame",
+          "seat": 2,
+          "order": "descending",
+          "expected": [
+            "0"
+          ],
+          "choice": "5",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            95
+          ],
+          "network_latency_s": 2.292941834020894,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat3/ascending",
+          "cluster": "private_over_false_claim/seat3",
+          "family": "private_over_false_claim",
+          "seat": 3,
+          "order": "ascending",
+          "expected": [
+            "4"
+          ],
+          "choice": "5",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            102
+          ],
+          "network_latency_s": 1.6697073340183124,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat3/descending",
+          "cluster": "private_over_false_claim/seat3",
+          "family": "private_over_false_claim",
+          "seat": 3,
+          "order": "descending",
+          "expected": [
+            "4"
+          ],
+          "choice": "5",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            103
+          ],
+          "network_latency_s": 1.8189829170005396,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat3/ascending",
+          "cluster": "clear_endgame/seat3",
+          "family": "clear_endgame",
+          "seat": 3,
+          "order": "ascending",
+          "expected": [
+            "1"
+          ],
+          "choice": "6",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            104
+          ],
+          "network_latency_s": 2.849091874959413,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat4/ascending",
+          "cluster": "private_over_false_claim/seat4",
+          "family": "private_over_false_claim",
+          "seat": 4,
+          "order": "ascending",
+          "expected": [
+            "5"
+          ],
+          "choice": "6",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            112
+          ],
+          "network_latency_s": 2.071196292003151,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat4/descending",
+          "cluster": "private_over_false_claim/seat4",
+          "family": "private_over_false_claim",
+          "seat": 4,
+          "order": "descending",
+          "expected": [
+            "5"
+          ],
+          "choice": "6",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            113
+          ],
+          "network_latency_s": 2.247911209007725,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat4/ascending",
+          "cluster": "clear_endgame/seat4",
+          "family": "clear_endgame",
+          "seat": 4,
+          "order": "ascending",
+          "expected": [
+            "2"
+          ],
+          "choice": "0",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            114
+          ],
+          "network_latency_s": 3.231158124981448,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "unread_investigation/seat4/ascending",
+          "cluster": "unread_investigation/seat4",
+          "family": "unread_investigation",
+          "seat": 4,
+          "order": "ascending",
+          "expected": [
+            "2",
+            "3",
+            "5",
+            "6"
+          ],
+          "choice": "0",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            118
+          ],
+          "network_latency_s": 2.567202583013568,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat5/ascending",
+          "cluster": "private_over_false_claim/seat5",
+          "family": "private_over_false_claim",
+          "seat": 5,
+          "order": "ascending",
+          "expected": [
+            "6"
+          ],
+          "choice": "0",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            122
+          ],
+          "network_latency_s": 2.4151529590017162,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat5/descending",
+          "cluster": "private_over_false_claim/seat5",
+          "family": "private_over_false_claim",
+          "seat": 5,
+          "order": "descending",
+          "expected": [
+            "6"
+          ],
+          "choice": "0",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            123
+          ],
+          "network_latency_s": 2.1494810410076752,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat5/ascending",
+          "cluster": "clear_endgame/seat5",
+          "family": "clear_endgame",
+          "seat": 5,
+          "order": "ascending",
+          "expected": [
+            "3"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            124
+          ],
+          "network_latency_s": 3.484715041995514,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat5/descending",
+          "cluster": "clear_endgame/seat5",
+          "family": "clear_endgame",
+          "seat": 5,
+          "order": "descending",
+          "expected": [
+            "3"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            125
+          ],
+          "network_latency_s": 3.815729082969483,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "unread_investigation/seat5/ascending",
+          "cluster": "unread_investigation/seat5",
+          "family": "unread_investigation",
+          "seat": 5,
+          "order": "ascending",
+          "expected": [
+            "2",
+            "3",
+            "4",
+            "6"
+          ],
+          "choice": "1",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            128
+          ],
+          "network_latency_s": 2.4991843749885447,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat6/ascending",
+          "cluster": "private_over_false_claim/seat6",
+          "family": "private_over_false_claim",
+          "seat": 6,
+          "order": "ascending",
+          "expected": [
+            "0"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            132
+          ],
+          "network_latency_s": 1.8617036659852602,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "private_over_false_claim/seat6/descending",
+          "cluster": "private_over_false_claim/seat6",
+          "family": "private_over_false_claim",
+          "seat": 6,
+          "order": "descending",
+          "expected": [
+            "0"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            133
+          ],
+          "network_latency_s": 2.138346249994356,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "clear_endgame/seat6/descending",
+          "cluster": "clear_endgame/seat6",
+          "family": "clear_endgame",
+          "seat": 6,
+          "order": "descending",
+          "expected": [
+            "4"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            135
+          ],
+          "network_latency_s": 3.6047040410339832,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        },
+        {
+          "id": "unread_investigation/seat6/descending",
+          "cluster": "unread_investigation/seat6",
+          "family": "unread_investigation",
+          "seat": 6,
+          "order": "descending",
+          "expected": [
+            "0",
+            "3",
+            "4",
+            "5"
+          ],
+          "choice": "2",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            139
+          ],
+          "network_latency_s": 2.563836582994554,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "explicit"
+        }
+      ],
+      "day_vote_count": 56,
+      "actual_wolf_votes_without_fallback": 34,
+      "families": {
+        "checked_wolf": {
+          "n": 14,
+          "correct": 14
+        },
+        "clear_endgame": {
+          "n": 14,
+          "correct": 6
+        },
+        "private_over_false_claim": {
+          "n": 14,
+          "correct": 0
+        },
+        "two_checked_wolves": {
+          "n": 14,
+          "correct": 14
+        },
+        "unread_investigation": {
+          "n": 14,
+          "correct": 10
+        }
+      }
+    },
+    "qwen2.5:7b-instruct-q4_K_M/generic": {
+      "n": 70,
+      "correct": 38,
+      "legal": 70,
+      "fallbacks": 0,
+      "failures": [
+        {
+          "id": "private_over_false_claim/seat0/ascending",
+          "cluster": "private_over_false_claim/seat0",
+          "family": "private_over_false_claim",
+          "seat": 0,
+          "order": "ascending",
+          "expected": [
+            "1"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            2
+          ],
+          "network_latency_s": 0.8849554169573821,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat0/descending",
+          "cluster": "private_over_false_claim/seat0",
+          "family": "private_over_false_claim",
+          "seat": 0,
+          "order": "descending",
+          "expected": [
+            "1"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            3
+          ],
+          "network_latency_s": 1.0329432919970714,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "clear_endgame/seat0/ascending",
+          "cluster": "clear_endgame/seat0",
+          "family": "clear_endgame",
+          "seat": 0,
+          "order": "ascending",
+          "expected": [
+            "5"
+          ],
+          "choice": "3",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            4
+          ],
+          "network_latency_s": 1.843335166980978,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat1/ascending",
+          "cluster": "private_over_false_claim/seat1",
+          "family": "private_over_false_claim",
+          "seat": 1,
+          "order": "ascending",
+          "expected": [
+            "2"
+          ],
+          "choice": "3",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            12
+          ],
+          "network_latency_s": 1.1736013329937123,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat1/descending",
+          "cluster": "private_over_false_claim/seat1",
+          "family": "private_over_false_claim",
+          "seat": 1,
+          "order": "descending",
+          "expected": [
+            "2"
+          ],
+          "choice": "3",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            13
+          ],
+          "network_latency_s": 1.1826868749922141,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "clear_endgame/seat1/descending",
+          "cluster": "clear_endgame/seat1",
+          "family": "clear_endgame",
+          "seat": 1,
+          "order": "descending",
+          "expected": [
+            "6"
+          ],
+          "choice": "4",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            15
+          ],
+          "network_latency_s": 1.8208102500066161,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat1/ascending",
+          "cluster": "unread_investigation/seat1",
+          "family": "unread_investigation",
+          "seat": 1,
+          "order": "ascending",
+          "expected": [
+            "2",
+            "3",
+            "5",
+            "6"
+          ],
+          "choice": "4",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            18
+          ],
+          "network_latency_s": 1.6210474169929512,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat1/descending",
+          "cluster": "unread_investigation/seat1",
+          "family": "unread_investigation",
+          "seat": 1,
+          "order": "descending",
+          "expected": [
+            "2",
+            "3",
+            "5",
+            "6"
+          ],
+          "choice": "4",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            19
+          ],
+          "network_latency_s": 1.5598044999642298,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat2/ascending",
+          "cluster": "private_over_false_claim/seat2",
+          "family": "private_over_false_claim",
+          "seat": 2,
+          "order": "ascending",
+          "expected": [
+            "3"
+          ],
+          "choice": "4",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            22
+          ],
+          "network_latency_s": 1.2294802499818616,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat2/descending",
+          "cluster": "private_over_false_claim/seat2",
+          "family": "private_over_false_claim",
+          "seat": 2,
+          "order": "descending",
+          "expected": [
+            "3"
+          ],
+          "choice": "4",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            23
+          ],
+          "network_latency_s": 1.3605339160421863,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat2/ascending",
+          "cluster": "unread_investigation/seat2",
+          "family": "unread_investigation",
+          "seat": 2,
+          "order": "ascending",
+          "expected": [
+            "0",
+            "3",
+            "4",
+            "6"
+          ],
+          "choice": "5",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            28
+          ],
+          "network_latency_s": 1.471084915974643,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat2/descending",
+          "cluster": "unread_investigation/seat2",
+          "family": "unread_investigation",
+          "seat": 2,
+          "order": "descending",
+          "expected": [
+            "0",
+            "3",
+            "4",
+            "6"
+          ],
+          "choice": "5",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            29
+          ],
+          "network_latency_s": 1.595467999984976,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat3/ascending",
+          "cluster": "private_over_false_claim/seat3",
+          "family": "private_over_false_claim",
+          "seat": 3,
+          "order": "ascending",
+          "expected": [
+            "4"
+          ],
+          "choice": "5",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            32
+          ],
+          "network_latency_s": 1.2930328749935143,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat3/descending",
+          "cluster": "private_over_false_claim/seat3",
+          "family": "private_over_false_claim",
+          "seat": 3,
+          "order": "descending",
+          "expected": [
+            "4"
+          ],
+          "choice": "5",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            33
+          ],
+          "network_latency_s": 1.107942999980878,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat3/descending",
+          "cluster": "unread_investigation/seat3",
+          "family": "unread_investigation",
+          "seat": 3,
+          "order": "descending",
+          "expected": [
+            "1",
+            "2",
+            "4",
+            "5"
+          ],
+          "choice": "6",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            39
+          ],
+          "network_latency_s": 1.8195000420091674,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat4/ascending",
+          "cluster": "private_over_false_claim/seat4",
+          "family": "private_over_false_claim",
+          "seat": 4,
+          "order": "ascending",
+          "expected": [
+            "5"
+          ],
+          "choice": "6",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            42
+          ],
+          "network_latency_s": 1.4112857499858364,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat4/descending",
+          "cluster": "private_over_false_claim/seat4",
+          "family": "private_over_false_claim",
+          "seat": 4,
+          "order": "descending",
+          "expected": [
+            "5"
+          ],
+          "choice": "6",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            43
+          ],
+          "network_latency_s": 5.257876457995735,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "clear_endgame/seat4/ascending",
+          "cluster": "clear_endgame/seat4",
+          "family": "clear_endgame",
+          "seat": 4,
+          "order": "ascending",
+          "expected": [
+            "2"
+          ],
+          "choice": "0",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            44
+          ],
+          "network_latency_s": 1.7184069579816423,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "clear_endgame/seat4/descending",
+          "cluster": "clear_endgame/seat4",
+          "family": "clear_endgame",
+          "seat": 4,
+          "order": "descending",
+          "expected": [
+            "2"
+          ],
+          "choice": "0",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            45
+          ],
+          "network_latency_s": 1.807766542013269,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat4/ascending",
+          "cluster": "unread_investigation/seat4",
+          "family": "unread_investigation",
+          "seat": 4,
+          "order": "ascending",
+          "expected": [
+            "2",
+            "3",
+            "5",
+            "6"
+          ],
+          "choice": "0",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            48
+          ],
+          "network_latency_s": 1.4014031669939868,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat4/descending",
+          "cluster": "unread_investigation/seat4",
+          "family": "unread_investigation",
+          "seat": 4,
+          "order": "descending",
+          "expected": [
+            "2",
+            "3",
+            "5",
+            "6"
+          ],
+          "choice": "0",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            49
+          ],
+          "network_latency_s": 1.3878298330237158,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat5/ascending",
+          "cluster": "private_over_false_claim/seat5",
+          "family": "private_over_false_claim",
+          "seat": 5,
+          "order": "ascending",
+          "expected": [
+            "6"
+          ],
+          "choice": "0",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            52
+          ],
+          "network_latency_s": 1.1905762920505367,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat5/descending",
+          "cluster": "private_over_false_claim/seat5",
+          "family": "private_over_false_claim",
+          "seat": 5,
+          "order": "descending",
+          "expected": [
+            "6"
+          ],
+          "choice": "0",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            53
+          ],
+          "network_latency_s": 1.0733854999998584,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "clear_endgame/seat5/ascending",
+          "cluster": "clear_endgame/seat5",
+          "family": "clear_endgame",
+          "seat": 5,
+          "order": "ascending",
+          "expected": [
+            "3"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            54
+          ],
+          "network_latency_s": 1.902281499991659,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "clear_endgame/seat5/descending",
+          "cluster": "clear_endgame/seat5",
+          "family": "clear_endgame",
+          "seat": 5,
+          "order": "descending",
+          "expected": [
+            "3"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            55
+          ],
+          "network_latency_s": 1.8763228330062702,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat5/ascending",
+          "cluster": "unread_investigation/seat5",
+          "family": "unread_investigation",
+          "seat": 5,
+          "order": "ascending",
+          "expected": [
+            "2",
+            "3",
+            "4",
+            "6"
+          ],
+          "choice": "1",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            58
+          ],
+          "network_latency_s": 1.668577042000834,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat5/descending",
+          "cluster": "unread_investigation/seat5",
+          "family": "unread_investigation",
+          "seat": 5,
+          "order": "descending",
+          "expected": [
+            "2",
+            "3",
+            "4",
+            "6"
+          ],
+          "choice": "1",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            59
+          ],
+          "network_latency_s": 1.723287541011814,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat6/ascending",
+          "cluster": "private_over_false_claim/seat6",
+          "family": "private_over_false_claim",
+          "seat": 6,
+          "order": "ascending",
+          "expected": [
+            "0"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            62
+          ],
+          "network_latency_s": 1.222968541958835,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "private_over_false_claim/seat6/descending",
+          "cluster": "private_over_false_claim/seat6",
+          "family": "private_over_false_claim",
+          "seat": 6,
+          "order": "descending",
+          "expected": [
+            "0"
+          ],
+          "choice": "1",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            63
+          ],
+          "network_latency_s": 1.3877240419969894,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "clear_endgame/seat6/descending",
+          "cluster": "clear_endgame/seat6",
+          "family": "clear_endgame",
+          "seat": 6,
+          "order": "descending",
+          "expected": [
+            "4"
+          ],
+          "choice": "2",
+          "phase": "day_vote",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            65
+          ],
+          "network_latency_s": 2.3407422909513116,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat6/ascending",
+          "cluster": "unread_investigation/seat6",
+          "family": "unread_investigation",
+          "seat": 6,
+          "order": "ascending",
+          "expected": [
+            "0",
+            "3",
+            "4",
+            "5"
+          ],
+          "choice": "2",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            68
+          ],
+          "network_latency_s": 1.6056162920431234,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        },
+        {
+          "id": "unread_investigation/seat6/descending",
+          "cluster": "unread_investigation/seat6",
+          "family": "unread_investigation",
+          "seat": 6,
+          "order": "descending",
+          "expected": [
+            "0",
+            "3",
+            "4",
+            "5"
+          ],
+          "choice": "2",
+          "phase": "night_seer",
+          "selected_true_role": "villager",
+          "legal": true,
+          "correct": false,
+          "fallback": false,
+          "stats": {
+            "decisions": 1,
+            "retries": 0,
+            "official_transcript_omitted_observations": 0
+          },
+          "requests": [
+            69
+          ],
+          "network_latency_s": 1.5209877499728464,
+          "model": "qwen2.5:7b-instruct-q4_K_M",
+          "rules": "generic"
+        }
+      ],
+      "day_vote_count": 56,
+      "actual_wolf_votes_without_fallback": 35,
+      "families": {
+        "checked_wolf": {
+          "n": 14,
+          "correct": 14
+        },
+        "clear_endgame": {
+          "n": 14,
+          "correct": 7
+        },
+        "private_over_false_claim": {
+          "n": 14,
+          "correct": 0
+        },
+        "two_checked_wolves": {
+          "n": 14,
+          "correct": 14
+        },
+        "unread_investigation": {
+          "n": 14,
+          "correct": 3
+        }
+      }
+    }
+  },
+  "comparisons": {
+    "qwen2.5:14b-instruct-q4_K_M-vs-qwen2.5:7b-instruct-q4_K_M/generic": {
+      "n": 70,
+      "clusters": 35,
+      "mean": 0.2857142857142857,
+      "se": 0.08272083833495604,
+      "ci95": [
+        0.12358144257777187,
+        0.4478471288507995
+      ]
+    },
+    "qwen2.5:14b-instruct-q4_K_M-vs-qwen2.5:7b-instruct-q4_K_M/explicit": {
+      "n": 70,
+      "clusters": 35,
+      "mean": 0.11428571428571428,
+      "se": 0.04143291776679344,
+      "ci95": [
+        0.033077195462799136,
+        0.19549423310862943
+      ]
+    }
+  },
+  "scope": "70 fixed diagnostic views of35 base positions; order variants are clustered, not independent field games",
+  "correctness_contract": "Predeclared private-check priority, avoiding known clears and repeat checks; not proof of the globally optimal vote under all possible other ballots. True-role selection is reported separately.",
+  "resources": [
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6425636864,
+      "time": "2026-10-13T13:48:10.219459-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6275715072,
+      "time": "2026-10-13T13:49:19.610794-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6287826944,
+      "time": "2026-10-13T13:49:21.124447-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6286000128,
+      "time": "2026-10-13T13:49:22.094360-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6288293888,
+      "time": "2026-10-13T13:49:22.985775-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6288494592,
+      "time": "2026-10-13T13:49:24.025718-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6283677696,
+      "time": "2026-10-13T13:49:25.876803-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6278922240,
+      "time": "2026-10-13T13:49:28.068916-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6279143424,
+      "time": "2026-10-13T13:49:29.656470-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6274105344,
+      "time": "2026-10-13T13:49:31.384448-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6277955584,
+      "time": "2026-10-13T13:49:32.963221-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6275895296,
+      "time": "2026-10-13T13:49:34.558720-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6273400832,
+      "time": "2026-10-13T13:49:35.895384-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6288220160,
+      "time": "2026-10-13T13:49:37.165150-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6284234752,
+      "time": "2026-10-13T13:49:38.346087-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6287593472,
+      "time": "2026-10-13T13:49:39.536189-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6289272832,
+      "time": "2026-10-13T13:49:39.540857-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6287015936,
+      "time": "2026-10-13T13:49:41.565050-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6281297920,
+      "time": "2026-10-13T13:49:43.392617-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6278176768,
+      "time": "2026-10-13T13:49:44.926177-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6277582848,
+      "time": "2026-10-13T13:49:46.611065-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6275141632,
+      "time": "2026-10-13T13:49:48.238609-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6275510272,
+      "time": "2026-10-13T13:49:49.805479-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6271901696,
+      "time": "2026-10-13T13:49:51.196526-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6272925696,
+      "time": "2026-10-13T13:49:52.507655-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6268854272,
+      "time": "2026-10-13T13:49:53.744777-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6266421248,
+      "time": "2026-10-13T13:49:55.112835-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6266290176,
+      "time": "2026-10-13T13:49:57.007511-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6282416128,
+      "time": "2026-10-13T13:49:58.909447-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6282215424,
+      "time": "2026-10-13T13:50:00.575335-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6277984256,
+      "time": "2026-10-13T13:50:02.283194-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6277951488,
+      "time": "2026-10-13T13:50:02.288421-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6279376896,
+      "time": "2026-10-13T13:50:03.766615-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6276726784,
+      "time": "2026-10-13T13:50:05.371329-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6272483328,
+      "time": "2026-10-13T13:50:06.741111-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6274867200,
+      "time": "2026-10-13T13:50:08.161488-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6274457600,
+      "time": "2026-10-13T13:50:09.462538-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6271537152,
+      "time": "2026-10-13T13:50:10.580137-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6267953152,
+      "time": "2026-10-13T13:50:12.602553-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6264033280,
+      "time": "2026-10-13T13:50:14.559042-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6264111104,
+      "time": "2026-10-13T13:50:16.420209-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6263648256,
+      "time": "2026-10-13T13:50:18.165203-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6280425472,
+      "time": "2026-10-13T13:50:19.762684-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6277079040,
+      "time": "2026-10-13T13:50:21.590059-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6294974464,
+      "time": "2026-10-13T13:50:23.115970-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6290845696,
+      "time": "2026-10-13T13:50:24.605979-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6290812928,
+      "time": "2026-10-13T13:50:24.612649-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6308474880,
+      "time": "2026-10-13T13:50:26.030962-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6311227392,
+      "time": "2026-10-13T13:50:31.296264-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6303956992,
+      "time": "2026-10-13T13:50:33.021310-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6314651648,
+      "time": "2026-10-13T13:50:34.835620-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6313254912,
+      "time": "2026-10-13T13:50:36.416271-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6312898560,
+      "time": "2026-10-13T13:50:38.021363-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6311432192,
+      "time": "2026-10-13T13:50:39.429726-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6315741184,
+      "time": "2026-10-13T13:50:40.826963-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6315839488,
+      "time": "2026-10-13T13:50:42.107509-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6315048960,
+      "time": "2026-10-13T13:50:43.336878-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6312263680,
+      "time": "2026-10-13T13:50:44.534594-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6307409920,
+      "time": "2026-10-13T13:50:45.615654-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6334611456,
+      "time": "2026-10-13T13:50:47.525008-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6328590336,
+      "time": "2026-10-13T13:50:49.408369-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6328565760,
+      "time": "2026-10-13T13:50:49.413094-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6325526528,
+      "time": "2026-10-13T13:50:50.894218-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6319218688,
+      "time": "2026-10-13T13:50:52.626906-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6320934912,
+      "time": "2026-10-13T13:50:54.302548-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6317146112,
+      "time": "2026-10-13T13:50:56.033571-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6307958784,
+      "time": "2026-10-13T13:50:58.791846-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6308130816,
+      "time": "2026-10-13T13:50:59.968308-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6323343360,
+      "time": "2026-10-13T13:51:01.199599-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6319427584,
+      "time": "2026-10-13T13:51:02.594449-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6314000384,
+      "time": "2026-10-13T13:51:04.903674-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6314221568,
+      "time": "2026-10-13T13:51:07.252103-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6311612416,
+      "time": "2026-10-13T13:51:08.873097-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6306377728,
+      "time": "2026-10-13T13:51:10.663359-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6326517760,
+      "time": "2026-10-13T13:51:12.276441-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6320967680,
+      "time": "2026-10-13T13:51:13.804662-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6320943104,
+      "time": "2026-10-13T13:51:13.809769-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6313984000,
+      "time": "2026-10-13T13:51:15.555855-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6311063552,
+      "time": "2026-10-13T13:51:16.874936-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6314242048,
+      "time": "2026-10-13T13:51:18.144681-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6315016192,
+      "time": "2026-10-13T13:51:19.576584-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6309081088,
+      "time": "2026-10-13T13:51:21.802310-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6309507072,
+      "time": "2026-10-13T13:51:23.952469-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6322184192,
+      "time": "2026-10-13T13:51:25.844555-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6316900352,
+      "time": "2026-10-13T13:51:27.681425-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6309490688,
+      "time": "2026-10-13T13:51:29.434252-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6311931904,
+      "time": "2026-10-13T13:51:31.099487-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6306336768,
+      "time": "2026-10-13T13:51:32.489406-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6301896704,
+      "time": "2026-10-13T13:51:33.858706-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6300917760,
+      "time": "2026-10-13T13:51:35.093768-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6303633408,
+      "time": "2026-10-13T13:51:36.518602-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6303604736,
+      "time": "2026-10-13T13:51:36.523810-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6317580288,
+      "time": "2026-10-13T13:51:38.646983-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6315204608,
+      "time": "2026-10-13T13:51:40.816183-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6309175296,
+      "time": "2026-10-13T13:51:42.687717-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6308831232,
+      "time": "2026-10-13T13:51:44.552819-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6304784384,
+      "time": "2026-10-13T13:51:46.373527-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6303006720,
+      "time": "2026-10-13T13:51:48.109601-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6296723456,
+      "time": "2026-10-13T13:51:49.809594-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6312103936,
+      "time": "2026-10-13T13:51:51.359424-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6305591296,
+      "time": "2026-10-13T13:51:52.812595-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6304972800,
+      "time": "2026-10-13T13:51:54.323825-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6298734592,
+      "time": "2026-10-13T13:51:56.604399-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6293045248,
+      "time": "2026-10-13T13:51:58.905158-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6290345984,
+      "time": "2026-10-13T13:52:00.965493-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6301659136,
+      "time": "2026-10-13T13:52:03.483778-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6301630464,
+      "time": "2026-10-13T13:52:03.489346-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6300028928,
+      "time": "2026-10-13T13:52:05.774254-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6297997312,
+      "time": "2026-10-13T13:52:08.231523-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6293389312,
+      "time": "2026-10-13T13:52:10.115769-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6292328448,
+      "time": "2026-10-13T13:52:11.930016-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6288400384,
+      "time": "2026-10-13T13:52:13.607399-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6283472896,
+      "time": "2026-10-13T13:52:15.435112-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6300397568,
+      "time": "2026-10-13T13:52:18.292127-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6294573056,
+      "time": "2026-10-13T13:52:21.231751-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6292213760,
+      "time": "2026-10-13T13:52:23.835253-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6290612224,
+      "time": "2026-10-13T13:52:26.557621-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6284275712,
+      "time": "2026-10-13T13:52:29.158836-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6298607616,
+      "time": "2026-10-13T13:52:31.756398-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6297194496,
+      "time": "2026-10-13T13:52:33.930634-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6292549632,
+      "time": "2026-10-13T13:52:36.072366-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6292533248,
+      "time": "2026-10-13T13:52:36.077813-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6305054720,
+      "time": "2026-10-13T13:52:38.156058-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6307061760,
+      "time": "2026-10-13T13:52:40.411644-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6300618752,
+      "time": "2026-10-13T13:52:43.650850-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6290640896,
+      "time": "2026-10-13T13:52:47.759787-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6301765632,
+      "time": "2026-10-13T13:52:51.594054-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6293127168,
+      "time": "2026-10-13T13:52:55.278989-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6304854016,
+      "time": "2026-10-13T13:52:57.854522-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6305697792,
+      "time": "2026-10-13T13:53:00.744366-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6303662080,
+      "time": "2026-10-13T13:53:03.358317-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6298722304,
+      "time": "2026-10-13T13:53:05.822325-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6296768512,
+      "time": "2026-10-13T13:53:08.250765-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6294196224,
+      "time": "2026-10-13T13:53:10.412962-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6287712256,
+      "time": "2026-10-13T13:53:13.908267-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6300274688,
+      "time": "2026-10-13T13:53:17.734520-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6300246016,
+      "time": "2026-10-13T13:53:17.741831-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6314369024,
+      "time": "2026-10-13T13:53:20.862864-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6310473728,
+      "time": "2026-10-13T13:53:24.055788-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6309789696,
+      "time": "2026-10-13T13:53:26.563262-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6307340288,
+      "time": "2026-10-13T13:53:29.250919-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6305742848,
+      "time": "2026-10-13T13:53:31.569138-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6297886720,
+      "time": "2026-10-13T13:53:33.711818-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6314717184,
+      "time": "2026-10-13T13:53:35.585316-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6313422848,
+      "time": "2026-10-13T13:53:37.732499-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6308155392,
+      "time": "2026-10-13T13:53:41.469474-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6302081024,
+      "time": "2026-10-13T13:53:45.083498-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6296752128,
+      "time": "2026-10-13T13:53:47.843677-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6277226496,
+      "time": "2026-10-13T13:53:50.662427-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6289551360,
+      "time": "2026-10-13T13:53:53.188821-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6284443648,
+      "time": "2026-10-13T13:53:55.760212-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6260969472,
+      "time": "2026-10-13T13:54:17.996206-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6249164800,
+      "time": "2026-10-13T13:54:20.559953-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6249324544,
+      "time": "2026-10-13T13:54:22.604233-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6252519424,
+      "time": "2026-10-13T13:54:25.593831-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6236893184,
+      "time": "2026-10-13T13:54:31.450489-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6236356608,
+      "time": "2026-10-13T13:54:39.240861-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6241144832,
+      "time": "2026-10-13T13:54:46.638502-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6232084480,
+      "time": "2026-10-13T13:54:52.162329-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6236643328,
+      "time": "2026-10-13T13:54:58.202313-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6234423296,
+      "time": "2026-10-13T13:55:02.914766-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6232240128,
+      "time": "2026-10-13T13:55:07.993606-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6226120704,
+      "time": "2026-10-13T13:55:12.574001-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6224322560,
+      "time": "2026-10-13T13:55:16.979298-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6221807616,
+      "time": "2026-10-13T13:55:21.576053-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6233800704,
+      "time": "2026-10-13T13:55:25.903925-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6233784320,
+      "time": "2026-10-13T13:55:25.909330-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6246707200,
+      "time": "2026-10-13T13:55:31.868280-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6245990400,
+      "time": "2026-10-13T13:55:37.472399-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6242082816,
+      "time": "2026-10-13T13:55:43.281390-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6254084096,
+      "time": "2026-10-13T13:55:48.673555-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6249340928,
+      "time": "2026-10-13T13:55:53.330094-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6243229696,
+      "time": "2026-10-13T13:55:58.070646-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6242873344,
+      "time": "2026-10-13T13:56:02.742763-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6234312704,
+      "time": "2026-10-13T13:56:07.565381-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6254637056,
+      "time": "2026-10-13T13:56:12.660398-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6248714240,
+      "time": "2026-10-13T13:56:17.899119-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6239625216,
+      "time": "2026-10-13T13:56:24.606336-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6241439744,
+      "time": "2026-10-13T13:56:30.634945-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6276812800,
+      "time": "2026-10-13T13:56:35.374453-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6283911168,
+      "time": "2026-10-13T13:56:40.471648-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6283886592,
+      "time": "2026-10-13T13:56:40.478102-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6273843200,
+      "time": "2026-10-13T13:56:44.154113-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6267265024,
+      "time": "2026-10-13T13:56:47.676314-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6264262656,
+      "time": "2026-10-13T13:56:51.039481-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6272724992,
+      "time": "2026-10-13T13:56:54.628412-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6267269120,
+      "time": "2026-10-13T13:56:58.493886-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6269902848,
+      "time": "2026-10-13T13:57:02.399464-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6276722688,
+      "time": "2026-10-13T13:57:08.484304-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6271152128,
+      "time": "2026-10-13T13:57:13.774637-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6265053184,
+      "time": "2026-10-13T13:57:18.830526-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6268702720,
+      "time": "2026-10-13T13:57:23.726468-07:00"
+    },
+    {
+      "pressure": 1,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6259732480,
+      "time": "2026-10-13T13:57:28.671429-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12135.81,
+      "disk_free": 6247051264,
+      "time": "2026-10-13T13:57:33.925794-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6258196480,
+      "time": "2026-10-13T13:57:38.372399-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6252249088,
+      "time": "2026-10-13T13:57:43.162949-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6252232704,
+      "time": "2026-10-13T13:57:43.169747-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6244118528,
+      "time": "2026-10-13T13:57:48.200963-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6254858240,
+      "time": "2026-10-13T13:57:53.946919-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6240710656,
+      "time": "2026-10-13T13:58:01.251970-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6250721280,
+      "time": "2026-10-13T13:58:09.362758-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6243422208,
+      "time": "2026-10-13T13:58:15.598264-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6235807744,
+      "time": "2026-10-13T13:58:21.954599-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6249992192,
+      "time": "2026-10-13T13:58:26.989796-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6258352128,
+      "time": "2026-10-13T13:58:31.819996-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6255620096,
+      "time": "2026-10-13T13:58:35.952309-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6246170624,
+      "time": "2026-10-13T13:58:39.768720-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6261411840,
+      "time": "2026-10-13T13:58:43.783241-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6247690240,
+      "time": "2026-10-13T13:58:49.002723-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6238892032,
+      "time": "2026-10-13T13:58:55.623859-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6232555520,
+      "time": "2026-10-13T13:59:03.200224-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12119.81,
+      "disk_free": 6232535040,
+      "time": "2026-10-13T13:59:03.212837-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6207057920,
+      "time": "2026-10-13T13:59:09.174795-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6216556544,
+      "time": "2026-10-13T13:59:14.002083-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6222086144,
+      "time": "2026-10-13T13:59:18.769052-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6205808640,
+      "time": "2026-10-13T13:59:23.006145-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6206951424,
+      "time": "2026-10-13T13:59:27.109723-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6214430720,
+      "time": "2026-10-13T13:59:30.784072-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6207389696,
+      "time": "2026-10-13T13:59:34.673714-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6204329984,
+      "time": "2026-10-13T13:59:40.136596-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6209912832,
+      "time": "2026-10-13T13:59:46.986325-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6203478016,
+      "time": "2026-10-13T13:59:54.520268-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6228037632,
+      "time": "2026-10-13T14:00:01.021482-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6224519168,
+      "time": "2026-10-13T14:00:05.889444-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12111.81,
+      "disk_free": 6215106560,
+      "time": "2026-10-13T14:00:10.662010-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6228725760,
+      "time": "2026-10-13T14:00:15.207154-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6228709376,
+      "time": "2026-10-13T14:00:15.213861-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6214692864,
+      "time": "2026-10-13T14:00:21.274059-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6207598592,
+      "time": "2026-10-13T14:00:25.715767-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6207209472,
+      "time": "2026-10-13T14:00:30.892325-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6216011776,
+      "time": "2026-10-13T14:00:35.293688-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6217961472,
+      "time": "2026-10-13T14:00:41.708495-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6201434112,
+      "time": "2026-10-13T14:00:48.747228-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6200328192,
+      "time": "2026-10-13T14:00:53.793178-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6198325248,
+      "time": "2026-10-13T14:00:59.807031-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6207328256,
+      "time": "2026-10-13T14:01:04.372676-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6200827904,
+      "time": "2026-10-13T14:01:09.334691-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6194966528,
+      "time": "2026-10-13T14:01:13.487381-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6193102848,
+      "time": "2026-10-13T14:01:17.813281-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6201167872,
+      "time": "2026-10-13T14:01:22.634572-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6197936128,
+      "time": "2026-10-13T14:01:27.200485-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6197907456,
+      "time": "2026-10-13T14:01:27.206087-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6215274496,
+      "time": "2026-10-13T14:01:33.129545-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6207610880,
+      "time": "2026-10-13T14:01:39.335386-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6208040960,
+      "time": "2026-10-13T14:01:44.571253-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6213492736,
+      "time": "2026-10-13T14:01:52.147825-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6208573440,
+      "time": "2026-10-13T14:01:56.432458-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6204157952,
+      "time": "2026-10-13T14:02:01.143519-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6205370368,
+      "time": "2026-10-13T14:02:05.086343-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6212931584,
+      "time": "2026-10-13T14:02:09.587955-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6208565248,
+      "time": "2026-10-13T14:02:14.127034-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6203842560,
+      "time": "2026-10-13T14:02:18.385744-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6195470336,
+      "time": "2026-10-13T14:02:24.598279-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6208491520,
+      "time": "2026-10-13T14:02:29.783024-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6210461696,
+      "time": "2026-10-13T14:02:35.171971-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6218969088,
+      "time": "2026-10-13T14:02:40.342839-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6218948608,
+      "time": "2026-10-13T14:02:40.349288-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6228176896,
+      "time": "2026-10-13T14:02:44.933184-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6212653056,
+      "time": "2026-10-13T14:02:50.754870-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6264913920,
+      "time": "2026-10-13T14:02:56.193234-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6247776256,
+      "time": "2026-10-13T14:03:01.606291-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6260396032,
+      "time": "2026-10-13T14:03:07.565302-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6252380160,
+      "time": "2026-10-13T14:03:12.313722-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6238572544,
+      "time": "2026-10-13T14:03:18.702285-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6243934208,
+      "time": "2026-10-13T14:03:26.036994-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6231228416,
+      "time": "2026-10-13T14:03:31.605010-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6232453120,
+      "time": "2026-10-13T14:03:36.870027-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6231097344,
+      "time": "2026-10-13T14:03:41.572088-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6238830592,
+      "time": "2026-10-13T14:03:45.975257-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6234681344,
+      "time": "2026-10-13T14:03:50.257289-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6215315456,
+      "time": "2026-10-13T14:03:55.189890-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6215286784,
+      "time": "2026-10-13T14:03:55.197877-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6229733376,
+      "time": "2026-10-13T14:03:59.530537-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6220283904,
+      "time": "2026-10-13T14:04:04.451227-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6221484032,
+      "time": "2026-10-13T14:04:10.599760-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6216732672,
+      "time": "2026-10-13T14:04:17.716359-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6215499776,
+      "time": "2026-10-13T14:04:22.876574-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6220742656,
+      "time": "2026-10-13T14:04:27.727212-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6227709952,
+      "time": "2026-10-13T14:04:31.916032-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6235361280,
+      "time": "2026-10-13T14:04:36.450719-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6254821376,
+      "time": "2026-10-13T14:04:40.518879-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6244503552,
+      "time": "2026-10-13T14:04:44.591463-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6237138944,
+      "time": "2026-10-13T14:04:48.855772-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6250024960,
+      "time": "2026-10-13T14:04:53.360016-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6234902528,
+      "time": "2026-10-13T14:04:58.180985-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6225768448,
+      "time": "2026-10-13T14:05:03.594546-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6225395712,
+      "time": "2026-10-13T14:05:03.601257-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6234071040,
+      "time": "2026-10-13T14:05:08.804958-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6231269376,
+      "time": "2026-10-13T14:05:13.566270-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6222663680,
+      "time": "2026-10-13T14:05:17.815324-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6244036608,
+      "time": "2026-10-13T14:05:21.656907-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6232866816,
+      "time": "2026-10-13T14:05:25.141307-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6224027648,
+      "time": "2026-10-13T14:05:28.525778-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6227804160,
+      "time": "2026-10-13T14:05:32.322933-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6238646272,
+      "time": "2026-10-13T14:05:36.347491-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6230405120,
+      "time": "2026-10-13T14:05:41.513159-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6236303360,
+      "time": "2026-10-13T14:05:46.939609-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6227456000,
+      "time": "2026-10-13T14:05:51.476117-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6224076800,
+      "time": "2026-10-13T14:05:56.013963-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6220615680,
+      "time": "2026-10-13T14:05:59.890760-07:00"
+    },
+    {
+      "pressure": 2,
+      "swap_used_mib": 12103.81,
+      "disk_free": 6226276352,
+      "time": "2026-10-13T14:06:03.980704-07:00"
+    }
+  ],
+  "ended": "2026-10-13T14:06:03.989656-07:00",
+  "source_files_unchanged": true,
+  "models": {
+    "qwen2.5:7b-instruct-q4_K_M": {
+      "model": "qwen2.5:7b-instruct-q4_K_M",
+      "model_digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "stats": {
+        "attempts": 140,
+        "network_calls": 140,
+        "prompt_tokens": 125566,
+        "output_tokens": 5664
+      },
+      "mean_s": 1.9640801106883112,
+      "max_s": 5.257876457995735,
+      "options": {
+        "temperature": 0,
+        "seed": 205,
+        "num_ctx": 16384,
+        "num_predict": 192,
+        "num_thread": 4
+      },
+      "encoding": "label_object",
+      "unloaded_after_run": true
+    },
+    "qwen2.5:14b-instruct-q4_K_M": {
+      "model": "qwen2.5:14b-instruct-q4_K_M",
+      "model_digest": "7cdf5a0187d5c58cc5d369b255592f7841d1c4696d45a8c8a9489440385b22f6",
+      "stats": {
+        "attempts": 140,
+        "network_calls": 140,
+        "prompt_tokens": 125566,
+        "output_tokens": 5527
+      },
+      "mean_s": 5.026139924667326,
+      "max_s": 8.09988695802167,
+      "options": {
+        "temperature": 0,
+        "seed": 205,
+        "num_ctx": 16384,
+        "num_predict": 192,
+        "num_thread": 4
+      },
+      "encoding": "label_object",
+      "unloaded_after_run": true
+    }
+  },
+  "raw_report": "logs/werewolf_benchmarks/scale-simple-model-guard-213/summary.json"
+}

@@ -1,0 +1,62 @@
+{
+  "status": "pass",
+  "training_games": 174240,
+  "unique_training_selection_deals": 1440,
+  "evaluations_recomputed": 1070,
+  "distinct_fitness_tables_recomputed": 726,
+  "frozen_genome": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    5,
+    2,
+    4,
+    10,
+    2,
+    10
+  ],
+  "raw_sha256": "5e3036ce3ef07a6563a7cfc9e394c5aad2b87f7cdf24ae1abac5c0168aa691a8",
+  "report_sha256": "96b5db614ace5c63c5a03478dcb62dd00a06d8cbd3aa8900d909e096d9d303fe",
+  "development": {
+    "status": "pass",
+    "pairs": 11200,
+    "games": 22400,
+    "statistics_recomputed": 152,
+    "overall": {
+      "candidate": {
+        "n": 11200,
+        "candidate_wins": 6172,
+        "reference_wins": 5864,
+        "improved": 351,
+        "worsened": 43,
+        "candidate_rate": 0.5510714285714285,
+        "reference_rate": 0.5235714285714286,
+        "delta": 0.0275,
+        "ci95": [
+          0.024063735963618965,
+          0.030936264036381035
+        ],
+        "conservative_ci95": [
+          0.022464136397611877,
+          0.0325112037941532
+        ],
+        "candidate_wilson_ci95": [
+          0.5418437831214652,
+          0.5602640510342766
+        ],
+        "reference_wilson_ci95": [
+          0.5143150949682558,
+          0.5328115977190095
+        ],
+        "mcnemar_p": 3.495960013666829e-61
+      }
+    },
+    "raw_sha256": "ec11512f7078cebd28bb96de5c32ea2e6071146dbb20f6c38f9a925ffc796ce5"
+  }
+}

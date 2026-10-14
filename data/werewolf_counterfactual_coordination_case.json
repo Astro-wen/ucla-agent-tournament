@@ -1,0 +1,1035 @@
+{
+  "scope": "selected posthoc mechanism replay, not a new strategy or independent win-rate sample",
+  "baseline": {
+    "evaluator_only_roles": [
+      "wolf",
+      "seer",
+      "villager",
+      "villager",
+      "wolf",
+      "villager",
+      "villager"
+    ],
+    "votes": [
+      {
+        "day": 1,
+        "votes": {
+          "__d": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              4
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              4,
+              1
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              6,
+              4
+            ]
+          ]
+        },
+        "eliminated": 1
+      },
+      {
+        "day": 2,
+        "votes": {
+          "__d": [
+            [
+              0,
+              3
+            ],
+            [
+              2,
+              4
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              4,
+              3
+            ],
+            [
+              5,
+              0
+            ]
+          ]
+        },
+        "eliminated": null
+      }
+    ],
+    "deaths": [
+      {
+        "day": 1,
+        "seat": 1,
+        "role": "seer",
+        "cause": "vote"
+      },
+      {
+        "day": 2,
+        "seat": 6,
+        "role": "villager",
+        "cause": "night_kill"
+      },
+      {
+        "day": 3,
+        "seat": 2,
+        "role": "villager",
+        "cause": "night_kill"
+      }
+    ],
+    "result": {
+      "id": "251/rt_chaos/k1/53",
+      "scenario": {
+        "seed": 251,
+        "game": 53,
+        "background": "rt_chaos",
+        "k": 1
+      },
+      "profile": "b0",
+      "seat": 5,
+      "deal_seed": 215208275725678258,
+      "role": "villager",
+      "win": false,
+      "winner": "wolf",
+      "days": 3,
+      "trace_hash": "c5daf9e9402af885c3b3a363cc4542adc3e0e0888561ba6cb7340195e2d009f4",
+      "event_hash": "e1f6182cae8e3e03fb53283a04d86652a9df1725be0962050e73e1e8952afda5",
+      "events": 140,
+      "errors": {
+        "crash": 0,
+        "illegal": 0,
+        "bad_chat": 0,
+        "timeout": 0,
+        "chat_after_terminate": 0,
+        "policy_errors": 0,
+        "policy_fallbacks": 0,
+        "logged_errors": 0,
+        "fallbacks": 0,
+        "overruns": 0,
+        "listen_errors": 0,
+        "fallback_paths": 0
+      },
+      "window_closures": 0,
+      "intervention_applied": false,
+      "decisions": 2
+    }
+  },
+  "single_vote_4": {
+    "evaluator_only_roles": [
+      "wolf",
+      "seer",
+      "villager",
+      "villager",
+      "wolf",
+      "villager",
+      "villager"
+    ],
+    "votes": [
+      {
+        "day": 1,
+        "votes": {
+          "__d": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              4
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              4,
+              1
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              6,
+              4
+            ]
+          ]
+        },
+        "eliminated": 1
+      },
+      {
+        "day": 2,
+        "votes": {
+          "__d": [
+            [
+              0,
+              3
+            ],
+            [
+              2,
+              4
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              4,
+              3
+            ],
+            [
+              5,
+              4
+            ]
+          ]
+        },
+        "eliminated": 4
+      },
+      {
+        "day": 3,
+        "votes": {
+          "__d": [
+            [
+              0,
+              3
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              5,
+              0
+            ]
+          ]
+        },
+        "eliminated": 0
+      }
+    ],
+    "deaths": [
+      {
+        "day": 1,
+        "seat": 1,
+        "role": "seer",
+        "cause": "vote"
+      },
+      {
+        "day": 2,
+        "seat": 6,
+        "role": "villager",
+        "cause": "night_kill"
+      },
+      {
+        "day": 2,
+        "seat": 4,
+        "role": "wolf",
+        "cause": "vote"
+      },
+      {
+        "day": 3,
+        "seat": 2,
+        "role": "villager",
+        "cause": "night_kill"
+      },
+      {
+        "day": 3,
+        "seat": 0,
+        "role": "wolf",
+        "cause": "vote"
+      }
+    ],
+    "result": {
+      "id": "251/rt_chaos/k1/53",
+      "scenario": {
+        "seed": 251,
+        "game": 53,
+        "background": "rt_chaos",
+        "k": 1
+      },
+      "profile": "b0",
+      "seat": 5,
+      "deal_seed": 215208275725678258,
+      "role": "villager",
+      "win": true,
+      "winner": "villager",
+      "days": 3,
+      "trace_hash": "d127bf3bbc03d41e02cfc179d75a13fb7684e20018d485d1b331467c4f1c51a6",
+      "event_hash": "fb98921a0defd8af9ab4331ea622da8dfd28c81cb158e48a708c54f05197cee6",
+      "events": 174,
+      "errors": {
+        "crash": 0,
+        "illegal": 0,
+        "bad_chat": 0,
+        "timeout": 0,
+        "chat_after_terminate": 0,
+        "policy_errors": 0,
+        "policy_fallbacks": 0,
+        "logged_errors": 0,
+        "fallbacks": 0,
+        "overruns": 0,
+        "listen_errors": 0,
+        "fallback_paths": 0
+      },
+      "window_closures": 0,
+      "intervention_applied": true,
+      "decisions": 3
+    }
+  },
+  "actor_point": {
+    "index": 1,
+    "day": 2,
+    "phase": "day_vote",
+    "legal": [
+      0,
+      2,
+      3,
+      4,
+      7
+    ],
+    "proposed": 0,
+    "action": 0,
+    "evaluator_prefix": "adb8fd506a4889fe10edffee546fb037f849a5db620f908044fc94d8344636c9",
+    "input_hash": "5a0fe66c9f3550789de799960b647bd074dc4bcd2ccb0d69ce26ec92981f2150",
+    "raw": {
+      "session_id": "local",
+      "game_type": "werewolf",
+      "runtime_adapter": "openspiel",
+      "status": "in_progress",
+      "state_version": 16,
+      "phase": "moving",
+      "observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 2 | phase day_vote | alive 5/7\nLiving: Player0, Player2, Player3, Player4, Player5\nDead:\n  day 1: Player1 was seer (eliminated by vote)\n  day 2: Player6 was villager (killed at night)\nDay 1 vote: Player0 -> Player1, Player1 -> Player0, Player2 -> Player4, Player3 -> Player1, Player4 -> Player1, Player5 -> Player0, Player6 -> Player4 \u2014 Player1 eliminated by vote",
+      "is_terminal": false,
+      "is_current_actor": true,
+      "current_actor": null,
+      "legal_actions": {
+        "session_id": "local",
+        "state_version": 16,
+        "actions": [
+          {
+            "action_id": "0",
+            "label": "Vote to eliminate Player0",
+            "input": {
+              "session_id": "local",
+              "action_id": "0",
+              "state_version": 16
+            }
+          },
+          {
+            "action_id": "2",
+            "label": "Vote to eliminate Player2",
+            "input": {
+              "session_id": "local",
+              "action_id": "2",
+              "state_version": 16
+            }
+          },
+          {
+            "action_id": "3",
+            "label": "Vote to eliminate Player3",
+            "input": {
+              "session_id": "local",
+              "action_id": "3",
+              "state_version": 16
+            }
+          },
+          {
+            "action_id": "4",
+            "label": "Vote to eliminate Player4",
+            "input": {
+              "session_id": "local",
+              "action_id": "4",
+              "state_version": 16
+            }
+          },
+          {
+            "action_id": "7",
+            "label": "Abstain",
+            "input": {
+              "session_id": "local",
+              "action_id": "7",
+              "state_version": 16
+            }
+          }
+        ]
+      },
+      "next_actions": [],
+      "your_position": 5,
+      "players": [
+        {
+          "position": 0,
+          "name": "agent0",
+          "agent_id": "id0"
+        },
+        {
+          "position": 1,
+          "name": "agent1",
+          "agent_id": "id1"
+        },
+        {
+          "position": 2,
+          "name": "agent2",
+          "agent_id": "id2"
+        },
+        {
+          "position": 3,
+          "name": "agent3",
+          "agent_id": "id3"
+        },
+        {
+          "position": 4,
+          "name": "agent4",
+          "agent_id": "id4"
+        },
+        {
+          "position": 5,
+          "name": "agent5",
+          "agent_id": "id5"
+        },
+        {
+          "position": 6,
+          "name": "agent6",
+          "agent_id": "id6"
+        }
+      ],
+      "game_state": {
+        "day": 2,
+        "phase": "day_vote",
+        "alive": [
+          "agent0",
+          "agent2",
+          "agent3",
+          "agent4",
+          "agent5"
+        ],
+        "dead": [
+          {
+            "day": 1,
+            "player": "agent1",
+            "role": "seer",
+            "cause": "vote"
+          },
+          {
+            "day": 2,
+            "player": "agent6",
+            "role": "villager",
+            "cause": "night_kill"
+          }
+        ],
+        "vote_history": [
+          {
+            "day": 1,
+            "votes": {
+              "agent0": "agent1",
+              "agent1": "agent0",
+              "agent2": "agent4",
+              "agent3": "agent1",
+              "agent4": "agent1",
+              "agent5": "agent0",
+              "agent6": "agent4"
+            },
+            "eliminated": "agent1"
+          }
+        ],
+        "winner": null
+      },
+      "eliminated": false,
+      "messaging_enabled": true,
+      "new_messages": [],
+      "terminated_messaging": [
+        1,
+        6,
+        2,
+        4,
+        0,
+        5,
+        3
+      ],
+      "messaging_seconds_left": null
+    },
+    "memory": {
+      "transcript": {
+        "__d": [
+          [
+            0,
+            {
+              "seq": 0,
+              "sender": 5,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            1,
+            {
+              "seq": 1,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "ok who do we like today",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            2,
+            {
+              "seq": 2,
+              "sender": 1,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "ok. seer here. player-0=werewolf.",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            3,
+            {
+              "seq": 3,
+              "sender": 5,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "Following the Seer (Player1): I vote Player0. Everyone vote Player0 so we do not split.",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            4,
+            {
+              "seq": 4,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "Player 6 feels quiet",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            5,
+            {
+              "seq": 5,
+              "sender": 3,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "p2 feels quiet",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            6,
+            {
+              "seq": 6,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "hi. villager. lets not abstain",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            7,
+            {
+              "seq": 7,
+              "sender": 6,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "ok who do we like today",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            8,
+            {
+              "seq": 8,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "oh sure, Player03 is TOTALLY the seer and Player3 is a wolf /s",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            9,
+            {
+              "seq": 9,
+              "sender": 3,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "Player6 said \"ok who do we like today\" hmm",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            10,
+            {
+              "seq": 10,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I am the Seer. Player1 is a wolf. Vote Player1.",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            11,
+            {
+              "seq": 11,
+              "sender": 1,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "if I were the seer I would say Player2 is a wolf. but I'm not.",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            12,
+            {
+              "seq": 12,
+              "sender": 1,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "oh sure, PLAYER6 is TOTALLY the seer and Player4 is a wolf /s",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            13,
+            {
+              "seq": 13,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "wait",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            15,
+            {
+              "seq": 15,
+              "sender": 1,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "not a wolf. Player04 is lying",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            16,
+            {
+              "seq": 16,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "all in on p0",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            17,
+            {
+              "seq": 17,
+              "sender": 6,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "VOTE seat#1",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            18,
+            {
+              "seq": 18,
+              "sender": 3,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "p0 today",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            19,
+            {
+              "seq": 19,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "oh sure, seat 3 is TOTALLY the seer and Player4 is a wolf /s",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            21,
+            {
+              "seq": 21,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "As the seer: agent1 is a wolfie! vote seat#1",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            22,
+            {
+              "seq": 22,
+              "sender": 6,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "vote Player8 lol jk",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            23,
+            {
+              "seq": 23,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "im voting p1",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            24,
+            {
+              "seq": 24,
+              "sender": 1,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "im voting PLAYER0",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            25,
+            {
+              "seq": 25,
+              "sender": 3,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "rip nobody yet",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            26,
+            {
+              "seq": 26,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "if I were the seer I would say Player4 is a wolf. but I'm not.",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            27,
+            {
+              "seq": 27,
+              "sender": 6,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I'm not the seer. Player2 isn't either. or are they",
+              "day": 1,
+              "_day": 1
+            }
+          ],
+          [
+            28,
+            {
+              "seq": 28,
+              "sender": 5,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "Following the Seer (Player1): I vote Player0. Everyone vote Player0 so we do not split.",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            29,
+            {
+              "seq": 29,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "same as yesterday?",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            30,
+            {
+              "seq": 30,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "hm",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            31,
+            {
+              "seq": 31,
+              "sender": 3,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "hi. villager. lets not abstain",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            32,
+            {
+              "seq": 32,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "hi. villager. lets not abstain",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            33,
+            {
+              "seq": 33,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I'm not the seer. Player0 isn't either. or are they",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            36,
+            {
+              "seq": 36,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "not a werewolf. seat 1 is lying",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            37,
+            {
+              "seq": 37,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "all in on PLAYER3",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            38,
+            {
+              "seq": 38,
+              "sender": 3,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "seat#4 today",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            39,
+            {
+              "seq": 39,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "voet Player04",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            40,
+            {
+              "seq": 40,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "im voting p3",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            41,
+            {
+              "seq": 41,
+              "sender": 3,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "oh sure, Plyer2 is TOTALLY the seer and Player5 is a wolf /s",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            42,
+            {
+              "seq": 42,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "if I were the seer I would say Player3 is a wolf. but I'm not.",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            43,
+            {
+              "seq": 43,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "if I were the seer I would say Player4 is a wolf. but I'm not.",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            44,
+            {
+              "seq": 44,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "really-really-really-really-really-really-suspicious-of-everyone-today-honestly-0 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-1 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-2 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-3 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-4 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-5 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-6 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-7 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-8 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-9 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-10 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-11",
+              "day": 2,
+              "_day": 2
+            }
+          ],
+          [
+            45,
+            {
+              "seq": 45,
+              "sender": 3,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "Player2 is not a wolf imo. Player4 is not the seer either",
+              "day": 2,
+              "_day": 2
+            }
+          ]
+        ]
+      },
+      "_said_day": 2,
+      "_topics": {
+        "__s": [
+          "follow"
+        ]
+      },
+      "_dm_target": null,
+      "_dm_day": null,
+      "_call": null
+    }
+  },
+  "interpretation": "Choosing a known wolf is not identical to choosing the ballot that changes the elimination; actual future ballots are evaluator evidence, not available facts for a policy."
+}

@@ -1,0 +1,8 @@
+{
+  "created": "2026-10-13T21:55:07.739694-07:00",
+  "source_digest": "93030c654ea6a3d3be92ecca450a5c4f96e35966d3f1f163dc9718ead9e98a8d",
+  "files": 308,
+  "archive": "/Users/szh/Documents/SZH/Project/Agent Competition SAIR/logs/werewolf_benchmarks/strength-confirm-frozen-source.zip",
+  "archive_sha256": "7228aa8c5d4c4093d8556d1db28490f4306389ed0cea35b668b59e82402269c4",
+  "scope": "Exact308-source-file snapshot of strength37301/37302, excluding model weights, secrets and decision logs"
+}

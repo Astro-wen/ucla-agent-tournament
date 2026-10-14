@@ -1,0 +1,11 @@
+{
+  "scope": "Explicit follow-up after original271/272negative screen; new274/275development, original results immutable; offline only",
+  "hypothesis": "Test whether retaining B0 under a model-advantage gate hides useful alternative votes, versus whether the imagined future model itself is wrong",
+  "difference": "Same public-information worlds, priors,16particles, full-terminal models, allowed actions and coupled random draws as rollout_prior; remove only mean>=0.125 and mean-minus-SE>0switch gate; choose maximum modeled win rate, ties retain reference",
+  "development": {"seed": 274, "games_per_background": 50, "backgrounds": "B0exact28", "profiles": ["B0","rollout_prior","rollout_free"], "timing": "rt", "visibility": "strict"},
+  "replication": {"seed": 275, "games_per_background": 100, "backgrounds": "B0exact28", "profiles": ["B0","rollout_free"], "always_run_once_if_resources_allow": true, "timing": "rt", "visibility": "strict"},
+  "no_further_tuning": true,
+  "selection_note": "If free model fails, do not re-label an observed subgroup as overall strength. Any later candidate uses a new plan and fresh data.",
+  "adoption_bar": "unchanged overall2pp, uncertainty and role/background safety; no deployment without live/complete validation",
+  "resources": {"minimum_free_disk_gib": 2, "deadline": "2026-10-14T05:00:00-07:00"}
+}

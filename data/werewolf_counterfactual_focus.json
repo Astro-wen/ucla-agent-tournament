@@ -1,0 +1,236 @@
+{
+  "scope": "posthoc diagnostic counts, not a new independent experiment",
+  "rescued_cases_by_phase_day": {
+    "day_vote:day1": 24,
+    "day_vote:day2": 16,
+    "day_vote:day3": 2,
+    "night_seer:day1": 53,
+    "night_seer:day2": 10
+  },
+  "first_investigation_groups": 7,
+  "first_investigation_cases": 100,
+  "confirmed_report_case": [
+    {
+      "case": "251/rt_chaos/k1/53",
+      "point": 1,
+      "baseline_action": 0,
+      "winning": [
+        4
+      ],
+      "observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 2 | phase day_vote | alive 5/7\nLiving: Player0, Player2, Player3, Player4, Player5\nDead:\n  day 1: Player1 was seer (eliminated by vote)\n  day 2: Player6 was villager (killed at night)\nDay 1 vote: Player0 -> Player1, Player1 -> Player0, Player2 -> Player4, Player3 -> Player1, Player4 -> Player1, Player5 -> Player0, Player6 -> Player4 \u2014 Player1 eliminated by vote",
+      "messages": [
+        {
+          "seq": 2,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "ok. seer here. player-0=werewolf.",
+          "day": 1,
+          "_day": 1
+        },
+        {
+          "seq": 11,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "if I were the seer I would say Player2 is a wolf. but I'm not.",
+          "day": 1,
+          "_day": 1
+        },
+        {
+          "seq": 12,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "oh sure, PLAYER6 is TOTALLY the seer and Player4 is a wolf /s",
+          "day": 1,
+          "_day": 1
+        },
+        {
+          "seq": 15,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "not a wolf. Player04 is lying",
+          "day": 1,
+          "_day": 1
+        },
+        {
+          "seq": 24,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "im voting PLAYER0",
+          "day": 1,
+          "_day": 1
+        },
+        {
+          "seq": 28,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Following the Seer (Player1): I vote Player0. Everyone vote Player0 so we do not split.",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 29,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "same as yesterday?",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 30,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "hm",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 31,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "hi. villager. lets not abstain",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 32,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "hi. villager. lets not abstain",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 33,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I'm not the seer. Player0 isn't either. or are they",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 36,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "not a werewolf. seat 1 is lying",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 37,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "all in on PLAYER3",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 38,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "seat#4 today",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 39,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "voet Player04",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 40,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "im voting p3",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 41,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "oh sure, Plyer2 is TOTALLY the seer and Player5 is a wolf /s",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 42,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "if I were the seer I would say Player3 is a wolf. but I'm not.",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 43,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "if I were the seer I would say Player4 is a wolf. but I'm not.",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 44,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "really-really-really-really-really-really-suspicious-of-everyone-today-honestly-0 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-1 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-2 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-3 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-4 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-5 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-6 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-7 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-8 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-9 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-10 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-11",
+          "day": 2,
+          "_day": 2
+        },
+        {
+          "seq": 45,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Player2 is not a wolf imo. Player4 is not the seer either",
+          "day": 2,
+          "_day": 2
+        }
+      ]
+    }
+  ],
+  "assessment": "Loss-only first-investigation rescue labels cannot train a reliable policy without winning controls and evaluation on unseen data."
+}

@@ -1,0 +1,12 @@
+{
+  "requested_cutoff": "2026-10-14T08:00:00-07:00",
+  "final_research_check_at": "2026-10-14T08:00:06.560484-07:00",
+  "checks": [
+    "werewolf_until8_final_integrity.json",
+    "werewolf_evolution_confirmation_audit.json",
+    "werewolf_robust_vote_audit.json",
+    "werewolf_evolution_llm_audit.json"
+  ],
+  "research_window_complete": true,
+  "next": "organize,commit,push only authorized private development branch; no public entry/runtime change"
+}

@@ -1,0 +1,11 @@
+{
+  "scope": "New distributionally robust direct-payoff study after the earlier candidate failed a rounds regression guard. Original46101/46102results remain unchanged; no reuse for fitting or promotion.",
+  "program_space": "Wolf-vote decision tree only, same12predicates and12selectors; all otherB0behavior fixed. Canonical exhaustive first screen:12unconditional selectors plus11predicates times132unequal leafpairs=1464programs.",
+  "objective": "minimum of mean paired wolf gains across strictRT andstrictRounds minus0.5times mean negative background/timing gain. Ties prefer fewer nonbase leaves, then lexicographic genes. No timing-mode or opponent-name dispatch in policy inputs.",
+  "training": {"seed": 517, "backgrounds": "first20B0", "stage1": "3wolf deals per background, both timings, every canonical program", "stage2": "best96plusB0 on12wolf deals per background, both timings; cached exact repeats counted once"},
+  "selection": {"seed": 518, "programs": "best8stage2plusB0", "wolf_deals_per_background": 12, "timings": ["rt","rounds"], "rule": "choose best fixed objective only if both timing mean gains positive; else B0"},
+  "development": {"seed": 519, "games_per_background": 100, "backgrounds": "all28B0", "timings": ["rt","rounds"], "compare": "B0 versus one frozen selected program; no further edits"},
+  "additional_registered_confirmation": {"seeds": [46301,46302], "registered_here_before_any_of_these_outcomes": true, "only_if": "both development timing overall gains>=2pp and unchanged prespecified regression checks pass", "games_per_background_per_seed": 500, "timings": ["rt","rounds"], "no_reselection": true},
+  "resources": {"hard_stop": "2026-10-14T07:50:00-07:00", "latest_new_confirmation_start": "2026-10-14T07:20:00-07:00", "min_free_disk_gib": 2, "workers": 1},
+  "claim_limit": "A screening optimum over a limited program language/sample is not a global strategy optimum. Incomplete confirmation stays exploratory. No entry/runtime changes or public-repository push."
+}

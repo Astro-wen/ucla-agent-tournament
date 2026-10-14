@@ -1,0 +1,4229 @@
+{
+  "selection": "posthoc first lexicographic improved and worsened development505/506case; explanatory only, not new independent strength evidence",
+  "additional_replay_games": 4,
+  "all_selected_replays_reproduced": true,
+  "cases": [
+    {
+      "id": "505/first_high_night/k1/21",
+      "improved": true,
+      "role": "wolf",
+      "seat": 4,
+      "first_message_difference": {
+        "index": 1,
+        "reference": {
+          "seq": 1,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player1 is most suspicious. I'll vote Player1 unless someone has better info.",
+          "day": 2
+        },
+        "candidate": {
+          "seq": 1,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player3 is most suspicious. I'll vote Player3 unless someone has better info.",
+          "day": 2
+        }
+      },
+      "first_action_difference": {
+        "index": 7,
+        "reference": {
+          "day": 1,
+          "seat": 4,
+          "phase": "day_vote",
+          "legal": [
+            0,
+            1,
+            2,
+            3,
+            5,
+            6,
+            7
+          ],
+          "alive": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "investigations_before": {},
+          "kind": "action",
+          "choice": "1",
+          "observed_checks": null,
+          "action": 1
+        },
+        "candidate": {
+          "day": 1,
+          "seat": 4,
+          "phase": "day_vote",
+          "legal": [
+            0,
+            1,
+            2,
+            3,
+            5,
+            6,
+            7
+          ],
+          "alive": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "investigations_before": {},
+          "kind": "action",
+          "choice": "2",
+          "observed_checks": null,
+          "action": 2
+        }
+      },
+      "reference": {
+        "id": "505/first_high_night/k1/21",
+        "scenario": {
+          "seed": 505,
+          "game": 21,
+          "background": "first_high_night",
+          "k": 1
+        },
+        "profile": "reference",
+        "seat": 4,
+        "role": "wolf",
+        "deal_seed": 3107999681920466788,
+        "win": false,
+        "winner": "villager",
+        "days": 3,
+        "failures": {
+          "crash": 0,
+          "illegal": 0,
+          "bad_chat": 0,
+          "timeout": 0,
+          "chat_after_terminate": 0,
+          "window_close": 0,
+          "fallbacks": 0,
+          "overruns": 0,
+          "policy_fallbacks": 0,
+          "policy_errors": 0,
+          "logged_errors": 0,
+          "listen_errors": 0,
+          "fallback_paths": 0
+        },
+        "background_failures": {
+          "crash": 0,
+          "illegal": 0,
+          "bad_chat": 0,
+          "timeout": 0,
+          "chat_after_terminate": 0,
+          "window_close": 0
+        },
+        "max_ms": 0.351125025190413,
+        "latency_histogram": {
+          "0.5": 2,
+          "0.25": 4,
+          "0.1": 15
+        },
+        "chats": 3,
+        "dms": 0,
+        "diagnostics": {
+          "first_day_wolf_elimination": [
+            1,
+            1
+          ],
+          "eliminations.table.wolf.day": [
+            2,
+            4
+          ],
+          "eliminations.table.wolf.night": [
+            0,
+            2
+          ],
+          "eliminations.table.wolf.ever_eliminated": [
+            2,
+            2
+          ],
+          "eliminations.table.seer.day": [
+            1,
+            2
+          ],
+          "eliminations.table.seer.night": [
+            0,
+            1
+          ],
+          "eliminations.table.seer.ever_eliminated": [
+            1,
+            1
+          ],
+          "eliminations.table.villager.day": [
+            0,
+            9
+          ],
+          "eliminations.table.villager.night": [
+            2,
+            7
+          ],
+          "eliminations.table.villager.ever_eliminated": [
+            2,
+            4
+          ],
+          "eliminations.table.innocent.day": [
+            1,
+            11
+          ],
+          "eliminations.table.innocent.night": [
+            2,
+            8
+          ],
+          "eliminations.table.innocent.ever_eliminated": [
+            3,
+            5
+          ],
+          "eliminations.controlled.wolf.day": [
+            1,
+            3
+          ],
+          "eliminations.controlled.wolf.night": [
+            0,
+            2
+          ],
+          "eliminations.controlled.wolf.ever_eliminated": [
+            1,
+            1
+          ],
+          "eliminations.controlled.seer.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.seer.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.seer.ever_eliminated": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.ever_eliminated": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.ever_eliminated": [
+            0,
+            0
+          ],
+          "votes.village_wolf_vote": [
+            0,
+            0
+          ],
+          "votes.village_wolf_vote_when_cast": [
+            0,
+            0
+          ],
+          "votes.controlled_abstention": [
+            0,
+            3
+          ],
+          "votes.faction_pivotal": [
+            0,
+            3
+          ],
+          "votes.immediate_terminal_pivotal": [
+            0,
+            3
+          ],
+          "votes.village_split_pressure": [
+            1,
+            11
+          ],
+          "votes.village_wolf_split_pressure": [
+            0,
+            7
+          ],
+          "votes.leader_margin": [
+            7,
+            3
+          ],
+          "votes.majority_margin": [
+            2,
+            3
+          ],
+          "votes.wolf_vs_innocent_margin": [
+            0,
+            3
+          ],
+          "stalls.no_elimination": [
+            0,
+            3
+          ],
+          "seer.unique_check_efficiency": [
+            2,
+            2
+          ],
+          "seer.unique_wolf_discovery_efficiency": [
+            1,
+            2
+          ],
+          "seer.observed_fact_coverage": [
+            2,
+            2
+          ],
+          "seer.observed_alive_usable": [
+            1,
+            3
+          ],
+          "seer.own_observed_wolf_vote_uptake": [
+            1,
+            1
+          ],
+          "claims.literal_claim_message_coverage": [
+            0,
+            3
+          ],
+          "claims.true_seer_literal_claim_day_rate": [
+            0,
+            2
+          ],
+          "claims.multiple_literal_claimant_day_rate": [
+            0,
+            3
+          ],
+          "claims.wolf_pair_double_literal_claim_rate": [
+            0,
+            1
+          ],
+          "claims.truthful_seer_report_vote_alignment": [
+            0,
+            0
+          ],
+          "night.observed_choice_coverage": [
+            2,
+            2
+          ],
+          "night.observed_seer_target": [
+            0,
+            2
+          ],
+          "night.observed_civilian_target": [
+            2,
+            2
+          ],
+          "night.seer_kill": [
+            0,
+            2
+          ],
+          "night.civilian_kill": [
+            2,
+            2
+          ],
+          "night.observed_wolf_disagreement": [
+            0,
+            0
+          ]
+        },
+        "trace": {
+          "roles": [
+            "wolf",
+            "seer",
+            "villager",
+            "villager",
+            "wolf",
+            "villager",
+            "villager"
+          ],
+          "votes": [
+            {
+              "day": 1,
+              "votes": {
+                "__d": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    2,
+                    0
+                  ],
+                  [
+                    3,
+                    0
+                  ],
+                  [
+                    4,
+                    1
+                  ],
+                  [
+                    5,
+                    0
+                  ],
+                  [
+                    6,
+                    0
+                  ]
+                ]
+              },
+              "eliminated": 0
+            },
+            {
+              "day": 2,
+              "votes": {
+                "__d": [
+                  [
+                    1,
+                    3
+                  ],
+                  [
+                    3,
+                    1
+                  ],
+                  [
+                    4,
+                    1
+                  ],
+                  [
+                    5,
+                    1
+                  ],
+                  [
+                    6,
+                    1
+                  ]
+                ]
+              },
+              "eliminated": 1
+            },
+            {
+              "day": 3,
+              "votes": {
+                "__d": [
+                  [
+                    4,
+                    5
+                  ],
+                  [
+                    5,
+                    4
+                  ],
+                  [
+                    6,
+                    4
+                  ]
+                ]
+              },
+              "eliminated": 4
+            }
+          ],
+          "dead": [
+            {
+              "day": 1,
+              "seat": 0,
+              "role": "wolf",
+              "cause": "vote"
+            },
+            {
+              "day": 2,
+              "seat": 2,
+              "role": "villager",
+              "cause": "night_kill"
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "role": "seer",
+              "cause": "vote"
+            },
+            {
+              "day": 3,
+              "seat": 3,
+              "role": "villager",
+              "cause": "night_kill"
+            },
+            {
+              "day": 3,
+              "seat": 4,
+              "role": "wolf",
+              "cause": "vote"
+            }
+          ],
+          "messages": [
+            {
+              "seq": 0,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No hard info yet. To avoid a split vote I'll vote Player1 unless the Seer speaks up. Please don't abstain.",
+              "day": 1
+            },
+            {
+              "seq": 1,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "My read from the vote record: Player1 is most suspicious. I'll vote Player1 unless someone has better info.",
+              "day": 2
+            },
+            {
+              "seq": 2,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "My read from the vote record: Player5 is most suspicious. I'll vote Player5 unless someone has better info.",
+              "day": 3
+            }
+          ],
+          "actions": [
+            {
+              "day": 1,
+              "seat": 0,
+              "phase": "night_wolf",
+              "legal": [
+                1,
+                2,
+                3,
+                5,
+                6
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "6",
+              "observed_checks": null,
+              "action": 6
+            },
+            {
+              "day": 1,
+              "seat": 4,
+              "phase": "night_wolf",
+              "legal": [
+                1,
+                2,
+                3,
+                5,
+                6
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 1,
+              "seat": 1,
+              "phase": "night_seer",
+              "legal": [
+                0,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": {},
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 0,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 1,
+              "seat": 1,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ]
+                ]
+              },
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ]
+                ]
+              },
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 2,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 3,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 4,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 1,
+              "seat": 5,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 6,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 2,
+              "seat": 4,
+              "phase": "night_wolf",
+              "legal": [
+                1,
+                2,
+                3,
+                5,
+                6
+              ],
+              "alive": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": null,
+              "action": 2
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "phase": "night_seer",
+              "legal": [
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "alive": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ]
+                ]
+              },
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ]
+                ]
+              },
+              "action": 2
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "phase": "day_vote",
+              "legal": [
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ],
+                  [
+                    2,
+                    "villager"
+                  ]
+                ]
+              },
+              "kind": "action",
+              "choice": "3",
+              "observed_checks": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ],
+                  [
+                    2,
+                    "villager"
+                  ]
+                ]
+              },
+              "action": 3
+            },
+            {
+              "day": 2,
+              "seat": 3,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 2,
+              "seat": 4,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                3,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 2,
+              "seat": 5,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                3,
+                4,
+                6,
+                7
+              ],
+              "alive": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 2,
+              "seat": 6,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                3,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 3,
+              "seat": 4,
+              "phase": "night_wolf",
+              "legal": [
+                3,
+                5,
+                6
+              ],
+              "alive": [
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "3",
+              "observed_checks": null,
+              "action": 3
+            },
+            {
+              "day": 3,
+              "seat": 4,
+              "phase": "day_vote",
+              "legal": [
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "5",
+              "observed_checks": null,
+              "action": 5
+            },
+            {
+              "day": 3,
+              "seat": 5,
+              "phase": "day_vote",
+              "legal": [
+                4,
+                6,
+                7
+              ],
+              "alive": [
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "4",
+              "observed_checks": null,
+              "action": 4
+            },
+            {
+              "day": 3,
+              "seat": 6,
+              "phase": "day_vote",
+              "legal": [
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "4",
+              "observed_checks": null,
+              "action": 4
+            }
+          ]
+        }
+      },
+      "candidate": {
+        "id": "505/first_high_night/k1/21",
+        "scenario": {
+          "seed": 505,
+          "game": 21,
+          "background": "first_high_night",
+          "k": 1
+        },
+        "profile": "vote_only",
+        "seat": 4,
+        "role": "wolf",
+        "deal_seed": 3107999681920466788,
+        "win": true,
+        "winner": "wolf",
+        "days": 3,
+        "failures": {
+          "crash": 0,
+          "illegal": 0,
+          "bad_chat": 0,
+          "timeout": 0,
+          "chat_after_terminate": 0,
+          "window_close": 0,
+          "fallbacks": 0,
+          "overruns": 0,
+          "policy_fallbacks": 0,
+          "policy_errors": 0,
+          "logged_errors": 0,
+          "listen_errors": 0,
+          "fallback_paths": 0
+        },
+        "background_failures": {
+          "crash": 0,
+          "illegal": 0,
+          "bad_chat": 0,
+          "timeout": 0,
+          "chat_after_terminate": 0,
+          "window_close": 0
+        },
+        "max_ms": 0.4646249581128359,
+        "latency_histogram": {
+          "0.5": 7,
+          "0.25": 14
+        },
+        "chats": 3,
+        "dms": 0,
+        "diagnostics": {
+          "first_day_wolf_elimination": [
+            1,
+            1
+          ],
+          "eliminations.table.wolf.day": [
+            1,
+            4
+          ],
+          "eliminations.table.wolf.night": [
+            0,
+            2
+          ],
+          "eliminations.table.wolf.ever_eliminated": [
+            1,
+            2
+          ],
+          "eliminations.table.seer.day": [
+            1,
+            2
+          ],
+          "eliminations.table.seer.night": [
+            0,
+            1
+          ],
+          "eliminations.table.seer.ever_eliminated": [
+            1,
+            1
+          ],
+          "eliminations.table.villager.day": [
+            1,
+            9
+          ],
+          "eliminations.table.villager.night": [
+            2,
+            7
+          ],
+          "eliminations.table.villager.ever_eliminated": [
+            3,
+            4
+          ],
+          "eliminations.table.innocent.day": [
+            2,
+            11
+          ],
+          "eliminations.table.innocent.night": [
+            2,
+            8
+          ],
+          "eliminations.table.innocent.ever_eliminated": [
+            4,
+            5
+          ],
+          "eliminations.controlled.wolf.day": [
+            0,
+            3
+          ],
+          "eliminations.controlled.wolf.night": [
+            0,
+            2
+          ],
+          "eliminations.controlled.wolf.ever_eliminated": [
+            0,
+            1
+          ],
+          "eliminations.controlled.seer.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.seer.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.seer.ever_eliminated": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.ever_eliminated": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.ever_eliminated": [
+            0,
+            0
+          ],
+          "votes.village_wolf_vote": [
+            0,
+            0
+          ],
+          "votes.village_wolf_vote_when_cast": [
+            0,
+            0
+          ],
+          "votes.controlled_abstention": [
+            0,
+            3
+          ],
+          "votes.faction_pivotal": [
+            1,
+            3
+          ],
+          "votes.immediate_terminal_pivotal": [
+            1,
+            3
+          ],
+          "votes.village_split_pressure": [
+            2,
+            11
+          ],
+          "votes.village_wolf_split_pressure": [
+            0,
+            6
+          ],
+          "votes.leader_margin": [
+            7,
+            3
+          ],
+          "votes.majority_margin": [
+            1,
+            3
+          ],
+          "votes.wolf_vs_innocent_margin": [
+            0,
+            3
+          ],
+          "stalls.no_elimination": [
+            0,
+            3
+          ],
+          "seer.unique_check_efficiency": [
+            2,
+            2
+          ],
+          "seer.unique_wolf_discovery_efficiency": [
+            1,
+            2
+          ],
+          "seer.observed_fact_coverage": [
+            2,
+            2
+          ],
+          "seer.observed_alive_usable": [
+            1,
+            3
+          ],
+          "seer.own_observed_wolf_vote_uptake": [
+            1,
+            1
+          ],
+          "claims.literal_claim_message_coverage": [
+            0,
+            3
+          ],
+          "claims.true_seer_literal_claim_day_rate": [
+            0,
+            2
+          ],
+          "claims.multiple_literal_claimant_day_rate": [
+            0,
+            3
+          ],
+          "claims.wolf_pair_double_literal_claim_rate": [
+            0,
+            1
+          ],
+          "claims.truthful_seer_report_vote_alignment": [
+            0,
+            0
+          ],
+          "night.observed_choice_coverage": [
+            2,
+            2
+          ],
+          "night.observed_seer_target": [
+            0,
+            2
+          ],
+          "night.observed_civilian_target": [
+            2,
+            2
+          ],
+          "night.seer_kill": [
+            0,
+            2
+          ],
+          "night.civilian_kill": [
+            2,
+            2
+          ],
+          "night.observed_wolf_disagreement": [
+            0,
+            0
+          ]
+        },
+        "trace": {
+          "roles": [
+            "wolf",
+            "seer",
+            "villager",
+            "villager",
+            "wolf",
+            "villager",
+            "villager"
+          ],
+          "votes": [
+            {
+              "day": 1,
+              "votes": {
+                "__d": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    2,
+                    0
+                  ],
+                  [
+                    3,
+                    0
+                  ],
+                  [
+                    4,
+                    2
+                  ],
+                  [
+                    5,
+                    0
+                  ],
+                  [
+                    6,
+                    0
+                  ]
+                ]
+              },
+              "eliminated": 0
+            },
+            {
+              "day": 2,
+              "votes": {
+                "__d": [
+                  [
+                    1,
+                    3
+                  ],
+                  [
+                    3,
+                    1
+                  ],
+                  [
+                    4,
+                    5
+                  ],
+                  [
+                    5,
+                    1
+                  ],
+                  [
+                    6,
+                    1
+                  ]
+                ]
+              },
+              "eliminated": 1
+            },
+            {
+              "day": 3,
+              "votes": {
+                "__d": [
+                  [
+                    3,
+                    4
+                  ],
+                  [
+                    4,
+                    3
+                  ],
+                  [
+                    6,
+                    3
+                  ]
+                ]
+              },
+              "eliminated": 3
+            }
+          ],
+          "dead": [
+            {
+              "day": 1,
+              "seat": 0,
+              "role": "wolf",
+              "cause": "vote"
+            },
+            {
+              "day": 2,
+              "seat": 2,
+              "role": "villager",
+              "cause": "night_kill"
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "role": "seer",
+              "cause": "vote"
+            },
+            {
+              "day": 3,
+              "seat": 5,
+              "role": "villager",
+              "cause": "night_kill"
+            },
+            {
+              "day": 3,
+              "seat": 3,
+              "role": "villager",
+              "cause": "vote"
+            }
+          ],
+          "messages": [
+            {
+              "seq": 0,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No hard info yet. To avoid a split vote I'll vote Player1 unless the Seer speaks up. Please don't abstain.",
+              "day": 1
+            },
+            {
+              "seq": 1,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "My read from the vote record: Player3 is most suspicious. I'll vote Player3 unless someone has better info.",
+              "day": 2
+            },
+            {
+              "seq": 2,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "My read from the vote record: Player6 is most suspicious. I'll vote Player6 unless someone has better info.",
+              "day": 3
+            }
+          ],
+          "actions": [
+            {
+              "day": 1,
+              "seat": 0,
+              "phase": "night_wolf",
+              "legal": [
+                1,
+                2,
+                3,
+                5,
+                6
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "6",
+              "observed_checks": null,
+              "action": 6
+            },
+            {
+              "day": 1,
+              "seat": 4,
+              "phase": "night_wolf",
+              "legal": [
+                1,
+                2,
+                3,
+                5,
+                6
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 1,
+              "seat": 1,
+              "phase": "night_seer",
+              "legal": [
+                0,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": {},
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 0,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 1,
+              "seat": 1,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ]
+                ]
+              },
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ]
+                ]
+              },
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 2,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 3,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 4,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": null,
+              "action": 2
+            },
+            {
+              "day": 1,
+              "seat": 5,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 6,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 2,
+              "seat": 4,
+              "phase": "night_wolf",
+              "legal": [
+                1,
+                2,
+                3,
+                5,
+                6
+              ],
+              "alive": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": null,
+              "action": 2
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "phase": "night_seer",
+              "legal": [
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "alive": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ]
+                ]
+              },
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ]
+                ]
+              },
+              "action": 2
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "phase": "day_vote",
+              "legal": [
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ],
+                  [
+                    2,
+                    "villager"
+                  ]
+                ]
+              },
+              "kind": "action",
+              "choice": "3",
+              "observed_checks": {
+                "__d": [
+                  [
+                    0,
+                    "wolf"
+                  ],
+                  [
+                    2,
+                    "villager"
+                  ]
+                ]
+              },
+              "action": 3
+            },
+            {
+              "day": 2,
+              "seat": 3,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 2,
+              "seat": 4,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                3,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "5",
+              "observed_checks": null,
+              "action": 5
+            },
+            {
+              "day": 2,
+              "seat": 5,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                3,
+                4,
+                6,
+                7
+              ],
+              "alive": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 2,
+              "seat": 6,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                3,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 3,
+              "seat": 4,
+              "phase": "night_wolf",
+              "legal": [
+                3,
+                5,
+                6
+              ],
+              "alive": [
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "5",
+              "observed_checks": null,
+              "action": 5
+            },
+            {
+              "day": 3,
+              "seat": 3,
+              "phase": "day_vote",
+              "legal": [
+                4,
+                6,
+                7
+              ],
+              "alive": [
+                3,
+                4,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "4",
+              "observed_checks": null,
+              "action": 4
+            },
+            {
+              "day": 3,
+              "seat": 4,
+              "phase": "day_vote",
+              "legal": [
+                3,
+                6,
+                7
+              ],
+              "alive": [
+                3,
+                4,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "3",
+              "observed_checks": null,
+              "action": 3
+            },
+            {
+              "day": 3,
+              "seat": 6,
+              "phase": "day_vote",
+              "legal": [
+                3,
+                4,
+                7
+              ],
+              "alive": [
+                3,
+                4,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "3",
+              "observed_checks": null,
+              "action": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "505/mixed/k1/83",
+      "improved": false,
+      "role": "wolf",
+      "seat": 2,
+      "first_message_difference": {
+        "index": 9,
+        "reference": {
+          "seq": 9,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player0 is most suspicious. I'll vote Player0 unless someone has better info.",
+          "day": 2
+        },
+        "candidate": {
+          "seq": 9,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player4 is most suspicious. I'll vote Player4 unless someone has better info.",
+          "day": 2
+        }
+      },
+      "first_action_difference": {
+        "index": 14,
+        "reference": {
+          "day": 2,
+          "seat": 2,
+          "phase": "day_vote",
+          "legal": [
+            0,
+            1,
+            4,
+            5,
+            7
+          ],
+          "alive": [
+            0,
+            1,
+            2,
+            4,
+            5
+          ],
+          "investigations_before": {},
+          "kind": "action",
+          "choice": "0",
+          "observed_checks": null,
+          "action": 0
+        },
+        "candidate": {
+          "day": 2,
+          "seat": 2,
+          "phase": "day_vote",
+          "legal": [
+            0,
+            1,
+            4,
+            5,
+            7
+          ],
+          "alive": [
+            0,
+            1,
+            2,
+            4,
+            5
+          ],
+          "investigations_before": {},
+          "kind": "action",
+          "choice": "4",
+          "observed_checks": null,
+          "action": 4
+        }
+      },
+      "reference": {
+        "id": "505/mixed/k1/83",
+        "scenario": {
+          "seed": 505,
+          "game": 83,
+          "background": "mixed",
+          "k": 1
+        },
+        "profile": "reference",
+        "seat": 2,
+        "role": "wolf",
+        "deal_seed": 3781990258687717210,
+        "win": true,
+        "winner": "wolf",
+        "days": 3,
+        "failures": {
+          "crash": 0,
+          "illegal": 0,
+          "bad_chat": 0,
+          "timeout": 0,
+          "chat_after_terminate": 0,
+          "window_close": 0,
+          "fallbacks": 0,
+          "overruns": 0,
+          "policy_fallbacks": 0,
+          "policy_errors": 0,
+          "logged_errors": 0,
+          "listen_errors": 0,
+          "fallback_paths": 0
+        },
+        "background_failures": {
+          "crash": 0,
+          "illegal": 0,
+          "bad_chat": 0,
+          "timeout": 0,
+          "chat_after_terminate": 0,
+          "window_close": 0
+        },
+        "max_ms": 1.2317919172346592,
+        "latency_histogram": {
+          "0.25": 13,
+          "0.5": 3,
+          "1": 1,
+          "0.1": 11,
+          "2": 1
+        },
+        "chats": 3,
+        "dms": 0,
+        "diagnostics": {
+          "first_day_wolf_elimination": [
+            0,
+            1
+          ],
+          "eliminations.table.wolf.day": [
+            0,
+            4
+          ],
+          "eliminations.table.wolf.night": [
+            0,
+            4
+          ],
+          "eliminations.table.wolf.ever_eliminated": [
+            0,
+            2
+          ],
+          "eliminations.table.seer.day": [
+            1,
+            1
+          ],
+          "eliminations.table.seer.night": [
+            0,
+            0
+          ],
+          "eliminations.table.seer.ever_eliminated": [
+            1,
+            1
+          ],
+          "eliminations.table.villager.day": [
+            0,
+            7
+          ],
+          "eliminations.table.villager.night": [
+            2,
+            7
+          ],
+          "eliminations.table.villager.ever_eliminated": [
+            2,
+            4
+          ],
+          "eliminations.table.innocent.day": [
+            1,
+            8
+          ],
+          "eliminations.table.innocent.night": [
+            2,
+            7
+          ],
+          "eliminations.table.innocent.ever_eliminated": [
+            3,
+            5
+          ],
+          "eliminations.controlled.wolf.day": [
+            0,
+            2
+          ],
+          "eliminations.controlled.wolf.night": [
+            0,
+            2
+          ],
+          "eliminations.controlled.wolf.ever_eliminated": [
+            0,
+            1
+          ],
+          "eliminations.controlled.seer.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.seer.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.seer.ever_eliminated": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.ever_eliminated": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.ever_eliminated": [
+            0,
+            0
+          ],
+          "votes.village_wolf_vote": [
+            0,
+            0
+          ],
+          "votes.village_wolf_vote_when_cast": [
+            0,
+            0
+          ],
+          "votes.controlled_abstention": [
+            0,
+            2
+          ],
+          "votes.faction_pivotal": [
+            2,
+            2
+          ],
+          "votes.immediate_terminal_pivotal": [
+            0,
+            2
+          ],
+          "votes.village_split_pressure": [
+            4,
+            8
+          ],
+          "votes.village_wolf_split_pressure": [
+            1,
+            5
+          ],
+          "votes.leader_margin": [
+            1,
+            2
+          ],
+          "votes.majority_margin": [
+            -2,
+            2
+          ],
+          "votes.wolf_vs_innocent_margin": [
+            -1,
+            2
+          ],
+          "stalls.no_elimination": [
+            1,
+            2
+          ],
+          "seer.unique_check_efficiency": [
+            1,
+            1
+          ],
+          "seer.unique_wolf_discovery_efficiency": [
+            1,
+            1
+          ],
+          "seer.observed_fact_coverage": [
+            1,
+            1
+          ],
+          "seer.observed_alive_usable": [
+            1,
+            1
+          ],
+          "seer.own_observed_wolf_vote_uptake": [
+            1,
+            1
+          ],
+          "claims.literal_claim_message_coverage": [
+            0,
+            13
+          ],
+          "claims.true_seer_literal_claim_day_rate": [
+            0,
+            1
+          ],
+          "claims.multiple_literal_claimant_day_rate": [
+            0,
+            2
+          ],
+          "claims.wolf_pair_double_literal_claim_rate": [
+            0,
+            2
+          ],
+          "claims.truthful_seer_report_vote_alignment": [
+            0,
+            0
+          ],
+          "night.observed_choice_coverage": [
+            2,
+            2
+          ],
+          "night.observed_seer_target": [
+            0,
+            2
+          ],
+          "night.observed_civilian_target": [
+            2,
+            2
+          ],
+          "night.seer_kill": [
+            0,
+            2
+          ],
+          "night.civilian_kill": [
+            2,
+            2
+          ],
+          "night.observed_wolf_disagreement": [
+            2,
+            2
+          ]
+        },
+        "trace": {
+          "roles": [
+            "villager",
+            "wolf",
+            "wolf",
+            "villager",
+            "villager",
+            "villager",
+            "seer"
+          ],
+          "votes": [
+            {
+              "day": 1,
+              "votes": {
+                "__d": [
+                  [
+                    0,
+                    2
+                  ],
+                  [
+                    1,
+                    6
+                  ],
+                  [
+                    2,
+                    6
+                  ],
+                  [
+                    3,
+                    6
+                  ],
+                  [
+                    4,
+                    0
+                  ],
+                  [
+                    5,
+                    0
+                  ],
+                  [
+                    6,
+                    2
+                  ]
+                ]
+              },
+              "eliminated": 6
+            },
+            {
+              "day": 2,
+              "votes": {
+                "__d": [
+                  [
+                    0,
+                    2
+                  ],
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    2,
+                    0
+                  ],
+                  [
+                    4,
+                    1
+                  ],
+                  [
+                    5,
+                    1
+                  ]
+                ]
+              },
+              "eliminated": null
+            }
+          ],
+          "dead": [
+            {
+              "day": 1,
+              "seat": 6,
+              "role": "seer",
+              "cause": "vote"
+            },
+            {
+              "day": 2,
+              "seat": 3,
+              "role": "villager",
+              "cause": "night_kill"
+            },
+            {
+              "day": 3,
+              "seat": 4,
+              "role": "villager",
+              "cause": "night_kill"
+            }
+          ],
+          "messages": [
+            {
+              "seq": 0,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+              "day": 1
+            },
+            {
+              "seq": 1,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+              "day": 1
+            },
+            {
+              "seq": 2,
+              "sender": 6,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I am the Seer. Player2 is a wolf. Vote Player2.",
+              "day": 1
+            },
+            {
+              "seq": 3,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I am the Seer. Player6 is a WOLF and is lying about being Seer. Vote Player6.",
+              "day": 1
+            },
+            {
+              "seq": 4,
+              "sender": 5,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+              "day": 1
+            },
+            {
+              "seq": 5,
+              "sender": 1,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I'm a villager. Let's hear from everyone before we vote.",
+              "day": 1
+            },
+            {
+              "seq": 6,
+              "sender": 3,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I think Player0 is suspicious. I'll vote Player0.",
+              "day": 1
+            },
+            {
+              "seq": 7,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I think Player2 is suspicious. I'll vote Player2.",
+              "day": 1
+            },
+            {
+              "seq": 8,
+              "sender": 6,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I'm not a wolf. Player2 is lying.",
+              "day": 1
+            },
+            {
+              "seq": 9,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "My read from the vote record: Player0 is most suspicious. I'll vote Player0 unless someone has better info.",
+              "day": 2
+            },
+            {
+              "seq": 10,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+              "day": 2
+            },
+            {
+              "seq": 11,
+              "sender": 1,
+              "recipients": [
+                2
+              ],
+              "visibility": "direct",
+              "type": "chat",
+              "content": "Let's kill Player5 tonight.",
+              "day": 2
+            },
+            {
+              "seq": 12,
+              "sender": 5,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+              "day": 2
+            },
+            {
+              "seq": 13,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I think Player2 is suspicious. I'll vote Player2.",
+              "day": 2
+            }
+          ],
+          "actions": [
+            {
+              "day": 1,
+              "seat": 1,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                3,
+                4,
+                5,
+                6
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 2,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                3,
+                4,
+                5,
+                6
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 6,
+              "phase": "night_seer",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": {},
+              "action": 2
+            },
+            {
+              "day": 1,
+              "seat": 0,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": null,
+              "action": 2
+            },
+            {
+              "day": 1,
+              "seat": 1,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "6",
+              "observed_checks": null,
+              "action": 6
+            },
+            {
+              "day": 1,
+              "seat": 2,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "6",
+              "observed_checks": null,
+              "action": 6
+            },
+            {
+              "day": 1,
+              "seat": 3,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "6",
+              "observed_checks": null,
+              "action": 6
+            },
+            {
+              "day": 1,
+              "seat": 4,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 5,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 6,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {
+                "__d": [
+                  [
+                    2,
+                    "wolf"
+                  ]
+                ]
+              },
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": {
+                "__d": [
+                  [
+                    2,
+                    "wolf"
+                  ]
+                ]
+              },
+              "action": 2
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                3,
+                4,
+                5
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "3",
+              "observed_checks": null,
+              "action": 3
+            },
+            {
+              "day": 2,
+              "seat": 2,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                3,
+                4,
+                5
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "4",
+              "observed_checks": null,
+              "action": 4
+            },
+            {
+              "day": 2,
+              "seat": 0,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                2,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": null,
+              "action": 2
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                2,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 2,
+              "seat": 2,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 2,
+              "seat": 4,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 2,
+              "seat": 5,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                4,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 3,
+              "seat": 1,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                4,
+                5
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "4",
+              "observed_checks": null,
+              "action": 4
+            },
+            {
+              "day": 3,
+              "seat": 2,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                4,
+                5
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "5",
+              "observed_checks": null,
+              "action": 5
+            }
+          ]
+        }
+      },
+      "candidate": {
+        "id": "505/mixed/k1/83",
+        "scenario": {
+          "seed": 505,
+          "game": 83,
+          "background": "mixed",
+          "k": 1
+        },
+        "profile": "vote_only",
+        "seat": 2,
+        "role": "wolf",
+        "deal_seed": 3781990258687717210,
+        "win": false,
+        "winner": "villager",
+        "days": 3,
+        "failures": {
+          "crash": 0,
+          "illegal": 0,
+          "bad_chat": 0,
+          "timeout": 0,
+          "chat_after_terminate": 0,
+          "window_close": 0,
+          "fallbacks": 0,
+          "overruns": 0,
+          "policy_fallbacks": 0,
+          "policy_errors": 0,
+          "logged_errors": 0,
+          "listen_errors": 0,
+          "fallback_paths": 0
+        },
+        "background_failures": {
+          "crash": 0,
+          "illegal": 0,
+          "bad_chat": 0,
+          "timeout": 0,
+          "chat_after_terminate": 0,
+          "window_close": 0
+        },
+        "max_ms": 1.29220902454108,
+        "latency_histogram": {
+          "2": 1,
+          "0.25": 21,
+          "0.1": 12,
+          "0.5": 2
+        },
+        "chats": 4,
+        "dms": 0,
+        "diagnostics": {
+          "first_day_wolf_elimination": [
+            0,
+            1
+          ],
+          "eliminations.table.wolf.day": [
+            2,
+            5
+          ],
+          "eliminations.table.wolf.night": [
+            0,
+            3
+          ],
+          "eliminations.table.wolf.ever_eliminated": [
+            2,
+            2
+          ],
+          "eliminations.table.seer.day": [
+            1,
+            1
+          ],
+          "eliminations.table.seer.night": [
+            0,
+            0
+          ],
+          "eliminations.table.seer.ever_eliminated": [
+            1,
+            1
+          ],
+          "eliminations.table.villager.day": [
+            0,
+            9
+          ],
+          "eliminations.table.villager.night": [
+            2,
+            7
+          ],
+          "eliminations.table.villager.ever_eliminated": [
+            2,
+            4
+          ],
+          "eliminations.table.innocent.day": [
+            1,
+            10
+          ],
+          "eliminations.table.innocent.night": [
+            2,
+            7
+          ],
+          "eliminations.table.innocent.ever_eliminated": [
+            3,
+            5
+          ],
+          "eliminations.controlled.wolf.day": [
+            1,
+            3
+          ],
+          "eliminations.controlled.wolf.night": [
+            0,
+            2
+          ],
+          "eliminations.controlled.wolf.ever_eliminated": [
+            1,
+            1
+          ],
+          "eliminations.controlled.seer.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.seer.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.seer.ever_eliminated": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.villager.ever_eliminated": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.day": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.night": [
+            0,
+            0
+          ],
+          "eliminations.controlled.innocent.ever_eliminated": [
+            0,
+            0
+          ],
+          "votes.village_wolf_vote": [
+            0,
+            0
+          ],
+          "votes.village_wolf_vote_when_cast": [
+            0,
+            0
+          ],
+          "votes.controlled_abstention": [
+            0,
+            3
+          ],
+          "votes.faction_pivotal": [
+            2,
+            3
+          ],
+          "votes.immediate_terminal_pivotal": [
+            0,
+            3
+          ],
+          "votes.village_split_pressure": [
+            4,
+            10
+          ],
+          "votes.village_wolf_split_pressure": [
+            1,
+            7
+          ],
+          "votes.leader_margin": [
+            3,
+            3
+          ],
+          "votes.majority_margin": [
+            -2,
+            3
+          ],
+          "votes.wolf_vs_innocent_margin": [
+            1,
+            3
+          ],
+          "stalls.no_elimination": [
+            0,
+            3
+          ],
+          "seer.unique_check_efficiency": [
+            1,
+            1
+          ],
+          "seer.unique_wolf_discovery_efficiency": [
+            1,
+            1
+          ],
+          "seer.observed_fact_coverage": [
+            1,
+            1
+          ],
+          "seer.observed_alive_usable": [
+            1,
+            1
+          ],
+          "seer.own_observed_wolf_vote_uptake": [
+            1,
+            1
+          ],
+          "claims.literal_claim_message_coverage": [
+            0,
+            16
+          ],
+          "claims.true_seer_literal_claim_day_rate": [
+            0,
+            1
+          ],
+          "claims.multiple_literal_claimant_day_rate": [
+            0,
+            3
+          ],
+          "claims.wolf_pair_double_literal_claim_rate": [
+            0,
+            2
+          ],
+          "claims.truthful_seer_report_vote_alignment": [
+            0,
+            0
+          ],
+          "night.observed_choice_coverage": [
+            2,
+            2
+          ],
+          "night.observed_seer_target": [
+            0,
+            2
+          ],
+          "night.observed_civilian_target": [
+            2,
+            2
+          ],
+          "night.seer_kill": [
+            0,
+            2
+          ],
+          "night.civilian_kill": [
+            2,
+            2
+          ],
+          "night.observed_wolf_disagreement": [
+            1,
+            1
+          ]
+        },
+        "trace": {
+          "roles": [
+            "villager",
+            "wolf",
+            "wolf",
+            "villager",
+            "villager",
+            "villager",
+            "seer"
+          ],
+          "votes": [
+            {
+              "day": 1,
+              "votes": {
+                "__d": [
+                  [
+                    0,
+                    2
+                  ],
+                  [
+                    1,
+                    6
+                  ],
+                  [
+                    2,
+                    6
+                  ],
+                  [
+                    3,
+                    6
+                  ],
+                  [
+                    4,
+                    0
+                  ],
+                  [
+                    5,
+                    0
+                  ],
+                  [
+                    6,
+                    2
+                  ]
+                ]
+              },
+              "eliminated": 6
+            },
+            {
+              "day": 2,
+              "votes": {
+                "__d": [
+                  [
+                    0,
+                    2
+                  ],
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    2,
+                    4
+                  ],
+                  [
+                    4,
+                    1
+                  ],
+                  [
+                    5,
+                    1
+                  ]
+                ]
+              },
+              "eliminated": 1
+            },
+            {
+              "day": 3,
+              "votes": {
+                "__d": [
+                  [
+                    0,
+                    2
+                  ],
+                  [
+                    2,
+                    5
+                  ],
+                  [
+                    5,
+                    2
+                  ]
+                ]
+              },
+              "eliminated": 2
+            }
+          ],
+          "dead": [
+            {
+              "day": 1,
+              "seat": 6,
+              "role": "seer",
+              "cause": "vote"
+            },
+            {
+              "day": 2,
+              "seat": 3,
+              "role": "villager",
+              "cause": "night_kill"
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "role": "wolf",
+              "cause": "vote"
+            },
+            {
+              "day": 3,
+              "seat": 4,
+              "role": "villager",
+              "cause": "night_kill"
+            },
+            {
+              "day": 3,
+              "seat": 2,
+              "role": "wolf",
+              "cause": "vote"
+            }
+          ],
+          "messages": [
+            {
+              "seq": 0,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+              "day": 1
+            },
+            {
+              "seq": 1,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+              "day": 1
+            },
+            {
+              "seq": 2,
+              "sender": 6,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I am the Seer. Player2 is a wolf. Vote Player2.",
+              "day": 1
+            },
+            {
+              "seq": 3,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I am the Seer. Player6 is a WOLF and is lying about being Seer. Vote Player6.",
+              "day": 1
+            },
+            {
+              "seq": 4,
+              "sender": 5,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+              "day": 1
+            },
+            {
+              "seq": 5,
+              "sender": 1,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I'm a villager. Let's hear from everyone before we vote.",
+              "day": 1
+            },
+            {
+              "seq": 6,
+              "sender": 3,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I think Player0 is suspicious. I'll vote Player0.",
+              "day": 1
+            },
+            {
+              "seq": 7,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I think Player2 is suspicious. I'll vote Player2.",
+              "day": 1
+            },
+            {
+              "seq": 8,
+              "sender": 6,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I'm not a wolf. Player2 is lying.",
+              "day": 1
+            },
+            {
+              "seq": 9,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "My read from the vote record: Player4 is most suspicious. I'll vote Player4 unless someone has better info.",
+              "day": 2
+            },
+            {
+              "seq": 10,
+              "sender": 4,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+              "day": 2
+            },
+            {
+              "seq": 11,
+              "sender": 1,
+              "recipients": [
+                2
+              ],
+              "visibility": "direct",
+              "type": "chat",
+              "content": "Let's kill Player5 tonight.",
+              "day": 2
+            },
+            {
+              "seq": 12,
+              "sender": 5,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+              "day": 2
+            },
+            {
+              "seq": 13,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I think Player2 is suspicious. I'll vote Player2.",
+              "day": 2
+            },
+            {
+              "seq": 14,
+              "sender": 2,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "My read from the vote record: Player5 is most suspicious. I'll vote Player5 unless someone has better info.",
+              "day": 3
+            },
+            {
+              "seq": 15,
+              "sender": 5,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+              "day": 3
+            },
+            {
+              "seq": 16,
+              "sender": 0,
+              "recipients": [],
+              "visibility": "broadcast",
+              "type": "chat",
+              "content": "I think Player2 is suspicious. I'll vote Player2.",
+              "day": 3
+            }
+          ],
+          "actions": [
+            {
+              "day": 1,
+              "seat": 1,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                3,
+                4,
+                5,
+                6
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 2,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                3,
+                4,
+                5,
+                6
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 6,
+              "phase": "night_seer",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": {},
+              "action": 2
+            },
+            {
+              "day": 1,
+              "seat": 0,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": null,
+              "action": 2
+            },
+            {
+              "day": 1,
+              "seat": 1,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "6",
+              "observed_checks": null,
+              "action": 6
+            },
+            {
+              "day": 1,
+              "seat": 2,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                3,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "6",
+              "observed_checks": null,
+              "action": 6
+            },
+            {
+              "day": 1,
+              "seat": 3,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                4,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "6",
+              "observed_checks": null,
+              "action": 6
+            },
+            {
+              "day": 1,
+              "seat": 4,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                5,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 5,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                6,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 1,
+              "seat": 6,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ],
+              "investigations_before": {
+                "__d": [
+                  [
+                    2,
+                    "wolf"
+                  ]
+                ]
+              },
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": {
+                "__d": [
+                  [
+                    2,
+                    "wolf"
+                  ]
+                ]
+              },
+              "action": 2
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                3,
+                4,
+                5
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "3",
+              "observed_checks": null,
+              "action": 3
+            },
+            {
+              "day": 2,
+              "seat": 2,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                3,
+                4,
+                5
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "4",
+              "observed_checks": null,
+              "action": 4
+            },
+            {
+              "day": 2,
+              "seat": 0,
+              "phase": "day_vote",
+              "legal": [
+                1,
+                2,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": null,
+              "action": 2
+            },
+            {
+              "day": 2,
+              "seat": 1,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                2,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "0",
+              "observed_checks": null,
+              "action": 0
+            },
+            {
+              "day": 2,
+              "seat": 2,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                4,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "4",
+              "observed_checks": null,
+              "action": 4
+            },
+            {
+              "day": 2,
+              "seat": 4,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 2,
+              "seat": 5,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                1,
+                2,
+                4,
+                7
+              ],
+              "alive": [
+                0,
+                1,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "1",
+              "observed_checks": null,
+              "action": 1
+            },
+            {
+              "day": 3,
+              "seat": 2,
+              "phase": "night_wolf",
+              "legal": [
+                0,
+                4,
+                5
+              ],
+              "alive": [
+                0,
+                2,
+                4,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "4",
+              "observed_checks": null,
+              "action": 4
+            },
+            {
+              "day": 3,
+              "seat": 0,
+              "phase": "day_vote",
+              "legal": [
+                2,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                2,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": null,
+              "action": 2
+            },
+            {
+              "day": 3,
+              "seat": 2,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                5,
+                7
+              ],
+              "alive": [
+                0,
+                2,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "5",
+              "observed_checks": null,
+              "action": 5
+            },
+            {
+              "day": 3,
+              "seat": 5,
+              "phase": "day_vote",
+              "legal": [
+                0,
+                2,
+                7
+              ],
+              "alive": [
+                0,
+                2,
+                5
+              ],
+              "investigations_before": {},
+              "kind": "action",
+              "choice": "2",
+              "observed_checks": null,
+              "action": 2
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

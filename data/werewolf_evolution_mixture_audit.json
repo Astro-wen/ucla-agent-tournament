@@ -1,0 +1,81 @@
+{
+  "status": "pass",
+  "selected": "vote_only",
+  "unique_deals": 4000,
+  "timings_reuse_deals": true,
+  "runs": {
+    "rt": {
+      "status": "pass",
+      "pairs": 4000,
+      "games": 8000,
+      "statistics_recomputed": 52,
+      "overall": {
+        "candidate": {
+          "n": 4000,
+          "candidate_wins": 1989,
+          "reference_wins": 1934,
+          "improved": 110,
+          "worsened": 55,
+          "candidate_rate": 0.49725,
+          "reference_rate": 0.4835,
+          "delta": 0.01375,
+          "ci95": [
+            0.007469491615211962,
+            0.020030508384788037
+          ],
+          "conservative_ci95": [
+            0.00374123428063319,
+            0.023724269827687612
+          ],
+          "candidate_wilson_ci95": [
+            0.4817651474807308,
+            0.5127401296511118
+          ],
+          "reference_wilson_ci95": [
+            0.46803653354921093,
+            0.4989951292418444
+          ],
+          "mcnemar_p": 2.227821511672589e-05
+        }
+      },
+      "raw_sha256": "08b0ffc25f2a12b3bd5bd065330ab8c301dd0245480f47dcf7906e472104ed53"
+    },
+    "rounds": {
+      "status": "pass",
+      "pairs": 4000,
+      "games": 8000,
+      "statistics_recomputed": 52,
+      "overall": {
+        "candidate": {
+          "n": 4000,
+          "candidate_wins": 1975,
+          "reference_wins": 1911,
+          "improved": 125,
+          "worsened": 61,
+          "candidate_rate": 0.49375,
+          "reference_rate": 0.47775,
+          "delta": 0.016,
+          "ci95": [
+            0.00933487857868364,
+            0.02266512142131636
+          ],
+          "conservative_ci95": [
+            0.0054069211238336225,
+            0.026552938202212394
+          ],
+          "candidate_wilson_ci95": [
+            0.47826948049144274,
+            0.5092425129900177
+          ],
+          "reference_wilson_ci95": [
+            0.46229895093801066,
+            0.4932437458559883
+          ],
+          "mcnemar_p": 3.1113077147069028e-06
+        }
+      },
+      "raw_sha256": "a8f2050efab4941c78e740353f25f8a31c7336791205570f0c04414aa1ce07f7"
+    }
+  },
+  "scope": "newmixtures of existing scripts; not newindependent implementations or global dominance"
+}

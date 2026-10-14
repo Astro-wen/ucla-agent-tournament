@@ -1,0 +1,16 @@
+{
+  "status": "pass",
+  "actual_simulations": 214920,
+  "training_evaluations_recomputed": 1570,
+  "screen_programs": 1464,
+  "chosen": [
+    0,
+    0,
+    0
+  ],
+  "stages": {},
+  "heldouts_used": [],
+  "raw_sha256": "0b5a3b85f456c139a9410ec53dec94c321c1bd5782e85affddff68de54436bfd",
+  "report_sha256": "cc9279ab28c4a1946d98373fe448d5f7542b035aa8441ae77ce86c928a845b17",
+  "scope": "independent standard-library raw-count/objective/selection/statistical audit; no new simulations"
+}

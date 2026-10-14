@@ -1,0 +1,10 @@
+{
+  "scope": "Follow-up development after503/504positive result; original learned program unchanged; no confirmation outcomes viewed",
+  "profiles": ["reference", "vote_only", "night_only", "combined"],
+  "components": {"vote_only": "B0 except learnedwolf-vote tree[5,2,4]", "night_only": "B0 except learnedwolf-night tree[10,2,10]", "combined": "original frozen learned model; good-role blocks remain B0"},
+  "development": {"seeds": [505,506], "games_per_background_per_seed": 100, "backgrounds": "all28B0", "timing": "rt", "visibility": "strict"},
+  "selection": "Require positive mean and clean integrity. Among programs within0.003of the highest overall paired delta, prefer fewer changed phases; ties in fixed order vote_only,night_only,combined. This parsimony choice is fixed before505/506outcomes; do not select again on confirmation.",
+  "confirmation": {"seeds": [46101,46102], "profiles": "B0 and one selected factory", "games_per_background_per_seed": 500, "timings": ["rt","rounds"], "unchanged_gates": "overall pointgain>=0.02and conservative95lower>0; global rolelower>-0.03; prespecified background/role warnings; zero illegal/protocol/internal errors"},
+  "resources": {"deadline": "2026-10-14T07:30:00-07:00", "disk_reserve_gib": 2},
+  "deployment": "not authorized for frozen tournament entry; private development branch only after08as user confirmed"
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "features": [
+    "seer_claim_compatibility",
+    "wolf_claim_rate",
+    "seer_report_consistency",
+    "wolf_report_consistency",
+    "wolf_vote_residual",
+    "town_vote_residual"
+  ],
+  "weights": [
+    2.031559741878549,
+    1.2162668099567426,
+    2.3548538721651773,
+    -2.1224906686920844,
+    -0.3581341424817057,
+    0.39733377004356407
+  ],
+  "training_digest": "61569aebefe4603b4c3a50f46a2114449c468efafa3961381a86d6368ba458b2",
+  "samples": 3599
+}

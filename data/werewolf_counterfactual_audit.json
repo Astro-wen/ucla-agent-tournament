@@ -1,0 +1,23 @@
+{
+  "status": "pass",
+  "calibration_records": 16800,
+  "calibration_deals": 5600,
+  "selected_losses": 200,
+  "branches": 3119,
+  "noops": 534,
+  "totals": {
+    "n": 200,
+    "points": 534,
+    "branches": 3119,
+    "rescued_any": 73,
+    "rescued_preserving_private_guards": 73,
+    "vote_rescue": 37,
+    "investigation_rescue": 53
+  },
+  "paired_statistics_recomputed": 248,
+  "visible_conflicts": 0,
+  "source_integrity": "runner source begin/end digest matched; B0 source verification passed before execution",
+  "prefix_limit": "Prefix enforcement is tested in the replay implementation; this audit does not rerun games or reconstruct every callback.",
+  "no_strategy_strength_claim_from_hindsight": true,
+  "input_report_sha256": "9c33a07fbf3daf694db0aa9e4085744229c22d7669dcb39e94f03390be27ce6e"
+}

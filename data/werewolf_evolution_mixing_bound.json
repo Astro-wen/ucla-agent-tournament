@@ -1,0 +1,12 @@
+{
+  "scope": "point-estimate algebra only,not a new empirical experiment or confidence guarantee",
+  "mixture": "choose the entire candidate policy with probabilityp independently of scenario,otherwiseB0",
+  "assumptions": "same fixed distributions as the two reported slices, no state-dependent switching or action-level randomization",
+  "rt_mean_gain": 0.023,
+  "rounds_detective_wolf_gain": -0.13402061855670103,
+  "required_p_for_2pp": 0.8695652173913044,
+  "maximum_p_for_point_regression_no_worse_than_minus3pp": 0.22384615384615383,
+  "rt_expected_gain_at_maximum_safe_point_p": 0.005148461538461538,
+  "regression_at_minimum_p_for_2pp": -0.11653966831017482,
+  "conclusion": "These point estimates cannot satisfy both targets with a simple uniform whole-game mixture; conditional strategies require separate evidence."
+}

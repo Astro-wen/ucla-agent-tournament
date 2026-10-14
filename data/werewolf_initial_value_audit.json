@@ -1,0 +1,73 @@
+{
+  "status": "pass",
+  "training_cases": 799,
+  "training_branches": 4794,
+  "winning_controls": 397,
+  "losing_controls": 402,
+  "training_statistics_recomputed": 228,
+  "selected_rank": 4,
+  "heldout_seeds_used": [],
+  "unseen_opponent_families_tested": false,
+  "replication": {
+    "pairs": 11200,
+    "raw_records": 22400,
+    "statistics_recomputed": 152,
+    "overall": {
+      "n": 11200,
+      "candidate_wins": 5802,
+      "reference_wins": 5822,
+      "improved": 97,
+      "worsened": 117,
+      "candidate_rate": 0.5180357142857143,
+      "reference_rate": 0.5198214285714285,
+      "delta": -0.0017857142857142857,
+      "ci95": [
+        -0.00434564423804419,
+        0.0007742156666156192
+      ],
+      "conservative_ci95": [
+        -0.005923280742157704,
+        0.0023534534569781534
+      ],
+      "candidate_wilson_ci95": [
+        0.5087770115323305,
+        0.5272820487814105
+      ],
+      "reference_wilson_ci95": [
+        0.5105633657908579,
+        0.5290658985143424
+      ],
+      "mcnemar_p": 0.19388944511670828
+    },
+    "seer": {
+      "n": 1561,
+      "candidate_wins": 777,
+      "reference_wins": 797,
+      "improved": 97,
+      "worsened": 117,
+      "candidate_rate": 0.4977578475336323,
+      "reference_rate": 0.5105701473414478,
+      "delta": -0.012812299807815503,
+      "ci95": [
+        -0.03117510542704434,
+        0.005550505811413331
+      ],
+      "conservative_ci95": [
+        -0.041492699583658546,
+        0.015950305018154406
+      ],
+      "candidate_wilson_ci95": [
+        0.47298989979712414,
+        0.5225368039919366
+      ],
+      "reference_wilson_ci95": [
+        0.48577602049550134,
+        0.5353123759274975
+      ],
+      "mcnemar_p": 0.19388944511670828
+    },
+    "nonseer_pairs_unchanged": true
+  },
+  "integrity_limit": "Source begin/end verified by runner; audit independently recomputes artifact pairing/counts/statistics without replaying games.",
+  "report_sha256": "e4a16f5b8d3dc4b8bf6ad8a9d8e34427b4c60d981873902113afc40568492168"
+}

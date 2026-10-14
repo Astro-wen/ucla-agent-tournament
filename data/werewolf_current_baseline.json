@@ -1,0 +1,1472 @@
+{
+  "id": "WW-B0-20261013",
+  "created": "2026-10-13T18:14:35.378466-07:00",
+  "scope": "Current default agent, reference only; existing audited data re-extracted, no new games or promotion",
+  "reference_factory": "agent",
+  "source_git_revision": "f813bc643dbbadd4a984f5e29e44a198923b4128",
+  "source_snapshot_digest": "1c21bc96a29df014ccbb93c10e106e34b54a6367877c6d17f6070a785cfa6e87",
+  "checked_werewolf_and_shared_runtime_files": {
+    "agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "agent/agent.py": "ece20f3fcfb0f655ec2043a3c899b32c1872246d3aa013f89bd95d299ff2f953",
+    "agent/fallback.py": "de7bbf3d26838356ff69c57e10fae4d1ca88df7465d5bdddc7004cdafc278ee1",
+    "agent/health.py": "db4e1842ecfeffd654b193f0bdc30c2bf9c06cd6a7bcca0cb9172fc1aaf32302",
+    "agent/matchstate.py": "ca7efb044419af008cd3893358f58e0ee9e9b4a5c54a2257076333805d00c0d0",
+    "agent/reasoning.py": "ae0738001984b67544cbd873af411ace0a238f46ca43b638ef02b5c889fa0184",
+    "agent/timecontrol.py": "960b99d826cb3ae5241f0b00bb77c9d05ca087fda275afd787a6786cf556f251",
+    "agent/werewolf/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "agent/werewolf/policy.py": "537b6bdb9f376bce2f23ebf193746eda11d956122f66f874e56a2520c0eec0a6",
+    "agent/werewolf/state.py": "104d80f8f30d7c254a75b9b7616bef300be5f9c1c6db266ea5653eb352cf498e"
+  },
+  "current_selected_source_matches": true,
+  "audited_report": "docs/werewolf_overnight_confirmation.json",
+  "audited_report_sha256": "1f3e5fb7b52f85c7f18dc9353cd4a6ebb15652af863bf6f4ce843643a75e281b",
+  "source_archive_index": "data/werewolf_overnight_archive.json",
+  "protocol": {
+    "backgrounds": [
+      "first",
+      "random",
+      "heuristic",
+      "llm",
+      "llmx",
+      "llmq",
+      "mixed",
+      "rt_wolfpack",
+      "rt_talker",
+      "rt_detective",
+      "rt_chaos",
+      "guard_silent",
+      "guard_abstain",
+      "guard_fixed",
+      "guard_echo",
+      "guard_fake",
+      "guard_contradict",
+      "first_high_night",
+      "first_random_night",
+      "first_switch",
+      "pop_coordinated",
+      "pop_prompt_seer",
+      "pop_late_claim",
+      "pop_pressure_bus",
+      "pop_distance",
+      "pop_observed_switch",
+      "pop_survivor_kill",
+      "pop_anti_majority"
+    ],
+    "seeds": [
+      33101,
+      33102
+    ],
+    "games_per_seed_per_background": 500,
+    "primary": "rt-strict",
+    "sensitivity": "rounds-strict",
+    "single_controlled_seat": true,
+    "strict_moving_phase_message_clear": true,
+    "note": "The other six seats include teammates. Same deals reused across timings; simple7 is a subset, not additional independent data."
+  },
+  "runs": {
+    "rt-strict": {
+      "timing": "rt",
+      "visibility": "strict",
+      "controlled_seats": 1,
+      "panels": {
+        "all": {
+          "seat": {
+            "games": 28000,
+            "wins": 14387,
+            "win_rate": 0.5138214285714285
+          },
+          "villager": {
+            "games": 16025,
+            "wins": 6838,
+            "win_rate": 0.4267082683307332
+          },
+          "seer": {
+            "games": 3990,
+            "wins": 2152,
+            "win_rate": 0.5393483709273182
+          },
+          "wolf": {
+            "games": 7985,
+            "wins": 5397,
+            "win_rate": 0.6758922980588603
+          }
+        },
+        "panel:simple7": {
+          "seat": {
+            "games": 7000,
+            "wins": 3571,
+            "win_rate": 0.5101428571428571
+          },
+          "villager": {
+            "games": 3977,
+            "wins": 1607,
+            "win_rate": 0.40407342217752074
+          },
+          "seer": {
+            "games": 1014,
+            "wins": 491,
+            "win_rate": 0.48422090729783035
+          },
+          "wolf": {
+            "games": 2009,
+            "wins": 1473,
+            "win_rate": 0.7332005973120955
+          }
+        },
+        "opponent:first": {
+          "seat": {
+            "games": 1000,
+            "wins": 481,
+            "win_rate": 0.481
+          },
+          "villager": {
+            "games": 537,
+            "wins": 227,
+            "win_rate": 0.4227188081936685
+          },
+          "seer": {
+            "games": 151,
+            "wins": 74,
+            "win_rate": 0.4900662251655629
+          },
+          "wolf": {
+            "games": 312,
+            "wins": 180,
+            "win_rate": 0.5769230769230769
+          }
+        },
+        "opponent:random": {
+          "seat": {
+            "games": 1000,
+            "wins": 357,
+            "win_rate": 0.357
+          },
+          "villager": {
+            "games": 573,
+            "wins": 68,
+            "win_rate": 0.11867364746945899
+          },
+          "seer": {
+            "games": 145,
+            "wins": 24,
+            "win_rate": 0.16551724137931034
+          },
+          "wolf": {
+            "games": 282,
+            "wins": 265,
+            "win_rate": 0.9397163120567376
+          }
+        },
+        "opponent:heuristic": {
+          "seat": {
+            "games": 1000,
+            "wins": 527,
+            "win_rate": 0.527
+          },
+          "villager": {
+            "games": 582,
+            "wins": 333,
+            "win_rate": 0.5721649484536082
+          },
+          "seer": {
+            "games": 152,
+            "wins": 90,
+            "win_rate": 0.5921052631578947
+          },
+          "wolf": {
+            "games": 266,
+            "wins": 104,
+            "win_rate": 0.39097744360902253
+          }
+        },
+        "opponent:llm": {
+          "seat": {
+            "games": 1000,
+            "wins": 649,
+            "win_rate": 0.649
+          },
+          "villager": {
+            "games": 561,
+            "wins": 312,
+            "win_rate": 0.5561497326203209
+          },
+          "seer": {
+            "games": 163,
+            "wins": 71,
+            "win_rate": 0.43558282208588955
+          },
+          "wolf": {
+            "games": 276,
+            "wins": 266,
+            "win_rate": 0.9637681159420289
+          }
+        },
+        "opponent:llmx": {
+          "seat": {
+            "games": 1000,
+            "wins": 595,
+            "win_rate": 0.595
+          },
+          "villager": {
+            "games": 560,
+            "wins": 283,
+            "win_rate": 0.5053571428571428
+          },
+          "seer": {
+            "games": 147,
+            "wins": 48,
+            "win_rate": 0.32653061224489793
+          },
+          "wolf": {
+            "games": 293,
+            "wins": 264,
+            "win_rate": 0.9010238907849829
+          }
+        },
+        "opponent:llmq": {
+          "seat": {
+            "games": 1000,
+            "wins": 606,
+            "win_rate": 0.606
+          },
+          "villager": {
+            "games": 595,
+            "wins": 293,
+            "win_rate": 0.492436974789916
+          },
+          "seer": {
+            "games": 139,
+            "wins": 61,
+            "win_rate": 0.43884892086330934
+          },
+          "wolf": {
+            "games": 266,
+            "wins": 252,
+            "win_rate": 0.9473684210526315
+          }
+        },
+        "opponent:mixed": {
+          "seat": {
+            "games": 1000,
+            "wins": 482,
+            "win_rate": 0.482
+          },
+          "villager": {
+            "games": 587,
+            "wins": 196,
+            "win_rate": 0.3339011925042589
+          },
+          "seer": {
+            "games": 134,
+            "wins": 42,
+            "win_rate": 0.31343283582089554
+          },
+          "wolf": {
+            "games": 279,
+            "wins": 244,
+            "win_rate": 0.8745519713261649
+          }
+        },
+        "opponent:rt_wolfpack": {
+          "seat": {
+            "games": 1000,
+            "wins": 420,
+            "win_rate": 0.42
+          },
+          "villager": {
+            "games": 569,
+            "wins": 117,
+            "win_rate": 0.2056239015817223
+          },
+          "seer": {
+            "games": 141,
+            "wins": 45,
+            "win_rate": 0.3191489361702128
+          },
+          "wolf": {
+            "games": 290,
+            "wins": 258,
+            "win_rate": 0.8896551724137931
+          }
+        },
+        "opponent:rt_talker": {
+          "seat": {
+            "games": 1000,
+            "wins": 604,
+            "win_rate": 0.604
+          },
+          "villager": {
+            "games": 534,
+            "wins": 303,
+            "win_rate": 0.5674157303370787
+          },
+          "seer": {
+            "games": 125,
+            "wins": 90,
+            "win_rate": 0.72
+          },
+          "wolf": {
+            "games": 341,
+            "wins": 211,
+            "win_rate": 0.6187683284457478
+          }
+        },
+        "opponent:rt_detective": {
+          "seat": {
+            "games": 1000,
+            "wins": 642,
+            "win_rate": 0.642
+          },
+          "villager": {
+            "games": 573,
+            "wins": 402,
+            "win_rate": 0.7015706806282722
+          },
+          "seer": {
+            "games": 142,
+            "wins": 116,
+            "win_rate": 0.8169014084507042
+          },
+          "wolf": {
+            "games": 285,
+            "wins": 124,
+            "win_rate": 0.43508771929824563
+          }
+        },
+        "opponent:rt_chaos": {
+          "seat": {
+            "games": 1000,
+            "wins": 658,
+            "win_rate": 0.658
+          },
+          "villager": {
+            "games": 576,
+            "wins": 425,
+            "win_rate": 0.7378472222222222
+          },
+          "seer": {
+            "games": 141,
+            "wins": 94,
+            "win_rate": 0.6666666666666666
+          },
+          "wolf": {
+            "games": 283,
+            "wins": 139,
+            "win_rate": 0.4911660777385159
+          }
+        },
+        "opponent:guard_silent": {
+          "seat": {
+            "games": 1000,
+            "wins": 480,
+            "win_rate": 0.48
+          },
+          "villager": {
+            "games": 546,
+            "wins": 240,
+            "win_rate": 0.43956043956043955
+          },
+          "seer": {
+            "games": 141,
+            "wins": 54,
+            "win_rate": 0.3829787234042553
+          },
+          "wolf": {
+            "games": 313,
+            "wins": 186,
+            "win_rate": 0.5942492012779552
+          }
+        },
+        "opponent:guard_abstain": {
+          "seat": {
+            "games": 1000,
+            "wins": 517,
+            "win_rate": 0.517
+          },
+          "villager": {
+            "games": 573,
+            "wins": 157,
+            "win_rate": 0.27399650959860383
+          },
+          "seer": {
+            "games": 150,
+            "wins": 83,
+            "win_rate": 0.5533333333333333
+          },
+          "wolf": {
+            "games": 277,
+            "wins": 277,
+            "win_rate": 1.0
+          }
+        },
+        "opponent:guard_fixed": {
+          "seat": {
+            "games": 1000,
+            "wins": 496,
+            "win_rate": 0.496
+          },
+          "villager": {
+            "games": 584,
+            "wins": 257,
+            "win_rate": 0.4400684931506849
+          },
+          "seer": {
+            "games": 137,
+            "wins": 58,
+            "win_rate": 0.4233576642335766
+          },
+          "wolf": {
+            "games": 279,
+            "wins": 181,
+            "win_rate": 0.6487455197132617
+          }
+        },
+        "opponent:guard_echo": {
+          "seat": {
+            "games": 1000,
+            "wins": 713,
+            "win_rate": 0.713
+          },
+          "villager": {
+            "games": 582,
+            "wins": 325,
+            "win_rate": 0.5584192439862543
+          },
+          "seer": {
+            "games": 138,
+            "wins": 108,
+            "win_rate": 0.782608695652174
+          },
+          "wolf": {
+            "games": 280,
+            "wins": 280,
+            "win_rate": 1.0
+          }
+        },
+        "opponent:guard_fake": {
+          "seat": {
+            "games": 1000,
+            "wins": 340,
+            "win_rate": 0.34
+          },
+          "villager": {
+            "games": 604,
+            "wins": 92,
+            "win_rate": 0.152317880794702
+          },
+          "seer": {
+            "games": 119,
+            "wins": 14,
+            "win_rate": 0.11764705882352941
+          },
+          "wolf": {
+            "games": 277,
+            "wins": 234,
+            "win_rate": 0.8447653429602888
+          }
+        },
+        "opponent:guard_contradict": {
+          "seat": {
+            "games": 1000,
+            "wins": 315,
+            "win_rate": 0.315
+          },
+          "villager": {
+            "games": 585,
+            "wins": 82,
+            "win_rate": 0.14017094017094017
+          },
+          "seer": {
+            "games": 140,
+            "wins": 14,
+            "win_rate": 0.1
+          },
+          "wolf": {
+            "games": 275,
+            "wins": 219,
+            "win_rate": 0.7963636363636364
+          }
+        },
+        "opponent:first_high_night": {
+          "seat": {
+            "games": 1000,
+            "wins": 312,
+            "win_rate": 0.312
+          },
+          "villager": {
+            "games": 587,
+            "wins": 91,
+            "win_rate": 0.15502555366269166
+          },
+          "seer": {
+            "games": 137,
+            "wins": 19,
+            "win_rate": 0.1386861313868613
+          },
+          "wolf": {
+            "games": 276,
+            "wins": 202,
+            "win_rate": 0.7318840579710145
+          }
+        },
+        "opponent:first_random_night": {
+          "seat": {
+            "games": 1000,
+            "wins": 385,
+            "win_rate": 0.385
+          },
+          "villager": {
+            "games": 565,
+            "wins": 138,
+            "win_rate": 0.24424778761061947
+          },
+          "seer": {
+            "games": 139,
+            "wins": 32,
+            "win_rate": 0.2302158273381295
+          },
+          "wolf": {
+            "games": 296,
+            "wins": 215,
+            "win_rate": 0.7263513513513513
+          }
+        },
+        "opponent:first_switch": {
+          "seat": {
+            "games": 1000,
+            "wins": 321,
+            "win_rate": 0.321
+          },
+          "villager": {
+            "games": 580,
+            "wins": 59,
+            "win_rate": 0.10172413793103448
+          },
+          "seer": {
+            "games": 139,
+            "wins": 24,
+            "win_rate": 0.17266187050359713
+          },
+          "wolf": {
+            "games": 281,
+            "wins": 238,
+            "win_rate": 0.8469750889679716
+          }
+        },
+        "opponent:pop_coordinated": {
+          "seat": {
+            "games": 1000,
+            "wins": 592,
+            "win_rate": 0.592
+          },
+          "villager": {
+            "games": 605,
+            "wins": 360,
+            "win_rate": 0.5950413223140496
+          },
+          "seer": {
+            "games": 142,
+            "wins": 127,
+            "win_rate": 0.8943661971830986
+          },
+          "wolf": {
+            "games": 253,
+            "wins": 105,
+            "win_rate": 0.4150197628458498
+          }
+        },
+        "opponent:pop_prompt_seer": {
+          "seat": {
+            "games": 1000,
+            "wins": 567,
+            "win_rate": 0.567
+          },
+          "villager": {
+            "games": 520,
+            "wins": 286,
+            "win_rate": 0.55
+          },
+          "seer": {
+            "games": 153,
+            "wins": 138,
+            "win_rate": 0.9019607843137255
+          },
+          "wolf": {
+            "games": 327,
+            "wins": 143,
+            "win_rate": 0.43730886850152906
+          }
+        },
+        "opponent:pop_late_claim": {
+          "seat": {
+            "games": 1000,
+            "wins": 557,
+            "win_rate": 0.557
+          },
+          "villager": {
+            "games": 568,
+            "wins": 333,
+            "win_rate": 0.5862676056338029
+          },
+          "seer": {
+            "games": 150,
+            "wins": 104,
+            "win_rate": 0.6933333333333334
+          },
+          "wolf": {
+            "games": 282,
+            "wins": 120,
+            "win_rate": 0.425531914893617
+          }
+        },
+        "opponent:pop_pressure_bus": {
+          "seat": {
+            "games": 1000,
+            "wins": 403,
+            "win_rate": 0.403
+          },
+          "villager": {
+            "games": 565,
+            "wins": 145,
+            "win_rate": 0.25663716814159293
+          },
+          "seer": {
+            "games": 147,
+            "wins": 99,
+            "win_rate": 0.673469387755102
+          },
+          "wolf": {
+            "games": 288,
+            "wins": 159,
+            "win_rate": 0.5520833333333334
+          }
+        },
+        "opponent:pop_distance": {
+          "seat": {
+            "games": 1000,
+            "wins": 592,
+            "win_rate": 0.592
+          },
+          "villager": {
+            "games": 566,
+            "wins": 344,
+            "win_rate": 0.607773851590106
+          },
+          "seer": {
+            "games": 141,
+            "wins": 122,
+            "win_rate": 0.8652482269503546
+          },
+          "wolf": {
+            "games": 293,
+            "wins": 126,
+            "win_rate": 0.4300341296928328
+          }
+        },
+        "opponent:pop_observed_switch": {
+          "seat": {
+            "games": 1000,
+            "wins": 665,
+            "win_rate": 0.665
+          },
+          "villager": {
+            "games": 577,
+            "wins": 390,
+            "win_rate": 0.6759098786828422
+          },
+          "seer": {
+            "games": 139,
+            "wins": 128,
+            "win_rate": 0.920863309352518
+          },
+          "wolf": {
+            "games": 284,
+            "wins": 147,
+            "win_rate": 0.5176056338028169
+          }
+        },
+        "opponent:pop_survivor_kill": {
+          "seat": {
+            "games": 1000,
+            "wins": 550,
+            "win_rate": 0.55
+          },
+          "villager": {
+            "games": 571,
+            "wins": 308,
+            "win_rate": 0.5394045534150613
+          },
+          "seer": {
+            "games": 159,
+            "wins": 144,
+            "win_rate": 0.9056603773584906
+          },
+          "wolf": {
+            "games": 270,
+            "wins": 98,
+            "win_rate": 0.362962962962963
+          }
+        },
+        "opponent:pop_anti_majority": {
+          "seat": {
+            "games": 1000,
+            "wins": 561,
+            "win_rate": 0.561
+          },
+          "villager": {
+            "games": 600,
+            "wins": 272,
+            "win_rate": 0.4533333333333333
+          },
+          "seer": {
+            "games": 139,
+            "wins": 129,
+            "win_rate": 0.9280575539568345
+          },
+          "wolf": {
+            "games": 261,
+            "wins": 160,
+            "win_rate": 0.6130268199233716
+          }
+        }
+      },
+      "failures": {
+        "crash": 0,
+        "illegal": 0,
+        "bad_chat": 0,
+        "timeout": 0,
+        "chat_after_terminate": 0,
+        "window_close": 0,
+        "fallbacks": 0,
+        "overruns": 0,
+        "policy_fallbacks": 0,
+        "policy_errors": 0,
+        "logged_errors": 0,
+        "listen_errors": 0,
+        "fallback_paths": 0
+      },
+      "sampling": {
+        "unique_deal_seeds": 28000,
+        "duplicated_deal_seeds": 0,
+        "max_scenarios_per_deal_seed": 1,
+        "independent_unit": "deal_seed; each k3 table once per role",
+        "raw_simulations_are_not_independent_sample_size": true
+      }
+    },
+    "rounds-strict": {
+      "timing": "rounds",
+      "visibility": "strict",
+      "controlled_seats": 1,
+      "panels": {
+        "all": {
+          "seat": {
+            "games": 28000,
+            "wins": 14105,
+            "win_rate": 0.50375
+          },
+          "villager": {
+            "games": 16025,
+            "wins": 6750,
+            "win_rate": 0.42121684867394693
+          },
+          "seer": {
+            "games": 3990,
+            "wins": 2051,
+            "win_rate": 0.5140350877192983
+          },
+          "wolf": {
+            "games": 7985,
+            "wins": 5304,
+            "win_rate": 0.6642454602379462
+          }
+        },
+        "panel:simple7": {
+          "seat": {
+            "games": 7000,
+            "wins": 3307,
+            "win_rate": 0.4724285714285714
+          },
+          "villager": {
+            "games": 3977,
+            "wins": 1488,
+            "win_rate": 0.37415137037968316
+          },
+          "seer": {
+            "games": 1014,
+            "wins": 423,
+            "win_rate": 0.4171597633136095
+          },
+          "wolf": {
+            "games": 2009,
+            "wins": 1396,
+            "win_rate": 0.6948730711796914
+          }
+        },
+        "opponent:first": {
+          "seat": {
+            "games": 1000,
+            "wins": 481,
+            "win_rate": 0.481
+          },
+          "villager": {
+            "games": 537,
+            "wins": 227,
+            "win_rate": 0.4227188081936685
+          },
+          "seer": {
+            "games": 151,
+            "wins": 74,
+            "win_rate": 0.4900662251655629
+          },
+          "wolf": {
+            "games": 312,
+            "wins": 180,
+            "win_rate": 0.5769230769230769
+          }
+        },
+        "opponent:random": {
+          "seat": {
+            "games": 1000,
+            "wins": 357,
+            "win_rate": 0.357
+          },
+          "villager": {
+            "games": 573,
+            "wins": 68,
+            "win_rate": 0.11867364746945899
+          },
+          "seer": {
+            "games": 145,
+            "wins": 24,
+            "win_rate": 0.16551724137931034
+          },
+          "wolf": {
+            "games": 282,
+            "wins": 265,
+            "win_rate": 0.9397163120567376
+          }
+        },
+        "opponent:heuristic": {
+          "seat": {
+            "games": 1000,
+            "wins": 527,
+            "win_rate": 0.527
+          },
+          "villager": {
+            "games": 582,
+            "wins": 333,
+            "win_rate": 0.5721649484536082
+          },
+          "seer": {
+            "games": 152,
+            "wins": 90,
+            "win_rate": 0.5921052631578947
+          },
+          "wolf": {
+            "games": 266,
+            "wins": 104,
+            "win_rate": 0.39097744360902253
+          }
+        },
+        "opponent:llm": {
+          "seat": {
+            "games": 1000,
+            "wins": 665,
+            "win_rate": 0.665
+          },
+          "villager": {
+            "games": 561,
+            "wins": 327,
+            "win_rate": 0.5828877005347594
+          },
+          "seer": {
+            "games": 163,
+            "wins": 69,
+            "win_rate": 0.4233128834355828
+          },
+          "wolf": {
+            "games": 276,
+            "wins": 269,
+            "win_rate": 0.9746376811594203
+          }
+        },
+        "opponent:llmx": {
+          "seat": {
+            "games": 1000,
+            "wins": 601,
+            "win_rate": 0.601
+          },
+          "villager": {
+            "games": 560,
+            "wins": 280,
+            "win_rate": 0.5
+          },
+          "seer": {
+            "games": 147,
+            "wins": 47,
+            "win_rate": 0.3197278911564626
+          },
+          "wolf": {
+            "games": 293,
+            "wins": 274,
+            "win_rate": 0.9351535836177475
+          }
+        },
+        "opponent:llmq": {
+          "seat": {
+            "games": 1000,
+            "wins": 608,
+            "win_rate": 0.608
+          },
+          "villager": {
+            "games": 595,
+            "wins": 301,
+            "win_rate": 0.5058823529411764
+          },
+          "seer": {
+            "games": 139,
+            "wins": 57,
+            "win_rate": 0.41007194244604317
+          },
+          "wolf": {
+            "games": 266,
+            "wins": 250,
+            "win_rate": 0.9398496240601504
+          }
+        },
+        "opponent:mixed": {
+          "seat": {
+            "games": 1000,
+            "wins": 482,
+            "win_rate": 0.482
+          },
+          "villager": {
+            "games": 587,
+            "wins": 197,
+            "win_rate": 0.33560477001703576
+          },
+          "seer": {
+            "games": 134,
+            "wins": 39,
+            "win_rate": 0.291044776119403
+          },
+          "wolf": {
+            "games": 279,
+            "wins": 246,
+            "win_rate": 0.8817204301075269
+          }
+        },
+        "opponent:rt_wolfpack": {
+          "seat": {
+            "games": 1000,
+            "wins": 394,
+            "win_rate": 0.394
+          },
+          "villager": {
+            "games": 569,
+            "wins": 94,
+            "win_rate": 0.16520210896309315
+          },
+          "seer": {
+            "games": 141,
+            "wins": 44,
+            "win_rate": 0.3120567375886525
+          },
+          "wolf": {
+            "games": 290,
+            "wins": 256,
+            "win_rate": 0.8827586206896552
+          }
+        },
+        "opponent:rt_talker": {
+          "seat": {
+            "games": 1000,
+            "wins": 603,
+            "win_rate": 0.603
+          },
+          "villager": {
+            "games": 534,
+            "wins": 307,
+            "win_rate": 0.5749063670411985
+          },
+          "seer": {
+            "games": 125,
+            "wins": 101,
+            "win_rate": 0.808
+          },
+          "wolf": {
+            "games": 341,
+            "wins": 195,
+            "win_rate": 0.5718475073313783
+          }
+        },
+        "opponent:rt_detective": {
+          "seat": {
+            "games": 1000,
+            "wins": 643,
+            "win_rate": 0.643
+          },
+          "villager": {
+            "games": 573,
+            "wins": 413,
+            "win_rate": 0.7207678883071553
+          },
+          "seer": {
+            "games": 142,
+            "wins": 113,
+            "win_rate": 0.795774647887324
+          },
+          "wolf": {
+            "games": 285,
+            "wins": 117,
+            "win_rate": 0.4105263157894737
+          }
+        },
+        "opponent:rt_chaos": {
+          "seat": {
+            "games": 1000,
+            "wins": 653,
+            "win_rate": 0.653
+          },
+          "villager": {
+            "games": 576,
+            "wins": 419,
+            "win_rate": 0.7274305555555556
+          },
+          "seer": {
+            "games": 141,
+            "wins": 92,
+            "win_rate": 0.6524822695035462
+          },
+          "wolf": {
+            "games": 283,
+            "wins": 142,
+            "win_rate": 0.5017667844522968
+          }
+        },
+        "opponent:guard_silent": {
+          "seat": {
+            "games": 1000,
+            "wins": 480,
+            "win_rate": 0.48
+          },
+          "villager": {
+            "games": 546,
+            "wins": 240,
+            "win_rate": 0.43956043956043955
+          },
+          "seer": {
+            "games": 141,
+            "wins": 54,
+            "win_rate": 0.3829787234042553
+          },
+          "wolf": {
+            "games": 313,
+            "wins": 186,
+            "win_rate": 0.5942492012779552
+          }
+        },
+        "opponent:guard_abstain": {
+          "seat": {
+            "games": 1000,
+            "wins": 517,
+            "win_rate": 0.517
+          },
+          "villager": {
+            "games": 573,
+            "wins": 157,
+            "win_rate": 0.27399650959860383
+          },
+          "seer": {
+            "games": 150,
+            "wins": 83,
+            "win_rate": 0.5533333333333333
+          },
+          "wolf": {
+            "games": 277,
+            "wins": 277,
+            "win_rate": 1.0
+          }
+        },
+        "opponent:guard_fixed": {
+          "seat": {
+            "games": 1000,
+            "wins": 496,
+            "win_rate": 0.496
+          },
+          "villager": {
+            "games": 584,
+            "wins": 257,
+            "win_rate": 0.4400684931506849
+          },
+          "seer": {
+            "games": 137,
+            "wins": 58,
+            "win_rate": 0.4233576642335766
+          },
+          "wolf": {
+            "games": 279,
+            "wins": 181,
+            "win_rate": 0.6487455197132617
+          }
+        },
+        "opponent:guard_echo": {
+          "seat": {
+            "games": 1000,
+            "wins": 449,
+            "win_rate": 0.449
+          },
+          "villager": {
+            "games": 582,
+            "wins": 206,
+            "win_rate": 0.3539518900343643
+          },
+          "seer": {
+            "games": 138,
+            "wins": 40,
+            "win_rate": 0.2898550724637681
+          },
+          "wolf": {
+            "games": 280,
+            "wins": 203,
+            "win_rate": 0.725
+          }
+        },
+        "opponent:guard_fake": {
+          "seat": {
+            "games": 1000,
+            "wins": 340,
+            "win_rate": 0.34
+          },
+          "villager": {
+            "games": 604,
+            "wins": 92,
+            "win_rate": 0.152317880794702
+          },
+          "seer": {
+            "games": 119,
+            "wins": 14,
+            "win_rate": 0.11764705882352941
+          },
+          "wolf": {
+            "games": 277,
+            "wins": 234,
+            "win_rate": 0.8447653429602888
+          }
+        },
+        "opponent:guard_contradict": {
+          "seat": {
+            "games": 1000,
+            "wins": 315,
+            "win_rate": 0.315
+          },
+          "villager": {
+            "games": 585,
+            "wins": 82,
+            "win_rate": 0.14017094017094017
+          },
+          "seer": {
+            "games": 140,
+            "wins": 14,
+            "win_rate": 0.1
+          },
+          "wolf": {
+            "games": 275,
+            "wins": 219,
+            "win_rate": 0.7963636363636364
+          }
+        },
+        "opponent:first_high_night": {
+          "seat": {
+            "games": 1000,
+            "wins": 312,
+            "win_rate": 0.312
+          },
+          "villager": {
+            "games": 587,
+            "wins": 91,
+            "win_rate": 0.15502555366269166
+          },
+          "seer": {
+            "games": 137,
+            "wins": 19,
+            "win_rate": 0.1386861313868613
+          },
+          "wolf": {
+            "games": 276,
+            "wins": 202,
+            "win_rate": 0.7318840579710145
+          }
+        },
+        "opponent:first_random_night": {
+          "seat": {
+            "games": 1000,
+            "wins": 385,
+            "win_rate": 0.385
+          },
+          "villager": {
+            "games": 565,
+            "wins": 138,
+            "win_rate": 0.24424778761061947
+          },
+          "seer": {
+            "games": 139,
+            "wins": 32,
+            "win_rate": 0.2302158273381295
+          },
+          "wolf": {
+            "games": 296,
+            "wins": 215,
+            "win_rate": 0.7263513513513513
+          }
+        },
+        "opponent:first_switch": {
+          "seat": {
+            "games": 1000,
+            "wins": 321,
+            "win_rate": 0.321
+          },
+          "villager": {
+            "games": 580,
+            "wins": 59,
+            "win_rate": 0.10172413793103448
+          },
+          "seer": {
+            "games": 139,
+            "wins": 24,
+            "win_rate": 0.17266187050359713
+          },
+          "wolf": {
+            "games": 281,
+            "wins": 238,
+            "win_rate": 0.8469750889679716
+          }
+        },
+        "opponent:pop_coordinated": {
+          "seat": {
+            "games": 1000,
+            "wins": 581,
+            "win_rate": 0.581
+          },
+          "villager": {
+            "games": 605,
+            "wins": 354,
+            "win_rate": 0.5851239669421487
+          },
+          "seer": {
+            "games": 142,
+            "wins": 124,
+            "win_rate": 0.8732394366197183
+          },
+          "wolf": {
+            "games": 253,
+            "wins": 103,
+            "win_rate": 0.40711462450592883
+          }
+        },
+        "opponent:pop_prompt_seer": {
+          "seat": {
+            "games": 1000,
+            "wins": 556,
+            "win_rate": 0.556
+          },
+          "villager": {
+            "games": 520,
+            "wins": 280,
+            "win_rate": 0.5384615384615384
+          },
+          "seer": {
+            "games": 153,
+            "wins": 130,
+            "win_rate": 0.8496732026143791
+          },
+          "wolf": {
+            "games": 327,
+            "wins": 146,
+            "win_rate": 0.44648318042813456
+          }
+        },
+        "opponent:pop_late_claim": {
+          "seat": {
+            "games": 1000,
+            "wins": 557,
+            "win_rate": 0.557
+          },
+          "villager": {
+            "games": 568,
+            "wins": 331,
+            "win_rate": 0.5827464788732394
+          },
+          "seer": {
+            "games": 150,
+            "wins": 105,
+            "win_rate": 0.7
+          },
+          "wolf": {
+            "games": 282,
+            "wins": 121,
+            "win_rate": 0.42907801418439717
+          }
+        },
+        "opponent:pop_pressure_bus": {
+          "seat": {
+            "games": 1000,
+            "wins": 404,
+            "win_rate": 0.404
+          },
+          "villager": {
+            "games": 565,
+            "wins": 149,
+            "win_rate": 0.26371681415929205
+          },
+          "seer": {
+            "games": 147,
+            "wins": 100,
+            "win_rate": 0.6802721088435374
+          },
+          "wolf": {
+            "games": 288,
+            "wins": 155,
+            "win_rate": 0.5381944444444444
+          }
+        },
+        "opponent:pop_distance": {
+          "seat": {
+            "games": 1000,
+            "wins": 589,
+            "win_rate": 0.589
+          },
+          "villager": {
+            "games": 566,
+            "wins": 358,
+            "win_rate": 0.6325088339222615
+          },
+          "seer": {
+            "games": 141,
+            "wins": 115,
+            "win_rate": 0.8156028368794326
+          },
+          "wolf": {
+            "games": 293,
+            "wins": 116,
+            "win_rate": 0.39590443686006827
+          }
+        },
+        "opponent:pop_observed_switch": {
+          "seat": {
+            "games": 1000,
+            "wins": 671,
+            "win_rate": 0.671
+          },
+          "villager": {
+            "games": 577,
+            "wins": 396,
+            "win_rate": 0.6863084922010398
+          },
+          "seer": {
+            "games": 139,
+            "wins": 128,
+            "win_rate": 0.920863309352518
+          },
+          "wolf": {
+            "games": 284,
+            "wins": 147,
+            "win_rate": 0.5176056338028169
+          }
+        },
+        "opponent:pop_survivor_kill": {
+          "seat": {
+            "games": 1000,
+            "wins": 544,
+            "win_rate": 0.544
+          },
+          "villager": {
+            "games": 571,
+            "wins": 311,
+            "win_rate": 0.5446584938704028
+          },
+          "seer": {
+            "games": 159,
+            "wins": 136,
+            "win_rate": 0.8553459119496856
+          },
+          "wolf": {
+            "games": 270,
+            "wins": 97,
+            "win_rate": 0.3592592592592593
+          }
+        },
+        "opponent:pop_anti_majority": {
+          "seat": {
+            "games": 1000,
+            "wins": 574,
+            "win_rate": 0.574
+          },
+          "villager": {
+            "games": 600,
+            "wins": 283,
+            "win_rate": 0.4716666666666667
+          },
+          "seer": {
+            "games": 139,
+            "wins": 125,
+            "win_rate": 0.8992805755395683
+          },
+          "wolf": {
+            "games": 261,
+            "wins": 166,
+            "win_rate": 0.6360153256704981
+          }
+        }
+      },
+      "failures": {
+        "crash": 0,
+        "illegal": 0,
+        "bad_chat": 0,
+        "timeout": 0,
+        "chat_after_terminate": 0,
+        "window_close": 634,
+        "fallbacks": 0,
+        "overruns": 0,
+        "policy_fallbacks": 0,
+        "policy_errors": 0,
+        "logged_errors": 0,
+        "listen_errors": 0,
+        "fallback_paths": 0
+      },
+      "sampling": {
+        "unique_deal_seeds": 28000,
+        "duplicated_deal_seeds": 0,
+        "max_scenarios_per_deal_seed": 1,
+        "independent_unit": "deal_seed; each k3 table once per role",
+        "raw_simulations_are_not_independent_sample_size": true
+      }
+    }
+  },
+  "language_model_pilot": {
+    "report": "data/werewolf_minimal_model_retry1_summary.json",
+    "unique_deals": 18,
+    "llm_seats_per_game": 2,
+    "scripted_other_seats": 4,
+    "default_wins": {
+      "7b": 12,
+      "14b": 13
+    },
+    "role_sampling": "six of each role, not natural4/7,1/7,2/7",
+    "scope": "diagnostic only; do not mix these rates with primary benchmark"
+  },
+  "comparison_rules": [
+    "Keep B0 code and protocol fixed as the reference.",
+    "Old33101/33102 are consumed and suitable for regression only, not new independent confirmation.",
+    "Select candidates on development seeds; compare candidate andB0 on identical new deals.",
+    "Keep the existing2-percentage-point overall improvement bar, uncertainty/role/background checks and zero-protocol-error requirements.",
+    "Do not interpret a fixed53.38% win rate on a different panel as passing a paired improvement gate.",
+    "No live-platform or universal high-win-rate claim."
+  ],
+  "verification": {
+    "werewolf_file_tests_passed": 3436,
+    "werewolf_file_tests_failed": 0,
+    "record": "data/werewolf_scale_simple_verification.json",
+    "other_game_failures": "Recorded and deferred by user; not resolved and not a Werewolf research task."
+  }
+}

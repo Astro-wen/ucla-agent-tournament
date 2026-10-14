@@ -1,0 +1,13 @@
+{
+  "scope": "Post-selection stress on new mixtures of existing implementations; not wholly new opponent algorithms and not a replacement for the fixed primary confirmation",
+  "candidate": "unchanged factory frozen by505/506selection; no adaptation to stress outcomes",
+  "seed": 516,
+  "backgrounds": ["mixed:rt_detective+rt_chaos+llmq", "mixed:first_switch+pop_coordinated+heuristic", "mixed:pop_pressure_bus+pop_observed_switch+pop_prompt_seer", "mixed:guard_fake+guard_contradict+rt_talker"],
+  "games_per_background": 1000,
+  "timings": ["rt", "rounds"],
+  "visibility": "strict",
+  "controlled_seats": 1,
+  "deadline": "2026-10-14T07:30:00-07:00",
+  "evaluation": "same baseline/candidate deal, role, seat, initial random stream and mixed peer assignment; outcomes may diverge normally; preserve all negative slices; no parameter changes",
+  "accounting": "4000unique deals reused across two timings and profiles,16000simulations,not16000independent samples"
+}

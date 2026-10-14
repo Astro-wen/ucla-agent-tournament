@@ -1,0 +1,113 @@
+{
+  "status": "pass",
+  "primary_all_pairs": {
+    "n": 16,
+    "candidate_wins": 11,
+    "reference_wins": 10,
+    "improved": 2,
+    "worsened": 1,
+    "candidate_rate": 0.6875,
+    "reference_rate": 0.625,
+    "delta": 0.0625,
+    "ci95": [
+      -0.15433999477341198,
+      0.279339994773412
+    ],
+    "conservative_ci95": [
+      -0.295173134637949,
+      0.3903030255716643
+    ],
+    "candidate_wilson_ci95": [
+      0.4440393186673406,
+      0.8583556494803894
+    ],
+    "reference_wilson_ci95": [
+      0.3864064709793481,
+      0.815190174452472
+    ],
+    "mcnemar_p": 1.0
+  },
+  "no_fallback_pairs": {
+    "n": 16,
+    "candidate_wins": 11,
+    "reference_wins": 10,
+    "improved": 2,
+    "worsened": 1,
+    "candidate_rate": 0.6875,
+    "reference_rate": 0.625,
+    "delta": 0.0625,
+    "ci95": [
+      -0.15433999477341198,
+      0.279339994773412
+    ],
+    "conservative_ci95": [
+      -0.295173134637949,
+      0.3903030255716643
+    ],
+    "candidate_wilson_ci95": [
+      0.4440393186673406,
+      0.8583556494803894
+    ],
+    "reference_wilson_ci95": [
+      0.3864064709793481,
+      0.815190174452472
+    ],
+    "mcnemar_p": 1.0
+  },
+  "no_fallback_or_retry_pairs": {
+    "n": 16,
+    "candidate_wins": 11,
+    "reference_wins": 10,
+    "improved": 2,
+    "worsened": 1,
+    "candidate_rate": 0.6875,
+    "reference_rate": 0.625,
+    "delta": 0.0625,
+    "ci95": [
+      -0.15433999477341198,
+      0.279339994773412
+    ],
+    "conservative_ci95": [
+      -0.295173134637949,
+      0.3903030255716643
+    ],
+    "candidate_wilson_ci95": [
+      0.4440393186673406,
+      0.8583556494803894
+    ],
+    "reference_wilson_ci95": [
+      0.3864064709793481,
+      0.815190174452472
+    ],
+    "mcnemar_p": 1.0
+  },
+  "adverse_pairs": [],
+  "model_stats": {
+    "decisions": 824,
+    "retries": 0,
+    "official_transcript_omitted_observations": 0,
+    "quota_or_ended": 437,
+    "post_termination_updates": 317
+  },
+  "guard_stats": {
+    "decisions": 156,
+    "removed_options": 67,
+    "forced_fact_action": 9
+  },
+  "request_scope": {
+    "attempts": 387,
+    "network_calls": 278,
+    "unique_network_keys": 278,
+    "unique_attempt_keys": 278,
+    "cache_hits": 109,
+    "errors": {},
+    "note": "Run-local exact-request memoization, not independent model samples; no cache imported from prior runs. Smoke and diagnostics caches cleared before games. Network keys may repeat after cache clears or failures."
+  },
+  "cache_audit": true,
+  "unique_deals": 16,
+  "controlled_role": "wolf",
+  "unloaded": true,
+  "scope": "descriptive16pair actual localmodel pilot; not overall win-rate or frontier-opponent proof",
+  "initial_zero_game_failure_preserved": "data/werewolf_evolution_llm_results.json",
+  "source_report_sha256": "fd4ef0d0e1d7f23199810abf1e2f96a5a292b3fbb2c28ad6bb43915245f6b0a4"
+}

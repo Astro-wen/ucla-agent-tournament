@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "checked_at": "2026-10-14T07:55:49.555895-07:00",
+  "frozen_source_files": 314,
+  "model_sha256": "1fafeafb51c24d60d4242a27a67744c841a591fd08a0507f4865d0d479440d4a",
+  "audit_statuses_verified": [
+    "werewolf_evolution_development_audit.json",
+    "werewolf_evolution_confirmation_audit.json",
+    "werewolf_evolution_mixture_audit.json",
+    "werewolf_evolution_llm_audit.json",
+    "werewolf_robust_vote_audit.json",
+    "werewolf_evolution_isolation_probe.json",
+    "werewolf_until8_archive_verification.json"
+  ],
+  "source_digest": "da2cb24add4209d73a26586a83ce43c15770de204b45cedeef9768d9e134d19e",
+  "scope": "current bytes match frozen candidate source/model; audit pass is integrity,not universal-strength or deployment approval"
+}

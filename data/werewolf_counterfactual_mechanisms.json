@@ -1,0 +1,2290 @@
+{
+  "authenticated_winning_reasons": {
+    "highest public suspicion (never abstain \u2014 stall rule favors wolves)": 8,
+    "follow the seer: named wolf": 1
+  },
+  "authenticated_examples": [
+    {
+      "case": "251/llmq/k1/72",
+      "point": 1,
+      "role": "villager",
+      "background": "llmq",
+      "phase": "day_vote",
+      "day": 2,
+      "category": "authenticated_seer_report",
+      "reason": "highest public suspicion (never abstain \u2014 stall rule favors wolves)",
+      "baseline_action": 5,
+      "winning_actions": [
+        2,
+        3,
+        7
+      ],
+      "raw_observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 2 | phase day_vote | alive 5/7\nLiving: Player0, Player2, Player3, Player5, Player6\nDead:\n  day 1: Player1 was wolf (eliminated by vote)\n  day 2: Player4 was seer (killed at night)\nDay 1 vote: Player0 -> Player1, Player1 -> Player2, Player2 -> Player1, Player3 -> Player1, Player4 -> Player5, Player5 -> Player6, Player6 -> Player5 \u2014 Player1 eliminated by vote",
+      "transcript": {
+        "0": {
+          "seq": 0,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No hard info yet. To avoid a split vote I'll vote Player1 unless the Seer speaks up. Please don't abstain.",
+          "day": 1,
+          "_day": 1
+        },
+        "1": {
+          "seq": 1,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Player2 is quiet, which means they are a wolf or a scared villager.",
+          "day": 1,
+          "_day": 1
+        },
+        "2": {
+          "seq": 2,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I checked Player1's votes, very shady. Voting Player1.",
+          "day": 1,
+          "_day": 1
+        },
+        "3": {
+          "seq": 3,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Is the Seer here? Please speak up before we vote.",
+          "day": 1,
+          "_day": 1
+        },
+        "4": {
+          "seq": 4,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I checked Player1's votes, very shady. Voting Player1.",
+          "day": 1,
+          "_day": 1
+        },
+        "6": {
+          "seq": 6,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I think Player1 is suspicious. I'll vote Player1.",
+          "day": 1,
+          "_day": 1
+        },
+        "7": {
+          "seq": 7,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player5 is most suspicious. I'll vote Player5 unless someone has better info.",
+          "day": 2,
+          "_day": 2
+        },
+        "8": {
+          "seq": 8,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Reminder: all players should vote, abstaining helps the wolves.",
+          "day": 2,
+          "_day": 2
+        },
+        "9": {
+          "seq": 9,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "p5 kinda sus tbh, voting p5",
+          "day": 2,
+          "_day": 2
+        },
+        "10": {
+          "seq": 10,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "We need the seer here to guide us.",
+          "day": 2,
+          "_day": 2
+        },
+        "11": {
+          "seq": 11,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I checked Player5's votes, very shady. Voting Player5.",
+          "day": 2,
+          "_day": 2
+        }
+      }
+    },
+    {
+      "case": "252/pop_pressure_bus/k1/79",
+      "point": 1,
+      "role": "villager",
+      "background": "pop_pressure_bus",
+      "phase": "day_vote",
+      "day": 2,
+      "category": "authenticated_seer_report",
+      "reason": "highest public suspicion (never abstain \u2014 stall rule favors wolves)",
+      "baseline_action": 1,
+      "winning_actions": [
+        2
+      ],
+      "raw_observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 2 | phase day_vote | alive 5/7\nLiving: Player1, Player2, Player3, Player5, Player6\nDead:\n  day 1: Player0 was villager (eliminated by vote)\n  day 2: Player4 was seer (killed at night)\nDay 1 vote: Player0 -> Player1, Player1 -> Player0, Player2 -> Player0, Player3 -> Player0, Player4 -> Player1, Player5 -> Player0, Player6 -> Player0 \u2014 Player0 eliminated by vote",
+      "transcript": {
+        "0": {
+          "seq": 0,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+          "day": 1,
+          "_day": 1
+        },
+        "1": {
+          "seq": 1,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I will vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "2": {
+          "seq": 2,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I will vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "3": {
+          "seq": 3,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I will vote Player1.",
+          "day": 1,
+          "_day": 1
+        },
+        "4": {
+          "seq": 4,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I will vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "5": {
+          "seq": 5,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I will vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "6": {
+          "seq": 6,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I will vote Player1.",
+          "day": 1,
+          "_day": 1
+        },
+        "7": {
+          "seq": 7,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player1 is most suspicious. I'll vote Player1 unless someone has better info.",
+          "day": 2,
+          "_day": 2
+        },
+        "8": {
+          "seq": 8,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I will vote Player2.",
+          "day": 2,
+          "_day": 2
+        },
+        "9": {
+          "seq": 9,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I will vote Player2.",
+          "day": 2,
+          "_day": 2
+        },
+        "10": {
+          "seq": 10,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I will vote Player2.",
+          "day": 2,
+          "_day": 2
+        },
+        "11": {
+          "seq": 11,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I will vote Player1.",
+          "day": 2,
+          "_day": 2
+        }
+      }
+    },
+    {
+      "case": "252/llmx/k1/52",
+      "point": 1,
+      "role": "villager",
+      "background": "llmx",
+      "phase": "day_vote",
+      "day": 2,
+      "category": "authenticated_seer_report",
+      "reason": "highest public suspicion (never abstain \u2014 stall rule favors wolves)",
+      "baseline_action": 1,
+      "winning_actions": [
+        2
+      ],
+      "raw_observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 2 | phase day_vote | alive 5/7\nLiving: Player1, Player2, Player4, Player5, Player6\nDead:\n  day 1: Player0 was seer (eliminated by vote)\n  day 2: Player3 was villager (killed at night)\nDay 1 vote: Player0 -> Player6, Player1 -> Player0, Player2 -> Player0, Player3 -> Player0, Player4 -> Player0, Player5 -> Player0, Player6 -> Player0 \u2014 Player0 eliminated by vote",
+      "transcript": {
+        "0": {
+          "seq": 0,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+          "day": 1,
+          "_day": 1
+        },
+        "1": {
+          "seq": 1,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I looked at Player6 and they seem nervous.",
+          "day": 1,
+          "_day": 1
+        },
+        "2": {
+          "seq": 2,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I think Player0 is suspicious. I'll vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "5": {
+          "seq": 5,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I think Player0 is suspicious. I'll vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "6": {
+          "seq": 6,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I looked at Player2 and they seem nervous.",
+          "day": 1,
+          "_day": 1
+        },
+        "7": {
+          "seq": 7,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player1 is most suspicious. I'll vote Player1 unless someone has better info.",
+          "day": 2,
+          "_day": 2
+        },
+        "8": {
+          "seq": 8,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Reminder: all players should vote, abstaining helps the wolves.",
+          "day": 2,
+          "_day": 2
+        },
+        "9": {
+          "seq": 9,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "What if I am the seer? Kidding, just a villager.",
+          "day": 2,
+          "_day": 2
+        },
+        "10": {
+          "seq": 10,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "p1 kinda sus tbh, voting p1",
+          "day": 2,
+          "_day": 2
+        }
+      }
+    },
+    {
+      "case": "252/random/k1/5",
+      "point": 1,
+      "role": "villager",
+      "background": "random",
+      "phase": "day_vote",
+      "day": 2,
+      "category": "authenticated_seer_report",
+      "reason": "highest public suspicion (never abstain \u2014 stall rule favors wolves)",
+      "baseline_action": 2,
+      "winning_actions": [
+        5
+      ],
+      "raw_observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 2 | phase day_vote | alive 5/7\nLiving: Player1, Player2, Player3, Player4, Player5\nDead:\n  day 1: Player6 was seer (eliminated by vote)\n  day 2: Player0 was villager (killed at night)\nDay 1 vote: Player0 -> Player4, Player1 -> Player0, Player2 -> Player6, Player3 -> Player6, Player4 -> abstain, Player5 -> abstain, Player6 -> Player2 \u2014 Player6 eliminated by vote",
+      "transcript": {
+        "0": {
+          "seq": 0,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+          "day": 1,
+          "_day": 1
+        },
+        "1": {
+          "seq": 1,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player2 is most suspicious. I'll vote Player2 unless someone has better info.",
+          "day": 2,
+          "_day": 2
+        }
+      }
+    },
+    {
+      "case": "252/rt_detective/k1/6",
+      "point": 2,
+      "role": "villager",
+      "background": "rt_detective",
+      "phase": "day_vote",
+      "day": 3,
+      "category": "authenticated_seer_report",
+      "reason": "highest public suspicion (never abstain \u2014 stall rule favors wolves)",
+      "baseline_action": 4,
+      "winning_actions": [
+        5
+      ],
+      "raw_observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 3 | phase day_vote | alive 3/7\nLiving: Player2, Player4, Player5\nDead:\n  day 1: Player0 was villager (eliminated by vote)\n  day 2: Player1 was villager (killed at night)\n  day 2: Player3 was wolf (eliminated by vote)\n  day 3: Player6 was seer (killed at night)\nDay 1 vote: Player0 -> Player1, Player1 -> Player0, Player2 -> Player0, Player3 -> Player0, Player4 -> Player0, Player5 -> Player0, Player6 -> Player0 \u2014 Player0 eliminated by vote\nDay 2 vote: Player2 -> Player3, Player3 -> Player4, Player4 -> Player3, Player5 -> Player3, Player6 -> Player3 \u2014 Player3 eliminated by vote",
+      "transcript": {
+        "0": {
+          "seq": 0,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+          "day": 1,
+          "_day": 1
+        },
+        "1": {
+          "seq": 1,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "4": {
+          "seq": 4,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "5": {
+          "seq": 5,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player1.",
+          "day": 1,
+          "_day": 1
+        },
+        "6": {
+          "seq": 6,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "7": {
+          "seq": 7,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "8": {
+          "seq": 8,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "9": {
+          "seq": 9,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player3 is most suspicious. I'll vote Player3 unless someone has better info.",
+          "day": 2,
+          "_day": 2
+        },
+        "12": {
+          "seq": 12,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. Player1 is clear. Player3 is a wolf. Vote Player3.",
+          "day": 2,
+          "_day": 2
+        },
+        "13": {
+          "seq": 13,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Following the Seer (Player6): I vote Player3. Everyone vote Player3 so we do not split.",
+          "day": 2,
+          "_day": 2
+        },
+        "14": {
+          "seq": 14,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player3 is the likeliest wolf. I vote Player3.",
+          "day": 2,
+          "_day": 2
+        },
+        "15": {
+          "seq": 15,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player4 is the likeliest wolf. I vote Player4.",
+          "day": 2,
+          "_day": 2
+        },
+        "16": {
+          "seq": 16,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player3 is the likeliest wolf. I vote Player3.",
+          "day": 2,
+          "_day": 2
+        },
+        "17": {
+          "seq": 17,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player4 is most suspicious. I'll vote Player4 unless someone has better info.",
+          "day": 3,
+          "_day": 3
+        },
+        "18": {
+          "seq": 18,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player4 is the likeliest wolf. I vote Player4.",
+          "day": 3,
+          "_day": 3
+        },
+        "19": {
+          "seq": 19,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player5 is the likeliest wolf. I vote Player5.",
+          "day": 3,
+          "_day": 3
+        }
+      }
+    },
+    {
+      "case": "251/guard_contradict/k1/9",
+      "point": 1,
+      "role": "villager",
+      "background": "guard_contradict",
+      "phase": "day_vote",
+      "day": 2,
+      "category": "authenticated_seer_report",
+      "reason": "highest public suspicion (never abstain \u2014 stall rule favors wolves)",
+      "baseline_action": 4,
+      "winning_actions": [
+        5
+      ],
+      "raw_observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 2 | phase day_vote | alive 5/7\nLiving: Player1, Player2, Player3, Player4, Player5\nDead:\n  day 1: Player6 was villager (eliminated by vote)\n  day 2: Player0 was seer (killed at night)\nDay 1 vote: Player0 -> Player6, Player1 -> Player6, Player2 -> Player6, Player3 -> Player4, Player4 -> Player6, Player5 -> Player6, Player6 -> Player5 \u2014 Player6 eliminated by vote",
+      "transcript": {
+        "0": {
+          "seq": 0,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+          "day": 1,
+          "_day": 1
+        },
+        "1": {
+          "seq": 1,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. I checked Player1: villager.",
+          "day": 1,
+          "_day": 1
+        },
+        "2": {
+          "seq": 2,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. I checked Player6: wolf. Vote Player6.",
+          "day": 1,
+          "_day": 1
+        },
+        "3": {
+          "seq": 3,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Two Seer claims: Player0 and Player5. One is lying. I vote Player0; the reveal will show who lied.",
+          "day": 1,
+          "_day": 1
+        },
+        "4": {
+          "seq": 4,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. I checked Player6: wolf. Vote Player6.",
+          "day": 1,
+          "_day": 1
+        },
+        "5": {
+          "seq": 5,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. I checked Player6: villager. Player6 is clear.",
+          "day": 1,
+          "_day": 1
+        },
+        "6": {
+          "seq": 6,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. I checked Player6: villager. Player6 is clear.",
+          "day": 1,
+          "_day": 1
+        },
+        "7": {
+          "seq": 7,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player4 is most suspicious. I'll vote Player4 unless someone has better info.",
+          "day": 2,
+          "_day": 2
+        },
+        "8": {
+          "seq": 8,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. I checked Player3: wolf. Vote Player3.",
+          "day": 2,
+          "_day": 2
+        },
+        "9": {
+          "seq": 9,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Player5 is lying: I am not a wolf, so Player5 is a fake Seer. Vote Player5.",
+          "day": 2,
+          "_day": 2
+        },
+        "10": {
+          "seq": 10,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. I checked Player3: wolf. Vote Player3.",
+          "day": 2,
+          "_day": 2
+        },
+        "11": {
+          "seq": 11,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. I checked Player3: villager. Player3 is clear.",
+          "day": 2,
+          "_day": 2
+        },
+        "12": {
+          "seq": 12,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. I checked Player3: villager. Player3 is clear.",
+          "day": 2,
+          "_day": 2
+        }
+      }
+    },
+    {
+      "case": "251/mixed/k1/32",
+      "point": 1,
+      "role": "villager",
+      "background": "mixed",
+      "phase": "day_vote",
+      "day": 2,
+      "category": "authenticated_seer_report",
+      "reason": "highest public suspicion (never abstain \u2014 stall rule favors wolves)",
+      "baseline_action": 0,
+      "winning_actions": [
+        2,
+        4,
+        7
+      ],
+      "raw_observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 2 | phase day_vote | alive 6/7\nLiving: Player0, Player2, Player3, Player4, Player5, Player6\nDead:\n  day 2: Player1 was seer (killed at night)\nDay 1 vote: Player0 -> Player1, Player1 -> Player2, Player2 -> Player1, Player3 -> Player0, Player4 -> Player5, Player5 -> Player3, Player6 -> Player0 \u2014 nobody eliminated",
+      "transcript": {
+        "0": {
+          "seq": 0,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+          "day": 1,
+          "_day": 1
+        },
+        "1": {
+          "seq": 1,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I think Player0 is suspicious. I'll vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "2": {
+          "seq": 2,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+          "day": 1,
+          "_day": 1
+        },
+        "3": {
+          "seq": 3,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I'm a villager. Let's hear from everyone before we vote.",
+          "day": 1,
+          "_day": 1
+        },
+        "4": {
+          "seq": 4,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player0 is most suspicious. I'll vote Player0 unless someone has better info.",
+          "day": 2,
+          "_day": 2
+        },
+        "6": {
+          "seq": 6,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I think Player0 is suspicious. I'll vote Player0.",
+          "day": 2,
+          "_day": 2
+        },
+        "7": {
+          "seq": 7,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No strong read yet. Let's not abstain; the vote record will tell us more.",
+          "day": 2,
+          "_day": 2
+        }
+      }
+    },
+    {
+      "case": "252/rt_detective/k1/97",
+      "point": 2,
+      "role": "villager",
+      "background": "rt_detective",
+      "phase": "day_vote",
+      "day": 3,
+      "category": "authenticated_seer_report",
+      "reason": "highest public suspicion (never abstain \u2014 stall rule favors wolves)",
+      "baseline_action": 4,
+      "winning_actions": [
+        6
+      ],
+      "raw_observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 3 | phase day_vote | alive 3/7\nLiving: Player4, Player5, Player6\nDead:\n  day 1: Player0 was villager (eliminated by vote)\n  day 2: Player1 was villager (killed at night)\n  day 2: Player3 was wolf (eliminated by vote)\n  day 3: Player2 was seer (killed at night)\nDay 1 vote: Player0 -> Player1, Player1 -> Player0, Player2 -> Player0, Player3 -> Player0, Player4 -> Player0, Player5 -> Player0, Player6 -> Player0 \u2014 Player0 eliminated by vote\nDay 2 vote: Player2 -> Player3, Player3 -> Player4, Player4 -> Player3, Player5 -> Player3, Player6 -> Player3 \u2014 Player3 eliminated by vote",
+      "transcript": {
+        "0": {
+          "seq": 0,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+          "day": 1,
+          "_day": 1
+        },
+        "1": {
+          "seq": 1,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player1.",
+          "day": 1,
+          "_day": 1
+        },
+        "2": {
+          "seq": 2,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "4": {
+          "seq": 4,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "5": {
+          "seq": 5,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "7": {
+          "seq": 7,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "8": {
+          "seq": 8,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No information yet; to avoid a split I take the lowest seat. I vote Player0.",
+          "day": 1,
+          "_day": 1
+        },
+        "9": {
+          "seq": 9,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player2 is most suspicious. I'll vote Player2 unless someone has better info.",
+          "day": 2,
+          "_day": 2
+        },
+        "10": {
+          "seq": 10,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player3 is the likeliest wolf. I vote Player3.",
+          "day": 2,
+          "_day": 2
+        },
+        "11": {
+          "seq": 11,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player6 is the likeliest wolf. I vote Player6.",
+          "day": 2,
+          "_day": 2
+        },
+        "14": {
+          "seq": 14,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player4 is the likeliest wolf. I vote Player4.",
+          "day": 2,
+          "_day": 2
+        },
+        "15": {
+          "seq": 15,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player2 is the likeliest wolf. I vote Player2.",
+          "day": 2,
+          "_day": 2
+        },
+        "16": {
+          "seq": 16,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. Player1 is clear. Player3 is a wolf. Vote Player3.",
+          "day": 2,
+          "_day": 2
+        },
+        "17": {
+          "seq": 17,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Following the Seer (Player2): I vote Player3. Everyone vote Player3 so we do not split.",
+          "day": 2,
+          "_day": 2
+        },
+        "18": {
+          "seq": 18,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player3 is the likeliest wolf. I vote Player3.",
+          "day": 2,
+          "_day": 2
+        },
+        "19": {
+          "seq": 19,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player3 is the likeliest wolf. I vote Player3.",
+          "day": 2,
+          "_day": 2
+        },
+        "20": {
+          "seq": 20,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player4 is the likeliest wolf. I vote Player4.",
+          "day": 2,
+          "_day": 2
+        },
+        "21": {
+          "seq": 21,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "My read from the vote record: Player4 is most suspicious. I'll vote Player4 unless someone has better info.",
+          "day": 3,
+          "_day": 3
+        },
+        "22": {
+          "seq": 22,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player4 is the likeliest wolf. I vote Player4.",
+          "day": 3,
+          "_day": 3
+        },
+        "23": {
+          "seq": 23,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "From the votes, kills and claims, Player6 is the likeliest wolf. I vote Player6.",
+          "day": 3,
+          "_day": 3
+        }
+      }
+    },
+    {
+      "case": "251/rt_chaos/k1/53",
+      "point": 1,
+      "role": "villager",
+      "background": "rt_chaos",
+      "phase": "day_vote",
+      "day": 2,
+      "category": "authenticated_seer_report",
+      "reason": "follow the seer: named wolf",
+      "baseline_action": 0,
+      "winning_actions": [
+        4
+      ],
+      "raw_observation": "=== Werewolf ===\nYour role: VILLAGER\nYou do not know anyone else's role.\nDay 2 | phase day_vote | alive 5/7\nLiving: Player0, Player2, Player3, Player4, Player5\nDead:\n  day 1: Player1 was seer (eliminated by vote)\n  day 2: Player6 was villager (killed at night)\nDay 1 vote: Player0 -> Player1, Player1 -> Player0, Player2 -> Player4, Player3 -> Player1, Player4 -> Player1, Player5 -> Player0, Player6 -> Player4 \u2014 Player1 eliminated by vote",
+      "transcript": {
+        "0": {
+          "seq": 0,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "No hard info yet. To avoid a split vote I'll vote Player0 unless the Seer speaks up. Please don't abstain.",
+          "day": 1,
+          "_day": 1
+        },
+        "1": {
+          "seq": 1,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "ok who do we like today",
+          "day": 1,
+          "_day": 1
+        },
+        "2": {
+          "seq": 2,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "ok. seer here. player-0=werewolf.",
+          "day": 1,
+          "_day": 1
+        },
+        "3": {
+          "seq": 3,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Following the Seer (Player1): I vote Player0. Everyone vote Player0 so we do not split.",
+          "day": 1,
+          "_day": 1
+        },
+        "4": {
+          "seq": 4,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Player 6 feels quiet",
+          "day": 1,
+          "_day": 1
+        },
+        "5": {
+          "seq": 5,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "p2 feels quiet",
+          "day": 1,
+          "_day": 1
+        },
+        "6": {
+          "seq": 6,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "hi. villager. lets not abstain",
+          "day": 1,
+          "_day": 1
+        },
+        "7": {
+          "seq": 7,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "ok who do we like today",
+          "day": 1,
+          "_day": 1
+        },
+        "8": {
+          "seq": 8,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "oh sure, Player03 is TOTALLY the seer and Player3 is a wolf /s",
+          "day": 1,
+          "_day": 1
+        },
+        "9": {
+          "seq": 9,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Player6 said \"ok who do we like today\" hmm",
+          "day": 1,
+          "_day": 1
+        },
+        "10": {
+          "seq": 10,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I am the Seer. Player1 is a wolf. Vote Player1.",
+          "day": 1,
+          "_day": 1
+        },
+        "11": {
+          "seq": 11,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "if I were the seer I would say Player2 is a wolf. but I'm not.",
+          "day": 1,
+          "_day": 1
+        },
+        "12": {
+          "seq": 12,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "oh sure, PLAYER6 is TOTALLY the seer and Player4 is a wolf /s",
+          "day": 1,
+          "_day": 1
+        },
+        "13": {
+          "seq": 13,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "wait",
+          "day": 1,
+          "_day": 1
+        },
+        "15": {
+          "seq": 15,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "not a wolf. Player04 is lying",
+          "day": 1,
+          "_day": 1
+        },
+        "16": {
+          "seq": 16,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "all in on p0",
+          "day": 1,
+          "_day": 1
+        },
+        "17": {
+          "seq": 17,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "VOTE seat#1",
+          "day": 1,
+          "_day": 1
+        },
+        "18": {
+          "seq": 18,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "p0 today",
+          "day": 1,
+          "_day": 1
+        },
+        "19": {
+          "seq": 19,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "oh sure, seat 3 is TOTALLY the seer and Player4 is a wolf /s",
+          "day": 1,
+          "_day": 1
+        },
+        "21": {
+          "seq": 21,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "As the seer: agent1 is a wolfie! vote seat#1",
+          "day": 1,
+          "_day": 1
+        },
+        "22": {
+          "seq": 22,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "vote Player8 lol jk",
+          "day": 1,
+          "_day": 1
+        },
+        "23": {
+          "seq": 23,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "im voting p1",
+          "day": 1,
+          "_day": 1
+        },
+        "24": {
+          "seq": 24,
+          "sender": 1,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "im voting PLAYER0",
+          "day": 1,
+          "_day": 1
+        },
+        "25": {
+          "seq": 25,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "rip nobody yet",
+          "day": 1,
+          "_day": 1
+        },
+        "26": {
+          "seq": 26,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "if I were the seer I would say Player4 is a wolf. but I'm not.",
+          "day": 1,
+          "_day": 1
+        },
+        "27": {
+          "seq": 27,
+          "sender": 6,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I'm not the seer. Player2 isn't either. or are they",
+          "day": 1,
+          "_day": 1
+        },
+        "28": {
+          "seq": 28,
+          "sender": 5,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Following the Seer (Player1): I vote Player0. Everyone vote Player0 so we do not split.",
+          "day": 2,
+          "_day": 2
+        },
+        "29": {
+          "seq": 29,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "same as yesterday?",
+          "day": 2,
+          "_day": 2
+        },
+        "30": {
+          "seq": 30,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "hm",
+          "day": 2,
+          "_day": 2
+        },
+        "31": {
+          "seq": 31,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "hi. villager. lets not abstain",
+          "day": 2,
+          "_day": 2
+        },
+        "32": {
+          "seq": 32,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "hi. villager. lets not abstain",
+          "day": 2,
+          "_day": 2
+        },
+        "33": {
+          "seq": 33,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "I'm not the seer. Player0 isn't either. or are they",
+          "day": 2,
+          "_day": 2
+        },
+        "36": {
+          "seq": 36,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "not a werewolf. seat 1 is lying",
+          "day": 2,
+          "_day": 2
+        },
+        "37": {
+          "seq": 37,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "all in on PLAYER3",
+          "day": 2,
+          "_day": 2
+        },
+        "38": {
+          "seq": 38,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "seat#4 today",
+          "day": 2,
+          "_day": 2
+        },
+        "39": {
+          "seq": 39,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "voet Player04",
+          "day": 2,
+          "_day": 2
+        },
+        "40": {
+          "seq": 40,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "im voting p3",
+          "day": 2,
+          "_day": 2
+        },
+        "41": {
+          "seq": 41,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "oh sure, Plyer2 is TOTALLY the seer and Player5 is a wolf /s",
+          "day": 2,
+          "_day": 2
+        },
+        "42": {
+          "seq": 42,
+          "sender": 2,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "if I were the seer I would say Player3 is a wolf. but I'm not.",
+          "day": 2,
+          "_day": 2
+        },
+        "43": {
+          "seq": 43,
+          "sender": 0,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "if I were the seer I would say Player4 is a wolf. but I'm not.",
+          "day": 2,
+          "_day": 2
+        },
+        "44": {
+          "seq": 44,
+          "sender": 4,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "really-really-really-really-really-really-suspicious-of-everyone-today-honestly-0 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-1 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-2 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-3 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-4 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-5 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-6 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-7 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-8 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-9 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-10 really-really-really-really-really-really-suspicious-of-everyone-today-honestly-11",
+          "day": 2,
+          "_day": 2
+        },
+        "45": {
+          "seq": 45,
+          "sender": 3,
+          "recipients": [],
+          "visibility": "broadcast",
+          "type": "chat",
+          "content": "Player2 is not a wolf imo. Player4 is not the seer either",
+          "day": 2,
+          "_day": 2
+        }
+      }
+    }
+  ],
+  "posthoc_information_conflicts_among_rescuable_members": [
+    {
+      "visible_hash": "b2385cc9b3fd06d0dff84e53a361fbde8bd08098f5709ae46e48f38e3b42d812",
+      "all_states": 22,
+      "rescuable_states": 15,
+      "cases": [
+        {
+          "case": "251/llmq/k1/99",
+          "point": 0,
+          "role": "seer",
+          "background": "llmq",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            2,
+            5
+          ]
+        },
+        {
+          "case": "252/rt_chaos/k1/71",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_chaos",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            2,
+            3
+          ]
+        },
+        {
+          "case": "251/pop_late_claim/k1/8",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_late_claim",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            4,
+            5
+          ]
+        },
+        {
+          "case": "251/pop_distance/k1/30",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_distance",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            4
+          ]
+        },
+        {
+          "case": "252/pop_observed_switch/k1/30",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_observed_switch",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            4,
+            5
+          ]
+        },
+        {
+          "case": "251/pop_survivor_kill/k1/8",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_survivor_kill",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            3,
+            4
+          ]
+        },
+        {
+          "case": "252/rt_detective/k1/51",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_detective",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            4
+          ]
+        },
+        {
+          "case": "251/pop_prompt_seer/k1/0",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_prompt_seer",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            3,
+            5
+          ]
+        },
+        {
+          "case": "251/pop_observed_switch/k1/20",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_observed_switch",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            3,
+            4
+          ]
+        },
+        {
+          "case": "252/random/k1/39",
+          "point": 0,
+          "role": "seer",
+          "background": "random",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            3
+          ]
+        },
+        {
+          "case": "252/llmx/k1/84",
+          "point": 0,
+          "role": "seer",
+          "background": "llmx",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "case": "252/rt_wolfpack/k1/56",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_wolfpack",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0
+          ]
+        },
+        {
+          "case": "251/rt_wolfpack/k1/95",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_wolfpack",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            4
+          ]
+        },
+        {
+          "case": "252/rt_detective/k1/50",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_detective",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            2,
+            4
+          ]
+        },
+        {
+          "case": "252/guard_echo/k1/36",
+          "point": 0,
+          "role": "seer",
+          "background": "guard_echo",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            2,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "visible_hash": "6d0f4c2f28aca5bb5f125b5a798581cbf1f779ecd691e27e36225d2f48dd234c",
+      "all_states": 12,
+      "rescuable_states": 5,
+      "cases": [
+        {
+          "case": "251/heuristic/k1/75",
+          "point": 0,
+          "role": "seer",
+          "background": "heuristic",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 5,
+          "winning_actions": [
+            1,
+            3
+          ]
+        },
+        {
+          "case": "251/llm/k1/16",
+          "point": 0,
+          "role": "seer",
+          "background": "llm",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 5,
+          "winning_actions": [
+            0,
+            3
+          ]
+        },
+        {
+          "case": "252/pop_distance/k1/33",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_distance",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 5,
+          "winning_actions": [
+            0,
+            2
+          ]
+        },
+        {
+          "case": "252/guard_silent/k1/15",
+          "point": 0,
+          "role": "seer",
+          "background": "guard_silent",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 5,
+          "winning_actions": [
+            1
+          ]
+        },
+        {
+          "case": "251/guard_fixed/k1/5",
+          "point": 0,
+          "role": "seer",
+          "background": "guard_fixed",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 5,
+          "winning_actions": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "visible_hash": "daac2b4585d3cbdf64b0815135c7ec4262274f92b847dee1e64f3edc39a75c5e",
+      "all_states": 17,
+      "rescuable_states": 11,
+      "cases": [
+        {
+          "case": "251/llm/k1/38",
+          "point": 0,
+          "role": "seer",
+          "background": "llm",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            5
+          ]
+        },
+        {
+          "case": "252/rt_detective/k1/26",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_detective",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            1
+          ]
+        },
+        {
+          "case": "252/guard_echo/k1/51",
+          "point": 0,
+          "role": "seer",
+          "background": "guard_echo",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            1,
+            4
+          ]
+        },
+        {
+          "case": "252/pop_prompt_seer/k1/83",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_prompt_seer",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            1
+          ]
+        },
+        {
+          "case": "251/guard_echo/k1/91",
+          "point": 0,
+          "role": "seer",
+          "background": "guard_echo",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            4,
+            5
+          ]
+        },
+        {
+          "case": "251/pop_survivor_kill/k1/30",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_survivor_kill",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            1,
+            5
+          ]
+        },
+        {
+          "case": "252/rt_detective/k1/78",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_detective",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            5
+          ]
+        },
+        {
+          "case": "252/pop_prompt_seer/k1/63",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_prompt_seer",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            1,
+            5
+          ]
+        },
+        {
+          "case": "251/pop_anti_majority/k1/8",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_anti_majority",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            1,
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "case": "252/llmx/k1/41",
+          "point": 0,
+          "role": "seer",
+          "background": "llmx",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            4
+          ]
+        },
+        {
+          "case": "252/rt_chaos/k1/84",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_chaos",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "visible_hash": "010e8301d488e1682ad82c27003468cc534fb13569f67cf9191830768f4281ae",
+      "all_states": 20,
+      "rescuable_states": 9,
+      "cases": [
+        {
+          "case": "251/llmx/k1/17",
+          "point": 0,
+          "role": "seer",
+          "background": "llmx",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            1,
+            2,
+            3,
+            5
+          ]
+        },
+        {
+          "case": "251/rt_wolfpack/k1/82",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_wolfpack",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            5
+          ]
+        },
+        {
+          "case": "252/pop_coordinated/k1/31",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_coordinated",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            4,
+            5
+          ]
+        },
+        {
+          "case": "252/pop_anti_majority/k1/52",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_anti_majority",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            1,
+            5
+          ]
+        },
+        {
+          "case": "252/rt_talker/k1/7",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_talker",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            1,
+            4,
+            5
+          ]
+        },
+        {
+          "case": "252/pop_anti_majority/k1/70",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_anti_majority",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            3,
+            5
+          ]
+        },
+        {
+          "case": "252/rt_talker/k1/49",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_talker",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "case": "252/pop_pressure_bus/k1/59",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_pressure_bus",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            5
+          ]
+        },
+        {
+          "case": "252/rt_talker/k1/47",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_talker",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            3,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "visible_hash": "3335c9c75e674d95ee5d1c39e9979ee149f1be75eb96e86d9143eed954063ac5",
+      "all_states": 10,
+      "rescuable_states": 4,
+      "cases": [
+        {
+          "case": "252/rt_talker/k1/19",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_talker",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            1,
+            5
+          ]
+        },
+        {
+          "case": "251/guard_fake/k1/18",
+          "point": 0,
+          "role": "seer",
+          "background": "guard_fake",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            5
+          ]
+        },
+        {
+          "case": "252/pop_distance/k1/30",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_distance",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            1,
+            2
+          ]
+        },
+        {
+          "case": "251/guard_fake/k1/26",
+          "point": 0,
+          "role": "seer",
+          "background": "guard_fake",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "visible_hash": "13e433b086a0939c9179b8cc6368329e6e92c32e11967db5a0b9348d84dcc3bf",
+      "all_states": 12,
+      "rescuable_states": 6,
+      "cases": [
+        {
+          "case": "251/llmx/k1/31",
+          "point": 0,
+          "role": "seer",
+          "background": "llmx",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            1,
+            3,
+            4
+          ]
+        },
+        {
+          "case": "251/rt_wolfpack/k1/50",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_wolfpack",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "case": "252/llm/k1/43",
+          "point": 0,
+          "role": "seer",
+          "background": "llm",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            1
+          ]
+        },
+        {
+          "case": "252/rt_chaos/k1/96",
+          "point": 0,
+          "role": "seer",
+          "background": "rt_chaos",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            2
+          ]
+        },
+        {
+          "case": "251/guard_silent/k1/3",
+          "point": 0,
+          "role": "seer",
+          "background": "guard_silent",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "case": "251/pop_late_claim/k1/14",
+          "point": 0,
+          "role": "seer",
+          "background": "pop_late_claim",
+          "phase": "night_seer",
+          "day": 1,
+          "category": "investigation",
+          "reason": "investigate a likely wolf the table is not already lynching",
+          "baseline_action": 6,
+          "winning_actions": [
+            3,
+            4
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "descriptive posthoc loss analysis only; not new strength evidence"
+}

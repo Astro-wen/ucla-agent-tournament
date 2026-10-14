@@ -1,0 +1,8 @@
+{
+  "created": "2026-10-13T07:21:05.453135-07:00",
+  "source_digest": "1c21bc96a29df014ccbb93c10e106e34b54a6367877c6d17f6070a785cfa6e87",
+  "files": 301,
+  "archive": "logs/werewolf_benchmarks/overnight-frozen-source-33101.zip",
+  "archive_sha256": "2544c32c1a90f1c9e6dcd66ee0ab12c956c4442d7184389828a429a24dcd17b3",
+  "scope": "Exact confirmation source files, not later exploratory additions, logs, credentials, model weights or a standalone deployment bundle"
+}

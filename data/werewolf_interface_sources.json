@@ -1,0 +1,389 @@
+{
+  "schema_version": 1,
+  "purpose": "Bounded public-literature follow-up on Werewolf LLM interface diagnostics; evidence catalog, not a policy change or deployment recommendation.",
+  "research_window": {
+    "first_checked_time_pdt": "2026-10-13T07:27:46-07:00",
+    "deadline_pdt": "2026-10-13T07:45:00-07:00",
+    "last_public_retrieval_pdt": "2026-10-13T07:32:25.288444-07:00",
+    "parent_research_deadline_pdt": "2026-10-13T08:00:00-07:00",
+    "note": "This bounded follow-up does not claim to have researched continuously until the parent's 08:00 deadline. Exact retrieval timestamps are recorded below."
+  },
+  "verification": {
+    "metadata_hash_quote_and_local_count_audit_passed_at_pdt": "2026-10-13T07:37:33.473764-07:00",
+    "distinct_full_text_sources_checked": 4,
+    "public_get_requests": 7,
+    "arxiv_atom_queries": 3,
+    "pdf_downloads": 4,
+    "all_http_statuses": 200,
+    "redirect_hops": 0,
+    "exact_short_quotes_checked": 11,
+    "quote_method": "pdftotext reading-order extraction; exact substring check after collapsing whitespace only; 1-based PDF page numbers. No paraphrases are presented as quotations.",
+    "hash_method": "SHA-256 of downloaded response bytes and extracted UTF-8 text bytes. Versioned PDF URLs came from returned Atom links, not guessed paper IDs.",
+    "network_method": "httpx public GET, follow_redirects=True, trust_env=False, no authentication or credentials; requests were sequential and spaced at least three seconds apart.",
+    "paid_model_calls": 0,
+    "local_model_calls": 0,
+    "local_model_restarts": 0,
+    "dependency_installs": 0,
+    "github_operations": 0,
+    "repository_write_scope": ["data/werewolf_interface_sources.json"],
+    "scratch_prefix": "/tmp/werewolf_interface_",
+    "artifact_note": "Downloaded PDFs, Atom feeds, extraction text and helper audit outputs are temporary; the repository keeps citations, exact short excerpts, retrieval metadata, hashes, and evaluation recommendations only."
+  },
+  "discovery": [
+    {
+      "id": "atom_selectors",
+      "query": "ti:\"Large Language Models Are Not Robust Multiple Choice Selectors\"",
+      "retrieved_url": "https://export.arxiv.org/api/query?search_query=ti%3A%22Large+Language+Models+Are+Not+Robust+Multiple+Choice+Selectors%22&start=0&max_results=8",
+      "retrieved_at_pdt": "2026-10-13T07:28:26.646979-07:00",
+      "http_status": 200,
+      "response_sha256": "b1a0aa58e63f9faf885f1102368cea291db77484c368f2dda0c6c34c69b733d8",
+      "response_bytes": 2913,
+      "returned_paper_ids": ["2309.03882v4"]
+    },
+    {
+      "id": "atom_format_and_rationales",
+      "query": "ti:\"Let Me Speak Freely\" OR ti:\"Language Models Don't Always Say What They Think\"",
+      "retrieved_url": "https://export.arxiv.org/api/query?search_query=ti%3A%22Let+Me+Speak+Freely%22+OR+ti%3A%22Language+Models+Don%27t+Always+Say+What+They+Think%22&start=0&max_results=8",
+      "retrieved_at_pdt": "2026-10-13T07:28:30.123479-07:00",
+      "http_status": 200,
+      "response_sha256": "c51b0e2c99e0478e8f2b401fb03843652106035379f064200aa53a8ffa3dfa2b",
+      "response_bytes": 5076,
+      "returned_paper_ids": ["2305.04388v2", "2408.02442v3"]
+    },
+    {
+      "id": "atom_jsonschema",
+      "query": "all:JSONSchemaBench",
+      "retrieved_url": "https://export.arxiv.org/api/query?search_query=all%3AJSONSchemaBench&start=0&max_results=8",
+      "retrieved_at_pdt": "2026-10-13T07:32:01.657778-07:00",
+      "http_status": 200,
+      "response_sha256": "e37c1e3dd32f44338b931a6a5094e128e6c0f44043dc082704db3d17057ebb40",
+      "response_bytes": 3630,
+      "returned_paper_ids": ["2501.10868v3"]
+    }
+  ],
+  "local_observation": {
+    "status": "Existing local evidence reread and counts recomputed; no new model experiment.",
+    "model": "qwen2.5:7b-instruct-q4_K_M",
+    "model_digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+    "selection_corpus": "29 selected guard examples: five prior diagnostic cases plus 24 seat rotations; the same cases selected the preferred encoding, so they are not an independent held-out validation set.",
+    "artifacts": [
+      {
+        "path": "logs/werewolf_benchmarks/overnight-local-llm-205-interface-observer-v3/selection.json",
+        "lines": "1-43",
+        "use": "Counts, selected encoding, selection rule and explicit reuse/property-order warning."
+      },
+      {
+        "path": "logs/werewolf_benchmarks/overnight-local-llm-205-interface-observer-v3/summary.json",
+        "sha256": "d4c29fabc636243ba6a5845a6ad75bef6509aa02696d4139c2e21b6b9dfeb8b6",
+        "json_pointer": "/quality",
+        "use": "Recomputed all 116 guard rows; legal, correct, retries and fallback counts are separate."
+      },
+      {
+        "path": "scripts/werewolf_local_model_eval.py",
+        "lines": "173-220, 473-481, 533-535",
+        "use": "Property ordering; reversible alias and state-object transformations; dependent rotation construction; correctness includes no fallback."
+      },
+      {
+        "path": "docs/werewolf_overnight_research_index.json",
+        "lines": "15-17, 23",
+        "use": "Existing v2-v4 experiment limitations, four remaining errors and absence of clean game-strength improvement."
+      }
+    ],
+    "encoding_definitions": {
+      "numeric_string": "Official numeric-string action identifiers; the state value is itself a JSON-serialized string inside the outer JSON payload.",
+      "label_string": "Replace action identifiers and their output enum with existing unique semantic action labels; map the result back to the official identifier; retain string-encoded state.",
+      "numeric_object": "Parse the inner state into an object without adding state information; retain numeric-string identifiers.",
+      "label_object": "Combine reversible semantic action aliases with object-valued state."
+    },
+    "guard_results": [
+      {"encoding": "numeric_string", "n": 29, "correct": 13, "legal": 29, "wrong_but_legal": 16, "retries": 0, "fallbacks": 0},
+      {"encoding": "label_string", "n": 29, "correct": 23, "legal": 29, "wrong_but_legal": 6, "retries": 0, "fallbacks": 0},
+      {"encoding": "numeric_object", "n": 29, "correct": 18, "legal": 29, "wrong_but_legal": 11, "retries": 0, "fallbacks": 0},
+      {"encoding": "label_object", "n": 29, "correct": 25, "legal": 29, "wrong_but_legal": 4, "retries": 0, "fallbacks": 0}
+    ],
+    "selected_encoding": "label_object",
+    "remaining_errors": [
+      {"case": "known_clear_three_alive", "rotation": 0, "expected_action_id": "2", "actual_action_id": "1"},
+      {"case": "known_clear_three_alive_rotate4", "rotation": 4, "expected_action_id": "6", "actual_action_id": "5"},
+      {"case": "known_clear_three_alive_rotate5", "rotation": 5, "expected_action_id": "0", "actual_action_id": "6"},
+      {"case": "known_clear_three_alive_rotate6", "rotation": 6, "expected_action_id": "1", "actual_action_id": "0"}
+    ],
+    "rationale_examples": [
+      {
+        "case": "known_wolf_seer",
+        "encoding": "numeric_string",
+        "summary_lines": "989-1005",
+        "expected_action_id": "2",
+        "actual_action_id": "1",
+        "recorded_summary": "Player2 is identified as a wolf and should be eliminated.",
+        "interpretation": "A correct-sounding target statement did not accompany the expected action identifier. This is observable output inconsistency, not proof of an internal reasoning mechanism."
+      },
+      {
+        "case": "known_clear_three_alive",
+        "encoding": "label_object",
+        "summary_lines": "3013-3029",
+        "expected_action_id": "2",
+        "actual_action_id": "1",
+        "recorded_summary": "I will vote to eliminate Player1 as they are a villager and eliminating wolves is crucial.",
+        "interpretation": "The named target can agree with the emitted action while the stated reason conflicts with the task objective. Target agreement alone would miss this failure."
+      }
+    ],
+    "negative_findings_preserved": [
+      "100% legality in these guard rows is not 100% semantic correctness: every mode has wrong-but-legal choices.",
+      "Changing reasoning_summary property order alone had already failed; all four interface-selection modes used reason_first. These results do not establish that reordering fields is sufficient.",
+      "The best selected mode still has four known-clear errors; these are four cases in one dependent family, not four independent replications.",
+      "The later 16384-context same-scenario check removed context refusals/fallbacks but retained four known-clear errors and identical candidate/reference game outcomes, as recorded in the existing research index.",
+      "The interface guard improvement is not a measured tournament win-rate improvement or evidence that the local model is a stronger opponent."
+    ],
+    "causal_scope": "The measured differences describe this fixed local model, selected cases, prompts, decoder and evaluation setup. They do not identify a universal causal mechanism, establish semantic-label superiority across models, or isolate identifier binding from tokenization, formatting, salience, context length and content-position interactions."
+  },
+  "sources": [
+    {
+      "id": "zheng_2024_mcq_selectors",
+      "paper_id": "2309.03882v4",
+      "title": "Large Language Models Are Not Robust Multiple Choice Selectors",
+      "authors": ["Chujie Zheng", "Hao Zhou", "Fandong Meng", "Jie Zhou", "Minlie Huang"],
+      "published_at_utc": "2023-09-07T17:44:56Z",
+      "version_updated_at_utc": "2024-02-22T01:40:35Z",
+      "venue_verified_in_pdf": "ICLR 2024",
+      "discovered_by": "atom_selectors",
+      "landing_url_from_atom": "https://arxiv.org/abs/2309.03882v4",
+      "retrieval": {
+        "requested_url": "https://arxiv.org/pdf/2309.03882v4",
+        "retrieved_url": "https://arxiv.org/pdf/2309.03882v4",
+        "retrieved_at_pdt": "2026-10-13T07:29:10.834544-07:00",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "response_bytes": 4855732,
+        "pdf_sha256": "857c0da05b2e64596e2e22bf8c9759b98b1dafd75302b0b29e354b025ae7670f",
+        "layout_text_sha256": "00ab5376ab5006214abadcf11b720be16fc0458d9af8d7d46d54533eee609436",
+        "flow_text_sha256": "fb168d54cc7f3248c555fa53ae1a217f1e09d27b377695b9b47c290078ca6d27"
+      },
+      "sections_checked": ["1", "2.1-2.6", "3.1-3.3"],
+      "exact_short_quotes": [
+        {"quote": "they prefer to select specific option IDs as answers (like “Option A”)", "pdf_page": 1, "section": "1", "role": "Selection bias definition"},
+        {"quote": "removing option IDs usually degrades model performance", "pdf_page": 5, "section": "2.5", "role": "Important counterevidence to a universal semantic-label advantage"},
+        {"quote": "the two prompting strategies cannot mitigate selection bias well.", "pdf_page": 5, "section": "2.6", "role": "Negative result for the particular debiasing instruction and CoT prompts tested"}
+      ],
+      "source_evidence": [
+        "Tests 20 LLMs on MMLU, ARC-Challenge and CommonsenseQA; model families include LLaMA, LLaMA-2, Vicuna, Falcon and GPT-3.5-turbo-0613, not our Qwen2.5 checkpoint.",
+        "Section 2.4 separates presentation position from option-ID tokens by shuffling ID order and removing IDs. The authors attribute a substantial part of their measured selection bias to ID-token bias within that experimental setup.",
+        "Numeric symbols 1/2/3/4 were among alternative IDs tested. Table 2 gives GPT-3.5 MMLU accuracy 67.2 for default IDs and 65.8 for numeric IDs; ARC accuracy 84.3 and 82.3 respectively. Changing arbitrary ID symbols was not a universal fix.",
+        "Removing IDs reduced their recall-imbalance measure in many settings, but usually reduced accuracy for the open-model likelihood-selection protocol. GPT-3.5 Table 2 is mixed: MMLU 67.2 to 66.7, ARC 84.3 to 84.9 after removal.",
+        "For open models, no-ID selection used length-normalized option likelihoods; GPT-3.5 generated the whole selected option. Neither is the same intervention as our reversible semantic-label output enum."
+      ],
+      "local_relevance": "Direct motivation to counterbalance option positions and disentangle arbitrary identifier tokens from semantic action content. Supports treating our alias result as a testable interface observation, not a universal law.",
+      "limitations_and_nonclaims": [
+        "Do not cite this paper as proving that numeric action identifiers caused our Qwen errors or that natural-language aliases always improve correctness.",
+        "Its mechanism claims concern the tested MCQ prompting/probability protocols; they are not measurements of our structured decoder or Werewolf hidden-state reasoning.",
+        "PriDe is described as label-free because it needs no ground-truth sample labels for calibration. That term does not mean semantic action aliases or removal of option-ID tokens.",
+        "Lower selection-bias metrics and higher task accuracy are distinct objectives; both must be reported."
+      ],
+      "evaluation_rule": "Vary seat identity, option position and identifier spelling independently; report per-position accuracy/recall as well as total accuracy, and preserve any regressions."
+    },
+    {
+      "id": "tam_2024_format_restrictions",
+      "paper_id": "2408.02442v3",
+      "title": "Let Me Speak Freely? A Study on the Impact of Format Restrictions on Performance of Large Language Models",
+      "authors": ["Zhi Rui Tam", "Cheng-Kuang Wu", "Yi-Lin Tsai", "Chieh-Yen Lin", "Hung-yi Lee", "Yun-Nung Chen"],
+      "published_at_utc": "2024-08-05T13:08:24Z",
+      "version_updated_at_utc": "2024-10-14T13:57:29Z",
+      "discovered_by": "atom_format_and_rationales",
+      "landing_url_from_atom": "https://arxiv.org/abs/2408.02442v3",
+      "retrieval": {
+        "requested_url": "https://arxiv.org/pdf/2408.02442v3",
+        "retrieved_url": "https://arxiv.org/pdf/2408.02442v3",
+        "retrieved_at_pdt": "2026-10-13T07:29:17.923861-07:00",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "response_bytes": 489277,
+        "pdf_sha256": "172930a8e9166ded9df95bb9ec41aafb7f43907969d14ea2dd05240d2c902f75",
+        "layout_text_sha256": "bc368b370b9dc77d53715d7a8a09a07733fe50fd18bd74f8eeefffc6896af33c",
+        "flow_text_sha256": "6be9c316e505c524e8501f70361f7d86eccc0528c87ab2dbc07ad8a4a01d8b04"
+      },
+      "sections_checked": ["2", "3", "4.1", "5.1-5.4", "Tables 2-3", "7"],
+      "exact_short_quotes": [
+        {"quote": "100% of GPT 3.5 Turbo JSON-mode responses placed the \"answer\" key before the \"reason\" key", "pdf_page": 4, "section": "4.1", "role": "Specific observed key-order issue on Last Letter, not a universal order fix"},
+        {"quote": "performs competitively, and in some cases, surpasses the other three methodologies.", "pdf_page": 4, "section": "4.1", "role": "The subject is JSON-mode on classification datasets; preserves the positive result"},
+        {"quote": "near zero parsing error in Gemini-Flash XML and YAML, there’s still degradation in the final benchmark scores.", "pdf_page": 7, "section": "Table 3 caption", "role": "Parsing reliability and task accuracy can differ"}
+      ],
+      "source_evidence": [
+        "Compares constrained JSON-mode, format-restricting instructions, natural-language-to-format conversion and natural-language responses on reasoning and classification tasks, with prompt/schema variations.",
+        "Reports reasoning-task degradation under some restrictions and an answer-before-reason observation for GPT-3.5 on Last Letter; classification tasks sometimes benefit from JSON-mode.",
+        "Table 3 explicitly separates parsing-error percentages from task scores. Good parsing is not sufficient evidence of correct content.",
+        "Section 5.4 tests newer JSON-Schema structured output on GPT-4o-mini-2024-07-18: Table 2 gives natural-language versus JSON-Schema scores 94.57 vs 91.71 on GSM8K, 82.85 vs 81.77 on Shuffle Objects, but 83.11 vs 86.07 on Last Letter. Even within this paper, stricter output does not always reduce accuracy."
+      ],
+      "local_relevance": "Motivates measuring schema/property-order effects, completion order, reasoning budget and semantic correctness separately from JSON validity. Our negative result for reasoning_summary order alone must be retained rather than explained away.",
+      "limitations_and_nonclaims": [
+        "The tested models and provider implementations differ from local Qwen2.5/Ollama; do not transfer effect sizes or assert the same causal mechanism.",
+        "An input state encoded as a nested JSON string versus an object is a different intervention from imposing an output schema; the paper does not isolate our input-encoding effect.",
+        "The paper's JSON-mode, format instructions and JSON-Schema API are not interchangeable. Its provider-implementation assumptions are not independent audits of our decoder.",
+        "Results are task/model/prompt dependent; classification and JSON-Schema counterexamples prohibit the claim that structured output always harms reasoning.",
+        "A field-order observation in another model is not evidence that changing a JSON Schema properties order must change emitted order or fix our errors."
+      ],
+      "evaluation_rule": "Record both requested property order and actual generated order; use paired content-equivalent conditions with equal reasoning/output budgets, and score validity separately from task correctness."
+    },
+    {
+      "id": "turpin_2023_unfaithful_explanations",
+      "paper_id": "2305.04388v2",
+      "title": "Language Models Don't Always Say What They Think: Unfaithful Explanations in Chain-of-Thought Prompting",
+      "authors": ["Miles Turpin", "Julian Michael", "Ethan Perez", "Samuel R. Bowman"],
+      "published_at_utc": "2023-05-07T22:44:25Z",
+      "version_updated_at_utc": "2023-12-09T21:25:02Z",
+      "venue_verified_in_pdf": "NeurIPS 2023",
+      "discovered_by": "atom_format_and_rationales",
+      "landing_url_from_atom": "https://arxiv.org/abs/2305.04388v2",
+      "retrieval": {
+        "requested_url": "https://arxiv.org/pdf/2305.04388v2",
+        "retrieved_url": "https://arxiv.org/pdf/2305.04388v2",
+        "retrieved_at_pdt": "2026-10-13T07:29:14.463663-07:00",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "response_bytes": 836076,
+        "pdf_sha256": "f68cfafe59e7acef0f03ec0bdcfe34fb64154db8c354e17b0ee11e0c2c4bb708",
+        "layout_text_sha256": "3babdd524752fdabfe3c463fb9b3b00869459937a334b0fe907ecf741e455066",
+        "flow_text_sha256": "6f60a145ec67ff3b36a1c68e8451ed0574762fe7060f9e8cfaeaa9113e6fa5ac"
+      },
+      "sections_checked": ["Abstract", "1", "Table 1", "2"],
+      "exact_short_quotes": [
+        {"quote": "When we bias models toward incorrect answers, they frequently generate CoT explanations rationalizing those answers.", "pdf_page": 1, "section": "Abstract", "role": "Plausible explanations can rationalize biased wrong answers"},
+        {"quote": "models can give plausible reasoning that is consistent with their predicted answer but is nonetheless an unfaithful explanation", "pdf_page": 2, "section": "Table 1 caption", "role": "Surface answer/reason agreement does not establish explanation faithfulness"}
+      ],
+      "source_evidence": [
+        "Tests GPT-3.5 and Claude 1.0 with biasing features such as few-shot demonstrations whose correct option is always A, or a suggested answer; uses BBH and BBQ.",
+        "Shows that explanations may change to justify bias-consistent answers without mentioning the biasing input feature.",
+        "Table 1 explicitly demonstrates an explanation consistent with the selected answer but unfaithful as an account of what drove that selection. This is not the same endpoint as a numeric action/rationale target mismatch."
+      ],
+      "local_relevance": "A reasoning_summary is observable model output, not an oracle for correctness or a direct measurement of internal causation. Check action targets against summaries and summaries against game facts/objectives independently.",
+      "limitations_and_nonclaims": [
+        "Does not test our model, Werewolf action IDs or JSON field order.",
+        "Its unfaithfulness experiments do not prove why our four remaining errors occur.",
+        "A summary-action mismatch can be measured directly, but agreement cannot certify semantic correctness or faithful internal reasoning.",
+        "Do not use a fluent summary to override an independently scored wrong action or to infer intentional deception."
+      ],
+      "evaluation_rule": "Retain emitted action and summary side by side; score target agreement, factual consistency, objective consistency and gold-action correctness as separate observables."
+    },
+    {
+      "id": "geng_2025_jsonschemabench",
+      "paper_id": "2501.10868v3",
+      "title": "JSONSchemaBench: A Rigorous Benchmark of Structured Outputs for Language Models",
+      "authors": ["Saibo Geng", "Hudson Cooper", "Michał Moskal", "Samuel Jenkins", "Julian Berman", "Nathan Ranchin", "Robert West", "Eric Horvitz", "Harsha Nori"],
+      "published_at_utc": "2025-01-18T20:26:00Z",
+      "version_updated_at_utc": "2025-02-27T15:37:21Z",
+      "publication_status_in_retrieved_pdf": "Preprint. Under review.",
+      "discovered_by": "atom_jsonschema",
+      "landing_url_from_atom": "https://arxiv.org/abs/2501.10868v3",
+      "retrieval": {
+        "requested_url": "https://arxiv.org/pdf/2501.10868v3",
+        "retrieved_url": "https://arxiv.org/pdf/2501.10868v3",
+        "retrieved_at_pdt": "2026-10-13T07:32:25.288444-07:00",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "response_bytes": 3800079,
+        "pdf_sha256": "0c540f59b5a143f2f18de79ede30ae16b109d13698a824316bda4190ca3aa50e",
+        "layout_text_sha256": "f08149673001fa7f6c20b6a3de3bfacd789324138d37b9a14bdf5af407d6c42a",
+        "flow_text_sha256": "0707444ac5d9574c23725d271558f08b30978bf0c4bf4b0213091bcd7a9a3b4c"
+      },
+      "sections_checked": ["1", "5.1-5.2", "Definitions 5.1-5.3", "6.1-6.2", "Table 8", "Appendices B and F"],
+      "exact_short_quotes": [
+        {"quote": "Guidance consistently delivers the best performance across all tasks", "pdf_page": 12, "section": "6.2", "role": "Positive constrained-decoding result in their particular three-task quality experiment"},
+        {"quote": "The fact that we only sample the top 1 output may quantify our empirical coverage as Top 1 Empirical Coverage.", "pdf_page": 18, "section": "Appendix B, Decoding Method", "role": "Authors' explicit empirical-coverage limitation"},
+        {"quote": "no single engine outperforms the others across all instances.", "pdf_page": 28, "section": "Appendix F, Figure 8 discussion", "role": "Per-instance counterexample to a universal best-engine claim"}
+      ],
+      "source_evidence": [
+        "Separates efficiency, JSON Schema feature coverage/compliance, and downstream task quality. Accepting a schema, producing a valid sample and correctly implementing its entire accepted language are different claims.",
+        "Its coverage experiment uses Llama-3.2-1B-Instruct with one greedy sample, validator checks and compilation/generation timeouts. It reports framework-specific coverage failures; constrained output guarantees depend on feature support and implementation.",
+        "Its quality experiment instead uses Llama-3.1-8B-Instruct on Last Letters, Shuffle Objects and GSM8K. Table 8 reports LM-only scores 50.7, 52.6, 80.1 and Guidance scores 54.0, 55.9, 83.8 respectively. The other constrained engines are also no worse in that table, including a tie for Llamacpp on Shuffle Objects.",
+        "This positive constrained-decoding result is important counterevidence to a blanket reading of Tam et al. The paper uses task/prompt/schema choices derived from a rebuttal and modifies the Last Letter prompt; it does not isolate one universal cause of the earlier result.",
+        "Appendix B notes single-sample empirical coverage and validator limitations; Appendix F shows that no engine wins on every individual instance."
+      ],
+      "local_relevance": "Supports a layered reliability ledger: parsing, schema conformance, legal-action membership, task correctness, latency and fallback status. Keep grammar checks without mistaking them for correct Werewolf decisions.",
+      "limitations_and_nonclaims": [
+        "Does not evaluate Qwen2.5, our Ollama build, our action schema or our Werewolf cases; its llama.cpp results do not establish the behavior of any particular Ollama backend version.",
+        "The 10K-schema coverage collection is not 10K independent tests of semantic task correctness. Coverage and quality experiments use different models and data.",
+        "The paper's token-healing explanation is phrased as a possible attribution, not an established explanation of our alias improvement.",
+        "The paper references and extends Tam et al.; these are contrasting studies, not independent replications of our result.",
+        "A syntax/schema guarantee does not exclude choosing the wrong member of a valid action enum."
+      ],
+      "evaluation_rule": "Measure actual supported schema features and completion validity for the exact decoder/version, then separately test semantic accuracy; preserve positive and negative task effects."
+    }
+  ],
+  "synthesis": {
+    "supported_bounded_takeaways": [
+      "The verified selector-paper identity is Zheng et al., arXiv:2309.03882v4, ICLR 2024; no guessed identity is used.",
+      "Option IDs, option order and output formatting can affect results in the published experimental settings. They justify controlled interface evaluation, not an asserted mechanism for our Qwen errors.",
+      "Published evidence is mixed: removing IDs may lower accuracy; output constraints sometimes harm reasoning scores and sometimes improve them. Semantic labels and unrestricted prose are not universal remedies.",
+      "Valid JSON, schema compliance, legal action membership, correct action selection and explanation faithfulness are different properties. Our 116/116 legal guard outputs and remaining wrong actions directly illustrate that distinction.",
+      "Observed 13/29, 23/29, 18/29 and 25/29 are selected-corpus counts; four known-clear errors and the failed order-only intervention remain part of the conclusion."
+    ],
+    "our_hypotheses_not_established_facts": [
+      {"hypothesis": "Semantic aliases might reduce identifier-to-action binding difficulty or alter token preferences.", "needed_test": "Independently permute positions and arbitrary IDs; compare numeric, alphabetic and multiple semantically equivalent labels with identical game facts and reversible decoding."},
+      {"hypothesis": "Object-valued state might help by removing escaping/serialization indirection or changing salience and token budget.", "needed_test": "Verify semantic identity and round-trip reconstruction; measure actual token counts and truncation; add equal-budget/context controls before attributing the gain to nesting itself."},
+      {"hypothesis": "Some failures may involve poor use of known-clear information rather than merely output binding.", "needed_test": "Held-out known-clear cases, fact/target/objective agreement annotations and independent seat permutations; do not infer internal causes from a summary alone."}
+    ],
+    "not_supported": [
+      "All LLMs fail because of numeric action IDs.",
+      "Qwen2.5 has a proven position-bias mechanism explaining this corpus.",
+      "Reasoning-first field order fixes the observed failures.",
+      "100% structured/legal output means a competent or strategically correct agent.",
+      "25/29 on this selected corpus establishes general Werewolf strength or a tournament win-rate improvement."
+    ]
+  },
+  "future_interface_evaluation_checklist": [
+    {
+      "id": "counterbalanced_option_order",
+      "check": "Balance the correct action across presentation positions; retain stable underlying action semantics and map outputs back before scoring. Separately vary identifier-to-position mapping instead of conflating the two.",
+      "report": "Accuracy and wrong-but-legal count by position, identifier, action type and base case; paired differences and flip rates.",
+      "source_basis": ["zheng_2024_mcq_selectors"]
+    },
+    {
+      "id": "seat_permutations",
+      "check": "Apply consistent permutations to seats, player names, roles, observations, chat references, legal actions and expected targets. Include more than cyclic rotations and keep option-order changes as a separate factor.",
+      "report": "Per-seat results and dependence groups; do not count rotations of the same base case as independent evidence.",
+      "source_basis": ["local_observation", "zheng_2024_mcq_selectors"]
+    },
+    {
+      "id": "semantically_equivalent_encodings",
+      "check": "Cross numeric/arbitrary IDs versus existing semantic aliases with string-encoded versus object-valued state. Verify a bijective alias map, exact recovery of game facts, unchanged available actions and no added hidden information; use several equivalent label phrasings.",
+      "report": "Main effects, interactions, ambiguous aliases, token/byte lengths and any round-trip failures; do not call altered information content a formatting-only test.",
+      "source_basis": ["local_observation", "zheng_2024_mcq_selectors", "tam_2024_format_restrictions"]
+    },
+    {
+      "id": "heldout_cases",
+      "check": "Freeze the chosen interface, rubric and acceptance thresholds before using fresh cases and base scenario families; exclude the 29 selection guards and their direct rotations from independent confirmation.",
+      "report": "Development versus held-out results, roles, phases, known-wolf and known-clear cases, full failure list and paired uncertainty grouped by base scenario.",
+      "source_basis": ["local_observation"]
+    },
+    {
+      "id": "wrong_but_legal_rate",
+      "check": "Score parse validity, schema conformance, enum/action legality and independent gold-action correctness separately. A safe fallback is not a model-correct answer; record refusal, retry, timeout and fallback provenance.",
+      "report": "Both wrong-and-legal / all attempted decisions and wrong-and-legal / legal decisions, with explicit counts and denominators; include no-output attempts rather than silently dropping them.",
+      "source_basis": ["local_observation", "tam_2024_format_restrictions", "geng_2025_jsonschemabench"]
+    },
+    {
+      "id": "reason_action_agreement",
+      "check": "Compare the summary's named target/action with the decoded official action. Independently score whether the summary uses visible facts correctly and advances the role/team objective; agreement is not evidence of faithful internal reasoning.",
+      "report": "Action/summary target mismatches, fact contradictions, objective contradictions, ambiguous summaries and gold-action correctness; preserve raw emitted fields.",
+      "source_basis": ["local_observation", "turpin_2023_unfaithful_explanations"]
+    },
+    {
+      "id": "context_budget_controls",
+      "check": "Hold model digest, quantization, prompt facts, sampling settings and output/reasoning allowance fixed. Record actual prompt/output tokens, configured context, completion reason and truncation/refusal status; compare encodings under adequate shared context as well as matched budget controls.",
+      "report": "All-attempt and clean paired subsets with denominators; do not interpret removal of context fallbacks as an accuracy gain or silently change the reasoning budget.",
+      "source_basis": ["local_observation", "tam_2024_format_restrictions"]
+    },
+    {
+      "id": "schema_and_order_controls",
+      "check": "Treat requested property order, actual emitted order, prompt instruction order, mandatory versus optional summary and constrained versus instruction-only output as separate interventions. Verify feature support in the exact decoder version.",
+      "report": "Observed field order, semantic accuracy, schema failure rate and latency for each condition; retain the existing negative reasoning_summary-order result.",
+      "source_basis": ["local_observation", "tam_2024_format_restrictions", "geng_2025_jsonschemabench"]
+    },
+    {
+      "id": "reproducibility_and_strength_boundary",
+      "check": "Freeze source/model/schema hashes and seeds, distinguish real requests from exact cache hits, and report all candidate outcomes. Only after held-out interface checks evaluate fresh full-game paired scenarios under the existing promotion rules.",
+      "report": "No promotion from legality or guard accuracy alone; distinguish interface reliability from team win rate, opponent strength and universal claims.",
+      "source_basis": ["local_observation", "geng_2025_jsonschemabench"]
+    }
+  ],
+  "handoff_note_zh": "核实了4篇公开论文（3次arXiv检索、4次PDF下载），不是只看标题或摘要。证据并不单向支持改接口：有论文发现去掉选项编号会降准确率，也有论文发现约束输出提高任务成绩。因此这里只能说：本地这29个被用来选接口的题，换表示方式后正确数变化明显；全部合法不等于选对，最佳仍错4题，单改reasoning_summary顺序没修好。下一轮应独立打乱选项顺序和座位、使用未参与挑选的新题，并分别统计合法但选错、理由与动作是否一致、上下文截断和兜底。未改源码、测试、文档、服务或部署。"
+}

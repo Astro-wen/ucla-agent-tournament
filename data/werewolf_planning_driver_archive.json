@@ -1,0 +1,48 @@
+{
+  "archive": "logs/werewolf_benchmarks/planning-drivers-tests-audit.zip",
+  "sha256": "b1a7103eadef1d7bb02ba9f4158fa1fe99024d8e8aed5e64b3d3fb039cf80c43",
+  "files": {
+    "scripts/werewolf_planning_eval.py": {
+      "sha256": "40ce254dfdee59e221d1369fb06cc089d4ed1035bb1a2c9ee4f2d2924a17097d",
+      "bytes": 10682
+    },
+    "scripts/werewolf_planning_free_eval.py": {
+      "sha256": "8d32cb1a6cfc863ec27827afe32f5b88783e21a87c189f9a67b3f51af5f536c2",
+      "bytes": 6096
+    },
+    "scripts/audit_werewolf_planning.py": {
+      "sha256": "065df036da80f836c6dd14e1f2ba967a37eb979b015b8e998dc50d9d7002b6a4",
+      "bytes": 7780
+    },
+    "scripts/werewolf_counterfactual_eval.py": {
+      "sha256": "ad977dd810834fe542d707617be4a18620dc2a4463b4c99bb01abeace4eb999f",
+      "bytes": 11892
+    },
+    "scripts/audit_werewolf_counterfactual.py": {
+      "sha256": "0b240de182597f83d93cafe3d97d5bcd2ffde260c6c7074de186ca8bfdb05001",
+      "bytes": 10956
+    },
+    "scripts/audit_werewolf_strength.py": {
+      "sha256": "2531ab6a0cffc1c85595269dfc0622d77e8541c9bdc2137acd7ac61de2f5a9c5",
+      "bytes": 43605
+    },
+    "tests/strategy/test_werewolf_planning_research.py": {
+      "sha256": "2aa296b01b222d51ada645c36799c091f4b0b7b6863821143ead9f6d2fa17eff",
+      "bytes": 9777
+    },
+    "tests/strategy/test_werewolf_planning_free_research.py": {
+      "sha256": "242c01685a26956a0c212a66537787d44bbc412d4d3140250746d5c3809ab50d",
+      "bytes": 1906
+    },
+    "data/werewolf_planning_plan.json": {
+      "sha256": "5dd2c2304a8fee6cf4b71d41b68e88688ef5361ae6340f2efacec82faf1ee6bc",
+      "bytes": 4291
+    },
+    "data/werewolf_planning_free_plan.json": {
+      "sha256": "6c770daeea1cfd93b058c9b45d9ad37cea36ea3b1fd5baaa6e23e7ac56622b8a",
+      "bytes": 1350
+    }
+  },
+  "unique_evaluation_deals_verified": 6160,
+  "scope": "offline planning evaluators/tests/plans complement to frozen model/runtime source; not deployment"
+}

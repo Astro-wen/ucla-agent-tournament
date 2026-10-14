@@ -37,6 +37,13 @@ SEED_REGISTRIES = {
     "evidence": (DEVELOPMENT_SEEDS, HELDOUT_SEEDS),
     # Registered before the guarding-strategy search; original confirmation seeds are already consumed.
     "guards": (tuple(range(161, 170)), (29301, 29302)),
+    "simple": (tuple(range(171, 180)), (30701, 30702)),
+    "overnight": (tuple(range(181, 210)), (33101, 33102)),
+    "scale_simple": (tuple(range(211, 220)), (35301, 35302)),
+    "strength": (tuple(range(231, 240)), (37301, 37302)),
+    "causal": (tuple(range(251, 260)), (39701, 39702)),
+    "planning": (tuple(range(271, 280)), (41901, 41902)),
+    "evolution": (tuple(range(501, 520)), (46101, 46102)),
 }
 DEFAULT_BACKGROUNDS = ("first", "random", "heuristic", "llmq", "rt_wolfpack", "rt_talker", "rt_detective", "rt_chaos")
 VARIANTS = ("reference", "candidate", "wolf_only", "village_only")
@@ -394,7 +401,8 @@ def source_manifest():
     files = set()
     for directory in SOURCE_ROOTS:
         files.update(ROOT.glob(f"{directory}/**/*.py"))
-    for pattern in ("pyproject.toml", "requirements*.txt", "requirements*.lock", "uv.lock", "poetry.lock", "champion/VERSION"):
+    for pattern in ("pyproject.toml", "requirements*.txt", "requirements*.lock", "uv.lock", "poetry.lock", "champion/VERSION",
+                    "data/werewolf_learned_likelihoods.json"):
         files.update(ROOT.glob(pattern))
     files = sorted(files)
     hashes = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}

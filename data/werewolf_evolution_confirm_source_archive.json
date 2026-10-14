@@ -1,0 +1,10 @@
+{
+  "created": "2026-10-14T06:30:30.079033-07:00",
+  "source_digest": "da2cb24add4209d73a26586a83ce43c15770de204b45cedeef9768d9e134d19e",
+  "files": 314,
+  "archive": "/Users/szh/Documents/SZH/Project/Agent Competition SAIR/logs/werewolf_benchmarks/evolution-confirmation-frozen-source.zip",
+  "archive_sha256": "4b0d571df27af6a5fc821ecdf1e142f8053a6eb536832eef2aa9a5b61e032bc5",
+  "scope": "Frozen46101/46102vote-only candidate confirmation source; no deployment",
+  "selected": "vote_only",
+  "model_sha256": "1fafeafb51c24d60d4242a27a67744c841a591fd08a0507f4865d0d479440d4a"
+}

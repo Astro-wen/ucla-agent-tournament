@@ -1,0 +1,13 @@
+{
+  "scope": "Local14Blanguage-model sensitivity pilot for the frozen candidate selected by505/506ablation, not model-size training or formal strength confirmation",
+  "model": {"name": "qwen2.5:14b-instruct-q4_K_M", "sha256": "7cdf5a0187d5c58cc5d369b255592f7841d1c4696d45a8c8a9489440385b22f6", "endpoint": "http://127.0.0.1:11437", "context": 16384, "encoding": "label_object", "temperature": 0, "decoder_seed": 1013, "output_tokens": 192, "rules": "exact public game rules supplied"},
+  "opponent_guard": "Filter model legal choices by its own private seer checks/inferred clears and authenticated dead-seer reports; prefer unread checks. No access to actual hidden roles; arbitrary wolf daytime buses remain legal. The guard may improve factual reliability, but is not presumed to make a stronger overall opponent.",
+  "sample": {"seed": 515, "backgrounds": ["llmq", "rt_detective", "pop_coordinated", "pop_observed_switch"], "controlled_role": "wolf", "quota_per_background": 4, "pairs": 16, "other_model_seats": 2, "selection": "first role-matching deals up to1000perbackground, no outcome filtering", "placements": "two noncontrolled seats sampled with fixed evaluator-only RNG before outcomes"},
+  "comparison": "B0 versus fixed selected factory, same deals and same initial otherplayers; reference then candidate; provider request cache reuses only identical model/config/prompt/schema keys",
+  "timing": "strictRT, existing post-termination observation adapter, model seats may be allies as well as opponents",
+  "metrics": "team wins paired, all invalid/schema/retry/fallback/context events, exact requests and cache keys, per-seat guards; complete and clean-pair summaries separately, never drop failures from primary raw result",
+  "limits": "wolf-only16pairs cannot estimate overall win rate or top-opponent strength; do not reselect candidate or tune prompt from this pilot",
+  "resources": {"deadline": "2026-10-14T07:15:00-07:00", "request_timeout_seconds": 20, "max_model_requests": 600, "min_free_disk_gib": 2, "max_new_swap_mib": 1024, "stop_at_critical_memory_pressure": true, "unload_only_model_loaded_by_this_run": true},
+  "external_cost_usd": 0,
+  "production_changes": false
+}

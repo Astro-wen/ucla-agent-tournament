@@ -1,0 +1,19 @@
+{
+  "scope": "Catalog of accumulated offline Werewolf research on strategy/werewolf-evidence-search; no submitted entry or default strategy promotion",
+  "human_entrypoints": ["docs/werewolf_benchmark.md", "docs/werewolf_evidence_strategy.md", "docs/progress.md"],
+  "fixed_baseline": "data/werewolf_current_baseline.json",
+  "research_lines": [
+    {"topic": "strategy literature, factor combinations, scheduling and local model interfaces", "index": "docs/werewolf_overnight_research_index.json", "sources": ["data/werewolf_strategy_sources.json", "data/werewolf_interface_sources.json"]},
+    {"topic": "7B/14B capacity diagnostics and complete minimal-policy comparisons", "reports": ["data/werewolf_model_scale_diagnostics.json", "data/werewolf_minimal_scripted_summary.json", "data/werewolf_minimal_model_retry1_summary.json", "data/werewolf_scale_simple_verification.json"]},
+    {"topic": "public commitments, bluffing and night-target rules with heldout confirmation", "index": "data/werewolf_strength_research_index.json", "audit": "data/werewolf_strength_confirmation_audit.json"},
+    {"topic": "B0 versus naive controlled-seat baselines, full-game counterfactuals and first-check action values", "index": "data/werewolf_causal_research_index.json"},
+    {"topic": "online information-set full-terminal planning and ungated control", "index": "data/werewolf_planning_research_index.json"},
+    {"topic": "direct terminal-payoff program evolution, component selection, independent confirmation, mixture/model stress and robust search through08:00", "index": "data/werewolf_until8_research_index.json"}
+  ],
+  "strongest_primary_panel_result": "WW-EVO-VOTE-20261014: strictRT52.45%to54.75% on28000paired heldout deals, but cross-timing detective regression prevents overall robust adoption",
+  "current_default": "B0 unchanged",
+  "limits": ["Fixed-panel evidence is not a global optimum or tournament ranking", "Negative experiments and confidence intervals retained", "Model/training/replay/real-evaluation counts separated", "Other-game issues recorded but out of research scope"],
+  "versioned_assets": "Code, tests, plans, fixed small learned parameters, results, audits and artifact indexes",
+  "local_only_assets": "Raw synthetic game/request logs, frozen source ZIPs, temporary native profiler output and large model weights; hashes and locations retained in artifact indexes, not uploaded as scratch logs",
+  "push_scope": {"user_explicitly_confirmed": true, "private_repo": "Astro-wen/ucla-agent-tournament", "branch": "strategy/werewolf-evidence-search", "after": "2026-10-14T08:00:00-07:00", "never": "submitted public repo, main, live runtime or configuration"}
+}

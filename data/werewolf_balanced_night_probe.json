@@ -1,0 +1,1218 @@
+{
+  "base": {
+    "winner": "wolf",
+    "win": true,
+    "observations": [
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {},
+        "wolves_left": 2,
+        "scores": {
+          "0": 0.0,
+          "2": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "6": 0.0
+        },
+        "target": [
+          0,
+          "remove the most trusted villager"
+        ]
+      },
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {
+          "0": "villager"
+        },
+        "wolves_left": 2,
+        "scores": {
+          "2": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "6": 1.0
+        },
+        "target": [
+          2,
+          "remove the most trusted villager"
+        ]
+      },
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {
+          "0": "villager",
+          "2": "villager",
+          "1": "wolf"
+        },
+        "wolves_left": 1,
+        "scores": {
+          "3": 0.4,
+          "5": 0.30000000000000004,
+          "6": 0.30000000000000004
+        },
+        "target": [
+          5,
+          "remove the most trusted villager"
+        ]
+      }
+    ],
+    "votes": [
+      {
+        "day": 1,
+        "votes": {
+          "0": 1,
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "eliminated": 0
+      },
+      {
+        "day": 2,
+        "votes": {
+          "1": 3,
+          "3": 1,
+          "4": 3,
+          "5": 1,
+          "6": 1
+        },
+        "eliminated": 1
+      },
+      {
+        "day": 3,
+        "votes": {
+          "3": 4,
+          "4": 3,
+          "6": 3
+        },
+        "eliminated": 3
+      }
+    ],
+    "deaths": [
+      {
+        "day": 1,
+        "seat": 0,
+        "role": "villager",
+        "cause": "vote"
+      },
+      {
+        "day": 2,
+        "seat": 2,
+        "role": "villager",
+        "cause": "night_kill"
+      },
+      {
+        "day": 2,
+        "seat": 1,
+        "role": "wolf",
+        "cause": "vote"
+      },
+      {
+        "day": 3,
+        "seat": 5,
+        "role": "seer",
+        "cause": "night_kill"
+      },
+      {
+        "day": 3,
+        "seat": 3,
+        "role": "villager",
+        "cause": "vote"
+      }
+    ],
+    "controlled_actions": [
+      {
+        "day": 1,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          0,
+          2,
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "0",
+        "observed_checks": null,
+        "action": 0
+      },
+      {
+        "day": 1,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          0,
+          1,
+          2,
+          3,
+          5,
+          6,
+          7
+        ],
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "0",
+        "observed_checks": null,
+        "action": 0
+      },
+      {
+        "day": 2,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          2,
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "2",
+        "observed_checks": null,
+        "action": 2
+      },
+      {
+        "day": 2,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          1,
+          3,
+          5,
+          6,
+          7
+        ],
+        "alive": [
+          1,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "3",
+        "observed_checks": null,
+        "action": 3
+      },
+      {
+        "day": 3,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "5",
+        "observed_checks": null,
+        "action": 5
+      },
+      {
+        "day": 3,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          3,
+          6,
+          7
+        ],
+        "alive": [
+          3,
+          4,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "3",
+        "observed_checks": null,
+        "action": 3
+      }
+    ]
+  },
+  "balanced": {
+    "winner": "wolf",
+    "win": true,
+    "observations": [
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {},
+        "wolves_left": 2,
+        "scores": {
+          "0": 0.0,
+          "2": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "6": 0.0
+        },
+        "target": [
+          0,
+          "remove the most trusted villager"
+        ]
+      },
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {
+          "0": "villager"
+        },
+        "wolves_left": 2,
+        "scores": {
+          "2": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "6": 1.0
+        },
+        "target": [
+          2,
+          "remove the most trusted villager"
+        ]
+      },
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {
+          "0": "villager",
+          "2": "villager",
+          "1": "wolf"
+        },
+        "wolves_left": 1,
+        "scores": {
+          "3": 0.4,
+          "5": 0.30000000000000004,
+          "6": 0.30000000000000004
+        },
+        "target": [
+          5,
+          "remove the most trusted villager"
+        ]
+      }
+    ],
+    "votes": [
+      {
+        "day": 1,
+        "votes": {
+          "0": 1,
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "eliminated": 0
+      },
+      {
+        "day": 2,
+        "votes": {
+          "1": 3,
+          "3": 1,
+          "4": 3,
+          "5": 1,
+          "6": 1
+        },
+        "eliminated": 1
+      },
+      {
+        "day": 3,
+        "votes": {
+          "3": 4,
+          "4": 3,
+          "6": 3
+        },
+        "eliminated": 3
+      }
+    ],
+    "deaths": [
+      {
+        "day": 1,
+        "seat": 0,
+        "role": "villager",
+        "cause": "vote"
+      },
+      {
+        "day": 2,
+        "seat": 2,
+        "role": "villager",
+        "cause": "night_kill"
+      },
+      {
+        "day": 2,
+        "seat": 1,
+        "role": "wolf",
+        "cause": "vote"
+      },
+      {
+        "day": 3,
+        "seat": 5,
+        "role": "seer",
+        "cause": "night_kill"
+      },
+      {
+        "day": 3,
+        "seat": 3,
+        "role": "villager",
+        "cause": "vote"
+      }
+    ],
+    "controlled_actions": [
+      {
+        "day": 1,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          0,
+          2,
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "0",
+        "observed_checks": null,
+        "action": 0
+      },
+      {
+        "day": 1,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          0,
+          1,
+          2,
+          3,
+          5,
+          6,
+          7
+        ],
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "0",
+        "observed_checks": null,
+        "action": 0
+      },
+      {
+        "day": 2,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          2,
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "2",
+        "observed_checks": null,
+        "action": 2
+      },
+      {
+        "day": 2,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          1,
+          3,
+          5,
+          6,
+          7
+        ],
+        "alive": [
+          1,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "3",
+        "observed_checks": null,
+        "action": 3
+      },
+      {
+        "day": 3,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "5",
+        "observed_checks": null,
+        "action": 5
+      },
+      {
+        "day": 3,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          3,
+          6,
+          7
+        ],
+        "alive": [
+          3,
+          4,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "3",
+        "observed_checks": null,
+        "action": 3
+      }
+    ]
+  },
+  "extremes": {
+    "winner": "wolf",
+    "win": true,
+    "observations": [
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {},
+        "wolves_left": 2,
+        "scores": {
+          "0": 0.0,
+          "2": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "6": 0.0
+        },
+        "target": [
+          6,
+          "equal-trust target reduces wolves at the public seat extremes"
+        ]
+      },
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {
+          "0": "villager"
+        },
+        "wolves_left": 2,
+        "scores": {
+          "2": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "6": 1.0
+        },
+        "target": [
+          2,
+          "remove the most trusted villager"
+        ]
+      },
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {
+          "0": "villager",
+          "2": "villager",
+          "1": "wolf"
+        },
+        "wolves_left": 1,
+        "scores": {
+          "3": 0.4,
+          "5": 0.30000000000000004,
+          "6": 0.30000000000000004
+        },
+        "target": [
+          5,
+          "remove the most trusted villager"
+        ]
+      }
+    ],
+    "votes": [
+      {
+        "day": 1,
+        "votes": {
+          "0": 1,
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "eliminated": 0
+      },
+      {
+        "day": 2,
+        "votes": {
+          "1": 3,
+          "3": 1,
+          "4": 3,
+          "5": 1,
+          "6": 1
+        },
+        "eliminated": 1
+      },
+      {
+        "day": 3,
+        "votes": {
+          "3": 4,
+          "4": 3,
+          "6": 3
+        },
+        "eliminated": 3
+      }
+    ],
+    "deaths": [
+      {
+        "day": 1,
+        "seat": 0,
+        "role": "villager",
+        "cause": "vote"
+      },
+      {
+        "day": 2,
+        "seat": 2,
+        "role": "villager",
+        "cause": "night_kill"
+      },
+      {
+        "day": 2,
+        "seat": 1,
+        "role": "wolf",
+        "cause": "vote"
+      },
+      {
+        "day": 3,
+        "seat": 5,
+        "role": "seer",
+        "cause": "night_kill"
+      },
+      {
+        "day": 3,
+        "seat": 3,
+        "role": "villager",
+        "cause": "vote"
+      }
+    ],
+    "controlled_actions": [
+      {
+        "day": 1,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          0,
+          2,
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "6",
+        "observed_checks": null,
+        "action": 6
+      },
+      {
+        "day": 1,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          0,
+          1,
+          2,
+          3,
+          5,
+          6,
+          7
+        ],
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "0",
+        "observed_checks": null,
+        "action": 0
+      },
+      {
+        "day": 2,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          2,
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "2",
+        "observed_checks": null,
+        "action": 2
+      },
+      {
+        "day": 2,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          1,
+          3,
+          5,
+          6,
+          7
+        ],
+        "alive": [
+          1,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "3",
+        "observed_checks": null,
+        "action": 3
+      },
+      {
+        "day": 3,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "5",
+        "observed_checks": null,
+        "action": 5
+      },
+      {
+        "day": 3,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          3,
+          6,
+          7
+        ],
+        "alive": [
+          3,
+          4,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "3",
+        "observed_checks": null,
+        "action": 3
+      }
+    ]
+  },
+  "tie_high": {
+    "winner": "wolf",
+    "win": true,
+    "observations": [
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {},
+        "wolves_left": 2,
+        "scores": {
+          "0": 0.0,
+          "2": 0.0,
+          "3": 0.0,
+          "5": 0.0,
+          "6": 0.0
+        },
+        "target": [
+          6,
+          "same trust priority; high-seat tie break"
+        ]
+      },
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {
+          "0": "villager"
+        },
+        "wolves_left": 2,
+        "scores": {
+          "2": 1.0,
+          "3": 1.0,
+          "5": 1.0,
+          "6": 1.0
+        },
+        "target": [
+          6,
+          "same trust priority; high-seat tie break"
+        ]
+      },
+      {
+        "me": 4,
+        "role": "wolf",
+        "alive": [
+          3,
+          4,
+          5,
+          6
+        ],
+        "allies": [
+          1
+        ],
+        "dead": {
+          "0": "villager",
+          "2": "villager",
+          "1": "wolf"
+        },
+        "wolves_left": 1,
+        "scores": {
+          "3": 0.4,
+          "5": 0.30000000000000004,
+          "6": 0.30000000000000004
+        },
+        "target": [
+          6,
+          "same trust priority; high-seat tie break"
+        ]
+      }
+    ],
+    "votes": [
+      {
+        "day": 1,
+        "votes": {
+          "0": 1,
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "eliminated": 0
+      },
+      {
+        "day": 2,
+        "votes": {
+          "1": 3,
+          "3": 1,
+          "4": 3,
+          "5": 1,
+          "6": 1
+        },
+        "eliminated": 1
+      },
+      {
+        "day": 3,
+        "votes": {
+          "3": 4,
+          "4": 3,
+          "5": 3
+        },
+        "eliminated": 3
+      }
+    ],
+    "deaths": [
+      {
+        "day": 1,
+        "seat": 0,
+        "role": "villager",
+        "cause": "vote"
+      },
+      {
+        "day": 2,
+        "seat": 2,
+        "role": "villager",
+        "cause": "night_kill"
+      },
+      {
+        "day": 2,
+        "seat": 1,
+        "role": "wolf",
+        "cause": "vote"
+      },
+      {
+        "day": 3,
+        "seat": 6,
+        "role": "villager",
+        "cause": "night_kill"
+      },
+      {
+        "day": 3,
+        "seat": 3,
+        "role": "villager",
+        "cause": "vote"
+      }
+    ],
+    "controlled_actions": [
+      {
+        "day": 1,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          0,
+          2,
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "6",
+        "observed_checks": null,
+        "action": 6
+      },
+      {
+        "day": 1,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          0,
+          1,
+          2,
+          3,
+          5,
+          6,
+          7
+        ],
+        "alive": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "0",
+        "observed_checks": null,
+        "action": 0
+      },
+      {
+        "day": 2,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          2,
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "6",
+        "observed_checks": null,
+        "action": 6
+      },
+      {
+        "day": 2,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          1,
+          3,
+          5,
+          6,
+          7
+        ],
+        "alive": [
+          1,
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "3",
+        "observed_checks": null,
+        "action": 3
+      },
+      {
+        "day": 3,
+        "seat": 4,
+        "phase": "night_wolf",
+        "legal": [
+          3,
+          5,
+          6
+        ],
+        "alive": [
+          3,
+          4,
+          5,
+          6
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "6",
+        "observed_checks": null,
+        "action": 6
+      },
+      {
+        "day": 3,
+        "seat": 4,
+        "phase": "day_vote",
+        "legal": [
+          3,
+          5,
+          7
+        ],
+        "alive": [
+          3,
+          4,
+          5
+        ],
+        "investigations_before": {},
+        "kind": "action",
+        "choice": "3",
+        "observed_checks": null,
+        "action": 3
+      }
+    ]
+  }
+}
