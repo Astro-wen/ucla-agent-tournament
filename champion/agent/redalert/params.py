@@ -74,6 +74,28 @@ DEFAULTS: dict[str, float] = {
     "deploy_pending_ticks": 375,    # an MCV deploy the platform accepted is not resent for this long (0: v4.5, 100)
     "harv_spread": 0,               # idle harvesters to the field with the most ore per harvester near our refineries;
     "harv_share": 3,                # one moves on when more than harv_share share a refinery's field (off: no gain)
+    # v4.7 switches (ARENA_RA_ATTACK_GATE=0 ARENA_RA_TRADE_RETREAT=0 ARENA_RA_RECOVER=0, attack_comp off by default:
+    # the v4.6 behaviour exactly); see docs/redalert_design.md section 18
+    "attack_gate": 1,               # the attack decision: a larger margin while no enemy building was ever seen
+    "gate_unseen_ratio": 1.6,       # (instead of attack_ratio), the blind prior keeps growing after prior_cap up to
+    "prior_late_cap": 13000,        # prior_late_cap, and seen towers / artillery weigh gate_def_w (they shoot first)
+    "gate_def_w": 1.5,
+    "trade_retreat": 1,             # the attack group falls back when the running trade is clearly losing: over the
+    "trade_window_s": 12,           # last trade_window_s our losses >= trade_loss_ratio x our kills, >= trade_min_loss
+    "trade_loss_ratio": 1.5,        # and >= trade_min_frac of the wave's value (0.2 tried: it stopped charges into
+    "trade_min_loss": 1500,         # nashball's post that won, kills lag behind the first deaths; the two real losses
+    "trade_min_frac": 0.33,         # lost 40% of the wave in 10-11 s)
+    "trade_cum_ratio": 1.0,         # ... and only while the wave's losses since it set out >= this x its kills (0: no
+                                    # such check; real wins fffc7ced / 971ec5dc: a bad 12 s after a good exchange)
+    "attack_comp": 0,               # attack waves take vehicles, rocket / grenade infantry and at most
+    "comp_rifles_per_veh": 0.5,     # comp_rifles_per_veh rifles per vehicle; the other rifles stay home as guards
+    "comp_min_veh": 5,              # (only once the wave has comp_min_veh vehicles and from comp_from_s: a small early
+    "comp_from_s": 360,             # wave without its rifles is too weak, dev seeds 1404002 / 1405014). Off: the sim
+                                    # has no crush / splash, so it cannot judge it, and human RA armies keep rifles
+    "recover": 1,                   # after a failed wave: recover_s of defend-and-rebuild (next wave needs
+    "recover_s": 240,               # recover_mult x the failed wave; recover_towers towers at home while their army
+    "recover_mult": 1.6,            # is the bigger one, 0 = none: dev seed 1405014, 3 towers ate the money before
+    "recover_towers": 0,            # riffo's push)
 }
 
 
