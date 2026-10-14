@@ -914,9 +914,29 @@ def test_recover_after_a_failed_wave_wants_a_bigger_army_and_towers(monkeypatch)
         assert a._should_attack(v, 14000.0, 12, 6, go=[]) == (not on)
         assert a._should_attack(v, 16500.0, 12, 6, go=[])
         if on:
-            assert a.towers_wanted(v) >= int(p.recover_towers)       # their army is the bigger one: towers
+            assert p.recover_towers == 0                             # (towers off by default)
             v.tick += int(p.recover_s * 25) + 1
             assert not a.recovering(v)
+
+
+def test_recover_towers_when_their_army_is_the_bigger_one():
+    for towers in ("0", "3"):
+        pol, v = _late_view({**V46, "ARENA_RA_RECOVER": "1", "ARENA_RA_RECOVER_TOWERS": towers})
+        a = pol.army
+        base_want = a.towers_wanted(v)
+        a.state, a.wave_value = "ENGAGE", 10000.0
+        a._start_retreat(v, [], [], "losing trade")
+        assert a.recovering(v)
+        want = a.towers_wanted(v)                                    # blind prior 9000 > our handful of units
+        assert want == (max(base_want, 3) if towers == "3" else base_want), (towers, base_want, want)
+
+
+def test_v47_defaults_gate_trade_recover_on_comp_off_and_the_off_set_is_v46():
+    p = load_params({})
+    assert p.attack_gate and p.trade_retreat and p.recover and not p.attack_comp
+    assert p.trade_min_frac == 0.33 and p.recover_towers == 0
+    off = load_params(V46)
+    assert not (off.attack_gate or off.trade_retreat or off.recover or off.attack_comp)
 
 
 def test_v47_switches_leave_the_summary_fields_and_never_raise():
