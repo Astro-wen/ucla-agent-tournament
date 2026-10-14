@@ -875,24 +875,28 @@ def test_trade_retreat_falls_back_when_the_running_trade_is_clearly_losing(monke
 
 
 def test_attack_comp_keeps_most_rifles_home():
-    for env, kept in ((V46, 0), ({**V46, "ARENA_RA_ATTACK_COMP": "1"}, 8)):
+    for env, kept in ((V46, 0), ({**V46, "ARENA_RA_ATTACK_COMP": "1"}, 7)):
         pol, v = _late_view(env)
         a = pol.army
         units = {}
         for k in range(10):
             units[900000 + k] = {"id": 900000 + k, "type": "e1", "hp": 100 - k, "x": 30, "y": 44, "idle": True}
-        for k in range(4):
+        for k in range(6):
             units[900100 + k] = {"id": 900100 + k, "type": "2tnk", "hp": 100, "x": 30, "y": 44, "idle": True}
         units[900200] = {"id": 900200, "type": "e3", "hp": 100, "x": 30, "y": 44, "idle": True}
         v.unit_by_id.update(units)
         ids = sorted(units)
-        go, stay = a._launch_split(v, ids, 4)
+        go, stay = a._launch_split(v, ids, 6)
         assert len(stay) == kept
         if kept:
-            # vehicles, rockets and the 2 healthiest rifles (0.5 per vehicle) go
-            assert set(go) == {900000, 900001} | {900100 + k for k in range(4)} | {900200}
-        assert a._launch_split(v, [i for i in ids if units[i]["type"] == "e1"], 0) == (
-            [i for i in ids if units[i]["type"] == "e1"], [])           # no vehicle: no split
+            # vehicles, rockets and the 3 healthiest rifles (0.5 per vehicle) go
+            assert set(go) == {900000, 900001, 900002} | {900100 + k for k in range(6)} | {900200}
+        rifles = [i for i in ids if units[i]["type"] == "e1"]
+        assert a._launch_split(v, rifles, 0) == (rifles, [])          # no vehicle: no split
+        four = rifles + [900100 + k for k in range(4)]
+        assert a._launch_split(v, four, 4) == (four, [])               # a small wave (< comp_min_veh) keeps them
+        v.game_s = 300.0
+        assert a._launch_split(v, ids, 6) == (ids, [])                 # an early wave (< comp_from_s) too
 
 
 def test_recover_after_a_failed_wave_wants_a_bigger_army_and_towers(monkeypatch):

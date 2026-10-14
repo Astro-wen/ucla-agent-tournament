@@ -86,6 +86,8 @@ DEFAULTS: dict[str, float] = {
     "trade_min_frac": 0.2,
     "attack_comp": 0,               # attack waves take vehicles, rocket / grenade infantry and at most
     "comp_rifles_per_veh": 0.5,     # comp_rifles_per_veh rifles per vehicle; the other rifles stay home as guards
+    "comp_min_veh": 5,              # (only once the wave has comp_min_veh vehicles and from comp_from_s: a small early
+    "comp_from_s": 360,             # wave without its rifles is too weak, dev seeds 1404002 / 1405014)
     "recover": 0,                   # after a failed wave: recover_s of defend-and-rebuild (next wave needs
     "recover_s": 240,               # recover_mult x the failed wave, recover_towers towers at home)
     "recover_mult": 1.6,

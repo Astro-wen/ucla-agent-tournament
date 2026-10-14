@@ -397,7 +397,8 @@ class Army:
             want = max(want, 1 if v.game_s < p.safety_tower_s + 60 else int(p.safety_towers))
         if self.threatened and v.game_s < 360 and self.threat_value > floor:
             want = max(want, 1 if self.threat_value < 1500 else 2)
-        if self.recovering(v) and self.enemy_strength(v) > self.value(self.main | self.home, v):
+        if p.recover_towers > 0 and self.recovering(v) and \
+                self.enemy_strength(v) > self.value(self.main | self.home, v):
             # recover: a wave failed and their army is the bigger one: towers hold the counter-push (real losses
             # f5ce0e92 / d527c9fa: the counter-push came 40 s / 5 minutes after the failed wave)
             want = max(want, int(p.recover_towers))
@@ -883,6 +884,8 @@ class Army:
         p = self.pol.p
         if not p.attack_comp or n_veh <= 0 or self.mode == "allin":
             return ids, []
+        if n_veh < p.comp_min_veh or v.game_s < p.comp_from_s:
+            return ids, []                             # an early, small wave needs its rifles
         rifles = [i for i in ids if v.unit_by_id[i]["type"] == "e1"]
         keep = int(p.comp_rifles_per_veh * n_veh)
         if len(rifles) <= keep:
