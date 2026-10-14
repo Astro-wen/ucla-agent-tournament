@@ -92,16 +92,16 @@ OPP_W = -1.0             # >= 0: a fixed mixture weight (no likelihood update); 
 OPP_MIN_KNOWN = 6        # the prior must know at least this many of the draft's species, else the model stays off
 W_EPS = 1e-3             # w below this: the v4.3 search; above 1 - W_EPS: no adversary branch
 # Counter term of the meta-like opponent (10-13, ARENA_DRAFT_OPPCTR; 0 = the v4.4 opponent model exactly). The real
-# contestants also pick cards that beat OUR roster (fit_meta_drafter.py's counter term gamma, ~2.6 on 36 real drafts;
-# Dragonfly ~3.6). With OPP_CTR = 1 and a prior file that carries `gamma` (fitted WITH the counter term), the meta-like
+# contestants also pick cards that beat OUR roster (fit_meta_drafter.py's counter term gamma, 2.41 on 41 real drafts;
+# Dragonfly + Steve Nash Equilibrium alone 2.31). With OPP_CTR = 1 and a prior file that carries `gamma` (fitted WITH the counter term), the meta-like
 # opponent's preference for card x at a search node is  u[x] + gamma * mean_{d in our roster there} (beats(x, d) - 0.5),
 # in the likelihood of its observed picks (w), in the expected pick of an opponent node and in its greedy roll-outs.
 OPP_CTR = 0.0            # scales the file's gamma; 0 = off. A prior file without `gamma` (draft_meta.json) = off too
 # Which opponent-model set (ARENA_DRAFT_METASET): the prior file, OPP_PRIOR and OPP_CTR together. The explicit knobs
 # (ARENA_DRAFT_META / OPPPRIOR / OPPCTR) still override each part.
 #   v44   draft_meta.json (22 real drafts 10-08/09, u only), prior 0.2, no counter term = the v4.4 opponent model
-#   1013  draft_meta_1013.json (36 real drafts to 10-13, incl. Dragonfly / Steve Nash Equilibrium), prior 0.5,
-#         counter term on (used only if the file carries gamma)
+#   1013  draft_meta_1013.json (41 real drafts to 10-13, incl. 10 vs Dragonfly, 1 vs Steve Nash Equilibrium; u fitted
+#         with the counter term), prior 0.5, counter term on (used only if the file carries gamma)
 META_PATH_1013 = Path(__file__).resolve().parent / "draft_meta_1013.json"
 META_SETS = {"v44": (META_PATH, 0.2, 0.0), "1013": (META_PATH_1013, 0.5, 1.0)}
 # 1013 (default since 10-13): vs a Dragonfly stand-in on fresh seed 173, 121/160 vs v4.4 106/160 (+9.4, McNemar
