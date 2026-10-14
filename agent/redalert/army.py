@@ -107,6 +107,7 @@ class Army:
         self._main_types: dict[int, str] = {}   # trade_retreat: the attack group as of the last view (id -> type)
         self._trade: list[tuple[int, float, float]] = []    # (tick, our losses, our kills) in the current wave
         self._kills_prev: float | None = None
+        self._trade_last = (0.0, 0.0)
         self.trade_retreats = 0
         self.recover_tick = -10 ** 9    # recover: the last failed wave
         self.comp_kept = 0              # attack_comp: rifles kept home at wave launches
@@ -1028,12 +1029,16 @@ class Army:
             return False
         lost = sum(t[1] for t in self._trade)
         kills = sum(t[2] for t in self._trade)
+        self._trade_last = (lost, kills)
         return lost >= p.trade_min_loss and lost >= p.trade_min_frac * max(1.0, self.wave_value) and \
             lost >= p.trade_loss_ratio * kills
 
     def _start_retreat(self, v, out, ids, why: str) -> None:
         if self.state != "RETREAT":
-            self.pol.log_event(f"retreat at {v.game_s:.0f}s ({why})")
+            extra = ""
+            if why == "losing trade":
+                extra = f": lost {self._trade_last[0]:.0f}, killed {self._trade_last[1]:.0f}, wave {self.wave_value:.0f}"
+            self.pol.log_event(f"retreat at {v.game_s:.0f}s ({why}{extra})")
             if why in ("outmatched", "losing trade"):
                 self.fail_mult = min(2.0, self.fail_mult * 1.25)
                 self.last_fail_value = max(self.last_fail_value, self.wave_value)
