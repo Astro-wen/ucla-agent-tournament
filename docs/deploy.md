@@ -38,7 +38,7 @@
 ### 主人的一次性准备（按顺序）
 
 1. **登录**：用 UCLA Google 账号登录 <https://platform.altruagent-game.com/tournament>，把报名做完（问卷、接受 Official Rules、agent 名字、公开的代码仓库）。报名没做完时 key 会被拒（403 `registration_incomplete`）。
-2. **Agent Configuration 页面**（`/tournament/dashboard/agent-setup`）：选 **Self Hosted**（不要选 Oracle Hosted：那是交 Markdown 提示词让平台代跑，选了它我们的 key 会被拒；10-08 时它也还没开放）。**截止（10-13 23:59 PDT）后托管方式改不了**：切回 Self Hosted 只能在截止前，所以截止后别再碰这个设置。然后生成 Official Agent Key（`eak_live_` + 64 位十六进制）。泄露了就在同一页面重新生成（新 key 替换旧 key，旧 key 开的会话立刻失效），再换进 `.env`、`systemctl --user restart arena-agent@main`（比赛进行中这样做要马上通知主办方，见下面「比赛进行中的规矩」）。
+2. **Agent Configuration 页面**（`/tournament/dashboard/agent-setup`）：选 **Self Hosted**（不要选 Oracle Hosted：那是交 Markdown 提示词让平台代跑，选了它我们的 key 会被拒；10-08 时它也还没开放）。**截止（10-15 19:00 PDT，主办方 10-13 从 10-13 23:59 推迟）后托管方式改不了**：切回 Self Hosted 只能在截止前，所以截止后别再碰这个设置。然后生成 Official Agent Key（`eak_live_` + 64 位十六进制）。泄露了就在同一页面重新生成（新 key 替换旧 key，旧 key 开的会话立刻失效），再换进 `.env`、`systemctl --user restart arena-agent@main`（比赛进行中这样做要马上通知主办方，见下面「比赛进行中的规矩」）。
 3. **放进主机的 `.env`**（只在要跑比赛的那台机器上；不要贴到聊天、GitHub、截图里）：
 
 ```bash
@@ -64,7 +64,7 @@ Docker 同理：`--env-file` 指向放 eak key 的文件（权限 600）；一�
 | PDT | 北京时间 | 做什么 | 看什么 |
 |---|---|---|---|
 | 10-13 截止前（建议白天） | 10-14 凌晨–上午 | 最后一次合进 `main` 并推送。比赛机部署**截止时 `main` 上最新的那个提交**，不用 tag（规则第 8 节：比赛版本就是截止时默认分支上最新的提交）：`git switch main && git pull --ff-only origin main`，记下 `git rev-parse HEAD`（截止后 `main` 不会再动，它就是比赛版本）。用压缩包时从这个提交**重新打包**：`bash scripts/bundle.sh`，包里的 `COMMIT` 文件必须是同一个提交号、没有 `built with uncommitted changes`。然后 `python -m pytest -q`、`selfcheck.py`、`check-tournament`。**如果按方案 C 交一个单独的公开仓库**（这个开发仓库保持私有）：先在开发仓库里 `bash scripts/publish_sync.sh --commit <main 的提交> --out <目录>`（结尾必须是 `READY`），把导出的内容提交、推送到公开仓库；比赛机从**公开仓库的全新 clone** 部署它 `main` 上最新的提交（不要从开发仓库部署），上面这些检查在那个 clone 里做；dashboard 上登记的提交号（有这个栏的话）也是公开仓库的提交号 | 全绿、每行 ✓；`git status` 干净；提交号 = GitHub 上（参赛的那个仓库）`main` 的最新提交；方案 C：公开仓库最新提交的树哈希（`git rev-parse HEAD^{tree}`）= `publish_sync.sh` 打印的树哈希 |
-| **10-13 23:59** | **10-14 14:59** | **提交截止（2026-10-14T06:59Z）**。之后到成绩公布后至少 30 天，**不往参赛仓库推任何东西**（不提交、不改历史、不改回私有、不删仓库），不换版本；测试赛关闭；Agent Configuration 也不能再切回 Self Hosted | — |
+| **10-15 19:00** | **10-16 10:00** | **提交截止（2026-10-16T02:00Z；主办方 10-13 从 10-13 23:59 推迟）**。之后到成绩公布后至少 30 天，**不往参赛仓库推任何东西**（不提交、不改历史、不改回私有、不删仓库），不换版本；测试赛关闭；Agent Configuration 也不能再切回 Self Hosted | — |
 | 10-14 – 10-15 | | 比赛机保持截止提交；可以在本地测（不改提交的版本）。把截止提交号和比赛机配置（去掉 key 的 `.env`、systemd 单元）记到仓库以外的地方 | `grep 'deployed:' logs/agent-main.out` 的最后一行 = 截止提交号 |
 | 10-16 7:00 | 10-16 22:00 | 确认只有计划中的机器在跑这把 key（主机；热备只在主办方同意后）；`free -m`、`df -h` | 内存 ≥ 1.2 GB × 预计并发场数；磁盘 ≥ 3 GB（日志上限约 2 GB） |
 | 10-16 8:30 | 10-16 23:30 | 登录 dashboard：有「规则已更新，请重新同意」就**马上同意**；Tournaments 页面每个要打的比赛都按过 **Register my agent** | 没有待同意的规则；报名状态完整 |
@@ -365,7 +365,7 @@ python scripts/rehearsal_official.py --bundle /tmp/x/arena-agent-* --out /tmp/of
 - **只开 `--match` 的进程不会接正式赛**：每一局正式赛它只打一次警告（`You have a tournament game waiting …: run with --tournament to play it`），那一局会因为 no-show 判负。看门脚本默认两个都开，不会出这个问题。
 - **`--claim` 现在会怎样**：只打印上游的停用说明（`Testing claim codes were retired; run with --match …`）后退出（退出码 1），不连平台。看门脚本拒绝 `--claim`。
 - **还没开打的座位每 10–20 s 起一个短命 worker，是正常的**：对局还在大厅里时（分配的 `match_status` 是 `lobby` / `pending`，比如开放座位还没人加入），平台对 `grant` 回 409 `assignment_not_grantable`，「还没准备好」和「已经结束」是同一个代码。SDK 的 worker 把它当成已结束：日志 `[match … seat=…] assignment already ended; nothing to play`，接着运行时打 `Match finished.`，冷却 10 s、再等下一次查询后重来。所以**同一个座位反复出现 `Match assigned` / `Starting match...` / `assignment already ended; nothing to play` / `Match finished.`，意思是对局还在大厅里，不是结束了**。每一轮起一个新进程、加载一遍 agent（约 1–2 s CPU）、用 key 认证一次；对局一准备好，下一个 worker 在约 20–30 s 内连上（正式赛的连接窗口默认 4 分钟，来得及）。这是 SDK 原有的行为，main 上一样（10-06 复审用真 worker、假时钟测过：60 s 里起 4 次 worker，每次退出码 0）。
-- 测试对局不计分：漏掉不算输，只是别的座位在等你；开始等人后 20 分钟还没到齐就取消（无结果；红警测试对局两边 15 分钟内没到齐就无结果结束）。**提交截止（10-13 23:59 PDT）后不能再建测试赛**，最后的真实测试要在那之前打完。
+- 测试对局不计分：漏掉不算输，只是别的座位在等你；开始等人后 20 分钟还没到齐就取消（无结果；红警测试对局两边 15 分钟内没到齐就无结果结束）。**提交截止（10-15 19:00 PDT）后不能再建测试赛**，最后的真实测试要在那之前打完。
 - 红警测试对局（v4.3 起）：我们的规则型 bot 会真的打（见上面「被分到红警」）。建议先两个座位都选 "Mine (self-hosted)" 自对弈，三张地图各打几局，看日志里的 `[match-summary] … game=red_alert` 行（`invalid_action=0`、`rejected` 很少、`exceptions=0`）和稀疏录像；`ARENA_RA=off` 时整场只回答 `WAIT`，那样就不要用它测红警。
 
 ## 每局都在录

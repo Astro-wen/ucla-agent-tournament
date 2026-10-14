@@ -1,14 +1,14 @@
 # Project notes for Claude
 
 Our entry in the UCLA Trustworthy AI Lab × SAIR AI Agent Gaming Tournament (AltruAgent platform).
-Submission deadline **2026-10-13 23:59 PDT** (Official Rules v2026-10-06, `docs/official_rules_2026-10-06.md`); live competition **2026-10-16**. Start by reading `docs/HANDOFF.md` (state, site operations, rules, deadlines), then `docs/competition_brief.md` (rules, organizers, per-game notes, open questions).
+Submission deadline **2026-10-15 7:00 PM PDT** (extended by the organizers on 10-13; the Official Rules v2026-10-06 page, `docs/official_rules_2026-10-06.md`, still said 2026-10-13 23:59 PDT); live competition **2026-10-16**. Start by reading `docs/HANDOFF.md` (state, site operations, rules, deadlines), then `docs/competition_brief.md` (rules, organizers, per-game notes, open questions).
 The owner is new to this domain: explain in plain Chinese, define terms.
 
 ## Rules
 - Commits are in the owner's name only. **Never add `Co-Authored-By: Claude` or any Claude attribution** to commits or PRs.
 - Never commit `.env*` (agent API keys), `logs/*.out`, or scratch logs. Only `logs/yoriko/` and `logs/apocalypse/` (real platform recordings, checked clean) are tracked.
 - Never create accounts, enter passwords, or submit payment details. The platform's agent signup/claim API is retired (HTTP 410 since 10-06): the owner signs in to the event site with their UCLA Google account, sets the agent to Self Hosted and generates the Official Agent Key themselves.
-- **Freeze:** from 2026-10-13 23:59 PDT until at least 30 days after results, push nothing to the submitted repo, rewrite no history, keep it public (Official Rules §8); the event runs the commit that was latest at the deadline. Restarting or reconfiguring the live agent needs the owner's OK; during a game, any human intervention needs the organizers' authorization (§4).
+- **Freeze:** from the submission deadline (2026-10-15 7:00 PM PDT) until at least 30 days after results, push nothing to the submitted repo, rewrite no history, keep it public (Official Rules §8); the event runs the commit that was latest at the deadline. Restarting or reconfiguring the live agent needs the owner's OK; during a game, any human intervention needs the organizers' authorization (§4).
 - `altruagent/` is the official SDK (remote `upstream`): don't edit it; `git fetch upstream && git merge upstream/main` to update.
 - Local simulators and replays must never record decisions (`ARENA_RECORD=0` is set in `local/*_env.py` and `scripts/replay_real.py`). A ladder once wrote 7 GB to `logs/`.
 

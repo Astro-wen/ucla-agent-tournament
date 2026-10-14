@@ -311,7 +311,7 @@ flowchart LR
 ## Submitted version
 
 The submitted version is the **latest commit on this repository's default branch (`main`) at the Submission
-Deadline**, 11:59 p.m. PDT on October 13, 2026 (2026-10-14T06:59Z). The competition machine runs exactly that commit:
+Deadline**, 7:00 p.m. PDT on October 15, 2026 (2026-10-16T02:00Z), as extended by the Organizers. The competition machine runs exactly that commit:
 a fresh clone of it, or a bundle built from it with `bash scripts/bundle.sh` (the bundle's `COMMIT` file names the full
 commit id). Every start of `scripts/run_agent.sh` logs the full commit id and the `ARENA_*` settings in effect. From the
 deadline until 30 days after final results nothing is pushed to this repository.

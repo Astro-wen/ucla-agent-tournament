@@ -1,7 +1,7 @@
 # UCLA AI Agent Gaming Tournament 2026：我们的参赛仓库（开发用，私有）
 
 > UCLA Trustworthy AI Lab × SAIR「首届 AI Agent 游戏锦标赛」，平台 AltruAgent。我们的 agent 叫 **YurikoRed**（参赛者显示名 Yuriko Red）。
-> 提交截止 **2026-10-13 23:59 PDT（2026-10-14T06:59Z，北京时间 10-14 14:59）**；现场比赛 **2026-10-16**（UCLA Engineering VI，观众全线上）。
+> 提交截止 **2026-10-15 19:00 PDT（2026-10-16T02:00Z，北京时间 10-16 10:00）**（主办方 10-13 从 10-13 23:59 推迟；规则页当时还写着旧日期）；现场比赛 **2026-10-16**（UCLA Engineering VI，观众全线上）。
 > 官网：<https://altruagent-game.com/> · 平台：<https://platform.altruagent-game.com/tournament> · 规则：[`docs/official_rules_2026-10-06.md`](docs/official_rules_2026-10-06.md)
 > **新接手的人先读 [`docs/HANDOFF.md`](docs/HANDOFF.md)**（现状、网站操作、规则、截止前要做的事）。
 
@@ -289,7 +289,7 @@ bash scripts/run_agent.sh start        # 部署：一直开着上面那条，崩
 git fetch upstream && git merge upstream/main
 ```
 
-`README.md` 是我们自己的；上游的 README 原文放在 `docs/STARTER_README.md`。合并时 README 冲突取我们的版本，再用 `git show upstream/main:README.md > docs/STARTER_README.md` 更新原文，上游新增的要点在本文件里补一两句。`agent/agent.py` 永远取我们的（上游的是只走第一个合法动作的占位 agent）。`agent/__main__.py` 以上游为准，我们的加固（`_authenticate` 启动重试、`_tournament_tuning` execution id 和按座位退避上限 30 s、`_HotStandby` 热备、`_startup` 本机检查）在它上面手工保留；`.env.example` 取上游的说明行，再补回我们自己的几行。合完跑 `tests/test_deploy.py`、`tests/test_main.py`、`tests/test_main_tournament.py`、`tests/test_realtime.py` 和全量 pytest。10-07 合到上游 5bc61a2（PR #5），10-08 合到上游 951f4f7（PR #7），记录见 `docs/progress.md`「v4.2.3 合并」「v4.2.4」。**提交截止（10-13 23:59 PDT）之后不再合并上游**：规则第 8 节禁止截止后改仓库，只有主办方书面授权的更新例外。
+`README.md` 是我们自己的；上游的 README 原文放在 `docs/STARTER_README.md`。合并时 README 冲突取我们的版本，再用 `git show upstream/main:README.md > docs/STARTER_README.md` 更新原文，上游新增的要点在本文件里补一两句。`agent/agent.py` 永远取我们的（上游的是只走第一个合法动作的占位 agent）。`agent/__main__.py` 以上游为准，我们的加固（`_authenticate` 启动重试、`_tournament_tuning` execution id 和按座位退避上限 30 s、`_HotStandby` 热备、`_startup` 本机检查）在它上面手工保留；`.env.example` 取上游的说明行，再补回我们自己的几行。合完跑 `tests/test_deploy.py`、`tests/test_main.py`、`tests/test_main_tournament.py`、`tests/test_realtime.py` 和全量 pytest。10-07 合到上游 5bc61a2（PR #5），10-08 合到上游 951f4f7（PR #7），记录见 `docs/progress.md`「v4.2.3 合并」「v4.2.4」。**提交截止（10-15 19:00 PDT）之后不再合并上游**：规则第 8 节禁止截止后改仓库，只有主办方书面授权的更新例外。
 
 ## 安全
 
