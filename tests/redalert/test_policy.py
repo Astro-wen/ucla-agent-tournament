@@ -802,3 +802,153 @@ def test_counter_ratio():
     # nothing to shoot back: inf; nothing on our side: 0
     assert counters.ratio([("e1", 1, 1.0)], [("harv", 2, 1.0)], r) == float("inf")
     assert counters.ratio([], [("e1", 1, 1.0)], r) == 0.0
+
+
+# ---- v4.7: attack decisions (docs/redalert_design.md section 18) -----------------------------------------------------
+V46 = {"ARENA_RA_ATTACK_GATE": "0", "ARENA_RA_TRADE_RETREAT": "0", "ARENA_RA_ATTACK_COMP": "0",
+       "ARENA_RA_RECOVER": "0"}                                     # every v4.7 switch off: v4.6
+
+
+def _late_view(env, game_s=520.0):
+    """A policy after a few seconds of play, its view moved to `game_s` and blind (no look at the enemy base)."""
+    srv = server()
+    pol = RedAlertPolicy(params=load_params(env))
+    drive(srv, pol, 2)
+    v = pol.view
+    v.game_s, v.tick = game_s, int(game_s * 25)
+    pol.army.intel_tick = -10 ** 9
+    return pol, v
+
+
+def test_attack_gate_wants_a_bigger_margin_until_an_enemy_building_was_seen(monkeypatch):
+    from agent.redalert import army as army_mod
+    monkeypatch.setattr(army_mod.counters, "ratio", lambda ours, theirs, rules: 1.4)
+    for env, unseen_ok in ((V46, True), ({**V46, "ARENA_RA_ATTACK_GATE": "1"}, False)):
+        pol, v = _late_view(env)
+        a, p = pol.army, pol.p
+        # the blind prior: capped at prior_cap (v4.6), growing on to prior_late_cap with the gate
+        cap = p.prior_late_cap if p.attack_gate else p.prior_cap
+        assert a.prior(v) == min(cap, p.prior_rate * (520 - 90))
+        assert not a.base_seen
+        # 1.4x the enemy (by counters) is enough for v4.6; the gate wants 1.6x while no building was ever seen
+        assert a._should_attack(v, 9000.0, 12, 6, go=[]) == unseen_ok
+        a.base_seen = True
+        assert a._should_attack(v, 9000.0, 12, 6, go=[])
+
+
+def test_attack_gate_weighs_towers_and_artillery_more():
+    for env, w in ((V46, 1.0), ({**V46, "ARENA_RA_ATTACK_GATE": "1"}, 1.5)):
+        pol, v = _late_view(env)
+        a = pol.army
+        a.intel_tick = v.tick                                       # not blind: only what we saw
+        a.enemy_blds[777] = {"type": "gun", "tick": v.tick, "x": 70, "y": 50, "hp": 100}
+        a.enemy_units[778] = {"type": "arty", "tick": v.tick, "x": 70, "y": 52, "hp": 100}
+        force = dict((t, n) for t, n, _f in a.enemy_force(v))
+        assert force["gun"] == w and abs(force["arty"] - w) < 1e-9
+
+
+def test_trade_retreat_falls_back_when_the_running_trade_is_clearly_losing(monkeypatch):
+    for env, on in ((V46, False), ({**V46, "ARENA_RA_TRADE_RETREAT": "1"}, True)):
+        pol, v = _late_view(env)
+        a, p = pol.army, pol.p
+        a.state, a.wave_value = "ENGAGE", 12000.0
+        monkeypatch.setattr(pol.prod, "stranded", lambda view: False)
+        # the attack group's dead (full cost) and our kills are tracked view by view during a wave
+        a._main_types, a._kills_prev = {987654: "3tnk", 987655: "e1"}, v.kills
+        a._trade_track(v, [])
+        lost = pol.static.rules.cost("3tnk") + pol.static.rules.cost("e1")
+        assert a._trade == [(v.tick, float(lost), 0.0)]
+        # real loss d527c9fa, 525-536 s: 5150 lost for 3100 killed -> fall back; an even trade or a small loss: no
+        a._trade = [(v.tick, 5150.0, 3100.0)]
+        assert a._trade_losing(v, (40, 45))
+        assert bool(p.trade_retreat) == on                          # (the switch acts where _main_step calls it)
+        if on:
+            a._trade = [(v.tick, 5150.0, 3600.0)]
+            assert not a._trade_losing(v, (40, 45))
+            a._trade = [(v.tick, 1400.0, 0.0)]                      # below trade_min_loss
+            assert not a._trade_losing(v, (40, 45))
+            # real win fffc7ced: the wave had killed 5400 for ~3000 before a bad dozen seconds (2600 for 400)
+            a._trade, a._trade_cum = [(v.tick, 2600.0, 400.0)], [3000.0, 5400.0]
+            assert not a._trade_losing(v, (40, 45))
+            a._trade_cum = [5150.0, 3100.0]
+            a._trade = [(v.tick, 5150.0, 3100.0)]
+            out = []
+            a._start_retreat(v, out, [], "losing trade")
+            assert a.state == "RETREAT" and a.trade_retreats == 1 and a.last_fail_value == 12000.0
+            assert a.fail_mult > 1.0 and a._trade == []
+
+
+def test_attack_comp_keeps_most_rifles_home():
+    for env, kept in ((V46, 0), ({**V46, "ARENA_RA_ATTACK_COMP": "1"}, 7)):
+        pol, v = _late_view(env)
+        a = pol.army
+        units = {}
+        for k in range(10):
+            units[900000 + k] = {"id": 900000 + k, "type": "e1", "hp": 100 - k, "x": 30, "y": 44, "idle": True}
+        for k in range(6):
+            units[900100 + k] = {"id": 900100 + k, "type": "2tnk", "hp": 100, "x": 30, "y": 44, "idle": True}
+        units[900200] = {"id": 900200, "type": "e3", "hp": 100, "x": 30, "y": 44, "idle": True}
+        v.unit_by_id.update(units)
+        ids = sorted(units)
+        go, stay = a._launch_split(v, ids, 6)
+        assert len(stay) == kept
+        if kept:
+            # vehicles, rockets and the 3 healthiest rifles (0.5 per vehicle) go
+            assert set(go) == {900000, 900001, 900002} | {900100 + k for k in range(6)} | {900200}
+        rifles = [i for i in ids if units[i]["type"] == "e1"]
+        assert a._launch_split(v, rifles, 0) == (rifles, [])          # no vehicle: no split
+        four = rifles + [900100 + k for k in range(4)]
+        assert a._launch_split(v, four, 4) == (four, [])               # a small wave (< comp_min_veh) keeps them
+        v.game_s = 300.0
+        assert a._launch_split(v, ids, 6) == (ids, [])                 # an early wave (< comp_from_s) too
+
+
+def test_recover_after_a_failed_wave_wants_a_bigger_army_and_towers(monkeypatch):
+    from agent.redalert import army as army_mod
+    monkeypatch.setattr(army_mod.counters, "ratio", lambda ours, theirs, rules: 3.0)
+    for env, on in ((V46, False), ({**V46, "ARENA_RA_RECOVER": "1"}, True)):
+        pol, v = _late_view(env)
+        a, p = pol.army, pol.p
+        a.base_seen = True
+        a.state, a.wave_value = "ENGAGE", 10000.0
+        a._start_retreat(v, [], [], "outmatched")
+        assert a.recovering(v) == on
+        a._go(v, "GATHER")
+        # 1.4x the failed wave: enough for v4.6 (1.3x), not while recovering (recover_mult 1.6x)
+        assert a._should_attack(v, 14000.0, 12, 6, go=[]) == (not on)
+        assert a._should_attack(v, 16500.0, 12, 6, go=[])
+        if on:
+            assert p.recover_towers == 0                             # (towers off by default)
+            v.tick += int(p.recover_s * 25) + 1
+            assert not a.recovering(v)
+
+
+def test_recover_towers_when_their_army_is_the_bigger_one():
+    for towers in ("0", "3"):
+        pol, v = _late_view({**V46, "ARENA_RA_RECOVER": "1", "ARENA_RA_RECOVER_TOWERS": towers})
+        a = pol.army
+        base_want = a.towers_wanted(v)
+        a.state, a.wave_value = "ENGAGE", 10000.0
+        a._start_retreat(v, [], [], "losing trade")
+        assert a.recovering(v)
+        want = a.towers_wanted(v)                                    # blind prior 9000 > our handful of units
+        assert want == (max(base_want, 3) if towers == "3" else base_want), (towers, base_want, want)
+
+
+def test_v47_defaults_gate_trade_recover_on_comp_off_and_the_off_set_is_v46():
+    p = load_params({})
+    assert p.attack_gate and p.trade_retreat and p.recover and not p.attack_comp
+    assert p.trade_min_frac == 0.33 and p.recover_towers == 0 and p.trade_cum_ratio == 1.0
+    off = load_params(V46)
+    assert not (off.attack_gate or off.trade_retreat or off.recover or off.attack_comp)
+
+
+def test_v47_switches_leave_the_summary_fields_and_never_raise():
+    for env in (V46, {"ARENA_RA_ATTACK_GATE": "1", "ARENA_RA_TRADE_RETREAT": "1", "ARENA_RA_ATTACK_COMP": "1",
+                      "ARENA_RA_RECOVER": "1"}):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params(env))
+        drive(srv, pol, 60)
+        text = pol.summary_text()
+        assert "trade_retreats=0" in text and "comp_kept=" in text and "base_seen=" in text
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0

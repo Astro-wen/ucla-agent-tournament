@@ -299,4 +299,6 @@ class RedAlertPolicy:
                 f"waves={s['army']['waves']} harv_emergencies={s['harv_emergencies']} sales={s['sales']} "
                 f"power_cancels={s['power_cancels']} hunt_seen={s['army']['hunt_seen']} "
                 f"rescouts={s['army']['rescouts']} harv_pulls={s['army']['harv_pulls']} "
-                f"harv_helps={s['army']['harv_helps']} early_army={int(s['army']['early_army'])}" + harv)
+                f"harv_helps={s['army']['harv_helps']} early_army={int(s['army']['early_army'])} "
+                f"base_seen={int(s['army']['base_seen'])} trade_retreats={s['army']['trade_retreats']} "
+                f"comp_kept={s['army']['comp_kept']}" + harv)

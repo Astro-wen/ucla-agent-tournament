@@ -22,6 +22,7 @@ HARV_HELP_RANGE = 40       # free combat units this close go help it
 HARV_FLEE = 7              # cells a harvester drives away from its attackers when its refinery is on their side
 EARLY_ARMY_S = 120         # econ_first: signs of an early enemy army before this (scout killed in their base, 2+
 EARLY_ARMY_VALUE = 700     # barracks, or this much of their combat units seen) -> a few more rifles and one tower
+ARTILLERY = frozenset({"arty", "v2rl"})     # attack_gate: long-range units that outrange an attack walking in
 
 
 def _centroid(pts):
@@ -101,6 +102,16 @@ class Army:
         self.mode = "normal"            # endgame: normal / hold / careful / allin
         self.tag = "opening"
         self.v = None
+        # v4.7 (docs/redalert_design.md section 18)
+        self.base_seen = False          # attack_gate: an enemy building was seen at least once
+        self._main_types: dict[int, str] = {}   # trade_retreat: the attack group as of the last view (id -> type)
+        self._trade: list[tuple[int, float, float]] = []    # (tick, our losses, our kills) in the current wave
+        self._kills_prev: float | None = None
+        self._trade_last = (0.0, 0.0)
+        self._trade_cum = [0.0, 0.0]    # trade_retreat: our losses / kills since the wave started
+        self.trade_retreats = 0
+        self.recover_tick = -10 ** 9    # recover: the last failed wave
+        self.comp_kept = 0              # attack_comp: rifles kept home at wave launches
 
     # ---- bookkeeping ----------------------------------------------------------------------------------------------
     def cost(self, t: str) -> int:
@@ -165,11 +176,16 @@ class Army:
                 self.home.add(uid)
             elif self.state in ("GATHER", "RETREAT", "DEFEND"):
                 self.main.add(uid)
+            elif self.pol.p.attack_comp and t == "e1":
+                self.home.add(uid)                    # attack_comp: rifles made during a wave guard the base
             else:
                 self.reinf.add(uid)
         # infantry over the home quota (after a rush) joins the attack group
         if not self.rush and len(self.home) > quota + 2:
             extra = sorted(self.home)[quota:]
+            if self.pol.p.attack_comp and self.state not in ("GATHER", "RETREAT", "DEFEND"):
+                # attack_comp: during a wave the rifles stay home (rockets / grenadiers still reinforce it)
+                extra = [i for i in extra if v.unit_by_id[i]["type"] != "e1"]
             for uid in extra:
                 self.home.discard(uid)
                 (self.main if self.state in ("GATHER", "RETREAT", "DEFEND") else self.reinf).add(uid)
@@ -204,6 +220,8 @@ class Army:
         self.enemy_peak = max(vis_val, peak)
         for b in v.enemy_blds:
             self.enemy_blds[b["id"]] = {"type": b["type"], "tick": v.tick, "x": b["x"], "y": b["y"], "hp": b["hp"]}
+            if b["type"] not in WALLS:
+                self.base_seen = True
         for k in [k for k, e in self.enemy_units.items() if v.tick - e["tick"] > 240 * 25]:
             del self.enemy_units[k]
         mine = [(u["x"], u["y"]) for u in v.units]
@@ -267,7 +285,10 @@ class Army:
         p = self.pol.p
         # (tried: minus what we killed in the last 3 minutes; tuning seed 501 116 -> 107 / 120 and 507 47 -> 34 / 60:
         # a skirmish won early made the first attack go too soon)
-        return min(float(p.prior_cap), max(0.0, p.prior_rate * (v.game_s - 90.0)))
+        # attack_gate: the cap grows on (real loss f5ce0e92: blind at 8:44 the prior said 9000, the army we met mid-map
+        # was ~12000: 24 rifles, 10 rockets, 5 heavy tanks)
+        cap = max(p.prior_cap, p.prior_late_cap) if p.attack_gate else p.prior_cap
+        return min(float(cap), max(0.0, p.prior_rate * (v.game_s - 90.0)))
 
     def enemy_towers(self) -> float:
         return sum(self.cost(b["type"]) for b in self.enemy_blds.values() if b["type"] in GROUND_DEFENSES)
@@ -304,8 +325,11 @@ class Army:
             rest = target - total
             for t, share in (("e1", 0.3), ("e3", 0.15), (tank, 0.55)):
                 vals[t] = vals.get(t, 0.0) + share * rest
-        force = [(t, x / max(1, self.cost(t)), 1.0) for t, x in vals.items()]
-        force += [(b["type"], 1.0, max(0.1, b["hp"] / 100.0)) for b in self.enemy_blds.values()
+        # attack_gate: towers and artillery shoot first (range, a fixed position we walk into: real loss d527c9fa,
+        # gun + pbox + 2 artillery of range 12 at home)
+        w_def = float(self.pol.p.gate_def_w) if self.pol.p.attack_gate else 1.0
+        force = [(t, x / max(1, self.cost(t)) * (w_def if t in ARTILLERY else 1.0), 1.0) for t, x in vals.items()]
+        force += [(b["type"], w_def, max(0.1, b["hp"] / 100.0)) for b in self.enemy_blds.values()
                   if b["type"] in GROUND_DEFENSES]
         return force
 
@@ -375,7 +399,19 @@ class Army:
             want = max(want, 1 if v.game_s < p.safety_tower_s + 60 else int(p.safety_towers))
         if self.threatened and v.game_s < 360 and self.threat_value > floor:
             want = max(want, 1 if self.threat_value < 1500 else 2)
+        if p.recover_towers > 0 and self.recovering(v) and \
+                self.enemy_strength(v) > self.value(self.main | self.home, v):
+            # recover: a wave failed and their army is the bigger one: towers hold the counter-push (real losses
+            # f5ce0e92 / d527c9fa: the counter-push came 40 s / 5 minutes after the failed wave)
+            want = max(want, int(p.recover_towers))
         return min(4, want)
+
+    def recovering(self, v) -> bool:
+        """recover: within recover_s of a failed wave (retreat after being outmatched / a losing trade) and no new
+        wave since."""
+        p = self.pol.p
+        return bool(p.recover) and v.tick - self.recover_tick < p.recover_s * 25 and self.state not in (
+            "ADVANCE", "ENGAGE", "SIEGE", "HUNT")
 
     def real_attack(self, v) -> bool:
         """A real attack on the base (an early rush, or the threat at home worth real_threat or more), as opposed to
@@ -729,7 +765,7 @@ class Army:
             self.stuck_pos, self.stuck_count = None, 0
             self.nothing_since = None
 
-    def _should_attack(self, v, main_val: float, n: int, n_veh: int) -> bool:
+    def _should_attack(self, v, main_val: float, n: int, n_veh: int, go=None) -> bool:
         p = self.pol.p
         if n == 0 or self.mode in ("hold", "careful"):
             return False
@@ -740,12 +776,18 @@ class Army:
         if p.counter_value and strength > 0:
             theirs = self.enemy_force(v)
             if theirs:
-                ids = sorted(i for i in self.main if i in v.unit_by_id)
+                ids = go if go is not None else sorted(i for i in self.main if i in v.unit_by_id)
                 r = counters.ratio(self.own_force(ids, v), theirs, v.st.rules)
                 eq = min(r, 100.0) * strength
-        if strength > 0 and eq < p.attack_ratio * strength:
+        ratio = p.attack_ratio
+        if p.attack_gate and not self.base_seen:
+            # attack_gate: we never saw one of their buildings, so neither their towers nor the army at home (real
+            # loss f5ce0e92: blind, 0 buildings seen all match, 20k went and traded 3.6k for 9.4k)
+            ratio = max(ratio, p.gate_unseen_ratio)
+        if strength > 0 and eq < ratio * strength:
             return False
-        if self.last_fail_value > 0 and main_val < 1.3 * self.last_fail_value:
+        mult = p.recover_mult if self.recovering(v) else 1.3
+        if self.last_fail_value > 0 and main_val < mult * self.last_fail_value:
             return False                               # the last wave had to retreat: come back bigger
         if n >= p.attack_min_units and main_val >= p.attack_min_value * self.fail_mult:
             return True
@@ -789,6 +831,8 @@ class Army:
             self.wp = self._first_wp(v)
             self.wp_tick = v.tick
         state = self.state
+        if self.pol.p.trade_retreat:
+            self._trade_track(v, ids)
         if state == "DEFEND":
             return                                    # _defend drives it; back to GATHER when the threat is gone
         if state == "GATHER":
@@ -799,6 +843,9 @@ class Army:
             return
         if self.mode == "hold" and not self._nearly_won(v, c):
             self._start_retreat(v, out, ids, "hold the lead")
+            return
+        if self.pol.p.trade_retreat and self._trade_losing(v, c):
+            self._start_retreat(v, out, ids, "losing trade")
             return
         near_enemies = self._enemies_near(v, c, self.pol.p.engage_radius + 2)
         near_blds = [b for b in v.enemy_blds if dist((b["x"], b["y"]), c) <= 14]
@@ -832,14 +879,44 @@ class Army:
                 return k
         return max(0, len(st.waypoints) - 1)
 
+    def _launch_split(self, v, ids, n_veh):
+        """attack_comp: the wave takes the vehicles, the rocket / grenade infantry and at most comp_rifles_per_veh
+        rifles per vehicle (a screen); the other rifles stay home (10% damage against heavy armour, and crushed and
+        splashed in the engine: real loss d527c9fa, 21 rifles went, 5 came back). No vehicle: no split."""
+        p = self.pol.p
+        if not p.attack_comp or n_veh <= 0 or self.mode == "allin":
+            return ids, []
+        if n_veh < p.comp_min_veh or v.game_s < p.comp_from_s:
+            return ids, []                             # an early, small wave needs its rifles
+        rifles = [i for i in ids if v.unit_by_id[i]["type"] == "e1"]
+        keep = int(p.comp_rifles_per_veh * n_veh)
+        if len(rifles) <= keep:
+            return ids, []
+        # the healthiest rifles go with the wave
+        rifles.sort(key=lambda i: (-v.unit_by_id[i]["hp"], i))
+        stay = set(rifles[keep:])
+        return [i for i in ids if i not in stay], sorted(stay)
+
     def _gather(self, v, out, ids, main_val, n_veh) -> None:
         st = v.st
         rally = st.rally or v.base
-        if self._should_attack(v, main_val, len(ids), n_veh):
+        go, stay = self._launch_split(v, ids, n_veh)
+        go_val = self.value(go, v) if stay else main_val
+        if self._should_attack(v, go_val, len(go), n_veh, go=go if stay else None):
+            if stay:
+                for i in stay:
+                    self.main.discard(i)
+                    self.home.add(i)
+                self.comp_kept += len(stay)
+                ids, main_val = go, go_val
             self.waves += 1
             self.wave_value = main_val
+            self.recover_tick = -10 ** 9
+            self._trade = []
+            self._trade_cum = [0.0, 0.0]
             self.pol.log_event(f"attack wave {self.waves} at {v.game_s:.0f}s: {len(ids)} units, value {main_val:.0f}, "
-                               f"enemy strength {self.enemy_strength(v):.0f} (towers {self.enemy_towers():.0f})")
+                               f"enemy strength {self.enemy_strength(v):.0f} (towers {self.enemy_towers():.0f})"
+                               + (f", {len(stay)} rifles stay home" if stay else ""))
             self._go(v, "ADVANCE")
             self.wp = self._first_wp(v)
             self.wp_tick = v.tick
@@ -925,12 +1002,61 @@ class Army:
             return True
         return False
 
+    def _trade_track(self, v, ids) -> None:
+        """trade_retreat: per view, the value of the attack group's units that died since the last view (full cost,
+        as the platform counts deaths) and the kills since then, kept for the current wave."""
+        rules = v.st.rules
+        lost = sum(self.cost(t) for i, t in self._main_types.items() if i not in v.unit_by_id)
+        kills = max(0, v.kills - self._kills_prev) if self._kills_prev is not None else 0
+        self._kills_prev = v.kills
+        self._main_types = {i: v.unit_by_id[i]["type"] for i in ids if is_combat(v.unit_by_id[i]["type"], rules)}
+        if self.state in ("ADVANCE", "ENGAGE", "SIEGE", "HUNT"):
+            if lost or kills:
+                self._trade.append((v.tick, float(lost), float(kills)))
+                self._trade_cum[0] += lost
+                self._trade_cum[1] += kills
+            win = int(self.pol.p.trade_window_s * 25)
+            while self._trade and v.tick - self._trade[0][0] > win:
+                self._trade.pop(0)
+        else:
+            self._trade = []
+            self._trade_cum = [0.0, 0.0]
+
+    def _trade_losing(self, v, c) -> bool:
+        """trade_retreat: over the last trade_window_s our attack group lost trade_loss_ratio x what we killed, and at
+        least trade_min_loss and trade_min_frac of the wave (real loss d527c9fa: 525-536 s we lost 5150 and killed
+        3100, kept fighting, and lost 12k for 13.5k into towers and artillery; f5ce0e92: 5550 for 1800 in 10 s).
+        Not in the all-in minute, not when nearly won, not when there is no base to fall back to."""
+        p = self.pol.p
+        if not self._trade or (self.mode == "allin" and v.remaining <= p.allin_s) or self._nearly_won(v, c):
+            return False
+        if self.pol.prod.stranded(v):
+            return False
+        lost = sum(t[1] for t in self._trade)
+        kills = sum(t[2] for t in self._trade)
+        self._trade_last = (lost, kills)
+        if p.trade_cum_ratio > 0 and self._trade_cum[0] < p.trade_cum_ratio * self._trade_cum[1]:
+            # the wave as a whole is still trading well: a bad dozen seconds after a good exchange is no reason to
+            # turn back (real wins fffc7ced: 340-371 s killed 5400 for ~3000, then 369-381 s lost 2600 for 400;
+            # 971ec5dc at 920 s)
+            return False
+        return lost >= p.trade_min_loss and lost >= p.trade_min_frac * max(1.0, self.wave_value) and \
+            lost >= p.trade_loss_ratio * kills
+
     def _start_retreat(self, v, out, ids, why: str) -> None:
         if self.state != "RETREAT":
-            self.pol.log_event(f"retreat at {v.game_s:.0f}s ({why})")
-            if why == "outmatched":
+            extra = ""
+            if why == "losing trade":
+                extra = f": lost {self._trade_last[0]:.0f}, killed {self._trade_last[1]:.0f}, wave {self.wave_value:.0f}"
+            self.pol.log_event(f"retreat at {v.game_s:.0f}s ({why}{extra})")
+            if why in ("outmatched", "losing trade"):
                 self.fail_mult = min(2.0, self.fail_mult * 1.25)
                 self.last_fail_value = max(self.last_fail_value, self.wave_value)
+                self.recover_tick = v.tick
+            if why == "losing trade":
+                self.trade_retreats += 1
+                self._trade = []
+                self._trade_cum = [0.0, 0.0]
         self._go(v, "RETREAT")
         rally = v.st.rally or v.base
         self._send(out, v, ids, "move", to=rally, urgent=True, min_gap=5, same_gap=125)
@@ -1149,4 +1275,5 @@ class Army:
         return {"state": self.state, "waves": self.waves, "home": len(self.home), "main": len(self.main),
                 "reinf": len(self.reinf), "rush": self.rush, "mode": self.mode, "hunt_seen": len(self.hunt_seen),
                 "harv_pulls": self.harv_pulls, "harv_helps": self.harv_helps, "rescouts": self.rescouts,
-                "early_army": self.early_army}
+                "early_army": self.early_army, "base_seen": self.base_seen, "trade_retreats": self.trade_retreats,
+                "comp_kept": self.comp_kept}
