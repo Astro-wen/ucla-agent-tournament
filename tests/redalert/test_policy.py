@@ -867,6 +867,10 @@ def test_trade_retreat_falls_back_when_the_running_trade_is_clearly_losing(monke
             assert not a._trade_losing(v, (40, 45))
             a._trade = [(v.tick, 1400.0, 0.0)]                      # below trade_min_loss
             assert not a._trade_losing(v, (40, 45))
+            # real win fffc7ced: the wave had killed 5400 for ~3000 before a bad dozen seconds (2600 for 400)
+            a._trade, a._trade_cum = [(v.tick, 2600.0, 400.0)], [3000.0, 5400.0]
+            assert not a._trade_losing(v, (40, 45))
+            a._trade_cum = [5150.0, 3100.0]
             a._trade = [(v.tick, 5150.0, 3100.0)]
             out = []
             a._start_retreat(v, out, [], "losing trade")
@@ -934,7 +938,7 @@ def test_recover_towers_when_their_army_is_the_bigger_one():
 def test_v47_defaults_gate_trade_recover_on_comp_off_and_the_off_set_is_v46():
     p = load_params({})
     assert p.attack_gate and p.trade_retreat and p.recover and not p.attack_comp
-    assert p.trade_min_frac == 0.33 and p.recover_towers == 0
+    assert p.trade_min_frac == 0.33 and p.recover_towers == 0 and p.trade_cum_ratio == 1.0
     off = load_params(V46)
     assert not (off.attack_gate or off.trade_retreat or off.recover or off.attack_comp)
 

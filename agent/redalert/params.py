@@ -85,6 +85,8 @@ DEFAULTS: dict[str, float] = {
     "trade_loss_ratio": 1.5,        # and >= trade_min_frac of the wave's value (0.2 tried: it stopped charges into
     "trade_min_loss": 1500,         # nashball's post that won, kills lag behind the first deaths; the two real losses
     "trade_min_frac": 0.33,         # lost 40% of the wave in 10-11 s)
+    "trade_cum_ratio": 1.0,         # ... and only while the wave's losses since it set out >= this x its kills (0: no
+                                    # such check; real wins fffc7ced / 971ec5dc: a bad 12 s after a good exchange)
     "attack_comp": 0,               # attack waves take vehicles, rocket / grenade infantry and at most
     "comp_rifles_per_veh": 0.5,     # comp_rifles_per_veh rifles per vehicle; the other rifles stay home as guards
     "comp_min_veh": 5,              # (only once the wave has comp_min_veh vehicles and from comp_from_s: a small early

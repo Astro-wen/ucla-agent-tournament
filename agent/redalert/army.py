@@ -108,6 +108,7 @@ class Army:
         self._trade: list[tuple[int, float, float]] = []    # (tick, our losses, our kills) in the current wave
         self._kills_prev: float | None = None
         self._trade_last = (0.0, 0.0)
+        self._trade_cum = [0.0, 0.0]    # trade_retreat: our losses / kills since the wave started
         self.trade_retreats = 0
         self.recover_tick = -10 ** 9    # recover: the last failed wave
         self.comp_kept = 0              # attack_comp: rifles kept home at wave launches
@@ -912,6 +913,7 @@ class Army:
             self.wave_value = main_val
             self.recover_tick = -10 ** 9
             self._trade = []
+            self._trade_cum = [0.0, 0.0]
             self.pol.log_event(f"attack wave {self.waves} at {v.game_s:.0f}s: {len(ids)} units, value {main_val:.0f}, "
                                f"enemy strength {self.enemy_strength(v):.0f} (towers {self.enemy_towers():.0f})"
                                + (f", {len(stay)} rifles stay home" if stay else ""))
@@ -1011,11 +1013,14 @@ class Army:
         if self.state in ("ADVANCE", "ENGAGE", "SIEGE", "HUNT"):
             if lost or kills:
                 self._trade.append((v.tick, float(lost), float(kills)))
+                self._trade_cum[0] += lost
+                self._trade_cum[1] += kills
             win = int(self.pol.p.trade_window_s * 25)
             while self._trade and v.tick - self._trade[0][0] > win:
                 self._trade.pop(0)
         else:
             self._trade = []
+            self._trade_cum = [0.0, 0.0]
 
     def _trade_losing(self, v, c) -> bool:
         """trade_retreat: over the last trade_window_s our attack group lost trade_loss_ratio x what we killed, and at
@@ -1030,6 +1035,11 @@ class Army:
         lost = sum(t[1] for t in self._trade)
         kills = sum(t[2] for t in self._trade)
         self._trade_last = (lost, kills)
+        if p.trade_cum_ratio > 0 and self._trade_cum[0] < p.trade_cum_ratio * self._trade_cum[1]:
+            # the wave as a whole is still trading well: a bad dozen seconds after a good exchange is no reason to
+            # turn back (real wins fffc7ced: 340-371 s killed 5400 for ~3000, then 369-381 s lost 2600 for 400;
+            # 971ec5dc at 920 s)
+            return False
         return lost >= p.trade_min_loss and lost >= p.trade_min_frac * max(1.0, self.wave_value) and \
             lost >= p.trade_loss_ratio * kills
 
@@ -1046,6 +1056,7 @@ class Army:
             if why == "losing trade":
                 self.trade_retreats += 1
                 self._trade = []
+                self._trade_cum = [0.0, 0.0]
         self._go(v, "RETREAT")
         rally = v.st.rally or v.base
         self._send(out, v, ids, "move", to=rally, urgent=True, min_gap=5, same_gap=125)
