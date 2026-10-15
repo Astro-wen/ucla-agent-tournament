@@ -112,6 +112,9 @@ class Army:
         self.trade_retreats = 0
         self.recover_tick = -10 ** 9    # recover: the last failed wave
         self.comp_kept = 0              # attack_comp: rifles kept home at wave launches
+        # v4.8 (docs/redalert_design.md section 19)
+        self.tank_peak = 0.0            # the most enemy tank value seen within 2 minutes (at_towers / at_comp)
+        self.tank_army_s = None         # game second the enemy tank army was first seen
 
     # ---- bookkeeping ----------------------------------------------------------------------------------------------
     def cost(self, t: str) -> int:
@@ -190,6 +193,13 @@ class Army:
                 self.home.discard(uid)
                 (self.main if self.state in ("GATHER", "RETREAT", "DEFEND") else self.reinf).add(uid)
         self._remember(v)
+        tv = self.enemy_tanks(v, 120.0)
+        if tv > self.tank_peak:
+            self.tank_peak = tv
+            if self.tank_army_s is None and self.tank_army(v):
+                self.tank_army_s = v.game_s
+                if self.pol.p.at_towers > 0 or self.pol.p.at_comp:
+                    self.pol.log_event(f"enemy tank army at {v.game_s:.0f}s (tanks worth {tv:.0f} seen)")
 
     def _remember(self, v) -> None:
         rules = v.st.rules
@@ -266,6 +276,36 @@ class Army:
             w = 1.0 if age <= half else max(0.0, (secs - age) / half)
             tot += self.cost(e["type"]) * w
         return tot
+
+    def enemy_tanks(self, v, secs: float = 120.0) -> float:
+        """Cost of the enemy tanks (heavy-armoured combat vehicles: tanks, APCs) seen recently, full weight up to half
+        of `secs`, fading out by `secs`."""
+        rules = v.st.rules
+        tot = 0.0
+        half = secs / 2.0
+        for e in self.enemy_units.values():
+            t = e["type"]
+            if not is_combat(t, rules) or t in AIR or is_infantry(t, rules) or rules.is_building(t) or \
+                    counters.armor(t, rules) != "Heavy":
+                continue
+            age = (v.tick - e["tick"]) / 25.0
+            w = 1.0 if age <= half else max(0.0, (secs - age) / half)
+            tot += self.cost(t) * w
+        return tot
+
+    def tank_army(self, v) -> bool:
+        """v4.8: an enemy tank army was seen this match (tanks worth at_tank_min within 2 minutes; sticky). Real
+        losses 6d0c7844 / f1cd3ba4 / edf99e95: 2-3 tanks by 5:00-6:00, 5-8 with the rifles at the push."""
+        p = self.pol.p
+        return p.at_tank_min > 0 and self.tank_peak >= p.at_tank_min
+
+    def at_threat(self, v) -> bool:
+        """v4.8 at_towers: an enemy tank army was seen and their army is worth at least at_ratio x ours."""
+        p = self.pol.p
+        if not self.tank_army(v):
+            return False
+        ours = self.value(self.main | self.home | self.reinf, v)
+        return self.enemy_strength(v) >= p.at_ratio * max(1.0, ours)
 
     def enemy_strength(self, v) -> float:
         """What an attack has to beat: the enemy army (recent sightings, or the biggest army seen at once, fading)
@@ -1276,4 +1316,5 @@ class Army:
                 "reinf": len(self.reinf), "rush": self.rush, "mode": self.mode, "hunt_seen": len(self.hunt_seen),
                 "harv_pulls": self.harv_pulls, "harv_helps": self.harv_helps, "rescouts": self.rescouts,
                 "early_army": self.early_army, "base_seen": self.base_seen, "trade_retreats": self.trade_retreats,
-                "comp_kept": self.comp_kept}
+                "comp_kept": self.comp_kept,
+                "tank_army_s": None if self.tank_army_s is None else round(self.tank_army_s)}

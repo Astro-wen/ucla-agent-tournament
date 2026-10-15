@@ -280,6 +280,7 @@ class RedAlertPolicy:
             "low_power_s": round(self.low_power_s, 1), "army": self.army.summary(),
             "game_s": round(v.game_s, 1) if v else None, "harv_emergencies": self.econ.emergencies,
             "sales": self.econ.sales, "power_cancels": self.econ.power_cancels, "army_skips": self.army_skipped,
+            "at_towers": self.econ.at_towers,
             "harv": self.harv.summary() if self.p.harv_first else None,
         }
 
@@ -301,4 +302,5 @@ class RedAlertPolicy:
                 f"rescouts={s['army']['rescouts']} harv_pulls={s['army']['harv_pulls']} "
                 f"harv_helps={s['army']['harv_helps']} early_army={int(s['army']['early_army'])} "
                 f"base_seen={int(s['army']['base_seen'])} trade_retreats={s['army']['trade_retreats']} "
-                f"comp_kept={s['army']['comp_kept']}" + harv)
+                f"comp_kept={s['army']['comp_kept']} tank_army_s={s['army']['tank_army_s']} "
+                f"at_towers={s['at_towers']}" + harv)

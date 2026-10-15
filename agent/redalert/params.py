@@ -96,6 +96,16 @@ DEFAULTS: dict[str, float] = {
     "recover_s": 240,               # recover_mult x the failed wave; recover_towers towers at home while their army
     "recover_mult": 1.6,            # is the bigger one, 0 = none: dev seed 1405014, 3 towers ate the money before
     "recover_towers": 0,            # riffo's push)
+    # v4.8 switches (ARENA_RA_AT_TOWERS=0 ARENA_RA_AT_COMP=0 ARENA_RA_HF_KEEP=0: the v4.7 behaviour exactly); see
+    # docs/redalert_design.md section 19 (real losses to an early tank army, 10-14 / 10-15)
+    "at_towers": 2,                 # anti-tank towers (gun / tesla coil) toward the threat once an enemy tank army
+    "at_tank_min": 1700,            # was seen (tanks worth at_tank_min at once, about 2) and their army is worth at
+    "at_ratio": 0.6,                # least at_ratio x ours (0: off)
+    "at_comp": 1,                   # infantry once an enemy tank army was seen: rockets at least at_e3_share of the
+    "at_e3_share": 0.6,             # rifles + rockets, rifles at most at_e1_cap
+    "at_e1_cap": 12,
+    "hf_keep": 1,                   # harv_first goes on through early-army signs from inside their base (a dead
+                                    # scout, units seen at their home); a rush or two barracks still end it
 }
 
 
