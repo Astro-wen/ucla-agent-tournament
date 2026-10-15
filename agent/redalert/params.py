@@ -96,8 +96,9 @@ DEFAULTS: dict[str, float] = {
     "recover_s": 240,               # recover_mult x the failed wave; recover_towers towers at home while their army
     "recover_mult": 1.6,            # is the bigger one, 0 = none: dev seed 1405014, 3 towers ate the money before
     "recover_towers": 0,            # riffo's push)
-    # v4.8 switches (ARENA_RA_AT_TOWERS=0 ARENA_RA_AT_COMP=0 ARENA_RA_HF_KEEP=0: the v4.7 behaviour exactly); see
-    # docs/redalert_design.md section 19 (real losses to an early tank army, 10-14 / 10-15)
+    # v4.8 switches (ARENA_RA_ANCHOR2=0, the others off by default: the v4.7 behaviour exactly); see
+    # docs/redalert_design.md section 19 (real losses to an early tank army, 10-14 / 10-15). Only anchor2 is on: none of
+    # the strength switches had a robust gain on the dev seeds (section 19, docs/progress.md v4.8).
     "at_towers": 0,                 # anti-tank towers (gun / tesla coil) toward the threat once an enemy tank army
     "at_tank_min": 1700,            # was seen (tanks worth at_tank_min at once, about 2) and their army is worth at
     "at_ratio": 0.6,                # least at_ratio x ours (0: off)
@@ -110,13 +111,23 @@ DEFAULTS: dict[str, float] = {
     "hf_keep": 0,                   # harv_first goes on through early-army signs from inside their base (a dead
                                     # scout, units seen at their home); a rush or two barracks still end it (off:
                                     # shadowfiend-ii dev seeds 1508 1 / 3, 0 / 3 on top of split_fire)
+    "split_fire": 0,                # tanks and rockets in a fight shoot the nearest enemy vehicle within reach, not
+                                    # the nearest enemy (the engine's auto-target: tanks on rifles). Off: on the dev
+                                    # seeds the defaults below (walk 2 cells to any vehicle) won 19 / 5 against tom and
+                                    # lost 0 / 5 against nash; every variant that spared nash lost the tom gain
     "split_slack": 2.0,             # split_fire: reach = weapon range + this for light vehicles (cells walked to it)
-    "split_slack_heavy": 0.0,       # ... and + this for tanks / APCs
+    "split_slack_heavy": 2.0,       # ... and + this for tanks / APCs (0 tried: tom 4 / 13, nash 2 / 0)
+    "split_slack_e3": 2.0,          # rocket soldiers: + this whatever the target (0 tried with tanks at 2: same as 2)
+    "split_rockets": 99,            # tanks walk split_slack_heavy to an enemy tank only with at most this many enemy
+                                    # rocket soldiers within 6 cells of it (2 tried: nash unchanged 0 / 4)
+    "split_pack": 99,               # ... and at most this many other enemy tanks within 5 cells of it (1 tried: tom
+                                    # 18 / 16, nash 3 / 5)
+    "split_tank_share": 1.0,        # ... and only while tanks are below this share of the enemy army seen (1: always;
+                                    # 0.5 tried: tom 10 / 15, nash 3 / 5)
     "split_release": 3.0,           # split_fire: an assignment ends this far beyond the reach
-    "split_resume": 1,              # split_fire: a released unit attack-moves to where its target was
+    "split_resume": 0,              # split_fire: a released unit attack-moves to where its target was (1 tried with
+                                    # slack 2: tom 8 / 4, nash 0 / 4)
     "split_e3": 1,                  # split_fire: rocket soldiers too (0: tanks only)
-    "split_fire": 1,               # tanks and rockets in a fight shoot the nearest enemy vehicle within reach, not
-                                    # the nearest enemy (the engine's auto-target: tanks on rifles)
     "anchor2": 1,                   # a second anchor in every batch, on the building farthest from the enemies in
                                     # sight (two real INVALID_ACTIONs while the base was razed; lockstep: no change)
 }

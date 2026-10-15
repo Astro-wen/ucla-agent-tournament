@@ -649,6 +649,20 @@ class Army:
             return
         self.split_tick = v.tick
         retreating = self.state == "RETREAT"
+        launchers = [(e["x"], e["y"]) for e in v.enemies if e["type"] in ("e3", "v2rl")]
+        rockets = {e["id"]: sum(1 for x, y in launchers if abs(x - e["x"]) <= 6 and abs(y - e["y"]) <= 6)
+                   for e in vehicles} if launchers else {}
+        heavy = [e for e in vehicles if counters.armor(e["type"], rules) != "Light"]
+        if p.split_tank_share < 1.0:
+            seen = self.enemy_army(v, 180.0)
+            if seen > 0 and self.enemy_tanks(v, 180.0) >= p.split_tank_share * seen:
+                heavy_walk = False                   # a tank army: our tanks stay in the line
+            else:
+                heavy_walk = True
+        else:
+            heavy_walk = True
+        pack = {e["id"]: sum(1 for o in heavy if o["id"] != e["id"] and abs(o["x"] - e["x"]) <= 5
+                             and abs(o["y"] - e["y"]) <= 5) for e in heavy}
         groups: dict[int, list[int]] = {}
         for i in sorted(self.home | self.main | self.reinf):
             u = v.unit_by_id.get(i)
@@ -662,7 +676,15 @@ class Army:
                 # light vehicles (raiders, artillery) are worth walking split_slack cells for; heavy tanks come with
                 # their escort: split_slack_heavy (dev seeds: walking 2 cells to tanks lost 0 / 9 against nash's tank
                 # push, won 27 / 9 against tom's jeeps and flak trucks)
-                extra = slack if counters.armor(e["type"], rules) == "Light" else float(p.split_slack_heavy)
+                if u["type"] == "e3":
+                    extra = float(p.split_slack_e3)      # rockets never walk out of the rifle line (nash 1504014)
+                elif counters.armor(e["type"], rules) == "Light":
+                    extra = slack
+                else:
+                    # a tank walks to an enemy tank only when few enemy rockets stand by it (dev seeds: walking into
+                    # nash's tank + rocket push lost 0 / 9; against tom's few tanks behind rifles it won 27 / 9)
+                    extra = float(p.split_slack_heavy) if heavy_walk and d > reach and \
+                        rockets.get(e["id"], 0) <= p.split_rockets and pack.get(e["id"], 0) <= p.split_pack else 0.0
                 if d <= reach + extra and (best is None or (d, e["hp"], e["id"]) < best[0]):
                     best = ((d, e["hp"], e["id"]), e["id"])
             if best is not None:

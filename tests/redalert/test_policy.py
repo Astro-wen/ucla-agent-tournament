@@ -965,10 +965,10 @@ def _see_tanks(pol, v, n=2, typ="2tnk", x=40, y=44):
     pol.army.tank_peak = max(pol.army.tank_peak, pol.army.enemy_tanks(v))
 
 
-def test_v48_defaults_on_and_the_off_set_is_v47():
+def test_v48_defaults_only_anchor2_on_and_the_off_set_is_v47():
     p = load_params({})
     assert p.at_towers == 0 and not p.at_comp and not p.hf_keep      # (off after the dev seeds)
-    assert p.split_fire and p.anchor2 and p.at_tank_min == 1700 and p.split_slack == 2.0 and p.split_slack_heavy == 0.0
+    assert not p.split_fire and p.anchor2 and p.at_tank_min == 1700 and p.split_slack_heavy == 2.0 and not p.split_resume
     off = load_params(V47)
     assert off.at_towers == 0 and not off.at_comp and not off.hf_keep and not off.anchor2 and not off.split_fire
     assert off.attack_gate and off.trade_retreat and off.recover          # v4.7 itself stays on
