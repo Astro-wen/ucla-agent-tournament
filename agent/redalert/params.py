@@ -104,12 +104,18 @@ DEFAULTS: dict[str, float] = {
     "at_tank_share": 0.5,           # at_towers: and tanks are at least this share of the enemy army seen (3 minutes)
     "at_place": 3,                  # at_towers: cells from the base toward the threat (other towers: 6)
                                     # (at_towers off: dev seeds 1501 vs tom 1/5, 0/3, 0/3 for three versions)
-    "at_comp": 1,                   # infantry once an enemy tank army was seen: rockets at least at_e3_share of the
-    "at_e3_share": 0.6,             # rifles + rockets, rifles at most at_e1_cap
-    "at_e1_cap": 12,
-    "hf_keep": 1,                   # harv_first goes on through early-army signs from inside their base (a dead
-                                    # scout, units seen at their home); a rush or two barracks still end it
-    "split_fire": 1,                # tanks and rockets in a fight shoot the nearest enemy vehicle within reach, not
+    "at_comp": 0,                   # infantry once an enemy tank army was seen: rockets at least at_e3_share of the
+    "at_e3_share": 0.6,             # rifles + rockets, rifles at most at_e1_cap (off: dev seeds 0 / 0 vs tom, 0 / 1
+    "at_e1_cap": 12,                # on top of split_fire; f1cd3ba4: a rifle ball shredded our rockets)
+    "hf_keep": 0,                   # harv_first goes on through early-army signs from inside their base (a dead
+                                    # scout, units seen at their home); a rush or two barracks still end it (off:
+                                    # shadowfiend-ii dev seeds 1508 1 / 3, 0 / 3 on top of split_fire)
+    "split_slack": 2.0,             # split_fire: reach = weapon range + this for light vehicles (cells walked to it)
+    "split_slack_heavy": 0.0,       # ... and + this for tanks / APCs
+    "split_release": 3.0,           # split_fire: an assignment ends this far beyond the reach
+    "split_resume": 1,              # split_fire: a released unit attack-moves to where its target was
+    "split_e3": 1,                  # split_fire: rocket soldiers too (0: tanks only)
+    "split_fire": 1,               # tanks and rockets in a fight shoot the nearest enemy vehicle within reach, not
                                     # the nearest enemy (the engine's auto-target: tanks on rifles)
     "anchor2": 1,                   # a second anchor in every batch, on the building farthest from the enemies in
                                     # sight (two real INVALID_ACTIONs while the base was razed; lockstep: no change)

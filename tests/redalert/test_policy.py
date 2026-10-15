@@ -967,7 +967,8 @@ def _see_tanks(pol, v, n=2, typ="2tnk", x=40, y=44):
 
 def test_v48_defaults_on_and_the_off_set_is_v47():
     p = load_params({})
-    assert p.at_towers == 0 and p.at_tank_min == 1700                 # (anti-tank towers: off after the dev seeds)
+    assert p.at_towers == 0 and not p.at_comp and not p.hf_keep      # (off after the dev seeds)
+    assert p.split_fire and p.anchor2 and p.at_tank_min == 1700 and p.split_slack == 2.0 and p.split_slack_heavy == 0.0
     off = load_params(V47)
     assert off.at_towers == 0 and not off.at_comp and not off.hf_keep and not off.anchor2 and not off.split_fire
     assert off.attack_gate and off.trade_retreat and off.recover          # v4.7 itself stays on
@@ -1007,7 +1008,7 @@ def test_at_towers_build_an_anti_tank_tower_once_a_tank_army_is_seen():
 
 
 def test_at_comp_makes_rockets_and_caps_rifles_against_a_tank_army():
-    for env, item in ((V47, "e1"), ({}, "e3")):
+    for env, item in ((V47, "e1"), ({"ARENA_RA_AT_COMP": "1"}, "e3")):
         pol, v = _late_view(env, game_s=200.0)
         v.have["tent"] = 1
         pol.first["weap"] = 150.0                                  # (the war factory stands: no opening cap)
@@ -1027,7 +1028,7 @@ def test_at_comp_makes_rockets_and_caps_rifles_against_a_tank_army():
 def test_hf_keep_keeps_harvesters_first_through_a_dead_scout_not_through_two_barracks(monkeypatch):
     for flag, kept in (("early_army", True), ("two_barracks", False)):
         srv = server("shadowfiend-ii")
-        pol = RedAlertPolicy(params=load_params({}))
+        pol = RedAlertPolicy(params=load_params({"ARENA_RA_HF_KEEP": "1"}))
         monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)
         pol.army.early_army = True                                  # as after the scout died in their base
         if flag == "two_barracks":
@@ -1076,8 +1077,9 @@ def test_split_fire_sends_tanks_and_rockets_at_the_enemy_tank_not_the_nearest_ri
         v.unit_by_id.update({u["id"]: u for u in ours})
         a.main |= {u["id"] for u in ours}
         v.enemies = [{"id": 840000, "type": "e1", "hp": 100, "x": 32, "y": 44},     # nearest: a rifle
-                     {"id": 840001, "type": "3tnk", "hp": 100, "x": 35, "y": 44},   # in reach: a heavy tank
-                     {"id": 840002, "type": "3tnk", "hp": 100, "x": 50, "y": 44}]   # out of reach
+                     {"id": 840001, "type": "3tnk", "hp": 100, "x": 34, "y": 44},   # in range: a heavy tank
+                     {"id": 840002, "type": "3tnk", "hp": 100, "x": 50, "y": 44},   # out of reach
+                     {"id": 840003, "type": "2tnk", "hp": 100, "x": 30, "y": 51}]   # e3 range (7.5) only
         out = []
         a._split_fire(v, out)
         sent = [c.order for c in out if c.order["cmd"] == "attack"]
