@@ -155,18 +155,25 @@ class Harvest:
         if not self.on() or self.suppressed or not self.map_ok(v):
             return False
         army = self.pol.army
-        if (army.rush or army.early_army or army.two_barracks) and v.game_s < SUPPRESS_UNTIL_S:
+        if (army.rush or self._early(army) or army.two_barracks) and v.game_s < SUPPRESS_UNTIL_S:
             self.suppressed = True
             self.pol.log_event(f"harvesters first off at {v.game_s:.0f}s: early army / rush signs")
             return False
         return True
+
+    def _early(self, army) -> bool:
+        """The early-army sign as harv_first sees it. v4.8 hf_keep: a scout killed in their base or units seen at their
+        home is no reason to give up the economy on a long map (real losses 6d0c7844 / f1cd3ba4 on shadowfiend-ii: the
+        scout died in their base at 110 s and the match ran on 2 / 4 / 4 harvesters at 3:00 / 4:30 / 6:30; their
+        first units reached us at 5:15-5:45); a rush or two barracks still end it (their own flags)."""
+        return bool(army.early_army) and not self.pol.p.hf_keep
 
     def active(self, v) -> bool:
         """The harvester target and its refinery apply now: engaged and no rush sign / real attack at the moment."""
         if not self.engaged(v):
             return False
         army = self.pol.army
-        return not (army.rush or army.early_army or army.two_barracks or army.real_attack(v))
+        return not (army.rush or self._early(army) or army.two_barracks or army.real_attack(v))
 
     # ---- serialisation -------------------------------------------------------------------------------------------
     def serialized(self, v) -> bool:
@@ -205,7 +212,7 @@ class Harvest:
         """A reason to drop the serialisation now, or None."""
         p = self.pol.p
         army = self.pol.army
-        if army.rush or army.early_army or army.two_barracks:
+        if army.rush or self._early(army) or army.two_barracks:
             return "early rush signs"
         if army.real_attack(v):
             return "real attack"

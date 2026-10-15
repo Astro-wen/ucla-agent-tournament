@@ -659,7 +659,7 @@ def test_harv_first_needs_a_long_way_between_the_bases_and_is_v45_elsewhere(monk
 
 def test_after_early_army_signs_harv_first_plays_v45_for_the_rest_of_the_match(monkeypatch):
     logs = []
-    for env in (V45, HARV_ON):
+    for env in (V45, {**HARV_ON, "ARENA_RA_HF_KEEP": "0"}):           # (v4.8 hf_keep off: v4.6 / v4.7)
         srv = server("shadowfiend-ii")
         pol = RedAlertPolicy(params=load_params(env))
         monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)
@@ -952,3 +952,146 @@ def test_v47_switches_leave_the_summary_fields_and_never_raise():
         text = pol.summary_text()
         assert "trade_retreats=0" in text and "comp_kept=" in text and "base_seen=" in text
         assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+
+
+# ---- v4.8: an early tank army (docs/redalert_design.md section 19) ---------------------------------------------------
+V47 = {"ARENA_RA_AT_TOWERS": "0", "ARENA_RA_AT_COMP": "0", "ARENA_RA_HF_KEEP": "0",
+       "ARENA_RA_ANCHOR2": "0", "ARENA_RA_SPLIT_FIRE": "0"}                                     # every v4.8 switch off: v4.7
+
+
+def _see_tanks(pol, v, n=2, typ="2tnk", x=40, y=44):
+    for k in range(n):
+        pol.army.enemy_units[800000 + k] = {"type": typ, "tick": v.tick, "x": x, "y": y, "hp": 100}
+    pol.army.tank_peak = max(pol.army.tank_peak, pol.army.enemy_tanks(v))
+
+
+def test_v48_defaults_only_anchor2_on_and_the_off_set_is_v47():
+    p = load_params({})
+    assert p.at_towers == 0 and not p.at_comp and not p.hf_keep      # (off after the dev seeds)
+    assert not p.split_fire and p.anchor2 and p.at_tank_min == 1700 and p.split_slack_heavy == 2.0 and not p.split_resume
+    off = load_params(V47)
+    assert off.at_towers == 0 and not off.at_comp and not off.hf_keep and not off.anchor2 and not off.split_fire
+    assert off.attack_gate and off.trade_retreat and off.recover          # v4.7 itself stays on
+
+
+def test_enemy_tank_army_counts_heavy_vehicles_only():
+    pol, v = _late_view({})
+    a = pol.army
+    for k in range(12):                                             # rifles, rockets and a jeep are no tank army
+        a.enemy_units[810000 + k] = {"type": ("e1", "e3", "jeep")[k % 3], "tick": v.tick, "x": 40, "y": 44, "hp": 100}
+    assert a.enemy_tanks(v) == 0.0 and not a.tank_army(v)
+    _see_tanks(pol, v, 1)
+    assert not a.tank_army(v)                                       # one medium tank: 850 < 1700
+    _see_tanks(pol, v, 2, "3tnk")
+    assert a.tank_army(v) and a.enemy_tanks(v) >= 1700
+    v.tick += 200 * 25                                              # sightings fade, the flag stays (sticky)
+    assert a.enemy_tanks(v) == 0.0 and a.tank_army(v)
+
+
+def test_at_towers_build_an_anti_tank_tower_once_a_tank_army_is_seen():
+    for env, want in ((V47, None), ({"ARENA_RA_AT_TOWERS": "2"}, "gun")):
+        pol, v = _late_view(env)
+        v.have["weap"] = 1
+        v.avail |= {"gun", "pbox"}
+        v.surplus = 200
+        assert pol.econ._at_tower(v) is None                        # no tank seen yet
+        _see_tanks(pol, v, 3)
+        assert pol.army.at_threat(v)                                # (blind prior + 3 tanks vs a handful of rifles)
+        assert pol.econ._at_tower(v) == want
+        if want:
+            v.have["gun"] = 2                                       # at_towers of them: no more
+            assert pol.econ._at_tower(v) is None
+            v.have["gun"] = 0
+            v.surplus = 10                                          # a tower waiting for power asks for a plant
+            v.avail = (v.avail - {"gun"}) | {"tsla"}
+            assert pol.econ._at_tower(v) is None and pol.econ.power_for == v.tick
+
+
+def test_at_comp_makes_rockets_and_caps_rifles_against_a_tank_army():
+    for env, item in ((V47, "e1"), ({"ARENA_RA_AT_COMP": "1"}, "e3")):
+        pol, v = _late_view(env, game_s=200.0)
+        v.have["tent"] = 1
+        pol.first["weap"] = 150.0                                  # (the war factory stands: no opening cap)
+        v.avail |= {"e1", "e3"}
+        v.cash, v.ore = 3000, 0
+        v.money = 3000
+        rifles = [{"id": 820000 + k, "type": "e1", "hp": 100, "x": 20, "y": 44, "idle": True} for k in range(12)]
+        v.units = [u for u in v.units if u["type"] not in ("e1", "e3")] + rifles
+        v.unit_by_id.update({u["id"]: u for u in rifles})
+        _see_tanks(pol, v, 2)
+        pol.army.enemy_units.clear()                                # seen 2 minutes ago: only the sticky flag left
+        out = []
+        pol.prod._infantry(v, out)
+        assert out and out[0].order["item"] == item, [c.order for c in out]
+
+
+def test_hf_keep_keeps_harvesters_first_through_a_dead_scout_not_through_two_barracks(monkeypatch):
+    for flag, kept in (("early_army", True), ("two_barracks", False)):
+        srv = server("shadowfiend-ii")
+        pol = RedAlertPolicy(params=load_params({"ARENA_RA_HF_KEEP": "1"}))
+        monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)
+        pol.army.early_army = True                                  # as after the scout died in their base
+        if flag == "two_barracks":
+            pol.army.two_barracks = True
+        drive(srv, pol, 200)
+        assert pol.harv.engaged(pol.view) == kept and pol.harv.suppressed == (not kept)
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+
+
+def test_v48_switches_leave_the_summary_fields_and_never_raise():
+    for env in (V47, {}):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params(env))
+        drive(srv, pol, 60)
+        text = pol.summary_text()
+        assert "tank_army_s=None" in text and "at_towers=0" in text
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+
+
+def test_anchor2_puts_a_second_anchor_on_the_building_farthest_from_the_enemy():
+    from agent.redalert.orders import anchor2
+    for env, n_anchor in ((V47, 1), ({}, 2)):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params(env))
+        log = []
+        drive(srv, pol, 120, record=log)
+        multi = [orders for _sv, orders, _res in log if sum(1 for o in orders if o["cmd"] == "power_toggle") >= 2]
+        assert bool(multi) == (n_anchor == 2)
+        assert all(res.get("accepted") for _sv, _o, res in log)
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+    v = pol.view
+    a = anchor(v)
+    b = anchor2(v, a["building"])
+    assert b is not None and b["building"] != a["building"] and b["cmd"] == "power_toggle" and b["on"] is True
+    assert anchor2(v, a["building"]) == b                           # deterministic
+
+
+def test_split_fire_sends_tanks_and_rockets_at_the_enemy_tank_not_the_nearest_rifle():
+    for env, on in ((V47, False), ({"ARENA_RA_SPLIT_FIRE": "1"}, True)):
+        pol, v = _late_view(env)
+        a = pol.army
+        ours = [{"id": 830000, "type": "2tnk", "hp": 100, "x": 30, "y": 44, "idle": False},
+                {"id": 830001, "type": "e3", "hp": 100, "x": 30, "y": 45, "idle": False},
+                {"id": 830002, "type": "e1", "hp": 100, "x": 30, "y": 43, "idle": False}]
+        v.units += ours
+        v.unit_by_id.update({u["id"]: u for u in ours})
+        a.main |= {u["id"] for u in ours}
+        v.enemies = [{"id": 840000, "type": "e1", "hp": 100, "x": 32, "y": 44},     # nearest: a rifle
+                     {"id": 840001, "type": "3tnk", "hp": 100, "x": 34, "y": 44},   # in range: a heavy tank
+                     {"id": 840002, "type": "3tnk", "hp": 100, "x": 50, "y": 44},   # out of reach
+                     {"id": 840003, "type": "2tnk", "hp": 100, "x": 30, "y": 51}]   # e3 range (7.5) only
+        out = []
+        a._split_fire(v, out)
+        sent = [c.order for c in out if c.order["cmd"] == "attack"]
+        if not on:
+            continue
+        assert sent and all(o["target"] == 840001 for o in sent), sent
+        assert sorted(u for o in sent for u in o["units"]) == [830000, 830001]      # the rifle keeps its attack-move
+        assert set(a.split) == {830000, 830001}
+        n = a._send(out, v, [830000, 830001, 830002], "attack_move", to=(40, 44))
+        assert n == 1                                                # busy hunters skip the fight's attack-move
+        v.enemies = v.enemies[:1]                                    # the tank is gone: released
+        v.tick += 40
+        a._split_fire(v, [])
+        assert not a.split
+    assert not load_params(V47).split_fire

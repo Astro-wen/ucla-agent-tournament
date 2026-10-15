@@ -200,6 +200,24 @@ def anchor(view) -> dict | None:
     return {"cmd": "power_toggle", "building": b["id"], "on": True}
 
 
+def anchor2(view, first: int) -> dict | None:
+    """v4.8 anchor2: a second anchor on another building, the one farthest from the enemies in sight (then the
+    healthiest), so a batch is refused as a whole only if both buildings die before the check. Real losses 6d0c7844
+    (598 s) / f1cd3ba4 (1096 s): one INVALID_ACTION each while the base was being razed (the anchor's building died
+    too; refusals not_owned)."""
+    blds = [b for b in view.buildings if not b.get("powered_down") and b["id"] != first]
+    if not blds:
+        return None
+    foes = [(e["x"], e["y"]) for e in view.enemies]
+
+    def away(b):
+        if not foes:
+            return 99.0
+        return min(99.0, min(((b["x"] - x) ** 2 + (b["y"] - y) ** 2) ** 0.5 for x, y in foes))
+    b = max(blds, key=lambda b: (away(b), b["hp"], -b["id"]))
+    return {"cmd": "power_toggle", "building": b["id"], "on": True}
+
+
 def noop(view) -> dict | None:
     """A batch member that is always valid and changes nothing (windows mode needs one valid order per window):
     re-set a unit's current stance, else a power-on of a building that is not powered down (`ok already_on`)."""

@@ -154,17 +154,24 @@ class Production:
             if inf_val > cap * (inf_val + veh_val) + 400:
                 return
         veh_share = army.enemy_vehicle_share()
+        # v4.8 at_comp: an enemy tank army was seen (real losses 6d0c7844 / edf99e95: 20-24 rifles made before 4:00
+        # against 2-8 tanks; rifles do a tenth of their damage to heavy armour and get crushed): rockets first
+        at = bool(p.at_comp) and army.tank_army(v) and not late and not army.rush
         if late:
             item = "e1"
-        elif n == 0 or (not threatened and e1 < 3) or (veh_share < 0.2 and v.game_s < 240):
+        elif n == 0 or (not threatened and e1 < 3) or (veh_share < 0.2 and v.game_s < 240 and not at):
             item = "e1"
         else:
             want_e3 = 0.6 if veh_share > 0.5 else (0.35 if veh_share > 0.15 else 0.2)
             if inf_heavy or (army.rush and veh_share < 0.2):
                 want_e3 = 0.1 if veh_share < 0.2 else 0.2
+            if at:
+                want_e3 = max(want_e3, float(p.at_e3_share))
             item = "e3" if e3 < want_e3 * (e1 + e3 + 1) else "e1"
             if item == "e1" and soviet and "e2" in v.avail and army.enemy_infantry_share() > 0.6 and n % 3 == 2:
                 item = "e2"
+        if at and item == "e1" and e1 >= int(p.at_e1_cap) and "e3" in v.avail:
+            item = "e3"
         if item not in v.avail:
             item = next((t for t in ("e1", "e3", "e2") if t in v.avail), None)
             if item is None:
