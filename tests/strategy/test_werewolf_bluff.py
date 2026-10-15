@@ -250,6 +250,28 @@ def test_bluff_errors_fall_back_to_the_normal_wolf(monkeypatch):
     assert WerewolfPolicy().act(_raw(g, phase="moving"))["action_id"] in {"0", "1", "2", "4", "6"}
 
 
+@pytest.mark.parametrize("timing", ["rt", "rounds"])
+def test_llm_mode_is_the_normal_wolf_unless_the_bluff_went_out(monkeypatch, timing):
+    """ARENA_WW_BLUFF=llm at scripted tables: every game in which our seat never sent the bluff claim is identical to
+    the switch off, including the counter-claims a wolf makes when a claimer accuses it (they are not bluffs)."""
+    monkeypatch.setenv("ARENA_WW_TIMING", timing)
+    monkeypatch.setenv("WW_EVAL_TRANSCRIPT", "1")
+    counters = 0
+    for bg in ("llmq", "rt_chaos", "rt_wolfpack", "llm"):
+        for g in range(40):
+            if "wolf" not in E.our_roles(53, g, bg, 1):
+                continue
+            a = E.play_one("agent@ARENA_WW_BLUFF=llm", 53, g, bg, 1)
+            me = a["log"]["ours"][0]
+            if any(P._BLUFF_CLAIM.fullmatch(m["content"]) for m in a["log"]["messages"] if m["sender"] == me):
+                continue
+            b = E.play_one("agent", 53, g, bg, 1)
+            assert a["log"] == b["log"], (bg, g)
+            counters += any("is lying about being Seer" in m["content"] for m in b["log"]["messages"]
+                            if m["sender"] == me)
+    assert counters >= 3                                   # the counter-claim path was exercised
+
+
 @pytest.mark.parametrize("mode", ["on", "llm"])
 def test_many_local_games_stay_clean_and_never_name_the_ally(monkeypatch, mode):
     monkeypatch.setenv(P.BLUFF_ENV, mode)

@@ -576,8 +576,8 @@ class WerewolfPolicy:
         pool = [t for t in targets if t not in wolfset]
         live = [s for s in c.order if s in v.alive and s not in c.liars]
         if v.me in live and bluff_mode() != "off":
-            try:
-                t = self._bluff_target(v, c)                         # vote what our seer bluff told the table
+            try:                                                     # vote what our seer bluff told the table
+                t = self._bluff_target(v, c) if self._bluff_day(v) is not None else None
             except Exception:
                 t = None
             if t is not None and t in pool:
@@ -755,11 +755,17 @@ class WerewolfPolicy:
 
     # ---- ARENA_WW_BLUFF: a wolf's proactive fake seer claim ---------------------------------------------------------
     @staticmethod
-    def _claim_day(v: View) -> int | None:
-        """The day of my first broadcast seer claim, or None."""
-        for _seq, sender, f, day in _chats(v):
-            if sender == v.me and f.claim and not f.injection:
-                return day
+    def _bluff_day(v: View) -> int | None:
+        """The day of my first broadcast seer claim if that claim was the bluff (its template), else None: after a
+        counter-claim (accused by a claimer) everything stays the normal wolf behaviour."""
+        names = tuple(sorted(v.names.items()))
+        for m in v.messages:
+            if not isinstance(m, dict) or m.get("sender") != v.me or m.get("type", "chat") != "chat" \
+                    or m.get("visibility") == "direct" or m.get("recipients") or not isinstance(m.get("content"), str):
+                continue
+            f = _facts(m["content"], v.me, names)
+            if f.claim and not f.injection:
+                return m.get("_day", m.get("day")) if _BLUFF_CLAIM.fullmatch(m["content"].strip()) else None
         return None
 
     @staticmethod
@@ -816,8 +822,9 @@ class WerewolfPolicy:
                 return None
             return "bluff-claim", {"content": f"I am the Seer. Player{x} is a WOLF. Everyone vote Player{x} today.",
                                    "recipients": []}
-        if v.me in c.liars:
-            return None                                       # exposed: nothing left to defend
+        claimed = self._bluff_day(v)
+        if claimed is None or v.me in c.liars:
+            return None                                       # a counter-claim (normal), or exposed: nothing to defend
         others = [s for s in v.alive if s != v.me and s not in v.allies]
         named = c.wolves.get(v.me, set())
         fresh = [s for s in c.order if s in others and s not in named]
@@ -826,8 +833,7 @@ class WerewolfPolicy:
             r = target if target in fresh else fresh[0]
             return "bluff-rebut", {"content": f"I am the Seer. Player{r} is lying about being Seer, so Player{r} is a "
                                               f"WOLF. Vote Player{r}.", "recipients": []}
-        claimed = self._claim_day(v)
-        if claimed is None or v.day is None or v.day <= claimed or target is None:
+        if v.day is None or not isinstance(claimed, int) or v.day <= claimed or target is None:
             return None
         wolves = [target] + [s for s in sorted(named) if s in others and s != target][:1]
         clears = [s for s in sorted(c.clears.get(v.me, ())) if s in others and s not in wolves]
@@ -848,7 +854,7 @@ class WerewolfPolicy:
             if bluff_mode() == "off":
                 return 0
             v = self._view(st)
-            return 1 if v.role == "wolf" and v.day is not None and self._claim_day(v) == v.day else 0
+            return 1 if v.role == "wolf" and v.day is not None and self._bluff_day(v) == v.day else 0
         except Exception:
             return 0
 
@@ -928,6 +934,7 @@ _BUS_OUT = re.compile(r"Following the Seer \(Player\d\): I vote (Player\d)\. Eve
 _BLUFF_OUT = re.compile(r"I am the Seer\. (Player\d) is a WOLF\.(?: Player\d is a WOLF\.)?(?: Player\d is clear\.){0,2} "
                         r"Everyone vote \1 today\."
                         r"|I am the Seer\. (Player\d) is lying about being Seer, so \2 is a WOLF\. Vote \2\.")
+_BLUFF_CLAIM = re.compile(r"I am the Seer\. (Player\d) is a WOLF\. Everyone vote \1 today\.")    # the day-1 claim
 _WORD_CAP = 50
 _CHAR_CAP = 1024        # MESSAGE_TOO_LONG over 1024 characters (werewolf.md §8); counted in UTF-8 bytes, which is
 #                         never fewer than the characters or UTF-16 units the server might count
