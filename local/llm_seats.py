@@ -83,7 +83,12 @@ def vgc_agent(sim=None, log=print, client: LLMClient | None = None):
 
 class LLMWerewolfSeat(ContestantSeat):
     """examples/llm_agent.py's LLMAgent on Nebius as a local.werewolf_env seat (a fresh agent every game). Its
-    exceptions and answers go to the engine unchanged (the engine models the runner / platform); only counted here."""
+    exceptions and answers go to the engine unchanged (the engine models the runner / platform); only counted here.
+
+    `slow`: under ARENA_WW_TIMING=rt it talks in the other seats' rounds, not at t = 0 with our seats (each of its
+    messages is a model call of seconds, ours answer in milliseconds; before 10-14 it was shuffled in with ours)."""
+
+    slow = True
 
     def __init__(self, client: LLMClient | None = None, name: str = "llm_real"):
         super().__init__(self._make_agent, name)

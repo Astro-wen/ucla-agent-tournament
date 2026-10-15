@@ -26,7 +26,13 @@ background draw are fixed, so every agent under test plays exactly the same deal
 while tuning the agent (NOTES.md): confirm on other seeds.
 
 An agent spec is a factory name (`agent`, `champion`, or `module:attr`), or `W/V`: spec W plays our wolf seats and V
-our villager and seer seats. With several of our seats at one table the candidate's villagers also play against
+our villager and seer seats. A suffix `@VAR=value[&VAR2=value2]` sets those environment variables while that spec's
+games are played (e.g. `agent@ARENA_WW_BLUFF=llm:agent` pairs a switch against the same code without it; the variables
+apply to the whole game, so use it for switches that only our code reads).
+
+--role R keeps, of each condition's first --games game indices, only those where one of our seats has role R (a
+game keeps its index, so it pairs with an unfiltered run); --records PATH writes every game as one JSON line (the
+condition and the record; with --transcripts also the game's transcript: roles, messages, votes, deaths). With several of our seats at one table the candidate's villagers also play against
 the candidate's wolves, so a whole-table comparison cannot say whether one role got worse; the role verdict
 therefore uses side-isolated pairs: `agent/champion` vs `champion` (only our wolves changed) for the wolf role and
 `champion/agent` vs `champion` (only our villagers and seer changed) for the villager and seer roles. The overall
@@ -170,7 +176,40 @@ def _client():
     return shared_client()
 
 
+def spec_env(spec: str) -> tuple[str, dict[str, str]]:
+    """`name@VAR=value&VAR2=value2` -> (name, {VAR: value, ...}); a spec without '@' has no variables."""
+    base, _, tail = spec.partition("@")
+    env = {}
+    for item in filter(None, tail.split("&")):
+        key, sep, val = item.partition("=")
+        if not sep or not key:
+            raise ValueError(f"bad environment item {item!r} in agent spec {spec!r} (want VAR=value)")
+        env[key] = val
+    return base, env
+
+
+def our_roles(seed: int, g: int, bg: str, k: int) -> list[str]:
+    """The roles of our seats in game g of a condition (deal_roles on the game's seed, as play_one deals them)."""
+    gseed, ours, _ = deal(seed, g, bg, k)
+    roles = deal_roles(random.Random(gseed))
+    return [roles[i] for i in ours]
+
+
 def play_one(spec: str, seed: int, g: int, bg: str, k: int) -> dict:
+    base, env = spec_env(spec)
+    saved = {key: os.environ.get(key) for key in env}
+    os.environ.update(env)
+    try:
+        return _play_one(base, seed, g, bg, k)
+    finally:
+        for key, val in saved.items():
+            if val is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = val
+
+
+def _play_one(spec: str, seed: int, g: int, bg: str, k: int) -> dict:
     gseed, ours, types = deal(seed, g, bg, k)
     wolf_spec, vill_spec = spec.split("/", 1) if "/" in spec else (spec, spec)
     roles = deal_roles(random.Random(gseed))
@@ -192,6 +231,10 @@ def play_one(spec: str, seed: int, g: int, bg: str, k: int) -> dict:
            "dms": sum(st["dms"][i] for i in ours)}
     if real or parse_bg(bg)[2]:
         rec["bg_seats"] = [[types[i], game.roles[i], ret[i] > 0] for i in sorted(types)]   # kind, role, won
+    if os.environ.get("WW_EVAL_TRANSCRIPT") == "1":                                     # --records
+        rec["log"] = {"ours": ours, "roles": list(game.roles), "messages": game.messages,
+                      "votes": [{"day": v["day"], "votes": {str(a): b for a, b in v["votes"].items()},
+                                 "eliminated": v["eliminated"]} for v in game.votes], "dead": game.dead}
     if real:
         cs = _client().stats
         llm = {key: sum(seats[i].stats[key] for i in real) for key in LLM_SEAT_KEYS}
@@ -554,7 +597,13 @@ def main(argv=None) -> None:
                     help="N background seats per game are the real examples/llm_agent.py on Nebius (costs API calls)")
     ap.add_argument("--llm-control", default="llm", help="what plays those N seats in the paired control ('' = none)")
     ap.add_argument("--llm-max-games", type=int, default=400, help="refuse to start a run with more real-LLM games")
+    ap.add_argument("--role", default="", choices=("",) + ROLES,
+                    help="keep only the games (of the first --games indices) where one of our seats has this role")
+    ap.add_argument("--records", default="", help="write every game (condition and record) as JSON lines")
+    ap.add_argument("--transcripts", action="store_true", help="with --records: add each game's transcript")
     a = ap.parse_args(argv)
+    if a.records and a.transcripts:
+        os.environ["WW_EVAL_TRANSCRIPT"] = "1"                     # worker processes inherit it
     for al in a.alias:
         name, _, target = al.partition("=")
         AGENTS[name] = target
@@ -593,6 +642,11 @@ def main(argv=None) -> None:
         specs = ["agent"]
     if not specs:
         raise SystemExit("nothing to evaluate: give --pairs or --agents")
+    for s in specs:
+        try:
+            spec_env(s)
+        except ValueError as e:
+            raise SystemExit(str(e)) from None
     tasks = []
     skipped = set()
     for spec in specs:
@@ -604,8 +658,12 @@ def main(argv=None) -> None:
                     if parse_bg(bg)[2] > 7 - k:
                         skipped.add((bg, k))             # fewer background seats than seats to swap
                         continue
-                    for lo in range(0, a.games, a.chunk):
-                        tasks.append((spec, seed, bg, k, list(range(lo, min(a.games, lo + a.chunk)))))
+                    idx = [g for g in range(a.games) if not a.role or a.role in our_roles(seed, g, bg, k)]
+                    for lo in range(0, len(idx), a.chunk):
+                        tasks.append((spec, seed, bg, k, idx[lo:lo + a.chunk]))
+    planned_games = defaultdict(int)
+    for t in tasks:
+        planned_games[t[:4]] += len(t[4])
     for bg, k in sorted(skipped):
         print(f"note: {bg} needs {parse_bg(bg)[2]} background seats, k={k} leaves {7 - k}: skipped", file=sys.stderr)
     live, model = False, None
@@ -641,7 +699,12 @@ def main(argv=None) -> None:
             for spec, seed, bg, k, rec in _chunk(t):
                 results[(spec, seed, bg, k)][rec["g"]] = rec
     if llm_mode:
-        _cut_to_finished(results, {t[:4] for t in tasks if t[2] in real_labels}, real_labels, a.games, live)
+        _cut_to_finished(results, {t[:4] for t in tasks if t[2] in real_labels}, real_labels, planned_games, live)
+    if a.records:
+        with open(a.records, "w") as f:
+            for (spec, seed, bg, k), recs in sorted(results.items(), key=lambda kv: str(kv[0])):
+                for g in sorted(recs):
+                    f.write(json.dumps({"spec": spec, "seed": seed, "bg": bg, "k": k, **recs[g]}, default=list) + "\n")
     summary = summarize(results, specs, pairs)
     report(summary, specs, pairs, a.margin, show_conditions=not a.quiet)
     ls = llm_summary(results, specs, real_labels) if llm_mode else {}
@@ -661,16 +724,17 @@ def main(argv=None) -> None:
                       default=list)
 
 
-def _cut_to_finished(results: dict, expected: set, real_labels: dict, games: int, live: bool) -> None:
+def _cut_to_finished(results: dict, expected: set, real_labels: dict, games, live: bool) -> None:
     """Drop real-LLM games a spend cap interrupted, and cut every control to the games its real condition finished.
-    `expected`: the (spec, seed, real label, k) conditions the run planned."""
+    `expected`: the (spec, seed, real label, k) conditions the run planned; `games`: the games planned per condition
+    (a number, or a mapping condition -> number)."""
     stopped = 0
     for key in sorted(expected, key=str):
         spec, seed, bg, k = key
         recs = results[key]                            # a defaultdict: a condition never started is empty
         for g in [g for g, r in recs.items() if r.get("llm_refused")]:
             del recs[g]
-        stopped += games - len(recs)
+        stopped += (games.get(key, 0) if isinstance(games, dict) else games) - len(recs)
         ctrl = real_labels[bg]
         if ctrl and (spec, seed, ctrl, k) in results:
             c = results[(spec, seed, ctrl, k)]

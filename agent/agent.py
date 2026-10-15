@@ -650,8 +650,8 @@ class Contestant:
             if not self.listen:
                 if self._chat_sent:
                     self._chat_queue = self._ask_chat(st)
-            elif self._followups < LISTEN_FOLLOWUPS:
-                self._chat_queue = self._ask_chat(st)[:LISTEN_FOLLOWUPS - self._followups]
+            elif self._followups < self._followup_cap(st):
+                self._chat_queue = self._ask_chat(st)[:self._followup_cap(st) - self._followups]
         while not self._chat_done and self._chat_queue and self._chat_sent < MAX_CHATS_PER_WINDOW:
             m = self._chat_queue.pop(0)
             opening = self._chat_opening > 0
@@ -723,10 +723,19 @@ class Contestant:
             log.debug("settling the last chat failed", exc_info=True)
 
     # ---- Werewolf listening (ARENA_WW_LISTEN) -------------------------------
+    def _followup_cap(self, st: dict) -> int:
+        """LISTEN_FOLLOWUPS, plus what the policy allows on top today (ARENA_WW_BLUFF: 1 on the day of its seer bluff;
+        0 otherwise and whenever the switch is off). Never raises."""
+        try:
+            extra = self.ww.extra_followups(st) if hasattr(self.ww, "extra_followups") else 0
+            return LISTEN_FOLLOWUPS + (1 if extra == 1 else 0)
+        except Exception:
+            return LISTEN_FOLLOWUPS
+
     def _may_hold(self, st: dict, me) -> bool:
         """Keep our part of the window open, i.e. not terminate yet: the window is open, we are alive, a follow-up
         (and chat quota for it) is left, some other living seat is still talking, and no time rule says stop."""
-        if self._followups >= LISTEN_FOLLOWUPS or self._chat_sent >= MAX_CHATS_PER_WINDOW:
+        if self._followups >= self._followup_cap(st) or self._chat_sent >= MAX_CHATS_PER_WINDOW:
             return False
         if st.get("phase") != "messaging" or st.get("is_terminal") or st.get("eliminated") \
                 or st.get("messaging_enabled") is False:

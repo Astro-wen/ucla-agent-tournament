@@ -443,7 +443,9 @@ class Game:
         """The official runner's timing (module docstring): ours first at t = 0, then woken by every event."""
         sent = {i: 0 for i in range(N)}
         living = self.living()
-        ours = [i for i in living if isinstance(self.seats[i], ContestantSeat)]
+        # (a seat that is slow to answer, like a real LLM seat whose every message is a model call of seconds, talks
+        # in the other seats' rounds even though it is a ContestantSeat: on the platform ours speaks before it)
+        ours = [i for i in living if isinstance(self.seats[i], ContestantSeat) and not getattr(self.seats[i], "slow", False)]
         others = [i for i in living if i not in ours]
         random.Random(f"{self.order_seed}:{self.day}:rt").shuffle(ours)
 

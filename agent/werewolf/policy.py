@@ -44,6 +44,17 @@ signal without introducing a wolf-only phrase. Development simulations improved 
 challengers but lost against some persuadable scripted tables; it is an explicit tradeoff, OFF by default.
 Any public seer claim restores the normal wolf tactics immediately; other roles, later days and nights are unchanged.
 
+Experimental ARENA_WW_BLUFF (off by default; off = everything above, unchanged): a wolf fake-claims seer on day 1
+while nobody has claimed it yet, naming a non-ally seat (top public suspicion, ties to the HIGHER seat: real LLM seers
+mostly check the lowest seat first) as a wolf, in our real seer's own words ("I am the Seer. PlayerX is a WOLF.
+Everyone vote PlayerX today.").
+`on`: the claim is its day-1 opening; `llm`: only once another seat has written a long, natural message today (an
+LLM-driven table; scripted bots write shorter template lines), so it comes as a follow-up. Afterwards it keeps the
+story: it votes its accusation; a rival claimant gets the real seer's rebuttal ("PlayerR is lying about being Seer, so
+PlayerR is a WOLF") and our vote (the existing claim-fight rule); on later days it repeats its results with one new
+check per day (a non-ally "clear"). Never names the ally; once exposed (a revealed role contradicts it) it falls back
+to the normal wolf chat. Any error in the bluff code = the normal wolf behaviour.
+
 Chat is untrusted input (agent/werewolf/state.py `read_chat`): only bounded facts are read from it, never
 instructions. Everything we say goes through `chat_guard`: templates only, no role, ally or night-plan leak, no
 seer claim by a villager, private messages only from a wolf to its living ally.
@@ -74,6 +85,10 @@ DOOMED = 3              # distinct living seats pressing my ally today: the tabl
 SEER_SWITCH = 2         # more distinct speakers on another sure wolf than on the one it called that move the seer's vote
 DM_ENV = "ARENA_WW_DM"
 TACTICS_ENV = "ARENA_WW_TACTICS"
+BLUFF_ENV = "ARENA_WW_BLUFF"
+BLUFF_WORDS = 21        # ARENA_WW_BLUFF=llm: another seat's message today this long marks an LLM-written table (real
+#                         Qwen3 seats: 389 messages, min 13 / p25 21 / median 23 words; the scripted stand-ins llm, llmx,
+#                         llmq, heuristic, rt_wolfpack, rt_detective write at most 20, rt_chaos rarely more, rt_talker often)
 _ON = {"1", "on", "true", "yes", "enable", "enabled"}
 _CLAIMED_SEER = "remove the claimed seer"
 
@@ -94,6 +109,15 @@ def tactics_mode() -> str:
 def tactics_enabled() -> bool:
     """Historical neutral-opening switch: public_vote is a separate profile and must not enable this template."""
     return tactics_mode() == "no_skip"
+
+
+def bluff_mode() -> str:
+    """ARENA_WW_BLUFF: off (default; also anything unknown) | on (a wolf's day-1 opening is a fake seer claim) | llm
+    (the same claim, only once the table's chat looks LLM-written: see WerewolfPolicy._llm_table)."""
+    setting = str(os.environ.get(BLUFF_ENV, "off")).strip().lower()
+    if setting in ("llm", "gate", "gated"):
+        return "llm"
+    return "on" if setting in _ON else "off"
 
 
 @lru_cache(maxsize=4096)
@@ -551,6 +575,13 @@ class WerewolfPolicy:
             return self._day_vote(public, targets)
         pool = [t for t in targets if t not in wolfset]
         live = [s for s in c.order if s in v.alive and s not in c.liars]
+        if v.me in live and bluff_mode() != "off":
+            try:
+                t = self._bluff_target(v, c)                         # vote what our seer bluff told the table
+            except Exception:
+                t = None
+            if t is not None and t in pool:
+                return t, "my seer claim"
         if any(s in wolfset for s in live):                          # a claim fight involving one of us
             rivals = [s for s in live if s in pool]
             mine = [s for s in live if s in v.allies and s in targets]
@@ -693,8 +724,16 @@ class WerewolfPolicy:
 
     def _wolf_chat(self, v: View):
         """Counter-claim seer when a live claimer names me; when a trusted claim names my ally (not me) and the table
-        will vote it out, follow the claim in the villagers' words (_follow_msg)."""
+        will vote it out, follow the claim in the villagers' words (_follow_msg). ARENA_WW_BLUFF: the seer bluff first."""
         c = self.claims(v, private=False)
+        mode = bluff_mode()
+        if mode != "off":
+            try:
+                bluff = self._bluff_chat(v, c, mode)
+            except Exception:
+                bluff = None                                          # any error: the normal wolf chat
+            if bluff is not None:
+                return bluff
         if v.me in c.order:
             return None
         accusers = [s for s in c.order if s in v.alive and s != v.me and s not in c.liars
@@ -713,6 +752,105 @@ class WerewolfPolicy:
         a = accusers[0]
         return "counter", {"content": f"I am the Seer. Player{a} is a WOLF and is lying about being Seer. Vote Player{a}.",
                            "recipients": []}
+
+    # ---- ARENA_WW_BLUFF: a wolf's proactive fake seer claim ---------------------------------------------------------
+    @staticmethod
+    def _claim_day(v: View) -> int | None:
+        """The day of my first broadcast seer claim, or None."""
+        for _seq, sender, f, day in _chats(v):
+            if sender == v.me and f.claim and not f.injection:
+                return day
+        return None
+
+    @staticmethod
+    def _llm_table(v: View) -> bool:
+        """Another living seat has written a message of BLUFF_WORDS or more words today (ARENA_WW_BLUFF=llm)."""
+        for m in v.messages:
+            if not isinstance(m, dict) or m.get("type", "chat") != "chat" or m.get("visibility") == "direct" \
+                    or m.get("recipients") or m.get("_day", m.get("day")) != v.day:
+                continue
+            s, text = m.get("sender"), m.get("content")
+            if isinstance(s, int) and not isinstance(s, bool) and s != v.me and s in v.alive and isinstance(text, str) \
+                    and len(text.split()) >= BLUFF_WORDS:
+                return True
+        return False
+
+    def _bluff_pick(self, v: View) -> int | None:
+        """The seat the claim names a wolf: the living non-ally seat with the highest public suspicion, ties to the
+        HIGHER seat (never a seat that claimed seer). Real LLM seers mostly investigate the first legal option, the
+        lowest other seat, on night 1 (pilot 10-14: 5 of 9 counter-claims said "I confirmed Player0 is a villager"
+        right after we named Player0), so the lowest seat is the one most likely already cleared. Our own opening's
+        "I'll vote PlayerN" (the lowest seat) is not evidence and is left out."""
+        c = self.claims(v, private=False)
+        pool = [s for s in v.alive if s != v.me and s not in v.allies and s not in c.order]
+        heard = replace(v, messages=[m for m in v.messages if not isinstance(m, dict) or m.get("sender") != v.me])
+        sus = self.suspicion(heard, exclude=set(v.allies))
+        pool = [s for s in pool if s in sus]
+        return max(pool, key=lambda s: (round(sus[s], 6), s)) if pool else None
+
+    @staticmethod
+    def _bluff_target(v: View, c: Claims) -> int | None:
+        """The seat our live seer bluff tells the table to vote: a rival claimant (the claim-fight rule: vote the
+        rival), else the lowest living non-ally seat we named a wolf."""
+        others = [s for s in v.alive if s != v.me and s not in v.allies]
+        rivals = [s for s in c.order if s in others]
+        if rivals:
+            return min(rivals)
+        named = sorted(s for s in c.wolves.get(v.me, ()) if s in others)
+        return named[0] if named else None
+
+    def _bluff_chat(self, v: View, c: Claims, mode: str):
+        """(topic, message) of the seer bluff, or None (then the normal wolf chat). Day 1 with no seer claim yet: the
+        claim. After it, while no revealed role has exposed it: a rival claimant gets the real seer's rebuttal once (on
+        the day it appears); every later day opens with our "results" (the wolves we named, one new non-ally clear per
+        day, the seat to vote)."""
+        if v.me not in v.alive:
+            return None
+        if v.me not in c.order:
+            if v.day != 1 or c.order or "seer" in v.dead.values():
+                return None
+            if mode == "llm" and not self._llm_table(v):
+                return None
+            x = self._bluff_pick(v)
+            if x is None:
+                return None
+            return "bluff-claim", {"content": f"I am the Seer. Player{x} is a WOLF. Everyone vote Player{x} today.",
+                                   "recipients": []}
+        if v.me in c.liars:
+            return None                                       # exposed: nothing left to defend
+        others = [s for s in v.alive if s != v.me and s not in v.allies]
+        named = c.wolves.get(v.me, set())
+        fresh = [s for s in c.order if s in others and s not in named]
+        target = self._bluff_target(v, c)
+        if fresh:
+            r = target if target in fresh else fresh[0]
+            return "bluff-rebut", {"content": f"I am the Seer. Player{r} is lying about being Seer, so Player{r} is a "
+                                              f"WOLF. Vote Player{r}.", "recipients": []}
+        claimed = self._claim_day(v)
+        if claimed is None or v.day is None or v.day <= claimed or target is None:
+            return None
+        wolves = [target] + [s for s in sorted(named) if s in others and s != target][:1]
+        clears = [s for s in sorted(c.clears.get(v.me, ())) if s in others and s not in wolves]
+        need = max(0, (v.day - claimed + 1) - len(named) - len(c.clears.get(v.me, ())))
+        if need:
+            sus = self.suspicion(v, exclude=set(v.allies))
+            pool = [s for s in others if s not in wolves and s not in clears and s not in c.order and s in sus]
+            clears += sorted(pool, key=lambda s: (sus[s], s))[:need]   # the most trusted unnamed seats
+        txt = "I am the Seer. " + " ".join(f"Player{s} is a WOLF." for s in wolves)
+        if clears:
+            txt += " " + " ".join(f"Player{s} is clear." for s in clears[:2])
+        return "bluff-result", {"content": txt + f" Everyone vote Player{target} today.", "recipients": []}
+
+    def extra_followups(self, st: dict) -> int:
+        """Listening follow-ups allowed on top of agent.LISTEN_FOLLOWUPS today: 1 on the day our seer bluff went out
+        (so the claim never uses up the one reaction a rival's counter-claim needs), else 0. 0 with ARENA_WW_BLUFF off."""
+        try:
+            if bluff_mode() == "off":
+                return 0
+            v = self._view(st)
+            return 1 if v.role == "wolf" and v.day is not None and self._claim_day(v) == v.day else 0
+        except Exception:
+            return 0
 
     @staticmethod
     def _follow_msg(c: Claims, t: int) -> dict:
@@ -785,6 +923,11 @@ _BUS_OUT = re.compile(r"Following the Seer \(Player\d\): I vote (Player\d)\. Eve
                       r"Please don't abstain\."
                       r"|Two Seer claims: Player\d and Player\d\. One is lying\. I vote Player\d; the reveal will show "
                       r"who lied\.")
+# The only seer claims a wolf may make besides the counter-claim: ARENA_WW_BLUFF's templates (topics "bluff-*", which
+# only WerewolfPolicy._bluff_chat produces, and only with the switch on). They name seats as above: never the ally.
+_BLUFF_OUT = re.compile(r"I am the Seer\. (Player\d) is a WOLF\.(?: Player\d is a WOLF\.)?(?: Player\d is clear\.){0,2} "
+                        r"Everyone vote \1 today\."
+                        r"|I am the Seer\. (Player\d) is lying about being Seer, so \2 is a WOLF\. Vote \2\.")
 _WORD_CAP = 50
 _CHAR_CAP = 1024        # MESSAGE_TOO_LONG over 1024 characters (werewolf.md §8); counted in UTF-8 bytes, which is
 #                         never fewer than the characters or UTF-16 units the server might count
@@ -811,7 +954,8 @@ def chat_guard(msg, v: View, topic: str):
         bus = topic.startswith("bus") and _BUS_OUT.fullmatch(text)      # voting a doomed ally, in villager words
         if (mentioned & set(v.allies) and not bus) or re.search(rf"(?i)player{v.me}\s+is\s+(?:a\s+)?wolf", text):
             return None
-        if _SEER_CLAIM_OUT.search(text) and topic != "counter":
+        if _SEER_CLAIM_OUT.search(text) and topic != "counter" \
+                and not (topic.startswith("bluff") and _BLUFF_OUT.fullmatch(text)):
             return None
     elif v.role == "villager":
         if _SEER_CLAIM_OUT.search(text) or (_RESULT_OUT.search(text) and topic != "follow"):
