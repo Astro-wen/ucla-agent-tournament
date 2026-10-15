@@ -23,6 +23,10 @@ HARV_FLEE = 7              # cells a harvester drives away from its attackers wh
 EARLY_ARMY_S = 120         # econ_first: signs of an early enemy army before this (scout killed in their base, 2+
 EARLY_ARMY_VALUE = 700     # barracks, or this much of their combat units seen) -> a few more rifles and one tower
 ARTILLERY = frozenset({"arty", "v2rl"})     # attack_gate: long-range units that outrange an attack walking in
+ARMOR_HUNTERS = frozenset({"1tnk", "2tnk", "3tnk", "4tnk", "e3"})   # split_fire: shoot enemy vehicles
+SPLIT_TICKS = 37            # split_fire: assignments every 1.5 s
+SPLIT_HOLD_TICKS = 8 * 25   # an assignment is re-checked after this long
+SPLIT_SLACK = 2.0           # reach = weapon range + this
 
 
 def _centroid(pts):
@@ -33,6 +37,16 @@ def _centroid(pts):
 
 def _cell(c):
     return [int(round(c[0])), int(round(c[1]))]
+
+
+def _reach(t: str, rules) -> float:
+    w = rules.item(t).get("weapon") if hasattr(rules, "item") else None
+    r = w.get("range_cells") if isinstance(w, dict) else None
+    try:
+        r = float(r)
+    except (TypeError, ValueError):
+        r = 5.0
+    return max(3.0, min(9.0, r)) + SPLIT_SLACK
 
 
 class Army:
@@ -115,6 +129,9 @@ class Army:
         # v4.8 (docs/redalert_design.md section 19)
         self.tank_peak = 0.0            # the most enemy tank value seen within 2 minutes (at_towers / at_comp)
         self.tank_army_s = None         # game second the enemy tank army was first seen
+        self.split: dict[int, tuple[int, int]] = {}    # split_fire: our unit -> (enemy vehicle, tick assigned)
+        self.split_tick = -10 ** 9
+        self.split_orders = 0
 
     # ---- bookkeeping ----------------------------------------------------------------------------------------------
     def cost(self, t: str) -> int:
@@ -300,12 +317,19 @@ class Army:
         return p.at_tank_min > 0 and self.tank_peak >= p.at_tank_min
 
     def at_threat(self, v) -> bool:
-        """v4.8 at_towers: an enemy tank army was seen and their army is worth at least at_ratio x ours."""
+        """v4.8 at_towers: an enemy tank army was seen, tanks make at least at_tank_share of the enemy army seen in
+        the last 3 minutes, and that army (seen, not the blind prior) is worth at least at_ratio x ours. (Dev seeds
+        1501, first version on the blind prior and any tank army: 2 gun towers in nearly every game against tom's
+        rifle-heavy army, 1 better / 5 worse.)"""
         p = self.pol.p
         if not self.tank_army(v):
             return False
+        seen = max(self.enemy_army(v, 180.0), self.enemy_peak)
+        tanks = self.enemy_tanks(v, 180.0)
+        if seen <= 0 or tanks < p.at_tank_share * self.enemy_army(v, 180.0):
+            return False
         ours = self.value(self.main | self.home | self.reinf, v)
-        return self.enemy_strength(v) >= p.at_ratio * max(1.0, ours)
+        return seen >= p.at_ratio * max(1.0, ours)
 
     def enemy_strength(self, v) -> float:
         """What an attack has to beat: the enemy army (recent sightings, or the biggest army seen at once, fading)
@@ -563,6 +587,8 @@ class Army:
               tag="") -> int:
         led = self.pol.ledger
         sig = (cmd, tuple(to) if to is not None else None, target)
+        if cmd == "attack_move" and self.split:
+            ids = [i for i in ids if i not in self.split]     # split_fire: busy with an enemy vehicle
         ok = []
         for i in ids:
             u = v.unit_by_id.get(i)
@@ -585,12 +611,62 @@ class Army:
     def _pts(self, ids, v):
         return [(v.unit_by_id[i]["x"], v.unit_by_id[i]["y"]) for i in ids if i in v.unit_by_id]
 
+    # ---- v4.8 split_fire: anti-armour units shoot enemy vehicles ------------------------------------------------
+    def _split_fire(self, v, out) -> None:
+        """Our tanks and rocket soldiers in a fight attack the nearest enemy vehicle within reach (weapon range +
+        SPLIT_SLACK) instead of whatever is nearest: the engine (and the simulator) auto-targets the nearest enemy,
+        so tanks spend their shells on rifles (a quarter of the damage) while the enemy tanks live. Real loss
+        f1cd3ba4 at 1019-1039 s: our 10 heavy tanks next to 19 enemy rifles, 7 rockets and 5 medium tanks killed 3
+        tanks and a few rifles while losing 10 rockets, 7 rifles and 5 tanks. Rifles and grenadiers keep their
+        attack-move (the nearest target is mostly infantry). An assignment ends when the target is gone, out of
+        reach + 3, the unit retreats, or after SPLIT_HOLD_TICKS (then re-assigned); busy units skip the attack-moves
+        of the fight (_send) but not a retreat."""
+        rules = v.st.rules
+        foes = {e["id"]: e for e in v.enemies}
+        for i in list(self.split):
+            tid, tick = self.split[i]
+            u = v.unit_by_id.get(i)
+            e = foes.get(tid)
+            if u is None or e is None or v.tick - tick > SPLIT_HOLD_TICKS or (i in self.main and self.state == "RETREAT") \
+                    or dist((u["x"], u["y"]), (e["x"], e["y"])) > _reach(u["type"], rules) + 3:
+                del self.split[i]
+        if v.tick - self.split_tick < SPLIT_TICKS:
+            return
+        vehicles = [e for e in v.enemies if is_combat(e["type"], rules) and e["type"] not in AIR
+                    and not is_infantry(e["type"], rules) and not rules.is_building(e["type"])]
+        if not vehicles:
+            return
+        self.split_tick = v.tick
+        retreating = self.state == "RETREAT"
+        groups: dict[int, list[int]] = {}
+        for i in sorted(self.home | self.main | self.reinf):
+            u = v.unit_by_id.get(i)
+            if u is None or u["type"] not in ARMOR_HUNTERS or (retreating and i in self.main):
+                continue
+            reach = _reach(u["type"], rules)
+            best = None
+            for e in vehicles:
+                d = dist((u["x"], u["y"]), (e["x"], e["y"]))
+                if d <= reach and (best is None or (d, e["hp"], e["id"]) < best[0]):
+                    best = ((d, e["hp"], e["id"]), e["id"])
+            if best is not None:
+                groups.setdefault(best[1], []).append(i)
+        for tid, us in groups.items():
+            for i in us:
+                if i not in self.split or self.split[i][0] != tid:
+                    self.split[i] = (tid, v.tick)
+            # (the same order again within same_gap is skipped by the ledger: no flood)
+            if self._send(out, v, us, "attack", target=tid, urgent=True, min_gap=10, same_gap=50, tag="split"):
+                self.split_orders += 1
+
     # ---- every view ----------------------------------------------------------------------------------------------
     def step(self, v, out: list[Cand], allow: bool) -> None:
         self.refresh(v)
         self.assess(v)
         self.endgame(v)
         self._mark_seen(v)
+        if self.pol.p.split_fire:
+            self._split_fire(v, out)
         self._defend(v, out, allow)
         self._harv_guard(v, out)
         if allow:
@@ -1317,4 +1393,5 @@ class Army:
                 "harv_pulls": self.harv_pulls, "harv_helps": self.harv_helps, "rescouts": self.rescouts,
                 "early_army": self.early_army, "base_seen": self.base_seen, "trade_retreats": self.trade_retreats,
                 "comp_kept": self.comp_kept,
-                "tank_army_s": None if self.tank_army_s is None else round(self.tank_army_s)}
+                "tank_army_s": None if self.tank_army_s is None else round(self.tank_army_s),
+                "split_orders": self.split_orders}

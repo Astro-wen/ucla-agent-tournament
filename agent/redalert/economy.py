@@ -61,6 +61,7 @@ class Economy:
         self.power_cancels = 0
         self.power_for = -10 ** 9             # v4.8 at_towers: tick an anti-tank tower last waited for power
         self.at_towers = 0                    # v4.8: anti-tank tower orders (summary)
+        self.at_item = None                   # v4.8: the anti-tank tower type ordered (placed at_place cells out)
 
     # ---- helpers ----
     def role_count(self, v, role: str) -> int:
@@ -345,7 +346,10 @@ class Economy:
                 return self._best_spot(v, item, ore, 7, prefer_dist=3.5)
             if item in ANTI_INFANTRY_DEF or item in ANTI_VEHICLE_DEF or item in ("agun", "sam", "hbox"):
                 toward = self.pol.army.threat_point or st.enemy_spawn or v.base
-                target = st.step_toward(v.base, toward, 6)
+                # v4.8 at_towers: anti-tank towers stand in the base (at_place cells out), where the decisive push
+                # comes, not 6 cells out where shelling and probes draw the army into fights (dev seeds 1501)
+                step = float(self.pol.p.at_place) if self.pol.p.at_towers > 0 and item == self.at_item else 6
+                target = st.step_toward(v.base, toward, step)
                 return self._best_spot(v, item, target, 4)
             if fails:
                 return self._best_spot(v, item, v.base, 9, prefer_dist=5.0)
@@ -446,7 +450,7 @@ class Economy:
                 and v.money < 1500:
             choice = None                                 # an early rush: the money goes to rifles and towers
         if p.at_towers > 0 and v.tick - self.power_for <= POWER_FOR_TICKS and choice not in POWER and \
-                v.surplus < 100 and v.remaining >= 120:
+                v.surplus < 100 + self.margin(v) and v.remaining >= 120:
             pw = self._power_item(v)                      # v4.8: an anti-tank tower waits for this power plant
             if pw is not None:
                 return pw
@@ -535,6 +539,7 @@ class Economy:
             return                                      # the Building queue adds power first
         if at is not None:
             self.at_towers += 1
+            self.at_item = at
         out.append(Cand({"cmd": "build", "item": item}, key=("build", item), urgent=army.threatened,
                         base=v.in_prod.get(item, 0)))
 
@@ -556,8 +561,10 @@ class Economy:
         for t in AT_DEF:
             if t in v.avail and self.blocked.get(t, -1) < v.tick:
                 d = -v.st.rules.power(t)
-                if d > 0 and v.surplus - d < 0:
-                    self.power_for = v.tick              # the Building queue: a power plant for it first
+                if d > 0 and v.surplus - d < self.margin(v):
+                    # the Building queue: a power plant for it first, keeping the margin (dev seeds 1501: without it the
+                    # towers cost 1501064 58 s of low power, a third of the production speed)
+                    self.power_for = v.tick
                     return None
                 return t
         return None

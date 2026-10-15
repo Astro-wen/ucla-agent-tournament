@@ -956,7 +956,7 @@ def test_v47_switches_leave_the_summary_fields_and_never_raise():
 
 # ---- v4.8: an early tank army (docs/redalert_design.md section 19) ---------------------------------------------------
 V47 = {"ARENA_RA_AT_TOWERS": "0", "ARENA_RA_AT_COMP": "0", "ARENA_RA_HF_KEEP": "0",
-       "ARENA_RA_ANCHOR2": "0"}                                     # every v4.8 switch off: v4.7
+       "ARENA_RA_ANCHOR2": "0", "ARENA_RA_SPLIT_FIRE": "0"}                                     # every v4.8 switch off: v4.7
 
 
 def _see_tanks(pol, v, n=2, typ="2tnk", x=40, y=44):
@@ -967,9 +967,9 @@ def _see_tanks(pol, v, n=2, typ="2tnk", x=40, y=44):
 
 def test_v48_defaults_on_and_the_off_set_is_v47():
     p = load_params({})
-    assert p.at_towers == 2 and p.at_comp and p.hf_keep and p.at_tank_min == 1700
+    assert p.at_towers == 0 and p.at_tank_min == 1700                 # (anti-tank towers: off after the dev seeds)
     off = load_params(V47)
-    assert off.at_towers == 0 and not off.at_comp and not off.hf_keep and not off.anchor2
+    assert off.at_towers == 0 and not off.at_comp and not off.hf_keep and not off.anchor2 and not off.split_fire
     assert off.attack_gate and off.trade_retreat and off.recover          # v4.7 itself stays on
 
 
@@ -988,7 +988,7 @@ def test_enemy_tank_army_counts_heavy_vehicles_only():
 
 
 def test_at_towers_build_an_anti_tank_tower_once_a_tank_army_is_seen():
-    for env, want in ((V47, None), ({}, "gun")):
+    for env, want in ((V47, None), ({"ARENA_RA_AT_TOWERS": "2"}, "gun")):
         pol, v = _late_view(env)
         v.have["weap"] = 1
         v.avail |= {"gun", "pbox"}
@@ -1063,3 +1063,33 @@ def test_anchor2_puts_a_second_anchor_on_the_building_farthest_from_the_enemy():
     b = anchor2(v, a["building"])
     assert b is not None and b["building"] != a["building"] and b["cmd"] == "power_toggle" and b["on"] is True
     assert anchor2(v, a["building"]) == b                           # deterministic
+
+
+def test_split_fire_sends_tanks_and_rockets_at_the_enemy_tank_not_the_nearest_rifle():
+    for env, on in ((V47, False), ({"ARENA_RA_SPLIT_FIRE": "1"}, True)):
+        pol, v = _late_view(env)
+        a = pol.army
+        ours = [{"id": 830000, "type": "2tnk", "hp": 100, "x": 30, "y": 44, "idle": False},
+                {"id": 830001, "type": "e3", "hp": 100, "x": 30, "y": 45, "idle": False},
+                {"id": 830002, "type": "e1", "hp": 100, "x": 30, "y": 43, "idle": False}]
+        v.units += ours
+        v.unit_by_id.update({u["id"]: u for u in ours})
+        a.main |= {u["id"] for u in ours}
+        v.enemies = [{"id": 840000, "type": "e1", "hp": 100, "x": 32, "y": 44},     # nearest: a rifle
+                     {"id": 840001, "type": "3tnk", "hp": 100, "x": 35, "y": 44},   # in reach: a heavy tank
+                     {"id": 840002, "type": "3tnk", "hp": 100, "x": 50, "y": 44}]   # out of reach
+        out = []
+        a._split_fire(v, out)
+        sent = [c.order for c in out if c.order["cmd"] == "attack"]
+        if not on:
+            continue
+        assert sent and all(o["target"] == 840001 for o in sent), sent
+        assert sorted(u for o in sent for u in o["units"]) == [830000, 830001]      # the rifle keeps its attack-move
+        assert set(a.split) == {830000, 830001}
+        n = a._send(out, v, [830000, 830001, 830002], "attack_move", to=(40, 44))
+        assert n == 1                                                # busy hunters skip the fight's attack-move
+        v.enemies = v.enemies[:1]                                    # the tank is gone: released
+        v.tick += 40
+        a._split_fire(v, [])
+        assert not a.split
+    assert not load_params(V47).split_fire

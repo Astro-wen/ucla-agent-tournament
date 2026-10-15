@@ -308,5 +308,5 @@ class RedAlertPolicy:
                 f"rescouts={s['army']['rescouts']} harv_pulls={s['army']['harv_pulls']} "
                 f"harv_helps={s['army']['harv_helps']} early_army={int(s['army']['early_army'])} "
                 f"base_seen={int(s['army']['base_seen'])} trade_retreats={s['army']['trade_retreats']} "
-                f"comp_kept={s['army']['comp_kept']} tank_army_s={s['army']['tank_army_s']} "
+                f"comp_kept={s['army']['comp_kept']} tank_army_s={s['army']['tank_army_s']} split_orders={s['army']['split_orders']} "
                 f"at_towers={s['at_towers']}" + harv)
