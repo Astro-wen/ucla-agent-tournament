@@ -106,6 +106,8 @@ DEFAULTS: dict[str, float] = {
     "at_e1_cap": 12,
     "hf_keep": 1,                   # harv_first goes on through early-army signs from inside their base (a dead
                                     # scout, units seen at their home); a rush or two barracks still end it
+    "anchor2": 1,                   # a second anchor in every batch, on the building farthest from the enemies in
+                                    # sight (two real INVALID_ACTIONs while the base was razed; lockstep: no change)
 }
 
 

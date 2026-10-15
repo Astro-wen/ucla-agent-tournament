@@ -955,7 +955,8 @@ def test_v47_switches_leave_the_summary_fields_and_never_raise():
 
 
 # ---- v4.8: an early tank army (docs/redalert_design.md section 19) ---------------------------------------------------
-V47 = {"ARENA_RA_AT_TOWERS": "0", "ARENA_RA_AT_COMP": "0", "ARENA_RA_HF_KEEP": "0"}  # every v4.8 switch off: v4.7
+V47 = {"ARENA_RA_AT_TOWERS": "0", "ARENA_RA_AT_COMP": "0", "ARENA_RA_HF_KEEP": "0",
+       "ARENA_RA_ANCHOR2": "0"}                                     # every v4.8 switch off: v4.7
 
 
 def _see_tanks(pol, v, n=2, typ="2tnk", x=40, y=44):
@@ -968,7 +969,7 @@ def test_v48_defaults_on_and_the_off_set_is_v47():
     p = load_params({})
     assert p.at_towers == 2 and p.at_comp and p.hf_keep and p.at_tank_min == 1700
     off = load_params(V47)
-    assert off.at_towers == 0 and not off.at_comp and not off.hf_keep
+    assert off.at_towers == 0 and not off.at_comp and not off.hf_keep and not off.anchor2
     assert off.attack_gate and off.trade_retreat and off.recover          # v4.7 itself stays on
 
 
@@ -1044,3 +1045,21 @@ def test_v48_switches_leave_the_summary_fields_and_never_raise():
         text = pol.summary_text()
         assert "tank_army_s=None" in text and "at_towers=0" in text
         assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+
+
+def test_anchor2_puts_a_second_anchor_on_the_building_farthest_from_the_enemy():
+    from agent.redalert.orders import anchor2
+    for env, n_anchor in ((V47, 1), ({}, 2)):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params(env))
+        log = []
+        drive(srv, pol, 120, record=log)
+        multi = [orders for _sv, orders, _res in log if sum(1 for o in orders if o["cmd"] == "power_toggle") >= 2]
+        assert bool(multi) == (n_anchor == 2)
+        assert all(res.get("accepted") for _sv, _o, res in log)
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+    v = pol.view
+    a = anchor(v)
+    b = anchor2(v, a["building"])
+    assert b is not None and b["building"] != a["building"] and b["cmd"] == "power_toggle" and b["on"] is True
+    assert anchor2(v, a["building"]) == b                           # deterministic
