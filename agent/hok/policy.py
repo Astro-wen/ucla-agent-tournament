@@ -1,4 +1,4 @@
-"""Honor of Kings 5v5 (`honor_of_kings_5v5`): a basic rule-based team, so our five heroes never stand still.
+"""Honor of Kings 5v5 (`honor_of_kings_5v5`): legal, visible-state team rules.
 
 The platform had not switched the game on by the submission deadline; this follows the contract published in the
 official starter's GAMES.md ("Honor of Kings") and the payload shapes of its tests (tests/test_hok.py upstream). No
@@ -16,14 +16,20 @@ Per hero, in order:
      threshold);
   3. retreat when hurt and outnumbered (visible enemy heroes near it at least two more than our live heroes near it),
      or hurt under an enemy tower;
-  4. fight what is in range: ultimate (skill 3) at an enemy hero only, skills 2 / 1 at anything, else a basic attack;
+  4. basic-attack an offered nearby structure; otherwise use skills in range (ultimate at a hero only), then attack;
   5. else advance (toward the nearest enemy tower or crystal).
 
 Only changes are sent: a hero whose standing order already is the rule's choice gets nothing, and an order younger
 than HOLD_S is kept unless the hero must retreat (no flapping when a target hovers at the edge of range). An order
 whose macro is no longer offered (a skill on cooldown) is replaced, since the hero would otherwise idle on it. Real
 time: WAIT when nothing changes. Lockstep: every pending hero gets an action. Orders are sent as the listed action's
-own action_id, so the runner checks each against the current legal actions before it goes out.
+own action_id, so the runner checks each against the current legal actions before it goes out. All pending heroes
+are considered before dispatch: emergencies first, with ageing to prevent one busy hero starving its teammates.
+Rejected orders invalidate only that hero's cache, and are not retried against the same rejected state.
+
+Contract: upstream GAMES.md / examples/llm/hok.py and the public /skill/hok guide. Distance cutoffs below are
+conservative policy heuristics, NOT verified hero/tower ranges. We never infer a hero's abilities from its ID,
+invent movement coordinates, or retain fogged enemy positions.
 """
 
 from __future__ import annotations
@@ -40,14 +46,16 @@ LOW_HP = 0.30          # retreat below this share of max HP ...
 HEALED = 0.85          # ... and go back out only above this one
 HURT = 0.60            # "hurt" for the outnumbered / tower rules
 NEAR = 10000           # game units: heroes this close count for the outnumbered rule
-TOWER_RANGE = 8800     # an enemy tower shoots a hero this close (HoK's towers reach about 8800 units)
-SKILL_RANGE = 8000     # cast a skill at a target this close
-ATTACK_RANGE = 9000    # basic-attack a target this close (the official example's "in range")
+TOWER_RANGE = 8800     # cautious proximity heuristic, not an asserted tower weapon range
+SKILL_RANGE = 8000     # conservative skill-distance heuristic; exact hero ranges are not published
+ATTACK_RANGE = 9000    # distance heuristic from the official example, not a universal weapon range
 HOLD_S = 0.6           # an order younger than this is kept, unless the hero must retreat
+RETRY_S = 0.4          # give a refused macro two nominal steps before reconsidering on a fresh view
+MAX_BYPASS = 4         # a continuously waiting hero gets priority after four other dispatches
 
-_SEAT_ID = re.compile(r"^s(\d+):(.+)$")
-_DISTANCE = re.compile(r"(\d+(?:\.\d+)?) away\)")
-_NEAREST = re.compile(r"nearest:\s*([^,()]*)")
+_SEAT_ID = re.compile(r"^s([0-9]):([^:\s]+)$")
+_DISTANCE = re.compile(r",\s*(\d+(?:\.\d+)?)\s+away\)", re.IGNORECASE)
+_NEAREST = re.compile(r"nearest:\s*([^,()]*)", re.IGNORECASE)
 
 TAGS = {"macro_retreat": "Falling back to heal", "macro_advance": "Pushing the nearest tower",
         "macro_attack": "Attacking the nearest target", "macro_skill1": "Using a skill", "macro_skill2": "Using a skill",
@@ -61,13 +69,20 @@ def offers_by_seat(actions: list[dict]) -> dict[int, dict[str, Any]]:
     """{seat: {"macros": {macro: label}, "ids": {macro: action_id}, "raw": [action dict, ...]}} from the seat-tagged
     legal actions."""
     out: dict[int, dict[str, Any]] = {}
-    for a in actions or []:
+    for a in actions if isinstance(actions, list) else []:
         if not isinstance(a, dict):
             continue
-        m = _SEAT_ID.match(str(a.get("action_id") or ""))
+        action_id = a.get("action_id")
+        m = _SEAT_ID.fullmatch(action_id) if isinstance(action_id, str) else None
         if not m:
             continue
         seat, base = int(m.group(1)), m.group(2)
+        if base not in MACROS and not re.fullmatch(r"button_[0-9]+", base):
+            continue
+        payload = a.get("input")
+        act = payload.get("action") if isinstance(payload, dict) else None
+        if isinstance(act, dict) and "seat" in act and (type(act["seat"]) is not int or act["seat"] != seat):
+            continue
         entry = out.setdefault(seat, {"macros": {}, "ids": {}, "raw": []})
         if base in MACROS:
             entry["macros"][base] = str(a.get("label") or base)
@@ -79,8 +94,11 @@ def offers_by_seat(actions: list[dict]) -> dict[int, dict[str, Any]]:
 
 def is_hok_shape(actions: list[dict]) -> bool:
     """Legal actions shaped like Honor of Kings': every one seat-tagged (`s3:macro_attack`, `s3:button_0`)."""
-    ids = [str(a.get("action_id") or "") for a in actions or [] if isinstance(a, dict)]
-    return bool(ids) and all(_SEAT_ID.match(i) and (":macro_" in i or ":button_" in i) for i in ids)
+    if not isinstance(actions, list) or not actions:
+        return False
+    return all(isinstance(a, dict) and isinstance(a.get("action_id"), str)
+               and re.fullmatch(r"s[0-9]:(?:macro_(?:advance|retreat|attack|skill[123])|button_[0-9]+)",
+                                a["action_id"]) for a in actions)
 
 
 def realtime(raw: dict) -> bool:
@@ -91,14 +109,14 @@ def realtime(raw: dict) -> bool:
 def standing_orders(raw: dict) -> dict[int, str]:
     sim = raw.get("simultaneous") if isinstance(raw.get("simultaneous"), dict) else {}
     orders = sim.get("standing_orders") if isinstance(sim.get("standing_orders"), dict) else {}
-    return {int(k): v for k, v in orders.items() if str(k).isdigit() and isinstance(v, str)}
+    return {int(k): v for k, v in orders.items() if re.fullmatch(r"[0-9]", str(k)) and isinstance(v, str)}
 
 
 def pending_seats(raw: dict, offers: dict[int, Any]) -> list[int]:
     sim = raw.get("simultaneous") if isinstance(raw.get("simultaneous"), dict) else {}
     pending = sim.get("your_pending_seats")
     if isinstance(pending, list):
-        return [s for s in pending if isinstance(s, int) and not isinstance(s, bool) and s in offers]
+        return sorted({s for s in pending if type(s) is int and s in offers})
     return sorted(offers)
 
 
@@ -112,17 +130,42 @@ def summary_of(raw: dict, seat: int) -> dict:
 
 def distance_of(label: str) -> float:
     """Macro labels end "(... 4123 away)"; inf without one."""
-    m = _DISTANCE.search(label or "")
+    m = _DISTANCE.search(label) if isinstance(label, str) else None
     return float(m.group(1)) if m else math.inf
 
 
 def target_is_hero(label: str) -> bool:
-    m = _NEAREST.search(label or "")
-    return bool(m) and "hero" in m.group(1).lower()
+    return target_kind(label) == "hero"
+
+
+def target_kind(label: str) -> str | None:
+    """Only classify the offered target description, never hero IDs or unseen world state."""
+    m = _NEAREST.search(label) if isinstance(label, str) else None
+    if not m:
+        return None
+    words = set(re.findall(r"[a-z]+", m.group(1).lower()))
+    if words & {"tower", "crystal", "structure"}:
+        return "structure"
+    if "hero" in words:
+        return "hero"
+    return None
+
+
+def _near_enough(label: str, limit: float) -> bool:
+    # The official guide guarantees a listed macro is legal. If the optional distance text is missing,
+    # trust that offer instead of silently leaving a hero advancing forever. Explicit distances still
+    # use the starter's conservative heuristic; they are not a claim about a particular hero's range.
+    return not isinstance(label, str) or _DISTANCE.search(label) is None or distance_of(label) <= limit
 
 
 def _num(x) -> float | None:
-    return float(x) if isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) else None
+    if isinstance(x, (int, float)) and not isinstance(x, bool):
+        try:
+            value = float(x)
+            return value if math.isfinite(value) else None
+        except (OverflowError, ValueError):
+            pass
+    return None
 
 
 def _pos(d: dict) -> tuple[float, float] | None:
@@ -139,35 +182,46 @@ def hp_share(me: dict) -> float | None:
     return hp / mx if hp is not None and mx and mx > 0 else None
 
 
+def _dict_list(value: Any) -> list[dict]:
+    return [x for x in value if isinstance(x, dict)] if isinstance(value, list) else []
+
+
 class Team:
     """What the five summaries say together: our live heroes' positions, enemy heroes in sight, enemy towers."""
 
     def __init__(self, raw: dict, seats: list[int]) -> None:
-        self.camp = raw.get("camp")
+        self.camp = raw.get("camp") if type(raw.get("camp")) is int and raw["camp"] in (1, 2) else None
         self.allies: dict[int, tuple[float, float]] = {}
         self.enemies: dict[Any, tuple[float, float]] = {}
         self.towers: list[tuple[float, float]] = []
-        for seat in seats:
-            s = summary_of(raw, seat)
+        summaries = [summary_of(raw, seat) for seat in seats]
+        if self.camp is None:
+            camps = {s["my_hero"].get("camp") for s in summaries if isinstance(s.get("my_hero"), dict)
+                     and type(s["my_hero"].get("camp")) is int and s["my_hero"]["camp"] in (1, 2)}
+            self.camp = next(iter(camps)) if len(camps) == 1 else None
+        towers: set[tuple[float, float]] = set()
+        for seat, s in zip(seats, summaries):
             me = s.get("my_hero") if isinstance(s.get("my_hero"), dict) else {}
-            if self.camp is None:
-                self.camp = me.get("camp")
             p = _pos(me)
             if p is not None and (_num(me.get("hp")) or 0) > 0:
                 self.allies[seat] = p
-            for o in s.get("other_heroes") or []:
-                if not isinstance(o, dict) or not o.get("visible") or o.get("camp") in (None, self.camp):
+            for o in _dict_list(s.get("other_heroes")):
+                if o.get("visible") is not True or self.camp is None \
+                        or type(o.get("camp")) is not int or o["camp"] != 3 - self.camp:
                     continue
                 q = _pos(o)
                 if q is not None and (_num(o.get("hp")) is None or o["hp"] > 0):
-                    self.enemies[o.get("runtime_id", len(self.enemies))] = q
-            if not self.towers:
-                for st in s.get("structures") or []:
-                    if isinstance(st, dict) and st.get("camp") not in (None, self.camp) \
-                            and "TOWER" in str(st.get("type") or "").upper() and (_num(st.get("hp")) or 0) > 0:
-                        q = _pos(st)
-                        if q is not None:
-                            self.towers.append(q)
+                    identity = o.get("runtime_id")
+                    key = ("id", identity) if type(identity) in (int, str) else ("position", q)
+                    self.enemies[key] = q
+            for st in _dict_list(s.get("structures")):
+                if self.camp is not None and type(st.get("camp")) is int and st["camp"] == 3 - self.camp \
+                        and st.get("visible") is not False \
+                        and "TOWER" in str(st.get("type") or "").upper() and (_num(st.get("hp")) or 0) > 0:
+                    q = _pos(st)
+                    if q is not None:
+                        towers.add(q)
+        self.towers = sorted(towers)
 
     def outnumbered(self, p) -> bool:
         foes = sum(1 for q in self.enemies.values() if _dist(p, q) <= NEAR)
@@ -184,6 +238,9 @@ def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, 
         return None
     me = summary.get("my_hero") if isinstance(summary.get("my_hero"), dict) else {}
     share = hp_share(me)
+    hp = _num(me.get("hp"))
+    if hp is not None and hp <= 0:
+        return None
     can_retreat = "macro_retreat" in macros
     if can_retreat and share is not None:
         if share < LOW_HP or (retreating and share < HEALED):
@@ -191,11 +248,14 @@ def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, 
         p = _pos(me)
         if team is not None and p is not None and share < HURT and (team.outnumbered(p) or team.under_tower(p)):
             return "macro_retreat"
+    attack = macros.get("macro_attack")
+    if attack is not None and target_kind(attack) == "structure" and _near_enough(attack, ATTACK_RANGE):
+        return "macro_attack"
     for macro in ("macro_skill3", "macro_skill2", "macro_skill1"):
         label = macros.get(macro)
-        if label is not None and distance_of(label) <= SKILL_RANGE and (macro != "macro_skill3" or target_is_hero(label)):
+        if label is not None and _near_enough(label, SKILL_RANGE) and (macro != "macro_skill3" or target_is_hero(label)):
             return macro
-    if "macro_attack" in macros and distance_of(macros["macro_attack"]) <= ATTACK_RANGE:
+    if "macro_attack" in macros and _near_enough(macros["macro_attack"], ATTACK_RANGE):
         return "macro_attack"
     if "macro_advance" in macros:
         return "macro_advance"
@@ -205,24 +265,46 @@ def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, 
 def idle_action(raw_actions: list[dict], seat: int):
     """A playable do-nothing for a hero without macros (lockstep only): the listed `s<seat>:button_0`, else the first
     raw button with the first legal value of each field."""
-    for a in raw_actions:
-        if str(a.get("action_id")) == f"s{seat}:button_0":
-            return a["action_id"]
-    for a in raw_actions:
-        act = (a.get("input") or {}).get("action") if isinstance(a.get("input"), dict) else None
-        if isinstance(act, dict) and act.get("which_button") == 0:
-            return a["action_id"]
-    if not raw_actions:
-        return {"which_button": 0, "seat": seat}
-    act = (raw_actions[0].get("input") or {}).get("action") or {}
-    out: dict[str, Any] = {"seat": seat}
-    for k, v in act.items():
-        if k.startswith("legal_"):
-            if isinstance(v, list) and v:
-                out[k[len("legal_"):]] = v[0]
-        elif k != "seat":
-            out[k] = v
-    return out
+    listed = offers_by_seat(raw_actions).get(seat, {}).get("raw", [])
+    for a in listed:
+        if a["action_id"] == f"s{seat}:button_0":
+            payload = a.get("input")
+            act = payload.get("action") if isinstance(payload, dict) else None
+            if not isinstance(act, dict) or (act.get("which_button", 0) == 0
+                                             and not any(str(k).startswith("legal_") for k in act)):
+                return a["action_id"]
+    for a in listed:
+        payload = a.get("input")
+        act = payload.get("action") if isinstance(payload, dict) else None
+        if not isinstance(act, dict) or type(act.get("which_button")) is not int:
+            continue
+        if a["action_id"] != f"s{seat}:button_{act['which_button']}":
+            continue
+        out: dict[str, Any] = {"seat": seat}
+        valid = True
+        for k, v in act.items():
+            if not isinstance(k, str):
+                valid = False
+                break
+            if k.startswith("legal_"):
+                if not isinstance(v, list) or not v or not k[len("legal_"):]:
+                    valid = False
+                    break
+                field = k[len("legal_"):]
+                if field == "seat":
+                    valid = seat in v
+                    if not valid:
+                        break
+                    continue
+                if field in act and act[field] not in v:
+                    valid = False
+                    break
+                out[field] = act.get(field, v[0])
+            elif k != "seat":
+                out[k] = v
+        if valid:
+            return out
+    return None  # No listed, fillable action: do not invent a button or a coordinate.
 
 
 # -- one match's decisions -----------------------------------------------------------------------------------------
@@ -237,6 +319,11 @@ class HokPolicy:
         self._clock = clock
         self._retreating: set[int] = set()
         self._sent: dict[int, tuple[str, float]] = {}       # seat -> (macro, when) of our last order to it
+        self._inflight: tuple[int, str | None, int | None] | None = None
+        self._rejected: dict[tuple[int, str], tuple[int | None, float]] = {}
+        self._dispatches = 0
+        self._last_service: dict[int, int] = {}
+        self._waiting_since: dict[int, int] = {}
         self.orders = 0
         self.by_macro: dict[str, int] = {}
         self.idles = 0
@@ -245,25 +332,49 @@ class HokPolicy:
 
     def decide(self, raw: dict):
         self.views += 1
+        if not isinstance(raw, dict):
+            return None, None
         actions = (raw.get("legal_actions") or {}).get("actions") if isinstance(raw.get("legal_actions"), dict) else []
         offers = offers_by_seat(actions or [])
+        owned = _seat_list(raw)
+        if isinstance(raw.get("seats"), list):
+            offers = {seat: entry for seat, entry in offers.items() if seat in owned}
         if not offers:
             return None, None
         rt = realtime(raw)
         standing = standing_orders(raw)
-        team = Team(raw, sorted(set(offers) | set(_seat_list(raw))))
+        team = Team(raw, sorted(set(offers) | set(owned)))
         now = self._clock()
+        version = raw.get("state_version")
+        version = version if type(version) is int and version >= 0 else None
         pending = pending_seats(raw, offers)
+        candidates: dict[int, tuple[str | None, Any, bool]] = {}
         for seat in pending:
             macros = offers[seat]["macros"]
             summary = summary_of(raw, seat)
             want = rule_macro(summary, macros, team, seat in self._retreating)
             self._track_retreat(seat, summary, want)
+            if rt and want is None:
+                self._sent.pop(seat, None)                   # dead heroes must be commanded again after respawn
+                continue
+            if want is not None and self._blocked(seat, want, version, now):
+                if want == "macro_retreat":
+                    if rt:
+                        continue                            # never turn a refused emergency retreat into a dive
+                    want = None
+                else:
+                    available = {m: label for m, label in macros.items()
+                                 if not self._blocked(seat, m, version, now)}
+                    want = rule_macro(summary, available, team, seat in self._retreating)
+                    if want == "macro_retreat":
+                        want = None                         # do not retreat a healthy hero just because push was refused
             if want is None:
                 if rt:
-                    continue                                 # a dead hero: nothing to send
-                self.idles += 1
-                return idle_action(offers[seat]["raw"], seat), None
+                    continue
+                action = idle_action(offers[seat]["raw"], seat)
+                if action is not None:
+                    candidates[seat] = (None, action, False)
+                continue
             current = standing.get(seat)
             if current is None and seat in self._sent:
                 current = self._sent[seat][0]
@@ -273,22 +384,41 @@ class HokPolicy:
             if rt and last is not None and now - last[1] < HOLD_S:
                 if last[0] == want:
                     continue                                 # just sent: the server's standing orders lag a step
-                if current in macros and last[0] == current and want != "macro_retreat":
+                opportunity = (want.startswith("macro_skill") and target_is_hero(macros[want])) \
+                    or (want == "macro_attack" and target_kind(macros[want]) == "structure")
+                if current in macros and last[0] == current and want != "macro_retreat" and not opportunity:
                     continue                                 # keep a fresh order a moment (no flapping)
+            emergency = want == "macro_retreat" and current != want
+            candidates[seat] = (want, offers[seat]["ids"][want], emergency)
+        self._waiting_since = {s: self._waiting_since.get(s, self._dispatches) for s in candidates}
+        if not candidates:
+            return None, None
+
+        def priority(seat: int) -> tuple:
+            overdue = self._dispatches - self._waiting_since[seat] >= MAX_BYPASS
+            return (not overdue, not candidates[seat][2], self._last_service.get(seat, -1), seat)
+
+        seat = min(candidates, key=priority)
+        want, action, _ = candidates[seat]
+        self._dispatches += 1
+        self._last_service[seat] = self._dispatches
+        self._waiting_since.pop(seat, None)
+        self._inflight = (seat, want, version)
+        if want is not None:
             self._sent[seat] = (want, now)
             self.orders += 1
             self.by_macro[want] = self.by_macro.get(want, 0) + 1
-            return offers[seat]["ids"][want], TAGS.get(want)
-        if rt:
-            return None, None
-        # Lockstep and every pending hero answered above, or no pending hero we know: keep the server moving.
-        seat = pending[0] if pending else sorted(offers)[0]
-        macros = offers[seat]["macros"]
-        want = rule_macro(summary_of(raw, seat), macros, team, seat in self._retreating)
-        if want is not None:
-            return offers[seat]["ids"][want], TAGS.get(want)
-        self.idles += 1
-        return idle_action(offers[seat]["raw"], seat), None
+        else:
+            self._sent.pop(seat, None)                       # raw actions clear the standing order (public guide)
+            self.idles += 1
+        return action, TAGS.get(want)
+
+    def _blocked(self, seat: int, macro: str, version: int | None, now: float) -> bool:
+        rejected = self._rejected.get((seat, macro))
+        if rejected is None:
+            return False
+        old_version, until = rejected
+        return now < until or (version is not None and old_version == version)
 
     def _track_retreat(self, seat: int, summary: dict, want: str | None) -> None:
         me = summary.get("my_hero") if isinstance(summary.get("my_hero"), dict) else {}
@@ -301,7 +431,12 @@ class HokPolicy:
     def on_result(self, result) -> None:
         if isinstance(result, dict) and result.get("error"):
             self.refused += 1
-            self._sent.clear()                                # re-read: decide again from the next view
+            if self._inflight is not None:
+                seat, macro, version = self._inflight
+                self._sent.pop(seat, None)                   # a refusal is not evidence about the other four heroes
+                if macro is not None:
+                    self._rejected[(seat, macro)] = (version, self._clock() + RETRY_S)
+        self._inflight = None
 
     def summary_text(self) -> str:
         macros = ",".join(f"{k[6:]}:{v}" for k, v in sorted(self.by_macro.items()))
@@ -310,4 +445,4 @@ class HokPolicy:
 
 def _seat_list(raw: dict) -> list[int]:
     seats = raw.get("seats")
-    return [s for s in seats if isinstance(s, int) and not isinstance(s, bool)] if isinstance(seats, list) else []
+    return sorted({s for s in seats if type(s) is int and 0 <= s <= 9}) if isinstance(seats, list) else []
