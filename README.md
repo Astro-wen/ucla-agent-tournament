@@ -19,7 +19,7 @@ self-hosted agent, **YurikoRed**, plays three games, each with the method that s
 
 <sub>*Testing matches on the platform, October 8–15, 2026, self-play excluded; Wilson intervals.</sub>
 
-**No LLM or other model service is called anywhere.** There are no prompts and nothing to inject into. Every
+**No LLM or other model service is called by the competition agent.** Every
 decision comes from code in this repository and data fixed before the match, and the agent is fully autonomous
 during play. Honor of Kings support follows the official starter's published contract; its strength in platform
 matches has not yet been verified.
@@ -193,10 +193,10 @@ real states are replayed through the agent before every release (`scripts/replay
 
 ## Submitted version and operation (Official Rules §8–9)
 
-- **Submitted version.** The latest commit on `main` at the Submission Deadline (9:30 a.m. PDT, October 16, 2026,
-  as announced on the platform). This repository is exported commit by commit from the entrant's private development
-  repository with `git archive`, so the code is byte-for-byte what was tested there. Nothing is pushed here from the
-  deadline until 30 days after final results.
+- **Submitted version.** The registered repository's latest commit on `main` at the Submission Deadline
+  (9:30 a.m. PDT, October 16, 2026, as announced on the platform). Selected commits can be exported with
+  `scripts/publish_sync.sh` from their committed contents using `git archive`. The registered submission repository
+  stays frozen from the deadline until 30 days after final results.
 - **Run** (Linux x86-64, Python ≥ 3.11, Node.js ≥ 18):
 
   ```bash
@@ -216,15 +216,17 @@ real states are replayed through the agent before every release (`scripts/replay
   [altruagent-starter](https://github.com/UCLA-Trustworthy-AI-Lab/altruagent-starter). `data/` holds static
   reference data. `agent/js/` holds the Node helpers for @smogon/calc and pokemon-showdown, pinned by lock files.
   `tests/` runs with `python -m pytest -q tests`. The only network peers are the platform's own hosts.
-- **Records.** `logs/agent-main.out` holds the runtime log. `logs/<session_id>.jsonl` holds every state received
-  and every answer sent. Both are kept on the competition machine and are not committed. `logs/yoriko/` and
+- **Records.** `logs/agent-main.out` holds the runtime log. `logs/<session_id>.jsonl` holds recorded states
+  and answers; real-time games use sparse sampling. Both are kept on the competition machine and are not committed. `logs/yoriko/` and
   `logs/apocalypse/` contain one sample real match.
-- **Excluded components.** Credentials (`.env`) and `node_modules` are not included. Also excluded, from the private
-  repository, is offline evaluation tooling: local simulators, sparring bots (some LLM-backed, using the developer's
-  own keys), VGC-Bench checkpoints, frozen earlier versions, ladder and fitting scripts, and internal notes. None of
-  them runs in competition or talks to the agent during a match.
+- **Development-only components.** This repository also contains local simulators, sparring bots, offline
+  evaluation and fitting scripts, frozen earlier versions and research notes. They do not run in competition or
+  communicate with the agent during a match; submission exports select only the documented release files.
+  Credentials (`.env`) and installed `node_modules` are not committed.
 - **Figures.** The charts in `assets/` are generated in the development repository from the agent's runtime logs
   and the recorded local measurements.
 
 ## License and credits
-MIT
+
+The original agent implementation is available under the [MIT License](LICENSE).
+Third-party components keep the licenses and usage terms listed in [NOTICE](NOTICE).

@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "started_local": "2026-10-16T04:02:58-07:00",
+  "research_until_local": "2026-10-16T08:00:00-07:00",
+  "no_push_before_local": "2026-10-16T08:00:00-07:00",
+  "delivery_deadline_local": "2026-10-16T08:30:00-07:00",
+  "authorization": "User explicitly requested sustained research, frequent local commits, then merge to main and push after 08:00; this supersedes the handoff's earlier 07:30 push instruction.",
+  "repository": {
+    "origin": "Astro-wen/ucla-agent-tournament",
+    "visibility_observed": "private at 05:04 PDT",
+    "visibility_history": [
+      {"time_local": "04:05 PDT", "visibility": "public"},
+      {"time_local": "05:04 PDT", "visibility": "private", "viewer_permission": "WRITE", "main_protected": false}
+    ],
+    "research_branch": "claude/zen-pasteur-qcmmq8",
+    "initial_main": "830b888",
+    "handoff_commit": "9583fb5",
+    "basic_policy_commit": "483d199",
+    "working_baseline_integration": "0785a42",
+    "separate_submission_repository_modified": false
+  },
+  "priority": [
+    "A complete legal five-hero controller in both realtime and lockstep modes",
+    "Owned-seat isolation, fair scheduling, refusal/respawn recovery, and bounded sparse recording",
+    "Objective-focused strategy research using only current legal visible information",
+    "Independent regression and delivery checks, preserving other games",
+    "Final organization, archive, merge verification and normal non-force pushes in the authorized window"
+  ],
+  "evidence_boundary": {
+    "official_starter": "686e7560708eaa595a409b330d0d1837d49ba9d5",
+    "official_guide": "https://api.altruagent-game.com/skill/hok",
+    "official_guide_http_status": 200,
+    "real_runtime": "Tencent game server behind the platform macro adapter",
+    "available_local_environment": "Explicitly synthetic configurable contract/strategy diagnostic model",
+    "not_available_at_registration": "Matching local Tencent 5v5 runtime and actual HoK match decision recordings",
+    "claim_limit": "Synthetic wins do not establish real-platform strength or a guarantee against arbitrary human players"
+  },
+  "diagnostic_evaluation": {
+    "initial_frozen_model": "hok-contract-diagnostic-v3",
+    "initial_model_commit": "86a6f0a",
+    "baseline_strategy_snapshot": "1b31f6d",
+    "weak_controls": ["research:idle", "research:first_legal", "research:uniform_random"],
+    "challenge_controls": [
+      "research:objective_rusher",
+      "research:opportunistic_combat",
+      "research:cautious_defender",
+      "research:pulse_pressure",
+      "research:split_pressure"
+    ],
+    "development_seeds": [1101, 1102],
+    "selection_seed": 1201,
+    "reserved_confirmation_seeds": [8101, 8102],
+    "paired_camps": true,
+    "pacing_modes": ["realtime", "lockstep"],
+    "full_horizon_steps": 3000,
+    "rules": [
+      "Freeze policy/model/opponent source hashes for every comparison",
+      "Equal decision opportunities and deterministic game-time clocks for both teams",
+      "No hidden simulator state, opponent implementation identity or future actions in policy inputs",
+      "Do not alter physics to make a candidate win",
+      "New assumption stress models must be versioned and reported separately",
+      "Use development results for selection; never retune on reserved confirmation outcomes",
+      "Report wins/losses/draws, objective damage, illegal actions, protocol failures, starvation and latency",
+      "A target of consistently beating weak controls is a diagnostic target, not a real-game strength claim"
+    ]
+  },
+  "adoption_requirements": [
+    "No valid-contract illegal actions or lockstep WAITs",
+    "No unowned-seat commands or observed hidden-state dependence",
+    "All five heroes continue receiving needed orders",
+    "No permanent order suppression across rejection, death or respawn",
+    "No unbounded recording or policy memory",
+    "No regression in other-game routing, policy source or recorded-state legality",
+    "Unverified strategic assumptions remain explicit; model-only improvement is not sufficient for a real win-rate claim"
+  ],
+  "schedule": {
+    "target_candidate_freeze": "07:00-07:15 PDT",
+    "verification_and_remaining_research": "Continue through 08:00 PDT with regression, adversarial review and evidence checks",
+    "release": "After 08:00 finalize archive, fetch/reconcile main, verify the integrated tree, then push research and main normally by 08:30"
+  },
+  "restrictions": {
+    "runtime_model_calls": false,
+    "paid_model_evaluation": false,
+    "live_match_creation_or_joining": false,
+    "live_agent_restart_or_reconfiguration": false,
+    "sdk_edits": false,
+    "credential_reads": false,
+    "force_push": false,
+    "record_simulation_decisions_via_agent_recorder": false
+  }
+}
