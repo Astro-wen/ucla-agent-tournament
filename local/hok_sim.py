@@ -60,6 +60,45 @@ def digest(value: Any) -> str:
                                     allow_nan=False).encode()).hexdigest()
 
 
+# Registered BEFORE any v4 strategy scores. v3 remains the default and its
+# configuration/trajectory hashes are not rewritten by this separate extension.
+SENSITIVITY_VERSION = "hok-contract-diagnostic-v4-sensitivity-20261016"
+SENSITIVITY_REGISTRATION = {
+    "version": SENSITIVITY_VERSION,
+    "registered_local": "2026-10-16T05:12:37-07:00",
+    "base_model": MODEL_VERSION,
+    "base_mechanics_commit": "86a6f0a",
+    "sources": [
+        {"reference": OFFICIAL_REFERENCE, "sha256": OFFICIAL_GUIDE_SHA256,
+         "uncertainty": "Macro legality does not specify skill damage to structures or guarantee home healing."},
+        {"git_commit": "f0f1566", "path": "docs/hok_sources_1016.md", "sections": [5, 6, 7, 8],
+         "uncertainty": "Nearest target semantics and healing differ across published Tencent environments; "
+                        "none establishes the tournament 5v5 effects."},
+    ],
+    "building_skill_multipliers": [0.0, 0.25, 1.0],
+    "base_healing_multipliers": [0.0, 0.25, 1.0],
+    "design": "Full 3x3 factorial; numerical levels are declared stress assumptions, NOT Tencent measurements.",
+    "mechanisms": [
+        "Only skill1/2/3 damage against towers/crystals is multiplied; hero-target skill damage is unchanged.",
+        "Basic attacks, target selection, legality, cooldowns, movement, towers and objectives remain v3.",
+        "Zero-damage skills remain legally offered: tests castable-but-ineffective actions, not verified masks.",
+        "Passive base healing equals the selected v3 profile's rate times the healing multiplier.",
+        "No-healing does not remove full-HP respawn; all death/respawn semantics remain v3.",
+        "Multiplier 1 and normal healing must produce byte-identical v3 physical trajectory hashes.",
+        "Treatment identity is hashed separately from physical state; never pool v3 and v4 outcomes.",
+    ],
+    "development_seeds": [1101, 1102],
+    "excluded_selection_and_confirmation_seeds": [1201, 8101, 8102],
+    "development_opponents": ["research:idle", "research:first_legal", "research:uniform_random",
+                              "research:objective_rusher", "research:cautious_defender"],
+    "screen": "Full-horizon default-profile paired camps, both modes, seed 1101, objective_rusher first; "
+              "then compare all six registered policies across the registered assumptions.",
+    "policy_registration_sha256": "bcd22815a944a7baf7e763981b9f6104dd339fd388e67ca4a630359b8a08ae10",
+    "claim_limit": "Sensitivity to unverified assumptions only; no real-game strength or promotion claim.",
+}
+SENSITIVITY_REGISTRATION_SHA256 = digest(SENSITIVITY_REGISTRATION)
+
+
 @dataclass(frozen=True)
 class SimConfig:
     # Step interval and default max_steps are from the official guide. Others
