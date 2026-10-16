@@ -146,10 +146,6 @@ DEFAULTS: dict[str, float] = {
     "split_gate": 0.0,              # split_fire only while enemy tanks are below this share of the enemy army seen in
                                     # 3 minutes (0: no gate; needs split_fire on)
     "rally_step": 0,                # the attack group gathers this many path cells from our spawn (0: as before, 8)
-    "hold_home": 0,               # before hold_until_s, a threat worth hold_ratio x our army at home (or a rush) is
-    "hold_r": 6,                    # met hold_r cells from the base toward it (by the towers), not at the threat
-    "hold_ratio": 0.7,
-    "hold_until_s": 600,
 }
 
 

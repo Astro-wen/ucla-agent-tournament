@@ -751,13 +751,6 @@ class Army:
         tp = self.threat_point
         if v.base is not None and dist(tp, v.base) > 30:
             return
-        p = self.pol.p
-        if p.hold_home and v.base is not None and v.game_s < p.hold_until_s and \
-                self.state in ("GATHER", "DEFEND", "RETREAT") and dist(tp, v.base) > p.hold_r and \
-                (self.rush or self.threat_value >= p.hold_ratio * max(1.0, self.value(self.home | self.main, v))):
-            # v4.9 hold_home: an early push about as big as our army: wait for it by the towers, not out at the
-            # threat (simulator vs tom2: 24 units met its ball 9 cells out and traded 5000 for 1150)
-            tp = v.st.step_toward(v.base, tp, p.hold_r)
         moved = self.defense_point is None or dist(tp, self.defense_point) > 4
         if v.tick - self.defense_tick < 3 * 25 and not moved:
             return
