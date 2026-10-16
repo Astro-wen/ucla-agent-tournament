@@ -18,6 +18,10 @@ contract as local/ra_bots.py; local/ra_platform.py takes them by name (--b tanks
     tom     the real losses of 10-14 / 10-15 (Tom_2026) as a script: fast war factory, continuous tanks with a
             rifle-heavy infantry mix, harvester-hunting jeeps / flak trucks, artillery later; probe at ~5:00, attacks
             from ~6:30, the big push at 9000+ or from 9:30
+    tom2    the upgraded Tom_2026 of 10-15 (real losses 335d2a62 / 21bf0e2a): war factory by ~2:00, 4 harvesters,
+            2 barracks, no towers, tanks without pause, attacks from ~4:45 and keeps feeding them; the army waits at
+            home (our scout dies in their base: the early-army rule fires, as in every real game of 10-13..10-15)
+    tom2p   tom2 with the army waiting a quarter of the way to us (scouts die on the road)
 """
 from __future__ import annotations
 
@@ -759,8 +763,112 @@ class Tom(Strong):
         return out
 
 
+class Tom2(Strong):
+    """The upgraded Tom_2026 of 10-15 (real losses 335d2a62 on trapped, 21bf0e2a on sidestep; measured from the
+    recordings, docs/progress.md v4.9): no towers; double refinery and the war factory by ~2:30, the service depot
+    right after it (the main tanks need it), the refineries' harvesters doubled, two barracks, then tanks without
+    pause and a rifle-heavy infantry stream (about four rifles per rocket), a jeep / flak truck from ~4:20. It does not
+    wait: the first attack reaches us at ~4:45-5:10 (2-3 tanks, 12-20 rifles, 2-5 rockets), then every new group of 6
+    follows it in; a second war factory once money floats after 5:00, a radar dome (artillery) after 7:00. Real Tom by
+    7:00 (distinct units seen): 6-7 tanks, ~30 rifles, ~5 rockets, 2-3 jeeps."""
+    style = "tom2"
+    TANKS = ("3tnk", "2tnk", "1tnk", "4tnk")
+    POST = 0.08                 # where the army waits before its first attack: this share of the way to us
+
+    def __init__(self, seed: int = 0):
+        super().__init__(seed)
+        self.first = False
+
+    def decide(self, raw, obs, la):
+        out = self.basics(obs, la)
+        soviet = self.side(obs) == "soviet"
+        bar = "barr" if soviet else "tent"
+        gs = self.game_s(raw, obs)
+        money = self.money(obs)
+        # (the depot is the main tanks' prerequisite: right after the war factory)
+        # (tried: the war factory before the second refinery, like `tom`: a weaker army at 5:00, v4.7 won 55 / 60)
+        plan = [("powr", 1), (bar, 1), ("proc", 1), ("proc", 2), ("weap", 1), ("powr", 2), ("fix", 1), (bar, 2),
+                ("powr", 3)]
+        if gs > 420:
+            plan += [("dome", 1), ("powr", 4)]
+        if gs > 300 and money > 2000:
+            plan += [("weap", 2), ("powr", 5), ("proc", 3), ("powr", 6)]
+        nb = self.next_building(obs, plan)
+        if nb:
+            out.append(nb)
+        avail = obs.get("available_production") or []
+        army = self.fighters(obs)
+        main = "3tnk" if soviet else "2tnk"
+        fast = "ftrk" if soviet else "jeep"
+        art = "v2rl" if soviet else "arty"
+        tanks_all = [u for u in army if u.get("type") in self.TANKS]
+        inf = [u for u in army if u.get("type") in ("e1", "e2", "e3")]
+        procs = self.count(obs, "proc")
+        need_harv = self.count(obs, "weap") and self.count(obs, "harv") < min(6, 2 * procs)
+        if self.count(obs, "weap") and not self.queue_busy(obs, "Vehicle"):
+            if need_harv and money >= 1100:
+                out.append(self.train(obs, "harv"))
+            elif need_harv:
+                pass                                         # saving for the harvester
+            elif fast in avail and gs >= 260 and len(tanks_all) >= 2 and \
+                    self.count(obs, fast) < (1 if gs < 400 else 2) and money >= 600:
+                out.append(self.train(obs, fast))
+            elif art in avail and gs >= 480 and self.count(obs, art) < len(tanks_all) // 4 and money >= 900:
+                out.append(self.train(obs, art))
+            elif main in avail and money >= 700:
+                out.append(self.train(obs, main))
+            elif "1tnk" in avail and money >= 700:
+                out.append(self.train(obs, "1tnk"))
+        cap = 16 if gs < 240 else (32 if gs < 420 else 40)
+        floor = 1250 if need_harv else 100
+        if self.count(obs, bar) and not self.queue_busy(obs, "Infantry") and len(inf) < cap and money >= floor:
+            n_e3 = sum(1 for u in inf if u.get("type") == "e3")
+            out.append(self.train(obs, "e3" if gs > 200 and n_e3 * 5 < len(inf) else "e1", 2))
+        alive = {u["id"] for u in army}
+        self.att &= alive
+        st = self.stance(army)
+        if st:
+            out.append(st)
+        home = [u for u in army if u["id"] not in self.att]
+        hd = self.home_defense(obs, home, radius=16)
+        eb = la.get("enemy_base") or [0, 0]
+        if hd:
+            out.append(hd)
+        else:
+            tanks = [u for u in home if u.get("type") in self.TANKS]
+            go = None
+            if not self.first and gs >= 225 and ((len(tanks) >= 2 and len(home) >= 12) or gs >= 300):
+                self.first = True
+                go = home
+            elif self.first and len(home) >= 6:
+                go = home
+            if go:
+                self.waves += 1
+                out.append({"cmd": "attack_move", "units": [u["id"] for u in go][:50], "to": eb})
+                self.att.update(u["id"] for u in go[:50])
+            else:
+                bc = obs.get("base_center") or [0, 0]
+                # tom2: at home, a few cells toward us (our scouts die inside the base, as in the real games, where
+                # the early-army rule fired in every one); tom2p: a post a quarter of the way (scouts die on the road)
+                f = self.POST
+                post = [int(bc[0] + f * (eb[0] - bc[0])), int(bc[1] + f * (eb[1] - bc[1]))]
+                idle = [u["id"] for u in home if u.get("idle") and d((u["x"], u["y"]), post) > 5]
+                if idle and self.once(obs, "post", 125):
+                    out.append({"cmd": "attack_move", "units": idle[:50], "to": post})
+        out += self.push(obs, la, [u for u in army if u["id"] in self.att],
+                         (DEF_PRIO, PROD, ("proc",), ("powr", "apwr"), ("fact",)))
+        return out
+
+
+class Tom2Post(Tom2):
+    """tom2 with its army waiting at a post a quarter of the way to us (our scout dies on the road, so the early-army
+    rule does not fire)."""
+    style = "tom2p"
+    POST = 0.25
+
+
 BOTS = {"tanks": TankRush, "swarm": Swarm, "pro": Pro, "raider": Raider, "hider": Hider, "nash": Nash, "riffo": Riffo,
-        "nashball": NashBall, "tom": Tom}
+        "nashball": NashBall, "tom": Tom, "tom2": Tom2, "tom2p": Tom2Post}
 STYLES = tuple(BOTS)
 
 
