@@ -15,12 +15,14 @@ self-hosted agent, **YurikoRed**, plays three games, each with the method that s
 | **Pokémon VGC doubles draft** | game-theoretic search: minimax draft, 90 × 90 matrix game at team preview, Showdown-engine search in battle | **50–25** (67%, 95% CI 55–76%) |
 | **Werewolf** (7 players) | deterministic rule policy over the public record; fixed chat templates | multi-player, not tallied |
 | **Red Alert** (OpenRA, real time) | rule-based bot: economy first, attack only with a clear edge, millisecond decisions | **22–9** (71%, 95% CI 53–84%) |
+| **Honor of Kings 5v5** | rule-based team macros: advance, fight and retreat using the current legal actions | not yet measured on the platform |
 
 <sub>*Testing matches on the platform, October 8–15, 2026, self-play excluded; Wilson intervals.</sub>
 
 **No LLM or other model service is called anywhere.** There are no prompts and nothing to inject into. Every
 decision comes from code in this repository and data fixed before the match, and the agent is fully autonomous
-during play. Honor of Kings is not supported, because it is not playable on the platform.
+during play. Honor of Kings support follows the official starter's published contract; its strength in platform
+matches has not yet been verified.
 
 ![Real platform results](assets/real_results.png)
 
@@ -32,8 +34,8 @@ during play. Honor of Kings is not supported, because it is not playable on the 
 flowchart LR
     P["AltruAgent platform"] -->|"assigned game"| R["Runtime<br/>python -m agent --tournament --match"]
     R -->|"one worker process per game"| C["agent/agent.py<br/>routes by game type"]
-    C --> PK["agent/pokemon/"] & WW["agent/werewolf/"] & RA["agent/redalert/"]
-    PK & WW & RA --> G["Safety layer<br/>time budget · legality check · safe fallback"]
+    C --> PK["agent/pokemon/"] & WW["agent/werewolf/"] & RA["agent/redalert/"] & HK["agent/hok/"]
+    PK & WW & RA & HK --> G["Safety layer<br/>time budget · legality check · safe fallback"]
     G -->|"action"| P
 ```
 
@@ -159,6 +161,16 @@ low, and one decisive wave ends the match.</sub>
 
 ---
 
+## Honor of Kings 5v5
+
+One agent commands all five heroes. The basic policy in `agent/hok/` uses the macros offered by the current
+observation: advance toward an objective, attack or use a skill against a nearby target, or retreat to recover.
+Low-health retreat has a separate recovery threshold so heroes do not repeatedly change direction around one
+threshold. A standing order is replaced only when needed; lockstep mode still answers every pending hero.
+
+This implementation is being verified against the published interface. Offline contract tests and diagnostic
+models do not establish a real-platform win rate.
+
 ## Evaluation
 
 Every release had to beat the frozen previous version in local ladders on fresh random seeds. It also had to hold
@@ -198,7 +210,7 @@ real states are replayed through the agent before every release (`scripts/replay
   `bash scripts/bundle.sh` builds a self-contained tarball. `deploy/` holds the systemd unit and the Dockerfile.
   The runbook is `docs/deploy.md` (in Chinese).
 - **Settings.** Every `ARENA_*` setting stays at its default: `ARENA_BATTLE=search`, `ARENA_WW_DM=off`,
-  `ARENA_WW_TACTICS=off`, `ARENA_RA=on` and `ARENA_RECORD=1`. The machine's `.env` holds only the key. Each
+  `ARENA_WW_TACTICS=off`, `ARENA_RA=on`, `ARENA_HOK=on` and `ARENA_RECORD=1`. The machine's `.env` holds only the key. Each
   start logs the full commit id and the settings in effect.
 - **Components.** `agent/` is our code. `altruagent/` is the official SDK, merged unmodified from
   [altruagent-starter](https://github.com/UCLA-Trustworthy-AI-Lab/altruagent-starter). `data/` holds static
