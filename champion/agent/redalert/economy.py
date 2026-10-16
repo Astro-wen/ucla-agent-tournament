@@ -15,7 +15,10 @@ OPENING_B_ALLIES = [("power", 1), ("barracks", 1), ("proc", 1), ("weap", 1), ("p
                     ("power", 3), ("weap", 2), ("proc", 3), ("power", 4)]
 OPENING_B_SOVIET = [("power", 1), ("barracks", 1), ("proc", 1), ("weap", 1), ("power", 2), ("fix", 1), ("proc", 2),
                     ("power", 3), ("weap", 2), ("proc", 3), ("power", 4)]
-ROLES = {"power": ("powr", "apwr"), "proc": ("proc",), "barracks": ("tent", "barr"), "weap": ("weap",),
+# v4.9 open_fast: opening A with the war factory before the second refinery (Tom_2026's tanks reached us at 4:45)
+OPENING_F = [("power", 1), ("barracks", 1), ("proc", 1), ("weap", 1), ("power", 2), ("proc", 2), ("fix", 1),
+             ("power", 3)]
+ROLES = {"power":("powr", "apwr"), "proc": ("proc",), "barracks": ("tent", "barr"), "weap": ("weap",),
          "fix": ("fix",), "dome": ("dome",)}
 ANTI_INFANTRY_DEF = ("pbox", "ftur", "hbox")
 ANTI_VEHICLE_DEF = ("tsla", "gun", "ftur", "pbox")
@@ -91,6 +94,8 @@ class Economy:
             rich = v.starting_cash >= pol.p.rich_cash_opening
             self.plan = OPENING_A if not rich else (OPENING_B_SOVIET if v.side == "soviet" else OPENING_B_ALLIES)
             pol.opening = "B" if rich else "A"
+            if not rich and pol.p.open_fast:
+                self.plan, pol.opening = OPENING_F, "F"
         if v.fact is not None:
             self.old_base = (v.fact["x"] + 1, v.fact["y"] + 1)
             self.deploy_spot = None
@@ -493,6 +498,12 @@ class Economy:
             return self.role_item(v, "proc")          # (harv_first: harvest.need_proc decides the refineries)
         if self.role_count(v, "weap") < min(2, p.max_weaps) and v.game_s >= 240 and v.money > 2000 and harv >= 3 \
                 and v.army_value >= 3000 and not (p.harv_first and self.pol.harv.serialized(v)):
+            return self.role_item(v, "weap")
+        if p.weap2_s > 0 and self.role_count(v, "weap") < min(2, p.max_weaps) and v.game_s >= p.weap2_s and \
+                v.money > p.weap2_cash and harv >= 3 and v.have.get("fix", 0) and \
+                not (p.harv_first and self.pol.harv.serialized(v)):
+            # v4.9: one war factory cannot spend two refineries' income (simulator vs tom2: 1300-2600 floating at
+            # 2:00-4:45 while the tank army came); the second one earlier, once the depot stands
             return self.role_item(v, "weap")
         if p.harv_first and p.harv_weap2 and self.pol.harv.engaged(v) and \
                 self.role_count(v, "weap") < min(2, p.max_weaps) and \

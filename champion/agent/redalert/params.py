@@ -130,6 +130,25 @@ DEFAULTS: dict[str, float] = {
     "split_e3": 1,                  # split_fire: rocket soldiers too (0: tanks only)
     "anchor2": 1,                   # a second anchor in every batch, on the building farthest from the enemies in
                                     # sight (two real INVALID_ACTIONs while the base was razed; lockstep: no change)
+    # v4.9 switches (ARENA_RA_RALLY_STEP=0 ARENA_RA_PRIOR_HOLD=0: the v4.8 defaults exactly; the others are off by
+    # default); see docs/redalert_design.md section 20 (real losses to the upgraded Tom_2026, 10-15: his 3 tanks + 12-20
+    # rifles reached our base at 4:45-5:10, our army was 2-5k)
+    "open_fast": 0,                 # 5000-credit opening with the war factory before the second refinery (opening F)
+    "pre_weap_float": 0,            # econ_first: before the first war factory, money above this raises the infantry
+                                    # cap by one per 100 credits (0: off; the Building queue is the bottleneck then)
+    "weap2_s": 0,                   # a second war factory from this game second once money > weap2_cash, 3+
+    "weap2_cash": 1200,             # harvesters and the depot stand (0: off; v4.5 rule: 240 s, 2000, army 3000)
+    "ea_lazy": 0,                   # early-army signs from their base (a dead scout, an army at home) add no towers;
+                                    # two barracks still do
+    "no3x_early": 0,                # after early-army signs, no "3x the enemy we saw" attack before 7:00 (a look at
+                                    # their home sees part of the army; tom2 dev seeds: 17 units went at 4:50 and died)
+    "prior_hold": 1,                # the blind prior does not end at prior_until_s (real f1cd3ba4: 13000 -> 4908 at
+                                    # 900 s, a wave into artillery)
+    "split_gate": 0.0,              # split_fire only while enemy tanks are below this share of the enemy army seen in
+                                    # 3 minutes (0: no gate; needs split_fire on)
+    "rally_step": 5,                # the attack group gathers this many path cells from our spawn, by the home guard and
+                                    # the towers (0: the v4.8 cell 8; dev seeds vs tom2 +10 / +20pp, nashball +27pp: an
+                                    # early push meets the army and the towers together)
 }
 
 
