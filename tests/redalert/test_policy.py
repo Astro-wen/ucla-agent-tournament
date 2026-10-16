@@ -1095,3 +1095,96 @@ def test_split_fire_sends_tanks_and_rockets_at_the_enemy_tank_not_the_nearest_ri
         a._split_fire(v, [])
         assert not a.split
     assert not load_params(V47).split_fire
+
+
+# ---- v4.9 candidate: the upgraded Tom_2026 (docs/redalert_design.md section 20) -------------------------------------
+V49_SWITCHES = ("open_fast", "pre_weap_float", "weap2_s", "ea_lazy", "no3x_early", "prior_hold")
+
+
+def test_v49_switches_are_off_by_default():
+    p = load_params({})
+    assert all(getattr(p, k) == 0 for k in V49_SWITCHES), {k: getattr(p, k) for k in V49_SWITCHES}
+    assert p.weap2_cash == 1200 and p.anchor2                       # (v4.8 defaults unchanged)
+
+
+def test_open_fast_puts_the_war_factory_before_the_second_refinery(monkeypatch):
+    for env, before in (({}, False), ({"ARENA_RA_OPEN_FAST": "1"}, True)):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params(env))
+        monkeypatch.setattr(pol.army, "_main_step", lambda v, out: None)
+        first = {}
+        for _ in range(170):
+            drive(srv, pol, 1)
+            own = [a for a in srv.world.own(0) if not getattr(a, "wreck", False)]
+            for t in ("weap", "proc"):
+                n = sum(1 for a in own if a.type == t)
+                if n >= (2 if t == "proc" else 1):
+                    first.setdefault(t, pol.view.game_s)
+        assert pol.opening == ("F" if before else "A")
+        assert "weap" in first, first
+        assert (first["weap"] < first.get("proc", 1e9)) == before, first
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+
+
+def test_ea_lazy_drops_the_early_army_towers_but_not_for_two_barracks():
+    for env, flags, want in (({}, ("early_army",), 2), ({"ARENA_RA_EA_LAZY": "1"}, ("early_army",), 0),
+                             ({"ARENA_RA_EA_LAZY": "1"}, ("early_army", "two_barracks"), 2)):
+        pol, v = _late_view(env, game_s=100.0)
+        pol.army.intel_tick = v.tick                                # (not blind: no prior)
+        for f in flags:
+            setattr(pol.army, f, True)
+        assert pol.army.towers_wanted(v) == want, (env, flags)
+
+
+def test_no3x_early_after_early_army_signs(monkeypatch):
+    from agent.redalert import army as army_mod
+    monkeypatch.setattr(army_mod.counters, "ratio", lambda ours, theirs, rules: 3.5)
+    for env, ok in (({}, True), ({"ARENA_RA_NO3X_EARLY": "1"}, False)):
+        pol, v = _late_view(env, game_s=290.0)
+        a = pol.army
+        a.intel_tick, a.base_seen, a.early_army = v.tick, True, True
+        a.enemy_peak = 1000.0                                       # what an early look saw of their army
+        assert a._should_attack(v, 3400.0, 17, 2, go=[]) == ok      # (the "3x what we saw" rule)
+        v.game_s = 430.0
+        assert a._should_attack(v, 3400.0, 17, 2, go=[])            # from 7:00 as before
+
+
+def test_prior_hold_keeps_the_blind_prior_after_prior_until_s():
+    for env, held in (({}, False), ({"ARENA_RA_PRIOR_HOLD": "1"}, True)):
+        pol, v = _late_view(env, game_s=950.0)
+        p = pol.p
+        assert pol.army.prior(v) == (min(p.prior_late_cap, p.prior_rate * (950 - 90)) if held else 0.0)
+        pol.army.intel_tick = v.tick                                # a look: not blind either way
+        assert pol.army.prior(v) == 0.0
+
+
+def test_pre_weap_float_turns_idle_money_into_rifles_before_the_war_factory():
+    for env, more in (({}, False), ({"ARENA_RA_PRE_WEAP_FLOAT": "1500"}, True)):
+        pol, v = _late_view(env, game_s=130.0)
+        pol.army.intel_tick = v.tick
+        v.have["tent"] = 1
+        v.have.pop("weap", None)
+        pol.first.pop("weap", None)
+        v.avail |= {"e1"}
+        v.money = v.cash = 2600
+        v.ore = 0
+        rifles = [{"id": 850000 + k, "type": "e1", "hp": 100, "x": 20, "y": 44, "idle": True}
+                  for k in range(int(pol.p.pre_weap_infantry))]
+        v.units = [u for u in v.units if u["type"] not in ("e1", "e3")] + rifles
+        v.unit_by_id.update({u["id"]: u for u in rifles})
+        out = []
+        pol.prod._infantry(v, out)
+        assert bool(out) == more, [c.order for c in out]
+
+
+def test_weap2_s_builds_the_second_war_factory_earlier():
+    for env, item in (({}, None), ({"ARENA_RA_WEAP2_S": "200"}, "weap")):
+        pol, v = _late_view(env, game_s=210.0)
+        pol.army.intel_tick = v.tick
+        v.have.update({"proc": 2, "weap": 1, "fix": 1, "tent": 1, "powr": 3})
+        v.avail |= {"weap", "proc"}
+        v.unit_count["harv"] = 4
+        v.money = v.cash = 1500
+        v.ore = 0
+        monkey = [u for u in v.units if u["type"] == "harv"]
+        assert pol.econ._midgame(v) == item, (env, pol.econ._midgame(v), len(monkey))

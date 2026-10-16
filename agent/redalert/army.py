@@ -337,7 +337,9 @@ class Army:
 
     def blind(self, v) -> bool:
         p = self.pol.p
-        return bool(p.econ_first) and v.game_s < p.prior_until_s and (v.tick - self.intel_tick) / 25.0 > p.blind_s
+        # v4.9 prior_hold: no end at prior_until_s (the prior stays at its cap while blind)
+        return bool(p.econ_first) and (v.game_s < p.prior_until_s or bool(p.prior_hold)) and \
+            (v.tick - self.intel_tick) / 25.0 > p.blind_s
 
     def prior(self, v) -> float:
         """econ_first, blind (no enemy army seen and no look at their base for blind_s): the army a competent
@@ -451,8 +453,10 @@ class Army:
             want = 2 if e_army < 2 * max(1, v.army_value) else 3
         floor = 600
         p = self.pol.p
-        if p.econ_first and self.early_army and v.game_s < 420:
-            want = max(want, int(p.early_army_towers))   # an early enemy army: towers against a rush
+        if p.econ_first and self.early_army and v.game_s < 420 and (not p.ea_lazy or self.two_barracks):
+            # an early enemy army: towers against a rush (v4.9 ea_lazy: only for two barracks; every real game of
+            # 10-13..10-15 set early_army and spent 1200 on towers at 1:30-2:15, before the war factory)
+            want = max(want, int(p.early_army_towers))
         if p.econ_first and not self.pol.first.get("weap"):
             floor = max(floor, p.real_threat)            # a light harass before the war factory: no tower money
         elif p.econ_first and v.game_s >= p.safety_tower_s and not (p.harv_first and self.pol.harv.serialized(v)):
@@ -957,6 +961,8 @@ class Army:
             # a look at their home that shows next to nothing at 4:00 means their army is elsewhere, maybe on its
             # way (v4.5 measurement seed 62043: 14 rifles went for "3x the 100 we saw" and met 34 rifles)
             return False
+        if p.no3x_early and self.early_army and v.game_s < 420:
+            return False                               # v4.9: an army stood at their home early; a look saw part of it
         return strength > 0 and n >= 3 and eq >= 3.0 * strength and v.game_s >= 180
 
     def _main_step(self, v, out) -> None:
