@@ -122,7 +122,7 @@ def accepts_clock(factory: Callable) -> bool:
 
 def _snapshot_info(factory: Callable, sources: dict[str, bytes], origin: str, kind: str) -> dict:
     params = inspect.signature(factory).parameters
-    return {"factory": factory.__qualname__, "source": origin + "/policy.py",
+    return {"factory": getattr(factory, "__qualname__", type(factory).__name__), "source": origin + "/policy.py",
             "source_kind": kind, "source_sha256": _source_digest(sources),
             "source_root": origin if kind == "directory_snapshot" else None,
             "file_sha256": {origin + "/" + name: hashlib.sha256(data).hexdigest()
@@ -389,6 +389,7 @@ class DiagnosticTelemetry:
         self.teams = {c: {"standing_hero_s": {}, "attack_attempts": {}, "damage_dealt": {},
                          "alive_hero_s": 0.0, "dead_hero_s": 0.0, "cooldown_blocked_hero_s": 0.0,
                          "ready_combat_hero_s": 0.0, "idle_alive_hero_s": 0.0,
+                         "raw_movement_hero_s": 0.0,
                          "advance_with_attack_offer_hero_s": 0.0, "retreat_at_home_hero_s": 0.0,
                          "retreat_at_full_hp_hero_s": 0.0, "enemy_half_hero_s": 0.0,
                          "first_objective_damage_step": None, "deaths": 0} for c in (1, 2)}
@@ -427,7 +428,9 @@ class DiagnosticTelemetry:
             macro = game.standing.get(h.seat, "none")
             team["standing_hero_s"][macro] = team["standing_hero_s"].get(macro, 0.0) + dt
             if macro == "none":
-                team["idle_alive_hero_s"] += dt
+                key = "raw_movement_hero_s" if game.fresh.get(h.seat, {}).get("which_button") == 2 \
+                    else "idle_alive_hero_s"
+                team[key] += dt
             if (h.camp == 1 and h.x > 0) or (h.camp == 2 and h.x < 0):
                 team["enemy_half_hero_s"] += dt
             if macro == "macro_retreat":

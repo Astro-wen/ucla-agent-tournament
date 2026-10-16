@@ -611,3 +611,59 @@ def test_malformed_server_action_is_counted_even_with_order_churn_instrumentatio
     result = play_game(Bad, idle, config=SimConfig(max_steps=1), diagnostics=True)
     assert result["stats"]["candidate"]["invalid"] == 6
     assert result["protocol_failure"] is None
+
+
+def test_frozen_factory_absolute_agent_import_is_not_the_live_module(tmp_path):
+    import sys
+    live = sys.modules.get("agent.hok.policy")
+    package = tmp_path / "research"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "factory.py").write_text(
+        "def make(seed=0, clock=None):\n"
+        "    from agent.hok.policy import HokPolicy\n"
+        "    return HokPolicy(clock=clock)\n")
+    agent = tmp_path / "agent"
+    agent.mkdir()
+    (agent / "__init__.py").write_text("")
+    hok = agent / "hok"
+    hok.mkdir()
+    (hok / "__init__.py").write_text("")
+    policy = hok / "policy.py"
+    policy.write_text("class HokPolicy:\n"
+                      "    def __init__(self, clock): self.clock = clock\n"
+                      "    def decide(self, raw):\n"
+                      "        return {'seat': raw['seats'][0], 'macro': 'macro_retreat'}, None\n")
+    factory, info = frozen_import_factory("research.factory:make", tmp_path)
+    policy.write_text("raise AssertionError('the edited live source must not be imported')\n")
+    idle, _ = opponent_factory("idle")
+    result = play_game(factory, idle, config=SimConfig(max_steps=2))
+    assert result["stats"]["candidate"]["action_kind_counts"] == {"macro_retreat": 12}
+    assert sys.modules.get("agent.hok.policy") is live
+    assert not source_unchanged(info)
+
+
+def test_source_factory_can_be_a_partial_with_fresh_configuration(tmp_path):
+    (tmp_path / "factory.py").write_text(
+        "from functools import partial\n"
+        "class Bot:\n"
+        "    def __init__(self, macro, seed=0, clock=None): self.macro = macro\n"
+        "    def decide(self, raw):\n"
+        "        return {'seat': raw['seats'][0], 'macro': self.macro}, None\n"
+        "make = partial(Bot, macro='macro_advance')\n")
+    factory, info = frozen_import_factory("factory:make", tmp_path)
+    assert info["factory"] == "partial"
+    idle, _ = opponent_factory("idle")
+    result = play_game(factory, idle, config=SimConfig(max_steps=2))
+    assert result["stats"]["candidate"]["action_kind_counts"] == {"macro_advance": 12}
+
+
+def test_raw_movement_is_not_reported_as_idle_occupancy():
+    class Mover:
+        def decide(self, raw):
+            return {"seat": raw["seats"][0], "which_button": 2, "move_x": 15, "move_z": 8}, None
+    idle, _ = opponent_factory("idle")
+    result = play_game(Mover, idle, config=SimConfig(max_steps=4), diagnostics=True)
+    team = result["diagnostics"]["teams"]["1"]
+    assert team["raw_movement_hero_s"] == pytest.approx(0.8)
+    assert team["idle_alive_hero_s"] == pytest.approx(3.2)
