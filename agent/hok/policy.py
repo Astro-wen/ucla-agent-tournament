@@ -56,11 +56,14 @@ MAX_BYPASS = 4         # a continuously waiting hero gets priority after four ot
 MAX_LABEL = 512        # labels and identifiers are untrusted metadata, not arbitrary-length instructions
 MAX_ACTIONS = 1024
 RESOLVED_MACRO_INPUTS = True  # False restores rejection of macros carrying legal_* metadata
+REAL_MACRO_LABELS = True  # False restores the legacy nearest/comma-only label parser
 MAX_ACTORS = 256
 
 _SEAT_ID = re.compile(r"^s([0-9]):([^:\s]+)$")
 _DISTANCE = re.compile(r",\s*(\d+(?:\.\d+)?)\s+away\)", re.IGNORECASE)
 _NEAREST = re.compile(r"nearest:\s*([^,()]*)", re.IGNORECASE)
+_REAL_DISTANCE = re.compile(r"(?:,\s*|\()\s*(\d+(?:\.\d+)?)\s+away\)", re.IGNORECASE)
+_REAL_TARGET = re.compile(r"(?:nearest:\s*|toward\s+)([^,()]*)", re.IGNORECASE)
 
 TAGS = {"macro_retreat": "Falling back to heal", "macro_advance": "Pushing the nearest tower",
         "macro_attack": "Attacking the nearest target", "macro_skill1": "Using a skill", "macro_skill2": "Using a skill",
@@ -231,9 +234,14 @@ def summary_of(raw: dict, seat: int) -> dict:
 
 
 def distance_of(label: str) -> float:
-    """Macro labels end "(... 4123 away)"; inf without one."""
-    m = _DISTANCE.search(label[:MAX_LABEL]) if isinstance(label, str) else None
+    """Read both nearest-target and live skill '(4123 away)' labels; inf without one."""
+    m = _distance_match(label)
     return float(m.group(1)) if m else math.inf
+
+
+def _distance_match(label: str):
+    parser = _REAL_DISTANCE if REAL_MACRO_LABELS else _DISTANCE
+    return parser.search(label[:MAX_LABEL]) if isinstance(label, str) else None
 
 
 def target_is_hero(label: str) -> bool:
@@ -242,7 +250,8 @@ def target_is_hero(label: str) -> bool:
 
 def target_kind(label: str) -> str | None:
     """Only classify the offered target description, never hero IDs or unseen world state."""
-    m = _NEAREST.search(label[:MAX_LABEL]) if isinstance(label, str) else None
+    parser = _REAL_TARGET if REAL_MACRO_LABELS else _NEAREST
+    m = parser.search(label[:MAX_LABEL]) if isinstance(label, str) else None
     if not m:
         return None
     words = set(re.findall(r"[a-z]+", m.group(1).lower()))
@@ -257,7 +266,7 @@ def _near_enough(label: str, limit: float) -> bool:
     # The official guide guarantees a listed macro is legal. If the optional distance text is missing,
     # trust that offer instead of silently leaving a hero advancing forever. Explicit distances still
     # use the starter's conservative heuristic; they are not a claim about a particular hero's range.
-    return not isinstance(label, str) or _DISTANCE.search(label[:MAX_LABEL]) is None or distance_of(label) <= limit
+    return _distance_match(label) is None or distance_of(label) <= limit
 
 
 def _num(x) -> float | None:
