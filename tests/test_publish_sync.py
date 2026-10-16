@@ -331,6 +331,32 @@ def test_install_check_canonicalizes_its_worktree_before_checking_imports(readme
 
 
 @needs_git
+def test_export_statistics_count_regular_files_not_links_or_preserved_git(readme_history, tmp_path):
+    root = readme_history[0]
+    (root / "assets/payload.txt").write_text("asset payload\n", encoding="utf-8")
+    (root / "assets/alias.txt").symlink_to("payload.txt")
+    git("add", "assets", cwd=root)
+    commit = _commit_fixture(root, "Regular asset with a relative symlink")
+    out = tmp_path / "export"
+    (out / ".git").mkdir(parents=True)
+    marker = out / ".git/preserved"
+    marker.write_bytes(b"x" * 4096)
+    result = subprocess.run(
+        ["bash", str(root / "scripts/publish_sync.sh"), "--commit", commit,
+         "--out", str(out), "--no-verify"],
+        cwd=root, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (out / "assets/alias.txt").is_symlink()
+    assert marker.read_bytes() == b"x" * 4096
+    files = [path for path in out.rglob("*") if path.relative_to(out).parts[0] != ".git"
+             and path.is_file() and not path.is_symlink()]
+    counts = re.search(r"^into .*: (\d+) files, (\d+) bytes ", result.stdout, re.M)
+    assert counts, result.stdout
+    assert tuple(map(int, counts.groups())) == (len(files), sum(len(path.read_bytes()) for path in files))
+
+
+@needs_git
 def test_the_scan_flags_planted_secrets_and_leaves_a_clean_tree_alone(tmp_path):
     clean = tmp_path / "clean"
     (clean / "agent").mkdir(parents=True)
