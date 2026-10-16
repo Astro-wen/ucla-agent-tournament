@@ -208,8 +208,4 @@ real states are replayed through the agent before every release (`scripts/replay
   and the recorded local measurements.
 
 ## License and credits
-
-© 2026 the entrant. All rights reserved. The source is published to meet the tournament's public-repository rule. No
-license to copy, modify or redistribute it is granted. Third-party components keep their own licenses (see `NOTICE`):
-the official starter (`altruagent/`, `GAMES.md`, upstream tests), Pokémon Showdown (Guangcong Luo and contributors,
-MIT), and Smogon's damage calculator (MIT).
+MIT
