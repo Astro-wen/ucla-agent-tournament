@@ -29,6 +29,7 @@ from typing import Any
 
 MODEL_VERSION = "hok-contract-diagnostic-v1"
 OFFICIAL_REFERENCE = "https://api.altruagent-game.com/skill/hok"
+OFFICIAL_GUIDE_SHA256 = "49168a46a941ceef29f704437c214383ef3b5ebebb67f8aac112901261728ba4"
 UPSTREAM_REFERENCE = "686e7560708eaa595a409b330d0d1837d49ba9d5"
 GAME_TYPE = "honor_of_kings_5v5"
 MACROS = ("macro_advance", "macro_retreat", "macro_attack",
@@ -101,9 +102,12 @@ class SimConfig:
                 if type(value) is not bool:
                     raise ValueError(f"{name} must be boolean")
                 continue
-            values = value if isinstance(value, (tuple, list)) else (value,)
-            if isinstance(value, (tuple, list)) and len(value) != 3:
-                raise ValueError(f"{name} must contain three numbers")
+            if name in ("skill_ranges", "skill_damage", "skill_cooldowns_s"):
+                if not isinstance(value, (tuple, list)) or len(value) != 3:
+                    raise ValueError(f"{name} must contain three numbers")
+                values = value
+            else:
+                values = (value,)
             if any(type(v) not in (int, float) or not math.isfinite(v) or v < 0 for v in values):
                 raise ValueError(f"{name} must be finite and nonnegative")
         for name in ("step_s", "half_length", "hero_hp", "tower_hp", "crystal_hp",
@@ -378,6 +382,14 @@ class DiagnosticGame:
         else:
             self.standing.pop(seat, None)
         return {"status": "in_progress", "state_version": self.step, "stepped": False}
+
+    def resign(self, camp: int) -> dict:
+        """Officially documented concession, separate from policy failures."""
+        self.seats(camp)
+        if self.terminal:
+            raise RuntimeError("cannot resign a terminal game")
+        self.finish(3 - camp, "resignation")
+        return self.result()
 
     def _move(self, hero: Hero, x: float, z: float):
         d = math.hypot(x - hero.x, z - hero.z)

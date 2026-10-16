@@ -19,9 +19,9 @@ import sys
 
 os.environ["ARENA_RECORD"] = "0"
 
-from local.hok_env import candidate_factory, import_factory, opponent_factory, play_game, source_info
-from local.hok_sim import (ASSUMPTIONS, MODEL_VERSION, OFFICIAL_REFERENCE, PROFILES, UPSTREAM_REFERENCE,
-                           digest, profile_config)
+from local.hok_env import candidate_factory, import_factory, opponent_factory, play_game, source_info, source_unchanged
+from local.hok_sim import (ASSUMPTIONS, MODEL_VERSION, OFFICIAL_GUIDE_SHA256, OFFICIAL_REFERENCE, PROFILES,
+                           UPSTREAM_REFERENCE, digest, profile_config)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -32,7 +32,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--opponent", action="append", help="random, first-legal, idle, push, research:<name>, module:factory")
     p.add_argument("--games", type=int, default=2, help="paired seeds per configuration (TWO games each; default 2)")
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--mode", choices=("realtime", "lockstep", "both"), default="realtime")
+    p.add_argument("--mode", choices=("realtime", "lockstep", "both"),
+                   help="override config mode (default config value, otherwise realtime)")
     p.add_argument("--profile", choices=(*PROFILES, "all"), default="default")
     p.add_argument("--config", help="JSON file with explicit SimConfig overrides (recorded in report)")
     p.add_argument("--max-steps", type=int)
@@ -43,6 +44,12 @@ def parser() -> argparse.ArgumentParser:
 
 
 def evaluate(args) -> dict:
+    root = Path(__file__).resolve().parents[1]
+    source_paths = (root / "local/hok_sim.py", root / "local/hok_env.py", Path(__file__).resolve())
+    def source_digests():
+        return {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in source_paths}
+    source_hashes = source_digests()
     if args.games < 1:
         raise ValueError("--games must be positive")
     if args.decision_steps < 1 or args.calls_per_step < 5:
@@ -58,7 +65,7 @@ def evaluate(args) -> dict:
     if args.max_steps is not None:
         overrides["max_steps"] = args.max_steps
     profiles = list(PROFILES) if args.profile == "all" else [args.profile]
-    modes = ["realtime", "lockstep"] if args.mode == "both" else [args.mode]
+    modes = ["realtime", "lockstep"] if args.mode == "both" else [args.mode or overrides.get("mode", "realtime")]
     cells = []
     for name in args.opponent or ["random"]:
         opponent, opponent_info = opponent_factory(name)
@@ -76,6 +83,7 @@ def evaluate(args) -> dict:
                 valid = [g for g in games if not g["protocol_failure"]]
                 cells.append({
                     "opponent": opponent_info, "profile": profile, "config": asdict(config),
+                    "opponent_source_unchanged": source_unchanged(opponent_info),
                     "config_sha256": config.config_hash, "pairs": pairs,
                     "summary": {
                         "paired_seeds": len(pairs), "games": len(games), "valid_games": len(valid),
@@ -88,19 +96,24 @@ def evaluate(args) -> dict:
                         "opponent_invalid": sum(g["stats"]["opponent"]["invalid"] for g in games),
                     },
                 })
-    root = Path(__file__).resolve().parents[1]
-    source_hashes = {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
-                     for path in (root / "local/hok_sim.py", root / "local/hok_env.py", Path(__file__).resolve())}
+    source_hashes_end = source_digests()
+    unchanged = (source_hashes == source_hashes_end and source_unchanged(candidate_info)
+                 and all(source_unchanged(c["opponent"]) for c in cells))
     report = {
         "schema_version": 1, "model": MODEL_VERSION, "fidelity": "uncalibrated_contract_diagnostic_only",
         "warning": "Synthetic outcomes are NOT evidence of live HoK strength; no promotion claim is justified.",
         "official_reference": OFFICIAL_REFERENCE, "official_reference_checked": "2026-10-16",
+        "official_guide_sha256": OFFICIAL_GUIDE_SHA256,
         "upstream_reference": UPSTREAM_REFERENCE, "assumptions": ASSUMPTIONS,
         "candidate": candidate_info, "source_sha256": source_hashes,
+        "artifact_source_unchanged_during_run": unchanged,
+        "source_sha256_end": source_hashes_end,
         "harness": {"ARENA_RECORD": os.environ["ARENA_RECORD"], "workers": 1,
                     "decision_steps": args.decision_steps, "calls_per_step": args.calls_per_step,
                     "latency": "in-process decide CPU/wall duration; not network latency or realtime pacing",
                     "pairing": "same world and role RNG seeds, fresh policies, camps swapped",
+                    "determinism": "game clock injected only when factories accept clock; external policy time/RNG "
+                                   "and dependencies outside each recorded hash scope are not controlled",
                     "failure_model": "explicit evaluation forfeits, NOT platform random takeover",
                     "recording": "aggregates and hashes only; no raw observations/actions/tags"},
         "cells": cells,
@@ -121,7 +134,7 @@ def main(argv=None) -> int:
     args = p.parse_args(argv)
     try:
         report = evaluate(args)
-    except (ValueError, TypeError, ImportError, AttributeError, OSError) as exc:
+    except Exception as exc:
         # Do not emit candidate exception messages, which may contain decisions.
         p.exit(2, f"Evaluation setup failed ({type(exc).__name__}); check policy/factory/config paths and values.\n")
     if args.json:
@@ -138,6 +151,10 @@ def main(argv=None) -> int:
                   f"{s['games']} games / {s['paired_seeds']} pairs; {s['valid_outcomes']}; "
                   f"protocol_forfeits={s['protocol_forfeits']}; "
                   f"invalid candidate/opponent={s['candidate_invalid']}/{s['opponent_invalid']}")
+    if not report["artifact_source_unchanged_during_run"]:
+        print("Model/harness/policy source changed during evaluation; discard this run and rerun frozen files.",
+              file=sys.stderr)
+        return 2
     return 1 if any(c["summary"]["protocol_forfeits"] or c["summary"]["candidate_invalid"]
                     or c["summary"]["opponent_invalid"] for c in report["cells"]) else 0
 

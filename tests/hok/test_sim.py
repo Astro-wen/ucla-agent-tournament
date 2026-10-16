@@ -221,7 +221,144 @@ def test_lockstep_wait_is_explicit_protocol_forfeit_not_game_strength():
 
 @pytest.mark.parametrize("changes", [{"mode": "fake"}, {"max_steps": 0}, {"max_steps": True},
                                      {"hero_hp": float("nan")}, {"speed": -1},
-                                     {"skill_ranges": [1, 2]}, {"raw_move": 1}, {"step_s": 0}])
+                                     {"skill_ranges": [1, 2]}, {"raw_move": 1}, {"step_s": 0},
+                                     {"speed": [1, 2, 3]}, {"skill_damage": 3},
+                                     {"skill_cooldowns_s": "bad"}, {"skill_ranges": [1, True, 3]}])
 def test_config_rejects_invalid_assumptions(changes):
     with pytest.raises(ValueError):
         replace(SimConfig(), **changes)
+
+
+def test_sdk_parses_views_and_validates_ids_legalaction_and_raw_inputs():
+    from altruagent import GameState
+    from altruagent.runner import _validate_decision
+    game = DiagnosticGame()
+    state = GameState.from_mcp_state(game.view(2))
+    assert state.raw["camp"] == 2
+    advance = next(a for a in state.legal_actions if a.action_id == "s5:macro_advance")
+    for action in (advance, advance.action_id, {"seat": 5, "macro": "macro_advance"}):
+        parsed = _validate_decision(action, state.legal_actions)
+        assert parsed.action_id == advance.action_id or parsed.action == {"seat": 5, "macro": "macro_advance"}
+    assert not game.submit(2, advance, 0).get("error")
+
+
+def test_malformed_and_foreign_seat_errors_notify_policy_without_recording_payload():
+    class Refused:
+        results = []
+        def decide(self, raw):
+            return "s9:macro_advance", "SECRET_TAG"
+        def on_result(self, result):
+            self.results.append(result)
+    idle, _ = opponent_factory("idle")
+    report = play_game(Refused, idle, config=SimConfig(max_steps=2))
+    assert report["stats"]["candidate"]["invalid"] == 12
+    assert report["protocol_failure"] is None  # realtime rejection is recoverable
+    assert len(Refused.results) == 12
+    assert all(r["error"] == "INVALID_ACTION" for r in Refused.results)
+    assert "SECRET_TAG" not in json.dumps(report)
+    assert "s9:macro_advance" not in json.dumps(report)
+
+
+def test_stale_target_refused_against_current_offers_without_losing_standing_order():
+    game = DiagnosticGame()
+    game.heroes[0].x = game.heroes[5].x = 0
+    game.heroes[0].z = game.heroes[5].z = 0
+    assert any(a["action_id"] == "s0:macro_attack" for a in game.view(1)["legal_actions"]["actions"])
+    game.heroes[5].x = game.config.half_length
+    assert game.submit(1, "s0:macro_attack", 0)["error"] == "INVALID_ACTION"
+    assert 0 in game.pending
+
+
+def test_structure_damage_is_hp_capped_and_shielding_is_explicit_parameter():
+    game = DiagnosticGame(SimConfig(attack_damage=100000, tower_damage=0, crystal_shielded=True))
+    game.heroes[0].x, game.heroes[0].z = game.structures[200].x, 0
+    assert game._shielded(game.structures[201])
+    assert not game.submit(1, "s0:macro_attack", 0).get("error")
+    game.tick()
+    assert game.structures[200].hp == 0
+    assert game.structure_damage[1] == game.config.tower_hp
+    assert not game._shielded(game.structures[201])
+    unshielded = DiagnosticGame(SimConfig(crystal_shielded=False))
+    assert not unshielded._shielded(unshielded.structures[201])
+
+
+def test_resignation_and_terminal_contract():
+    game = DiagnosticGame()
+    result = game.resign(1)
+    assert result["termination_reason"] == "resignation"
+    assert result["outcome"]["winner_camp"] == 2
+    assert result["returns"] == {"1": -1, "2": 1}
+    assert game.view(1)["legal_actions"]["actions"] == []
+    assert game.submit(2, "s5:macro_advance", 0)["error"] == "INVALID_ACTION"
+    with pytest.raises(RuntimeError):
+        game.tick()
+
+
+@pytest.mark.parametrize("profile", list(PROFILES))
+def test_mirrored_same_deterministic_policy_has_no_first_camp_damage_advantage(profile):
+    push, _ = opponent_factory("push")
+    report = play_game(push, push, config=profile_config(profile, max_steps=150), seed=37)
+    scores = report["result"]["outcome"]["score"]
+    assert scores["1"] == scores["2"]
+    assert report["candidate_score"] == 0.5
+
+
+def test_importable_factory_and_separate_candidate_package(tmp_path):
+    import os
+    (tmp_path / "helper.py").write_text("ACTION = 'macro_advance'\n")
+    (tmp_path / "policy.py").write_text(
+        "from .helper import ACTION\n"
+        "class HokPolicy:\n"
+        "    def __init__(self, clock): self.clock = clock\n"
+        "    def decide(self, raw):\n"
+        "        seat = raw['simultaneous']['your_pending_seats'][0]\n"
+        "        return {'seat': seat, 'macro': ACTION}, None\n")
+    candidate, info = candidate_factory(tmp_path)
+    idle, _ = opponent_factory("idle")
+    report = play_game(candidate, idle, config=SimConfig(max_steps=3))
+    assert report["stats"]["candidate"]["accepted"] == 15
+    assert info["clock_parameter"] is True
+    assert info["hash_scope"] == "hok package Python files"
+    old_hash = info["source_sha256"]
+    old_mtime = (tmp_path / "helper.py").stat().st_mtime_ns
+    (tmp_path / "helper.py").write_text("ACTION = 'macro_retreat'\n")
+    os.utime(tmp_path / "helper.py", ns=(old_mtime, old_mtime))
+    updated, changed = candidate_factory(tmp_path)
+    assert changed["source_sha256"] != old_hash
+    next_report = play_game(updated, idle, config=SimConfig(max_steps=1))
+    assert next_report["stats"]["candidate"]["action_kind_counts"] == {"macro_retreat": 5}
+    assert not (tmp_path / "__pycache__").exists()
+
+
+def test_policy_error_counts_do_not_include_sensitive_exception_messages():
+    class Broken:
+        def decide(self, raw):
+            raise ValueError("DO_NOT_RECORD_RAW_DECISION")
+    push, _ = opponent_factory("push")
+    report = play_game(Broken, push, config=SimConfig(max_steps=2))
+    assert report["stats"]["candidate"]["exceptions"] == {"ValueError": 1}
+    assert report["protocol_failure"]["kind"] == "policy_exception"
+    assert "DO_NOT_RECORD" not in json.dumps(report)
+
+
+def test_evaluation_never_connects_to_network_or_enables_recording(monkeypatch):
+    import os
+    import socket
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("offline evaluation must never connect")
+    monkeypatch.setattr(socket.socket, "connect", forbidden)
+    monkeypatch.setenv("ARENA_RECORD", "1")
+    candidate, _ = candidate_factory(Path(__file__).resolve().parents[2])
+    push, _ = opponent_factory("push")
+    report = play_game(candidate, push, config=SimConfig(max_steps=10))
+    assert report["protocol_failure"] is None
+    assert os.environ["ARENA_RECORD"] == "0"
+
+
+def test_json_mode_override_is_honored_and_cli_override_wins(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text('{"mode": "lockstep", "max_steps": 2}')
+    args = parser().parse_args(["--games", "1", "--config", str(path)])
+    assert evaluate(args)["cells"][0]["config"]["mode"] == "lockstep"
+    args.mode = "realtime"
+    assert evaluate(args)["cells"][0]["config"]["mode"] == "realtime"

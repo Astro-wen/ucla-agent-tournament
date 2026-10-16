@@ -14,6 +14,7 @@ os.environ["ARENA_RECORD"] = "0"  # Set before importing any candidate.
 
 import hashlib
 import importlib
+import importlib.abc
 import importlib.util
 import inspect
 import math
@@ -33,6 +34,40 @@ class Policy(Protocol):
 
 
 Factory = Callable[..., Policy]
+
+_CANDIDATE_ROOTS: dict[str, Path] = {}
+
+
+class _CandidateSourceLoader(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+    """Read isolated candidate-relative imports directly from source.
+
+    Timestamp pyc caches can silently load the wrong candidate after rapid
+    same-sized edits. Never read/write those caches for a candidate package.
+    All non-candidate modules retain Python's normal import behavior.
+    """
+    def find_spec(self, fullname, path=None, target=None):
+        namespace, dot, suffix = fullname.partition(".")
+        root = _CANDIDATE_ROOTS.get(namespace)
+        if root is None or not dot:
+            return None
+        location = root.joinpath(*suffix.split("."))
+        is_package = location.is_dir()
+        source = location / "__init__.py" if is_package else location.with_suffix(".py")
+        if not source.is_file():
+            return None
+        return importlib.util.spec_from_file_location(
+            fullname, source, loader=self,
+            submodule_search_locations=[str(location)] if is_package else None)
+
+    def create_module(self, spec):
+        return None
+
+    def exec_module(self, module):
+        path = Path(module.__spec__.origin)
+        exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
+
+
+_SOURCE_LOADER = _CandidateSourceLoader()
 
 
 class Baseline:
@@ -76,6 +111,7 @@ def _construct(factory: Callable, *, seed: int, clock: Callable, **extra):
 
 
 def import_factory(spec: str) -> Factory:
+    os.environ["ARENA_RECORD"] = "0"
     module, sep, attr = spec.partition(":")
     if not sep or not module or not attr:
         raise ValueError("factory must be importable.module:callable")
@@ -92,20 +128,31 @@ def candidate_factory(directory: str | Path) -> tuple[Factory, dict]:
     policy.py itself. Relative imports inside the hok package are supported.
     Absolute imports must already resolve via the caller's PYTHONPATH.
     """
+    os.environ["ARENA_RECORD"] = "0"
     root = Path(directory).resolve()
     paths = [root] if root.is_file() else [root / "agent/hok/policy.py", root / "hok/policy.py",
                                          root / "policy.py"]
     path = next((p for p in paths if p.is_file()), None)
     if path is None:
         raise ValueError(f"no HokPolicy policy.py under {root}")
-    namespace = "_offline_hok_" + hashlib.sha256(str(path).encode()).hexdigest()[:16]
+    package_hash = hashlib.sha256()
+    for source in sorted(path.parent.rglob("*.py")):
+        package_hash.update(str(source.relative_to(path.parent)).encode())
+        package_hash.update(b"\0" + source.read_bytes())
+    namespace = "_offline_hok_" + hashlib.sha256(str(path).encode()).hexdigest()[:12] \
+        + "_" + package_hash.hexdigest()[:16] + "_" + str(len(_CANDIDATE_ROOTS))
+    _CANDIDATE_ROOTS[namespace] = path.parent
+    if _SOURCE_LOADER not in sys.meta_path:
+        sys.meta_path.insert(0, _SOURCE_LOADER)
     package = types.ModuleType(namespace)
     package.__path__ = [str(path.parent)]
     sys.modules[namespace] = package
     spec = importlib.util.spec_from_file_location(namespace + ".policy", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+    # Compile the policy's actual source; the finder does the same for all
+    # relative dependencies, without writing into the candidate directory.
+    exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
     return module.HokPolicy, source_info(module.HokPolicy, source_root=path.parent)
 
 
@@ -120,10 +167,27 @@ def source_info(factory: Callable, source_root: Path | None = None) -> dict:
     return {"factory": getattr(factory, "__qualname__", type(factory).__name__),
             "source": str(path) if path else None, "source_sha256": hasher.hexdigest() if files else None,
             "hash_scope": "hok package Python files" if source_root else "factory module only",
-            "clock_parameter": "clock" in params}
+            "source_root": str(source_root) if source_root else None,
+            "file_sha256": {str(file): hashlib.sha256(file.read_bytes()).hexdigest() for file in files},
+            "clock_parameter": "clock" in params,
+            "accepts_extra_kwargs": any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())}
+
+
+def source_unchanged(info: dict) -> bool:
+    """Detect edited/deleted/added source during an evaluation, without reading
+    credentials or including source contents in the report."""
+    manifest = info["file_sha256"]
+    root = info.get("source_root")
+    try:
+        if root and {str(p) for p in Path(root).rglob("*.py")} != set(manifest):
+            return False
+        return all(hashlib.sha256(Path(path).read_bytes()).hexdigest() == sha for path, sha in manifest.items())
+    except OSError:
+        return False
 
 
 def opponent_factory(name: str) -> tuple[Factory, dict]:
+    os.environ["ARENA_RECORD"] = "0"
     if name in ("random", "first-legal", "idle", "push"):
         def make(seed=0, clock=None):
             return Baseline(name, seed=seed)
@@ -144,7 +208,7 @@ def opponent_factory(name: str) -> tuple[Factory, dict]:
 
 def _new_stats() -> dict:
     return {"calls": 0, "accepted": 0, "invalid": 0, "waits": 0, "exceptions": {},
-            "callback_exceptions": {}, "accepted_by_seat": {}, "_latency_ms": []}
+            "callback_exceptions": {}, "accepted_by_seat": {}, "action_kind_counts": {}, "_latency_ms": []}
 
 
 def _count_error(stats: dict, key: str, exc: Exception):
@@ -226,6 +290,9 @@ def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None
                     st["accepted"] += 1
                     seat = next(s for s in raw["simultaneous"]["your_pending_seats"] if s not in game.pending)
                     st["accepted_by_seat"][str(seat)] = st["accepted_by_seat"].get(str(seat), 0) + 1
+                    accepted = game.fresh[seat]
+                    kind = accepted.get("macro", f"button_{accepted.get('which_button')}")
+                    st["action_kind_counts"][kind] = st["action_kind_counts"].get(kind, 0) + 1
                 callback = getattr(policies[camp], "on_result", None)
                 if callback:
                     try:
