@@ -1,0 +1,34 @@
+{
+ "base": {
+  "meta": {
+   "use": 109,
+   "fail": 56,
+   "games": 150,
+   "games_with_use": 59,
+   "fail_rate": 0.514
+  },
+  "champion": {
+   "use": 30,
+   "fail": 18,
+   "games": 100,
+   "games_with_use": 16,
+   "fail_rate": 0.6
+  }
+ },
+ "suck1": {
+  "meta": {
+   "use": 55,
+   "fail": 22,
+   "games": 150,
+   "games_with_use": 34,
+   "fail_rate": 0.4
+  },
+  "champion": {
+   "use": 16,
+   "fail": 11,
+   "games": 100,
+   "games_with_use": 7,
+   "fail_rate": 0.688
+  }
+ }
+}
