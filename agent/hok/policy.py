@@ -62,6 +62,11 @@ MAX_ACTIONS = 1024
 RESOLVED_MACRO_INPUTS = True  # False restores rejection of macros carrying legal_* metadata
 REAL_MACRO_LABELS = True  # False restores the legacy nearest/comma-only label parser
 MAX_ACTORS = 256
+REFUSAL_DIAGNOSTICS = True  # False keeps the previous match-summary output; decisions are unchanged
+REFUSAL_EXAMPLE_LIMIT = 3
+# Exact public SDK runner callback codes only. Never retain or print server detail/error text.
+REFUSAL_CODES = frozenset({"STALE_STATE", "NOT_YOUR_TURN", "WRONG_PHASE", "GAME_ALREADY_COMPLETE",
+                           "PLAYER_ELIMINATED", "INVALID_ACTION", "RUNTIME_TEMPORARILY_UNAVAILABLE"})
 
 _SEAT_ID = re.compile(r"^s([0-9]):([^:\s]+)$")
 _DISTANCE = re.compile(r",\s*(\d+(?:\.\d+)?)\s+away\)", re.IGNORECASE)
@@ -520,6 +525,9 @@ class HokPolicy:
         self.idles = 0
         self.refused = 0
         self.views = 0
+        self._refusal_codes: dict[str, int] = {}
+        self._refusal_macros: dict[str, int] = {}
+        self._refusal_examples: list[tuple[int | None, str, int | None, str]] = []
 
     def decide(self, raw: dict):
         self.views += 1
@@ -681,6 +689,11 @@ class HokPolicy:
     def on_result(self, result) -> None:
         if isinstance(result, dict) and result.get("error"):
             self.refused += 1
+            if REFUSAL_DIAGNOSTICS:
+                try:
+                    self._record_refusal(result.get("error"))
+                except Exception:
+                    pass  # optional diagnostics must never skip the original rejection bookkeeping
             if self._inflight is not None:
                 seat, macro, version = self._inflight
                 if macro == "macro_retreat":
@@ -690,9 +703,26 @@ class HokPolicy:
                     self._rejected[(seat, macro)] = (version, self._clock() + RETRY_S)
         self._inflight = None
 
+    def _record_refusal(self, error: Any) -> None:
+        # Bounded vocabularies and three scalar examples; no raw result, labels or detail are retained.
+        code = error if type(error) is str and len(error) <= 64 and error in REFUSAL_CODES else "OTHER"
+        seat, macro, version = self._inflight if self._inflight is not None else (None, None, None)
+        kind = macro[6:] if macro in MACROS else ("raw" if self._inflight is not None else "unattributed")
+        self._refusal_codes[code] = self._refusal_codes.get(code, 0) + 1
+        self._refusal_macros[kind] = self._refusal_macros.get(kind, 0) + 1
+        if len(self._refusal_examples) < REFUSAL_EXAMPLE_LIMIT:
+            self._refusal_examples.append((seat, kind, version, code))
+
     def summary_text(self) -> str:
         macros = ",".join(f"{k[6:]}:{v}" for k, v in sorted(self.by_macro.items()))
-        return f"hok views={self.views} orders={self.orders} ({macros or '-'}) idles={self.idles} refused={self.refused}"
+        text = f"hok views={self.views} orders={self.orders} ({macros or '-'}) idles={self.idles} refused={self.refused}"
+        if REFUSAL_DIAGNOSTICS and self._refusal_codes:
+            codes = ",".join(f"{code}:{count}" for code, count in sorted(self._refusal_codes.items()))
+            kinds = ",".join(f"{kind}:{count}" for kind, count in sorted(self._refusal_macros.items()))
+            examples = ",".join(f"s{seat if seat is not None else '?'}/{kind}@{version if version is not None else '?'}:{code}"
+                                for seat, kind, version, code in self._refusal_examples)
+            text += f" refused_codes=({codes}) refused_macros=({kinds}) first_refusals=({examples})"
+        return text
 
 
 def _seat_list(raw: dict) -> list[int]:
