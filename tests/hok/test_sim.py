@@ -99,7 +99,7 @@ def test_hidden_heroes_never_leak_state_or_target_labels():
 
 def test_attack_reaim_cooldown_and_simultaneous_death_respawn():
     c = SimConfig(hero_hp=100, attack_damage=200, attack_cooldown_s=1.0, respawn_s=0.4,
-                  tower_damage=0, base_heal_fraction_per_s=0)
+                  tower_damage=0, base_heal_fraction_per_s=0, clear_orders_on_death=True)
     game = DiagnosticGame(c)
     for seat in (0, 5):
         game.heroes[seat].x = 0
@@ -362,3 +362,33 @@ def test_json_mode_override_is_honored_and_cli_override_wins(tmp_path):
     assert evaluate(args)["cells"][0]["config"]["mode"] == "lockstep"
     args.mode = "realtime"
     assert evaluate(args)["cells"][0]["config"]["mode"] == "realtime"
+
+
+def test_default_standing_order_survives_death_until_a_new_raw_order():
+    game = DiagnosticGame(SimConfig(hero_hp=100, tower_damage=200, respawn_s=0.2))
+    game.heroes[0].x, game.heroes[0].z = game.structures[200].x, 0
+    assert not game.submit(1, "s0:macro_advance", 0).get("error")
+    game.tick()
+    assert game.heroes[0].hp == 0
+    assert game.standing[0] == "macro_advance"
+    game.tick()
+    game.tick()
+    assert game.heroes[0].hp == 100
+    assert game.heroes[0].x > -game.config.half_length  # resumed without reissuing
+    assert not game.submit(1, "s0:button_0", game.step).get("error")
+    assert 0 not in game.standing
+
+
+def test_independently_supplied_research_factory_interface(monkeypatch):
+    import sys
+    import types
+    calls = []
+    def make_bot(name, seed=0):
+        calls.append((name, seed))
+        return Baseline("push", seed=seed)
+    monkeypatch.setitem(sys.modules, "local.hok_opponents_research", types.SimpleNamespace(make_bot=make_bot))
+    factory, info = opponent_factory("research:external-bot")
+    result = play_game(factory, factory, config=SimConfig(max_steps=3), seed=1016)
+    assert calls == [("external-bot", 1016), ("external-bot", 1001019)]
+    assert info["name"] == "external-bot"
+    assert result["protocol_failure"] is None

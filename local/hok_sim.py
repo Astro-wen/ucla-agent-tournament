@@ -27,7 +27,10 @@ import re
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
-MODEL_VERSION = "hok-contract-diagnostic-v1"
+# v2 corrects the default death behavior to the guide's literal "stays until
+# you send another action": retain the standing macro through death. Clearing
+# it remains an explicit sensitivity variant, not a fitted combat mechanic.
+MODEL_VERSION = "hok-contract-diagnostic-v2"
 OFFICIAL_REFERENCE = "https://api.altruagent-game.com/skill/hok"
 OFFICIAL_GUIDE_SHA256 = "49168a46a941ceef29f704437c214383ef3b5ebebb67f8aac112901261728ba4"
 UPSTREAM_REFERENCE = "686e7560708eaa595a409b330d0d1837d49ba9d5"
@@ -41,6 +44,7 @@ ASSUMPTIONS = (
     "Per-hero circular vision; hidden enemies expose identity/camp only; structures are public.",
     "Nearest visible enemy hero or structure is the attack/skill target; no manual target selection.",
     "Skills are single-target damage with independent cooldowns; unusable standing orders do nothing.",
+    "Living heroes always get movement macros, including already at their destination; combat offers require range/readiness.",
     "Advance only moves unless advance_attacks is enabled; no pathfinding or collision.",
     "All movement precedes simultaneous damage; towers target the nearest living enemy hero.",
     "Base healing, full-HP respawn, kill credit, death-order clearing and crystal shielding are assumptions.",
@@ -87,7 +91,7 @@ class SimConfig:
     respawn_s: float = 8.0
     crystal_shielded: bool = True
     advance_attacks: bool = False
-    clear_orders_on_death: bool = True
+    clear_orders_on_death: bool = False
     raw_move: bool = True
 
     def __post_init__(self):
@@ -136,7 +140,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     "durable": {"hero_hp": 8000.0, "tower_hp": 16000.0, "crystal_hp": 24000.0,
                 "respawn_s": 4.0, "base_heal_fraction_per_s": 0.35},
     "advance-attacks": {"advance_attacks": True, "crystal_shielded": False,
-                        "clear_orders_on_death": False},
+                        "clear_orders_on_death": True},
 }
 
 
