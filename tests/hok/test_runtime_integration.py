@@ -513,3 +513,46 @@ def test_recorded_hok_reasoning_keeps_the_underlying_action_machine_readable(mon
     expected = sent["action_id"] if sent["action_id"] is not None else sent["action"]
     assert row["out"] == expected, "recording must not store a WithReasoning repr instead of the legal action"
     assert row.get("reasoning_summary") == sent["reasoning_summary"] and row["reasoning_summary"]
+
+
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+def test_policy_exception_uses_pure_fallback_then_recovers_through_runner(monkeypatch, mode):
+    original = HokPolicy.decide
+
+    def fail_first(policy, raw):
+        if raw["state_version"] == 0:
+            raise RuntimeError("injected tactical policy failure")
+        return original(policy, raw)
+
+    monkeypatch.setattr(HokPolicy, "decide", fail_first)
+    frames = [payload(0, mode=mode, pending=[4], actions=entries(0, ()) + entries(4)),
+              payload(1, mode=mode, pending=[4])]
+    game = HokFakeSession(frames)
+    play(game, monkeypatch)
+    assert [(c["seat"], c["command"]) for c in game.accepted] == (
+        [(4, "macro_advance")] if mode == "realtime" else [(4, "button_0"), (4, "macro_advance")])
+
+
+def test_double_fault_lockstep_last_resort_still_respects_pending_seat(monkeypatch):
+    def broken(*args, **kwargs):
+        raise RuntimeError("injected helper failure")
+
+    monkeypatch.setattr(HokPolicy, "decide", broken)
+    monkeypatch.setattr("agent.hok.safe_fallback_action", broken)
+    game = HokFakeSession([payload(mode="lockstep", pending=[4], actions=entries(0, ()) + entries(4))])
+    play(game, monkeypatch)
+    assert [c["seat"] for c in game.accepted] == [4], "a playable current pending fallback exists"
+
+
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+def test_unexpected_recorder_exception_cannot_escape_into_official_runner(monkeypatch, tmp_path, mode):
+    monkeypatch.setenv("ARENA_RECORD", "1")
+    monkeypatch.setattr(deployed, "RECORD_DIR", str(tmp_path))
+
+    def broken_record(*args, **kwargs):
+        raise OSError("injected recorder failure outside its ordinary I/O handler")
+
+    monkeypatch.setattr(deployed, "record", broken_record)
+    game = HokFakeSession([payload(mode=mode, pending=[4])])
+    play(game, monkeypatch)
+    assert [(c["seat"], c["command"]) for c in game.accepted] == [(4, "macro_advance")]

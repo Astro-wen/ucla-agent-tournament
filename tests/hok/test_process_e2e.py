@@ -72,8 +72,12 @@ def fake_server(peer):
 
 
 @contextmanager
-def cli_process(temporary, port, *, record=False):
+def cli_process(temporary, port, *, record=False, block_recording=False):
     env = isolated_environment(ROOT, temporary, port, record=record)
+    if block_recording:
+        blocked = temporary / "not-a-recording-directory"
+        blocked.write_text("a regular file, so mkdir/open cannot record here")
+        env["ARENA_RECORD_DIR"] = str(blocked)
     output = temporary / "cli-output.log"
     audit = temporary / "process-boundary.jsonl"
     with output.open("w") as stream:
@@ -127,16 +131,18 @@ def cli_process(temporary, port, *, record=False):
                 assert not forced_children, f"children needed forced cleanup instead of exiting: {forced_children}"
 
 
-@pytest.mark.parametrize("record,inject_races", [(False, False), (True, True)],
-                         ids=["off-by-default", "recording-with-refusal-and-regrant"])
-def test_cli_dispatches_both_contexts_and_pacing_modes_finishes_and_reaps_workers(tmp_path, record, inject_races):
+@pytest.mark.parametrize("record,inject_races,block_recording", [(False, False, False), (True, True, False),
+                                                               (True, False, True)],
+                         ids=["off-by-default", "recording-with-refusal-and-regrant", "recording-io-failure"])
+def test_cli_dispatches_both_contexts_and_pacing_modes_finishes_and_reaps_workers(
+        tmp_path, record, inject_races, block_recording):
     realtime = FakeHokMatch("realtime", context="tournament", steps=90,
                            reject_first=inject_races, reconnect=inject_races)
     lockstep = FakeHokMatch("lockstep", context="testing", steps=8, camp=2)
     peer = FakeHokOfficial([realtime, lockstep])
 
     with fake_server(peer) as port:
-        with cli_process(tmp_path, port, record=record) as (process, output, audit, env):
+        with cli_process(tmp_path, port, record=record, block_recording=block_recording) as (process, output, audit, env):
             def completed():
                 text = output.read_text()
                 return (all(m.results == 1 for m in peer.matches.values())
@@ -183,7 +189,10 @@ def test_cli_dispatches_both_contexts_and_pacing_modes_finishes_and_reaps_worker
             assert FAKE_KEY not in text
             assert not list((tmp_path / "state").iterdir())
             recordings = list((tmp_path / "logs").glob("*.jsonl"))
-            if not record:
+            if block_recording:
+                assert not recordings
+                assert text.count("this match's states are not saved") == 2, "one I/O warning per worker, not per view"
+            elif not record:
                 assert not recordings, "full local lifecycle must keep decision recording off by default"
             else:
                 assert len(recordings) == 2
