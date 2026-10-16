@@ -337,7 +337,9 @@ class Army:
 
     def blind(self, v) -> bool:
         p = self.pol.p
-        return bool(p.econ_first) and v.game_s < p.prior_until_s and (v.tick - self.intel_tick) / 25.0 > p.blind_s
+        # Crossing the old cutoff is not fresh intelligence: an unseen army does not suddenly become weaker.
+        return bool(p.econ_first) and (v.game_s < p.prior_until_s or bool(p.prior_hold)) and \
+            (v.tick - self.intel_tick) / 25.0 > p.blind_s
 
     def prior(self, v) -> float:
         """econ_first, blind (no enemy army seen and no look at their base for blind_s): the army a competent

@@ -354,11 +354,18 @@ _DET = (r"(?:(?:a|an|the|one\s+of\s+the(?:\s+two)?|our|my)\s+)?"
         r"(?:(?:real|true|actual|confirmed|known|other|second|last|remaining|fellow)\s+)?")
 # a verdict word must end its phrase: "a wolf." / "a wolf too" / "a wolf, vote" but not "a wolf bluff" / "wolf's" /
 # "a wolf or a scared villager"
-_END = (r"(?=\s*(?:$|[.,!?;:)\]—–-]|(?:too|also|as\s+well|for\s+sure|for\s+certain|imo|tbh|then|now|confirmed|indeed|"
+_END = (r"(?!\s*,?\s*or\b)"
+        r"(?=\s*(?:$|[.,!?;:)\]—–-]|(?:too|also|as\s+well|for\s+sure|for\s+certain|imo|tbh|then|now|confirmed|indeed|"
         r"and|but|so|because|since|last\s+night|tonight|today|yesterday|here|btw|lol)\b))")
 _END_RE = re.compile(_END)
 _SEATS = r"player[0-6](?:\s*(?:,\s*(?:and\s+)?|and\s+|&\s*)player[0-6])*"
 _LIST = r"player[0-6](?:\s*(?:,\s*(?:and\s+)?|and\s+|&\s*)player[0-6])+"
+# An alternative list identifies no individual: "Wolf is Player1, 5 or 6" must not bind its first seat, and
+# "Player1 or Player5 is a wolf" must not bind its last. Mask only that reference, preserving other results in
+# the same message and leaving conjunctive reports ("Player1 and Player5 are wolves") intact.
+_SEAT_ALTERNATIVES = re.compile(
+    r"\bplayer[0-6]\b(?:\s*,\s*(?:player)?[0-9]+\b)*\s*,?\s*or\s+(?:player)?[0-9]+\b"
+    r"(?:\s*(?:,\s*(?:or\s+)?|or\s+)(?:player)?[0-9]+\b)*")
 _IS = r"\s*(?:is|=|was|['’]s|:)\s+"
 _CLEAR_PHRASE = r"(?:" + _DET + _CLEARW + r"|not\s+(?:a\s+|an\s+)?" + _W2 + r")"
 _TURNED = (r"\s+(?:turned\s+out\s+to\s+be|came\s+back(?:\s+as)?|showed\s+up\s+as|"
@@ -407,7 +414,7 @@ _PV_YOU = [   # "Player3, you're a wolf": only when the sentence opens by addres
 _CUE = re.compile(r"(?:\b(?P<who>\w+)\s+)?(?:said|says|say|claims?|claimed|claiming|thinks?|thought|believes?|"
                   r"believed|insists?|insisted|swears?|swore|admits?|admitted|denies|denied|deny|knows?|knew|wonders?|"
                   r"asks?|asked|pretends?|pretended|pretending|told\s+\w+|tells\s+\w+|if|whether|unless|maybe|perhaps|"
-                  r"suppose|imagine|might|could)\s*[:,]?\s+(?:that\s+)?$")
+                  r"suppose|imagine|might|could|either|or)\s*[:,]?\s+(?:that\s+)?$")
 # Another seat's stance or someone's attribution right before a verdict ("Player3 keeps insisting they're innocent",
 # "Player3 is adamant", "acts like", "According to Player2, they're a wolf", "Per Player2,"): the subject is a third
 # person, so "I'm sure they're a wolf" stays the sender's own verdict.
@@ -776,7 +783,7 @@ def read_chat(text, sender: int | None = None, names: dict[int, str] | None = No
             return m.group(0)
         return body if sender == int(m.group(1)) else ""
 
-    t = _SPEAKER_LINE.sub(speaker_line, t)
+    t = _SEAT_ALTERNATIVES.sub("candidates", _SPEAKER_LINE.sub(speaker_line, t))
     f.claim = _claims_seer(t) or (isinstance(sender, int) and _self_claim(t, sender))
     for p in _CHAT_ACCUSE:
         f.wolves |= {int(m.group(1)) for m in p.finditer(t) if _asserted_match(t, m)}
