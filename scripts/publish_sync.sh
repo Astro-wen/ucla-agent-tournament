@@ -350,7 +350,11 @@ VERIFY_RESULT="skipped (--no-verify)"; VERIFY_OK=1
 if [ "$VERIFY" = 1 ]; then
   VERIFY_RESULT="running"
   echo "== install check (clean venv, ${NPM} node_modules, selfcheck$([ "$TESTS" = 1 ] && echo ", ${#TEST_FILES[@]} test files"))"
-  WORK="$(mktemp -d)"; CHECK="$WORK/check"; mkdir -p "$CHECK" "$WORK/home" "$WORK/locks" "$WORK/state" "$WORK/tmp"
+  WORK="$(mktemp -d)"
+  # Python reports physical import paths (macOS /var -> /private/var, or a symlinked TMPDIR).
+  # Compare against the physical check directory; do not relax the import-location check.
+  WORK="$(canonical_path "$WORK")" || die "cannot resolve the verification directory"
+  CHECK="$WORK/check"; mkdir -p "$CHECK" "$WORK/home" "$WORK/locks" "$WORK/state" "$WORK/tmp"
   cp -a "$OUT/." "$CHECK/"; rm -rf "$CHECK/.git"
   VERIFY_OK=0
   step() { echo "  - $*"; }

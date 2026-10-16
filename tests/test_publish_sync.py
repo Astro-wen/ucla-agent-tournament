@@ -297,6 +297,40 @@ def test_invalid_output_paths_fail_closed(readme_history, tmp_path, kind):
 
 
 @needs_git
+@pytest.mark.skipif(shutil.which("npm") is None, reason="minimal install-check fixture needs npm")
+def test_install_check_canonicalizes_its_worktree_before_checking_imports(readme_history, tmp_path):
+    root = readme_history[0]
+    # Zero-dependency fixture: run the real verifier without a network install or live agent.
+    (root / "agent/__init__.py").write_text("", encoding="utf-8")
+    (root / "scripts/selfcheck.py").write_text("print('selfcheck: ready')\n", encoding="utf-8")
+    for directory in ("agent/js", "local/js"):
+        package = root / directory
+        package.mkdir(parents=True, exist_ok=True)
+        (package / "package.json").write_text('{"name":"fixture","version":"1.0.0"}\n', encoding="utf-8")
+        (package / "package-lock.json").write_text(
+            '{"name":"fixture","version":"1.0.0","lockfileVersion":3,'
+            '"packages":{"":{"name":"fixture","version":"1.0.0"}}}\n', encoding="utf-8")
+    git("add", "agent/__init__.py", "scripts/selfcheck.py", "agent/js", "local/js", cwd=root)
+    commit = _commit_fixture(root, "Minimal offline install-check fixture")
+    temp = tmp_path / "real-temp"
+    temp.mkdir()
+    alias = tmp_path / "temp-alias"
+    alias.symlink_to(temp, target_is_directory=True)
+    home = tmp_path / "home"
+    home.mkdir()
+    result = subprocess.run(
+        ["bash", str(root / "scripts/publish_sync.sh"), "--commit", commit,
+         "--out", str(tmp_path / "export"), "--no-tests"],
+        cwd=root, env=dict(os.environ, HOME=str(home), TMPDIR=str(alias), PYTHON=sys.executable,
+                          PIP_NO_INDEX="1", npm_config_offline="true"),
+        capture_output=True, text=True, timeout=90,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "install check: passed (selfcheck ready; tests not run)" in result.stdout
+    assert "resolves outside the export copy" not in result.stdout
+
+
+@needs_git
 def test_the_scan_flags_planted_secrets_and_leaves_a_clean_tree_alone(tmp_path):
     clean = tmp_path / "clean"
     (clean / "agent").mkdir(parents=True)
