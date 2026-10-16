@@ -31,15 +31,17 @@ The guide confirms:
 
 ## Candidate decisions and reasons
 
-- **Whole-team scheduling:** inspect all pending heroes before choosing an
-  order. A new retreat outranks a routine push. Oldest-served order breaks
+- **Whole-team scheduling:** inspect all owned legal heroes in real time;
+  `your_pending_seats` means "no fresh action this step", not exclusive
+  permission to replace a standing order. Lockstep respects that pending list.
+  A new retreat outranks a routine push. Oldest-served order breaks
   equal priorities; a continuously waiting update gains priority after four
   other dispatches. The bound concerns dispatches, not elapsed game seconds.
 - **Rejection isolation:** associate the result with the last submitted
   hero, not all five. Preserve teammates' order caches. Block the refused
   macro against the exact rejected version, and for a short wall-clock
   backoff. A different currently listed macro can still be used.
-- **Objective opportunity:** prefer a nearby, explicitly structure-targeting
+- **Objective opportunity:** prefer an offered, explicitly structure-targeting
   basic attack over skill macros. The guide establishes basic attacks and
   objective damage as meaningful; it does not establish which hero skills
   damage structures, so no hero-specific skill damage is assumed.
@@ -54,15 +56,32 @@ The guide confirms:
   heroes, deduplicate shared views, and merge structures from all five views.
   No enemy position is retained across decisions.
 - **Conservative parsing:** restrict commands to owned, currently pending
-  seats and recognized offered action IDs. Reject contradictory payload seats
-  and incomplete raw domains. Do not invent a no-op when none was offered.
+  seats in lockstep (all owned legal seats in real time) and recognized offered
+  action IDs. Normalize bounded numeric-string seats/camps; reject contradictory
+  ownership or payload seats and incomplete raw domains. Do not invent a no-op
+  when none was offered.
+- **Pure exception fallback:** `safe_fallback_action(raw)` is exported from
+  `agent.hok`. It reads no telemetry, clock, or policy state. It uses owned,
+  pending-seat offers only, preferring a playable button 0 across the team,
+  then a fully populated raw button, then a complete macro. A raw button 0
+  with `legal_*` fields also requires a completed action object, not its ID.
+- **Standing-order authority:** tolerate a short acknowledgement delay
+  (2 seconds for a never-acknowledged missing entry, 0.6 seconds for an explicit
+  clear), but never preserve an optimistic local order indefinitely. An observed
+  death, including during an empty legal-action view, invalidates it. A changed
+  death counter also handles a missed dead frame.
+- **Basic attacks:** the live guide explicitly says a basic-attack macro is
+  offered only with a target in range. The historical 9,000 label cutoff is
+  therefore removed; it is not a verified universal weapon range. Missing,
+  malformed, or large distance labels cannot by themselves disable an offered
+  basic attack. Recovery and short order hysteresis still take precedence.
 
 ## Deliberately unverified / not implemented
 
-- The 8,000 / 9,000 / 8,800 distance cutoffs are **policy heuristics**, not
-  verified skill, basic-attack, or tower weapon ranges. The original
-  universal tower-range assertion was removed. The starter uses a 9,000
-  combat heuristic; the public contract does not specify actual hero ranges.
+- The remaining 8,000 skill / 8,800 tower-proximity cutoffs are **policy
+  heuristics**, not verified weapon ranges. The original universal tower-range
+  assertion was removed. The starter's historical 9,000 combat heuristic is
+  no longer used to reject a currently offered basic attack.
 - No assumed hero roster, hero-specific cooldown/damage tables, item buying,
   target selection beyond each offered macro, lane assignment, movement-grid
   interpretation, tower aggro ownership, or unseen enemy locations.
@@ -77,6 +96,21 @@ The guide confirms:
 - A malformed lockstep state with no listed, fillable pending action cannot
   be made legal by guessing. The policy returns no action in that impossible
   contract case; the coordinator owns the top-level integration fallback.
+- Parser bounds are defensive: at most 1,024 action entries, 64 seat/order
+  metadata entries, 256 actors per summary, 64 raw fields, 256 choices per
+  domain, and 512 label characters. Oversized or contradictory metadata is
+  not used as authority to control another camp.
+
+## Legacy fixture compatibility
+
+The original `tests/hok/test_policy.py` fixture simultaneously offers
+`macro_attack` and labels it 12,000 units away, while many tests assert that
+the policy chooses advance. Its direct rule test similarly asserts advance
+for an offered attack at 20,000. Those tactical expectations conflict with
+trusting the live legal-attack contract. They are left unchanged for the
+coordinator to reconcile; neither these nor the independent integration test
+assertions were edited. The owned strategy fixture now omits attacks by default
+and adds them explicitly when testing an actual attack opportunity.
 
 ## Evaluation priorities
 

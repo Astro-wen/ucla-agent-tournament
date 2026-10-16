@@ -16,7 +16,7 @@ Per hero, in order:
      back-and-forth at the HP threshold or tower boundary);
   3. retreat when hurt and outnumbered (visible enemy heroes near it at least two more than our live heroes near it),
      or hurt under an enemy tower;
-  4. basic-attack an offered nearby structure; otherwise use skills in range (ultimate at a hero only), then attack;
+  4. basic-attack an offered structure; otherwise use skills in range (ultimate at a hero only), then offered attack;
   5. else advance (toward the nearest enemy tower or crystal).
 
 Only changes are sent: a hero whose standing order already is the rule's choice gets nothing, and an order younger
@@ -49,7 +49,6 @@ HURT = 0.60            # "hurt" for the outnumbered / tower rules
 NEAR = 10000           # game units: heroes this close count for the outnumbered rule
 TOWER_RANGE = 8800     # cautious proximity heuristic, not an asserted tower weapon range
 SKILL_RANGE = 8000     # conservative skill-distance heuristic; exact hero ranges are not published
-ATTACK_RANGE = 9000    # distance heuristic from the official example, not a universal weapon range
 HOLD_S = 0.6           # an order younger than this is kept, unless the hero must retreat
 ACK_GRACE_S = 2.0      # tolerate a few lagging snapshots, not an indefinitely missing standing order
 RETRY_S = 0.4          # give a refused macro two nominal steps before reconsidering on a fresh view
@@ -342,13 +341,15 @@ def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, 
         if team is not None and p is not None and share < HURT and (team.outnumbered(p) or team.under_tower(p)):
             return "macro_retreat"
     attack = macros.get("macro_attack")
-    if attack is not None and target_kind(attack) == "structure" and _near_enough(attack, ATTACK_RANGE):
+    if attack is not None and target_kind(attack) == "structure":
         return "macro_attack"
     for macro in ("macro_skill3", "macro_skill2", "macro_skill1"):
         label = macros.get(macro)
         if label is not None and _near_enough(label, SKILL_RANGE) and (macro != "macro_skill3" or target_is_hero(label)):
             return macro
-    if "macro_attack" in macros and _near_enough(macros["macro_attack"], ATTACK_RANGE):
+    if "macro_attack" in macros:
+        # The live contract explicitly says no macro_attack is offered without a target in range.
+        # A generic label cutoff is not evidence that an offered basic attack cannot hit.
         return "macro_attack"
     if "macro_advance" in macros:
         return "macro_advance"
@@ -485,8 +486,7 @@ class HokPolicy:
         snapshot = _standing_snapshot(raw)
         team = Team(raw, sorted(set(offers) | set(owned)))
         now = self._clock()
-        version = raw.get("state_version")
-        version = version if type(version) is int and version >= 0 else None
+        version = _small_int(raw.get("state_version"), 0, 2 ** 63 - 1)
         pending = pending_seats(raw, offers)
         candidates: dict[int, tuple[str | None, Any, bool]] = {}
         for seat in pending:
@@ -624,4 +624,7 @@ def _seat_list(raw: dict) -> list[int]:
     seats = raw.get("seats") if isinstance(raw, dict) else None
     normalized = {_seat(s) for s in seats[:64]} if isinstance(seats, list) else set()
     normalized.discard(None)
+    camp = _camp(raw.get("camp")) if isinstance(raw, dict) else None
+    if camp is not None:
+        normalized.intersection_update(range(0, 5) if camp == 1 else range(5, 10))
     return sorted(normalized)

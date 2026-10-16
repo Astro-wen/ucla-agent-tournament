@@ -22,7 +22,7 @@ def summary(seat=0, hp=3000, *, enemies=(), structures=()):
             "other_heroes": list(enemies), "structures": list(structures)}
 
 
-def entries(seat, macros=("macro_advance", "macro_retreat", "macro_attack"), *, target="minion 7", distance=12000):
+def entries(seat, macros=("macro_advance", "macro_retreat"), *, target="minion 7", distance=12000):
     return [{"action_id": f"s{seat}:button_0", "input": {"action": {"seat": seat, "which_button": 0}}}] + [
         {"action_id": f"s{seat}:{macro}", "label": f"{macro} (nearest: {target}, {distance} away)",
          "input": {"action": {"seat": seat, "macro": macro}}} for macro in macros]
@@ -113,7 +113,7 @@ def test_rejected_macro_requires_fresh_version_and_backoff_before_retry():
 @pytest.mark.parametrize("mode", ["realtime", "lockstep"])
 def test_rejected_emergency_never_becomes_an_attack(mode):
     policy = hok.HokPolicy(clock=Clock())
-    raw = payload(mode=mode, seats=(0,), actions=entries(0, distance=1000),
+    raw = payload(mode=mode, seats=(0,), actions=entries(0, ("macro_advance", "macro_retreat", "macro_attack"), distance=1000),
                   summaries={0: summary(hp=200)})
     assert policy.decide(raw)[0] == "s0:macro_retreat"
     policy.on_result({"error": "INVALID_ACTION"})
@@ -190,7 +190,7 @@ def test_hero_skill_and_objective_opportunities_can_interrupt_new_advance():
 
 
 def test_missing_optional_distance_does_not_disable_legal_attack():
-    actions = entries(0)
+    actions = entries(0, ("macro_advance", "macro_retreat", "macro_attack"))
     for action in actions:
         action.pop("label", None)
     assert hok.HokPolicy(clock=Clock()).decide(payload(seats=(0,), actions=actions))[0] == "s0:macro_attack"
@@ -485,3 +485,36 @@ def test_death_counter_change_handles_a_missed_dead_frame():
     assert policy.decide(raw)[0] == "s0:macro_advance"
     me["deaths"] = 1
     assert policy.decide(raw)[0] == "s0:macro_advance"
+
+
+@pytest.mark.parametrize("label", [None, "", "Basic attack", "Basic attack (nearest: enemy hero 77, 20000 away)",
+                                  "Basic attack (nearest: minion 7, 12000 away)", ["malformed"], 42])
+def test_offered_basic_attack_is_not_suppressed_by_unverified_label_range(label):
+    actions = entries(0, ("macro_advance", "macro_attack"))
+    actions[-1]["label"] = label
+    assert hok.HokPolicy(clock=Clock()).decide(payload(seats=(0,), actions=actions))[0] == "s0:macro_attack"
+
+
+def test_basic_attack_still_respects_brief_hold_but_emergency_retreat_does_not():
+    clock = Clock()
+    policy = hok.HokPolicy(clock=clock)
+    raw = payload(seats=(0,), actions=entries(0, ("macro_advance", "macro_retreat")))
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+    raw["simultaneous"]["standing_orders"] = {"0": "macro_advance"}
+    raw["legal_actions"]["actions"] = entries(0, ("macro_advance", "macro_retreat", "macro_attack"), distance=4000)
+    clock.now = 0.2
+    assert policy.decide(raw) == (None, None)
+    clock.now = 0.7
+    assert policy.decide(raw)[0] == "s0:macro_attack"
+    raw["simultaneous"]["standing_orders"] = {"0": "macro_attack"}
+    raw["observation"]["seats"]["0"]["summary"]["my_hero"]["hp"] = 200
+    clock.now = 0.8
+    assert policy.decide(raw)[0] == "s0:macro_retreat"
+
+
+def test_camp_ownership_contradictions_do_not_authorize_opponent_seats():
+    raw = payload(seats=(0,), actions=entries(9) + entries(0))
+    raw["seats"] = [0, "9"]
+    raw["simultaneous"]["your_pending_seats"] = ["9"]
+    assert hok.safe_fallback_action(raw) is None
+    assert hok.HokPolicy(clock=Clock()).decide(raw)[0] == "s0:macro_advance"  # real time: all own legal heroes
