@@ -426,3 +426,62 @@ def test_huge_and_nonfinite_metadata_does_not_enter_fallback_output():
     raw["legal_actions"]["actions"].insert(0, {"action_id": "s0:button_" + "9" * 100000})
     assert hok.safe_fallback_action(raw) == "s4:button_0"
     assert hok.HokPolicy(clock=Clock()).decide(raw)[0].startswith("s4:")
+
+
+@pytest.mark.parametrize("cleared", [None, ""])
+def test_explicit_standing_clear_expires_short_send_grace(cleared):
+    clock = Clock()
+    policy = hok.HokPolicy(clock=clock)
+    raw = payload(seats=(0,), actions=entries(0, ("macro_advance",)))
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+    raw["simultaneous"]["standing_orders"] = {"0": cleared}
+    clock.now = 0.1
+    assert policy.decide(raw) == (None, None)
+    clock.now = hok.HOLD_S + 0.01
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+
+
+def test_disappearing_acknowledged_order_is_reinstalled_not_cached_forever():
+    clock = Clock()
+    policy = hok.HokPolicy(clock=clock)
+    raw = payload(seats=(0,), actions=entries(0, ("macro_advance",)))
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+    clock.now = 0.2
+    raw["simultaneous"]["standing_orders"] = {"0": "macro_advance"}
+    assert policy.decide(raw) == (None, None)
+    clock.now = 1
+    raw["simultaneous"]["standing_orders"] = {}
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+
+
+def test_missing_acknowledgement_has_finite_but_nonzero_grace():
+    clock = Clock()
+    policy = hok.HokPolicy(clock=clock)
+    raw = payload(seats=(0,), actions=entries(0, ("macro_advance",)))
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+    clock.now = 1
+    assert policy.decide(raw) == (None, None)
+    clock.now = hok.ACK_GRACE_S + 0.01
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+
+
+def test_death_without_any_legal_offers_still_invalidates_sent_cache():
+    clock = Clock()
+    policy = hok.HokPolicy(clock=clock)
+    raw = payload(seats=(0,), actions=entries(0, ("macro_advance",)))
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+    dead = payload(seats=(0,), actions=[], pending=[], summaries={0: summary(hp=0)})
+    assert policy.decide(dead) == (None, None)
+    clock.now = 0.1  # the old send's grace cannot suppress an order for a new life
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+
+
+def test_death_counter_change_handles_a_missed_dead_frame():
+    clock = Clock()
+    policy = hok.HokPolicy(clock=clock)
+    raw = payload(seats=(0,), actions=entries(0, ("macro_advance",)))
+    me = raw["observation"]["seats"]["0"]["summary"]["my_hero"]
+    me["deaths"] = 0
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+    me["deaths"] = 1
+    assert policy.decide(raw)[0] == "s0:macro_advance"

@@ -149,17 +149,26 @@ def realtime(raw: dict) -> bool:
     return isinstance(pacing, dict) and pacing.get("mode") == "realtime"
 
 
-def standing_orders(raw: dict) -> dict[int, str]:
+def _standing_snapshot(raw: dict) -> dict[int, str | None] | None:
     if not isinstance(raw, dict):
-        return {}
+        return None
     sim = raw.get("simultaneous") if isinstance(raw.get("simultaneous"), dict) else {}
-    orders = sim.get("standing_orders") if isinstance(sim.get("standing_orders"), dict) else {}
+    orders = sim.get("standing_orders")
+    if not isinstance(orders, dict):
+        return None
     out = {}
     for k, v in islice(orders.items(), 64):
         seat = _seat(k)
-        if seat is not None and isinstance(v, str) and len(v) <= 64:
-            out[seat] = v
+        if seat is not None:
+            if v is None or v == "":
+                out[seat] = None
+            elif isinstance(v, str) and len(v) <= 64:
+                out[seat] = v
     return out
+
+
+def standing_orders(raw: dict) -> dict[int, str]:
+    return {seat: order for seat, order in (_standing_snapshot(raw) or {}).items() if order is not None}
 
 
 def _pending_only(raw: dict, offers: dict[int, Any]) -> list[int]:
@@ -449,6 +458,8 @@ class HokPolicy:
         self._clock = clock
         self._retreating: set[int] = set()
         self._sent: dict[int, tuple[str, float]] = {}       # seat -> (macro, when) of our last order to it
+        self._acknowledged: set[int] = set()
+        self._deaths: dict[int, int] = {}
         self._inflight: tuple[int, str | None, int | None] | None = None
         self._rejected: dict[tuple[int, str], tuple[int | None, float]] = {}
         self._dispatches = 0
@@ -464,13 +475,14 @@ class HokPolicy:
         self.views += 1
         if not isinstance(raw, dict):
             return None, None
-        offers = offers_by_seat(_actions(raw))
         owned = _seat_list(raw)
+        self._observe_life(raw, owned)                       # death may be visible even with no legal offers
+        offers = offers_by_seat(_actions(raw))
         offers = {seat: entry for seat, entry in offers.items() if seat in owned}
         if not offers:
             return None, None
         rt = realtime(raw)
-        standing = standing_orders(raw)
+        snapshot = _standing_snapshot(raw)
         team = Team(raw, sorted(set(offers) | set(owned)))
         now = self._clock()
         version = raw.get("state_version")
@@ -483,7 +495,7 @@ class HokPolicy:
             want = rule_macro(summary, macros, team, seat in self._retreating)
             self._track_retreat(seat, summary, want)
             if rt and want is None:
-                self._sent.pop(seat, None)                   # dead heroes must be commanded again after respawn
+                self._forget_order(seat)
                 continue
             if want is not None and self._blocked(seat, want, version, now):
                 if want == "macro_retreat":
@@ -503,9 +515,7 @@ class HokPolicy:
                 if action is not None:
                     candidates[seat] = (None, action, False)
                 continue
-            current = standing.get(seat)
-            if current is None and seat in self._sent:
-                current = self._sent[seat][0]
+            current = self._current_order(seat, snapshot, now)
             if rt and current == want:
                 continue
             last = self._sent.get(seat)
@@ -534,12 +544,51 @@ class HokPolicy:
         self._inflight = (seat, want, version)
         if want is not None:
             self._sent[seat] = (want, now)
+            self._acknowledged.discard(seat)
             self.orders += 1
             self.by_macro[want] = self.by_macro.get(want, 0) + 1
         else:
-            self._sent.pop(seat, None)                       # raw actions clear the standing order (public guide)
+            self._forget_order(seat)                         # raw actions clear the standing order (public guide)
             self.idles += 1
         return action, TAGS.get(want)
+
+    def _forget_order(self, seat: int) -> None:
+        self._sent.pop(seat, None)
+        self._acknowledged.discard(seat)
+
+    def _observe_life(self, raw: dict, owned: list[int]) -> None:
+        for seat in owned:
+            summary = summary_of(raw, seat)
+            me = summary.get("my_hero") if isinstance(summary.get("my_hero"), dict) else {}
+            hp = _num(me.get("hp"))
+            deaths = _small_int(me.get("deaths"), 0, 999999)
+            died = hp is not None and hp <= 0
+            if deaths is not None:
+                previous = self._deaths.get(seat)
+                died = died or (previous is not None and deaths > previous)
+                self._deaths[seat] = deaths
+            if died:
+                self._forget_order(seat)
+                self._retreating.discard(seat)
+                self._rejected = {key: value for key, value in self._rejected.items() if key[0] != seat}
+
+    def _current_order(self, seat: int, snapshot: dict[int, str | None] | None, now: float) -> str | None:
+        current = snapshot.get(seat) if snapshot is not None else None
+        last = self._sent.get(seat)
+        if current is not None:
+            if last is not None and current == last[0]:
+                self._acknowledged.add(seat)
+            return current
+        if last is None:
+            return None
+        # Explicit null/empty is a clear. A previously acknowledged entry disappearing is also a clear.
+        # Preserve the short send/ack grace; never let an optimistic cache override clear evidence forever.
+        cleared = snapshot is not None and (seat in snapshot or seat in self._acknowledged)
+        grace = HOLD_S if cleared else ACK_GRACE_S
+        if now - last[1] < grace:
+            return last[0]
+        self._forget_order(seat)
+        return None
 
     def _blocked(self, seat: int, macro: str, version: int | None, now: float) -> bool:
         rejected = self._rejected.get((seat, macro))
@@ -561,7 +610,7 @@ class HokPolicy:
             self.refused += 1
             if self._inflight is not None:
                 seat, macro, version = self._inflight
-                self._sent.pop(seat, None)                   # a refusal is not evidence about the other four heroes
+                self._forget_order(seat)                     # a refusal is not evidence about the other four heroes
                 if macro is not None:
                     self._rejected[(seat, macro)] = (version, self._clock() + RETRY_S)
         self._inflight = None
