@@ -57,6 +57,8 @@ AI tokens 的事实；原文其余内容、图片、LICENSE、NOTICE 不变。�
 
 - 相对 `fb421a2`，除 `agent/agent.py` 和 `agent/hok/` 外，`agent/` 的 **44 个文件相同**。
 - 官方 SDK `altruagent/` **17 个文件相同**。
+- 更新 main 已有的 data/local 文件及 `tests/strategy/test_draft_meta.py`
+  **75 个文件相同**；新增 HoK 离线工具不在这个 main 旧文件集合中。
 - `champion/` 与 `versions/` **157 个文件相同**。
 - 官方 examples、HoK 示例测试、starter README **12 个文件相同**。
 - 相对强化版父提交，HoK policy/导出文件、LICENSE、NOTICE、assets **10 个文件相同**。
@@ -83,3 +85,33 @@ AI tokens 的事实；原文其余内容、图片、LICENSE、NOTICE 不变。�
 - README 补充说明后，
   `tests/test_main.py tests/test_publish_sync.py tests/test_hok_delivery.py tests/test_hok.py tests/test_hok_team.py`：
   **127 passed，2 skipped，3 failed**，失败仍仅为上表的三个策略分歧。
+
+### 全量测试与限定修复
+
+首次全量 `python -m pytest -q`：**3234 passed，158 skipped，6 failed**
+（333.32 秒）。除上述三个 HoK 断言外：
+
+1. `tests/test_deploy.py::test_scripts_that_import_the_agent_put_their_own_tree_first_on_sys_path`
+   发现父分支的 `scripts/hok_eval.py` 未把自己的 worktree 放在导入路径首位。
+   已补同项目其他离线脚本一致的 `sys.path.insert(0, ...)`；不修改模拟器、策略、
+   SDK 或运行进程。新增隔离模式 `python -I .../hok_eval.py --help` 回归测试，
+   从任意临时目录启动，不执行任何模拟/模型/真实游戏。
+   此项加 `tests/test_hok_delivery.py tests/hok/test_sim.py` 重跑：
+   **123 passed，2 skipped**。
+2. `tests/strategy/test_draft_meta.py::test_the_weight_follows_how_the_opponent_drafts`：
+   `min(w_meta)=0.72`，原断言要求 `>0.8`；相关源码、数据、测试相对更新 main
+   未改变。没有改另一个游戏的策略或削弱断言；单独重跑仍失败，留给其负责人。
+3. `tests/strategy/test_draft_meta.py::test_meta_seat_drafts_by_the_fitted_scores_and_fixes_its_pilot_memory`：
+   本 worktree 没安装 `local/js/node_modules`，Showdown 明确报缺依赖。
+   没有因此改源码、伪造通过或隐藏 skip；单独重跑仍失败。
+
+全量中的 158 项 skip 含未安装 Node 依赖和本机不是 Linux 等环境限制，
+**不能用这次结果声称完整 CI 或引擎搜索已验证**。上游原 `docs/progress.md` 中
+也记录过两个 draft-meta 基线失败；本次保留事实，不扩展到其他游戏修复。
+目前没有全量绿灯：已定位、已修复脚本导入问题，尚有 3 个待定打法断言、
+1 个选秀基线断言和 1 个缺依赖问题。
+
+脚本修复后的最后一次聚焦复查（deploy 的导入隔离检查、HoK delivery、官方
+HoK 示例、旧团队测试、main 文档测试、HoK simulator 测试）：
+**178 passed，2 skipped，3 failed**，失败仍严格对应上表。
+没有在脚本修复后重跑整套测试；不把推算结果当作实测结果。

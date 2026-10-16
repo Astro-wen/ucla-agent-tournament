@@ -17,6 +17,7 @@ from pathlib import Path
 import statistics
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # this worktree, not an editable install's checkout
 os.environ["ARENA_RECORD"] = "0"
 
 from local.hok_env import (accepts_clock, candidate_factory, candidate_revision_factory, import_factory,

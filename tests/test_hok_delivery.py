@@ -176,3 +176,15 @@ def test_unidentified_realtime_game_is_not_claimed_by_action_shape(monkeypatch, 
     contestant = Contestant()
     assert contestant.choose_action(state, context) is WAIT
     assert contestant._hok is None
+
+
+def test_offline_hok_cli_imports_its_worktree_without_pythonpath(tmp_path):
+    # -I ignores PYTHONPATH and the current directory. --help imports the
+    # evaluator but runs no simulation, provider, SDK runtime or live game.
+    result = subprocess.run(
+        [sys.executable, "-I", str(ROOT / "scripts/hok_eval.py"), "--help"],
+        cwd=tmp_path, env={"PATH": os.environ["PATH"], "ARENA_RECORD": "0"},
+        capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "--candidate-revision" in result.stdout and "--max-steps" in result.stdout
