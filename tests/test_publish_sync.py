@@ -33,6 +33,12 @@ def git(*args, cwd=ROOT):
                           check=True).stdout
 
 
+def _commit_fixture(root, message):
+    git("-c", "user.name=Aaron Wen", "-c", "user.email=siyuanwe@g.ucla.edu",
+        "-c", "commit.gpgsign=false", "commit", "-qm", message, cwd=root)
+    return git("rev-parse", "HEAD", cwd=root).strip()
+
+
 @pytest.fixture
 def readme_history(tmp_path):
     """Selected-commit fixtures, with both README names before the public rename."""
@@ -55,16 +61,12 @@ def readme_history(tmp_path):
     (root / "PUBLIC_README.md").write_text("Legacy public README.\n", encoding="utf-8")
     git("init", "-q", cwd=root)
     git("add", "-A", cwd=root)
-    git("-c", "user.name=Aaron Wen", "-c", "user.email=siyuanwe@g.ucla.edu",
-        "-c", "commit.gpgsign=false", "commit", "-qm", "Legacy public README", cwd=root)
-    legacy = git("rev-parse", "HEAD", cwd=root).strip()
+    legacy = _commit_fixture(root, "Legacy public README")
     (root / "PUBLIC_README.md").unlink()
     (root / "README.md").write_text("Current public README.\n", encoding="utf-8")
     (root / "LICENSE").write_text("Committed license fixture.\n", encoding="utf-8")
     git("add", "-A", cwd=root)
-    git("-c", "user.name=Aaron Wen", "-c", "user.email=siyuanwe@g.ucla.edu",
-        "-c", "commit.gpgsign=false", "commit", "-qm", "Rename public README and add license", cwd=root)
-    current = git("rev-parse", "HEAD", cwd=root).strip()
+    current = _commit_fixture(root, "Rename public README and add license")
     # Neither a dirty README/LICENSE nor an untracked legacy filename may influence selection.
     for name in ("README.md", "PUBLIC_README.md", "LICENSE"):
         (root / name).write_text(f"Working-tree-only {name}.\n", encoding="utf-8")
@@ -88,6 +90,22 @@ def test_listing_selects_readme_and_optional_license_from_the_requested_commit(r
     assert {"agent/hok/policy.py", "assets/art.txt", "NOTICE"} <= set(lines)
     assert "PUBLIC_README.md" not in lines
     assert git("status", "--porcelain", cwd=root) == before
+
+
+@needs_listing
+def test_missing_committed_readme_is_not_replaced_from_the_working_tree(readme_history):
+    root = readme_history[0]
+    git("rm", "-f", "README.md", cwd=root)
+    commit = _commit_fixture(root, "No public README in this commit")
+    (root / "README.md").write_text("Untracked README must not repair the commit.\n", encoding="utf-8")
+    assert (root / "PUBLIC_README.md").is_file()  # both names exist only in the working tree
+    result = subprocess.run(
+        ["bash", str(root / "scripts" / "publish_sync.sh"), "--list", "--commit", commit],
+        cwd=root, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 2
+    assert f"README.md is not in commit {commit[:12]}" in result.stderr
+    assert not result.stdout
 
 
 @needs_git
@@ -114,6 +132,23 @@ def test_export_uses_committed_readme_license_and_not_dirty_files(readme_history
     git("init", "-q", cwd=out)
     git("add", "-A", cwd=out)
     assert git("write-tree", cwd=out).strip() == tree
+
+
+@needs_git
+def test_optional_license_is_not_exempt_from_the_secret_scan(readme_history, tmp_path):
+    root = readme_history[0]
+    fake_key = "eak_live_" + "ab" * 32
+    (root / "LICENSE").write_text(f"License fixture with a planted key: {fake_key}\n", encoding="utf-8")
+    git("add", "LICENSE", cwd=root)
+    commit = _commit_fixture(root, "License containing a planted test secret")
+    result = subprocess.run(
+        ["bash", str(root / "scripts" / "publish_sync.sh"), "--commit", commit,
+         "--out", str(tmp_path / "export"), "--no-verify"],
+        cwd=root, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 3, result.stdout + result.stderr
+    assert "KEY       LICENSE:1" in result.stdout and "NOT READY" in result.stdout
+    assert fake_key not in result.stdout + result.stderr
 
 
 @needs_git
