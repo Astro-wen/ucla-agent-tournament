@@ -1,8 +1,8 @@
 """Honor of Kings 5v5 (`honor_of_kings_5v5`): legal, visible-state team rules.
 
-The platform had not switched the game on by the submission deadline; this follows the contract published in the
-official starter's GAMES.md ("Honor of Kings") and the payload shapes of its tests (tests/test_hok.py upstream). No
-LLM: every order comes from the rules below.
+This follows the official starter's GAMES.md ("Honor of Kings"), the payload shapes in tests/test_hok.py upstream,
+and the public /skill/hok contract. It does not assume unobserved engine mechanics or access to a live match.
+No LLM: every order comes from the rules below.
 
 One agent commands a whole team (seats 0-4 or 5-9). Each hero is offered macros as seat-tagged legal actions
 (`s3:macro_advance`, `macro_retreat`, `macro_attack`, `macro_skill1`-`3`, each only while possible, labels such as
@@ -12,8 +12,8 @@ goes out per choose_action call; the runner calls again at once with the next vi
 
 Per hero, in order:
   1. dead (no macros): nothing (lockstep: the do-nothing button, the server needs an answer);
-  2. retreat home below LOW_HP of its HP, and keep retreating until HEALED (hysteresis: no back-and-forth at the
-     threshold);
+  2. retreat home below LOW_HP of its HP, and finish a wounded hero's retreat until HEALED (hysteresis: no
+     back-and-forth at the HP threshold or tower boundary);
   3. retreat when hurt and outnumbered (visible enemy heroes near it at least two more than our live heroes near it),
      or hurt under an enemy tower;
   4. basic-attack an offered nearby structure; otherwise use skills in range (ultimate at a hero only), then attack;
@@ -83,9 +83,14 @@ def offers_by_seat(actions: list[dict]) -> dict[int, dict[str, Any]]:
         act = payload.get("action") if isinstance(payload, dict) else None
         if isinstance(act, dict) and "seat" in act and (type(act["seat"]) is not int or act["seat"] != seat):
             continue
+        if isinstance(act, dict) and "macro" in act and act["macro"] != base:
+            continue
+        if base.startswith("button_") and isinstance(act, dict) and "which_button" in act \
+                and (type(act["which_button"]) is not int or base != f"button_{act['which_button']}"):
+            continue
         entry = out.setdefault(seat, {"macros": {}, "ids": {}, "raw": []})
         if base in MACROS:
-            entry["macros"][base] = str(a.get("label") or base)
+            entry["macros"][base] = a["label"] if isinstance(a.get("label"), str) else base
             entry["ids"][base] = a["action_id"]
         else:
             entry["raw"].append(a)
@@ -102,17 +107,21 @@ def is_hok_shape(actions: list[dict]) -> bool:
 
 
 def realtime(raw: dict) -> bool:
-    pacing = raw.get("pacing")
+    pacing = raw.get("pacing") if isinstance(raw, dict) else None
     return isinstance(pacing, dict) and pacing.get("mode") == "realtime"
 
 
 def standing_orders(raw: dict) -> dict[int, str]:
+    if not isinstance(raw, dict):
+        return {}
     sim = raw.get("simultaneous") if isinstance(raw.get("simultaneous"), dict) else {}
     orders = sim.get("standing_orders") if isinstance(sim.get("standing_orders"), dict) else {}
     return {int(k): v for k, v in orders.items() if re.fullmatch(r"[0-9]", str(k)) and isinstance(v, str)}
 
 
 def pending_seats(raw: dict, offers: dict[int, Any]) -> list[int]:
+    if not isinstance(raw, dict):
+        return sorted(offers)
     sim = raw.get("simultaneous") if isinstance(raw.get("simultaneous"), dict) else {}
     pending = sim.get("your_pending_seats")
     if isinstance(pending, list):
@@ -121,6 +130,8 @@ def pending_seats(raw: dict, offers: dict[int, Any]) -> list[int]:
 
 
 def summary_of(raw: dict, seat: int) -> dict:
+    if not isinstance(raw, dict):
+        return {}
     obs = raw.get("observation") if isinstance(raw.get("observation"), dict) else {}
     seats = obs.get("seats") if isinstance(obs.get("seats"), dict) else {}
     entry = seats.get(str(seat)) or seats.get(seat) or {}
@@ -169,6 +180,8 @@ def _num(x) -> float | None:
 
 
 def _pos(d: dict) -> tuple[float, float] | None:
+    if not isinstance(d, dict):
+        return None
     x, z = _num(d.get("x")), _num(d.get("z"))
     return (x, z) if x is not None and z is not None else None
 
@@ -178,6 +191,8 @@ def _dist(a, b) -> float:
 
 
 def hp_share(me: dict) -> float | None:
+    if not isinstance(me, dict):
+        return None
     hp, mx = _num(me.get("hp")), _num(me.get("max_hp"))
     return hp / mx if hp is not None and mx and mx > 0 else None
 
@@ -190,6 +205,7 @@ class Team:
     """What the five summaries say together: our live heroes' positions, enemy heroes in sight, enemy towers."""
 
     def __init__(self, raw: dict, seats: list[int]) -> None:
+        raw = raw if isinstance(raw, dict) else {}
         self.camp = raw.get("camp") if type(raw.get("camp")) is int and raw["camp"] in (1, 2) else None
         self.allies: dict[int, tuple[float, float]] = {}
         self.enemies: dict[Any, tuple[float, float]] = {}
@@ -234,8 +250,9 @@ class Team:
 
 def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, retreating: bool = False) -> str | None:
     """The rules for one hero (see the module docstring); None for a dead hero (no macros)."""
-    if not macros:
+    if not isinstance(macros, dict) or not macros:
         return None
+    summary = summary if isinstance(summary, dict) else {}
     me = summary.get("my_hero") if isinstance(summary.get("my_hero"), dict) else {}
     share = hp_share(me)
     hp = _num(me.get("hp"))
@@ -423,7 +440,7 @@ class HokPolicy:
     def _track_retreat(self, seat: int, summary: dict, want: str | None) -> None:
         me = summary.get("my_hero") if isinstance(summary.get("my_hero"), dict) else {}
         share = hp_share(me)
-        if want == "macro_retreat" and share is not None and share < LOW_HP:
+        if want == "macro_retreat" and share is not None and share < HURT:
             self._retreating.add(seat)
         elif want is None or (share is not None and share >= HEALED):
             self._retreating.discard(seat)                    # healed, or dead (revives at home with full HP)

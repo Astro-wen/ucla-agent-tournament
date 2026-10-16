@@ -143,6 +143,20 @@ def test_dead_hero_with_stale_macro_offer_is_skipped_then_recommanded_on_respawn
     assert policy.decide(payload(seats=(0,)))[0] == "s0:macro_advance"
 
 
+def test_tactical_retreat_finishes_healing_instead_of_reentering_tower_boundary():
+    clock = Clock()
+    policy = hok.HokPolicy(clock=clock)
+    tower = {"camp": 2, "type": "ACTOR_TOWER", "hp": 6000, "x": 0, "z": 1000}
+    raw = payload(seats=(0,), summaries={0: summary(hp=1500, structures=[tower])})
+    assert policy.decide(raw)[0] == "s0:macro_retreat"
+    clock.now = 2
+    raw = payload(seats=(0,), summaries={0: summary(hp=1500)}, standing={"0": "macro_retreat"})
+    assert policy.decide(raw) == (None, None)  # no threat now, but the hero has not recovered
+    clock.now = 4
+    raw["observation"]["seats"]["0"]["summary"]["my_hero"]["hp"] = 2700
+    assert policy.decide(raw)[0] == "s0:macro_advance"
+
+
 @pytest.mark.parametrize("target", ["enemy tower 4", "enemy crystal 8", "enemy structure 12"])
 def test_structure_basic_attack_precedes_unverified_skill_damage(target):
     raw = payload(seats=(0,), actions=entries(0, hok.MACROS, target=target, distance=3000))
@@ -224,6 +238,17 @@ def test_conflicting_payload_seat_is_not_sent(bad_seat):
     assert hok.offers_by_seat(actions) == {}
 
 
+@pytest.mark.parametrize("action_id, action", [
+    ("s0:macro_advance", {"macro": "macro_retreat"}),
+    ("s0:macro_advance", {"macro": []}),
+    ("s0:button_0", {"which_button": False}),
+    ("s0:button_0", {"which_button": 2}),
+    ("s0:button_2", {"macro": "macro_attack", "which_button": 2}),
+])
+def test_conflicting_payload_action_is_not_sent(action_id, action):
+    assert hok.offers_by_seat([{"action_id": action_id, "input": {"action": action}}]) == {}
+
+
 def test_raw_fallback_uses_only_fully_populated_listed_domains():
     broken = {"action_id": "s0:button_2", "input": {"action": {
         "seat": 0, "which_button": 2, "legal_move_x": [], "legal_move_z": [8]}}}
@@ -286,3 +311,15 @@ def test_malformed_nested_state_samples_never_raise():
         assert action is None or isinstance(action, (str, dict))
     assert hok.HokPolicy().decide(None) == (None, None)
     assert math.isinf(hok.distance_of(None))
+
+
+@pytest.mark.parametrize("malformed", [None, False, 17, "x", []])
+def test_state_reading_helpers_fail_closed_on_malformed_containers(malformed):
+    assert not hok.realtime(malformed)
+    assert hok.standing_orders(malformed) == {}
+    assert hok.pending_seats(malformed, {3: {}}) == [3]
+    assert hok.summary_of(malformed, 0) == {}
+    assert hok.hp_share(malformed) is None
+    assert hok.rule_macro(malformed, {"macro_advance": "a"}) == "macro_advance"
+    assert hok.rule_macro({}, malformed) is None
+    assert hok.Team(malformed, [0]).enemies == {}
