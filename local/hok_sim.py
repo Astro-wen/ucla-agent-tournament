@@ -187,9 +187,10 @@ class DiagnosticGame:
     requires all ten answers, or explicit timeout after one camp is complete.
     """
 
-    def __init__(self, config: SimConfig | None = None, seed: int = 0):
+    def __init__(self, config: SimConfig | None = None, seed: int = 0, *, event_sink=None):
         self.config = config or SimConfig()
         self.seed = seed
+        self._event_sink = event_sink  # Optional post-hoc instrumentation, never a policy input.
         c = self.config
         rng = random.Random(seed)
         # Identical seeded role geometry, mirrored between camps, for side pairing.
@@ -405,6 +406,11 @@ class DiagnosticGame:
         hero.x += (x - hero.x) * scale
         hero.z += (z - hero.z) * scale
 
+    def _emit(self, kind: str, **data):
+        if self._event_sink is not None:
+            # Scalars/categories only, no hero objects, observations or action payloads.
+            self._event_sink({"kind": kind, "tick_start_step": self.step, **data})
+
     def tick(self, *, timeout: bool = False):
         if self.terminal:
             raise RuntimeError("cannot step a terminal game")
@@ -456,6 +462,10 @@ class DiagnosticGame:
             h.ready[macro] = self.now + cooldown
             key = ("hero", target.seat) if isinstance(target, Hero) else ("structure", target.runtime_id)
             hits.setdefault(key, []).append((h.camp, h.seat, amount))
+            if self._event_sink is not None:
+                self._emit("attack_attempt", camp=h.camp, macro=macro,
+                           target="hero" if isinstance(target, Hero) else target.type,
+                           amount=amount)
         for tower in self.structures.values():
             if tower.type != "ACTOR_TOWER" or tower.hp <= 0 or tower.ready_at > self.now + 1e-9:
                 continue
@@ -469,10 +479,23 @@ class DiagnosticGame:
             target = self.heroes[rid] if kind == "hero" else self.structures[rid]
             amount = min(target.hp, sum(s[2] for s in sources))
             target.hp = max(0.0, target.hp - amount)
+            if self._event_sink is not None:
+                total = sum(s[2] for s in sources)
+                # Measurement convention ONLY: allocate capped damage proportionally
+                # between hero/tower sources. Does not affect damage or kill credit.
+                for source_kind in ("hero", "tower"):
+                    share = sum(s[2] for s in sources if (s[1] is not None) == (source_kind == "hero"))
+                    if share > 0:
+                        self._emit("damage", camp=3 - target.camp, source=source_kind,
+                                   target="hero" if kind == "hero" else target.type,
+                                   amount=amount * share / total)
             if kind == "structure":
                 self.structure_damage[3 - target.camp] += amount
+                if target.hp <= 0:
+                    self._emit("objective_destroyed", camp=target.camp, objective=target.type)
             elif target.hp <= 0:
                 target.deaths += 1
+                self._emit("death", camp=target.camp)
                 target.revive_at = self.now + c.step_s + c.respawn_s
                 if c.clear_orders_on_death:
                     self.standing.pop(target.seat, None)

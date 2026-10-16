@@ -20,8 +20,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # this worktree, not an editable install's checkout
 os.environ["ARENA_RECORD"] = "0"
 
-from local.hok_env import (accepts_clock, candidate_factory, candidate_revision_factory, import_factory,
-                           opponent_factory, play_game, source_info, source_unchanged)
+from local.hok_env import (accepts_clock, candidate_factory, candidate_revision_factory, configured_factory,
+                           frozen_import_factory, opponent_factory, play_game, source_unchanged)
 from local.hok_sim import (ASSUMPTIONS, MODEL_VERSION, OFFICIAL_GUIDE_SHA256, OFFICIAL_REFERENCE, PROFILES,
                            UPSTREAM_REFERENCE, digest, profile_config)
 
@@ -32,6 +32,11 @@ def parser() -> argparse.ArgumentParser:
     candidate.add_argument("--candidate-dir", help="repo or directory containing HokPolicy's policy.py")
     candidate.add_argument("--candidate-factory", help="importable.module:factory accepting optional seed/clock")
     candidate.add_argument("--candidate-revision", help="local Git commit/ref, loaded as a fixed HoK package snapshot")
+    p.add_argument("--factory-root", help="source repository/root for --candidate-factory (default this worktree)")
+    p.add_argument("--factory-revision", help="optional local Git snapshot for --candidate-factory")
+    p.add_argument("--factory-config", default="{}", help="JSON keyword arguments copied into each policy instance")
+    p.add_argument("--diagnostics", action="store_true", help="bounded post-hoc damage/occupancy/event summaries")
+    p.add_argument("--progress", action="store_true", help="bounded per-cell aggregate progress on stderr")
     p.add_argument("--opponent", action="append", help="random, first-legal, idle, push, research:<name>, module:factory")
     p.add_argument("--games", type=int, default=2, help="paired seeds per configuration (TWO games each; default 2)")
     p.add_argument("--seed", type=int, default=0)
@@ -61,12 +66,18 @@ def evaluate(args) -> dict:
     if args.candidate_revision:
         candidate, candidate_info = candidate_revision_factory(root, args.candidate_revision)
     elif args.candidate_factory:
-        candidate = import_factory(args.candidate_factory)
-        candidate_info = source_info(candidate)
+        candidate, candidate_info = frozen_import_factory(
+            args.candidate_factory, args.factory_root or root, args.factory_revision)
     else:
         candidate, candidate_info = candidate_factory(args.candidate_dir or Path(__file__).resolve().parents[1])
     if not accepts_clock(candidate):
         raise ValueError("evaluation factory must accept a deterministic clock")
+    factory_config = json.loads(args.factory_config)
+    if not isinstance(factory_config, dict):
+        raise ValueError("factory config must be a JSON object")
+    candidate_info["instance_config"] = factory_config
+    if factory_config:
+        candidate = configured_factory(candidate, factory_config)
     overrides = json.loads(Path(args.config).read_text()) if args.config else {}
     if not isinstance(overrides, dict):
         raise ValueError("--config must contain a JSON object")
@@ -87,7 +98,8 @@ def evaluate(args) -> dict:
                 for i in range(args.games):
                     legs = [play_game(candidate, opponent, config=config, seed=args.seed + i,
                                       candidate_camp=camp, decision_steps=args.decision_steps,
-                                      calls_per_step=args.calls_per_step) for camp in (1, 2)]
+                                      calls_per_step=args.calls_per_step, diagnostics=args.diagnostics)
+                            for camp in (1, 2)]
                     pairs.append({"seed": args.seed + i, "legs": legs,
                                   "candidate_pair_score": statistics.mean(g["candidate_score"] for g in legs)})
                 games = [g for pair in pairs for g in pair["legs"]]
@@ -108,6 +120,9 @@ def evaluate(args) -> dict:
                         "opponent_invalid": sum(g["stats"]["opponent"]["invalid"] for g in games),
                     },
                 })
+                if args.progress:
+                    print(json.dumps({"progress": True, "opponent": name, "profile": profile, "mode": mode,
+                                      **cells[-1]["summary"]}, sort_keys=True), file=sys.stderr, flush=True)
     source_hashes_end = source_digests()
     unchanged = (source_hashes == source_hashes_end and source_unchanged(candidate_info)
                  and all(source_unchanged(c["opponent"]) for c in cells))
@@ -122,6 +137,7 @@ def evaluate(args) -> dict:
         "source_sha256_end": source_hashes_end,
         "harness": {"ARENA_RECORD": os.environ["ARENA_RECORD"], "workers": 1,
                     "decision_steps": args.decision_steps, "calls_per_step": args.calls_per_step,
+                    "diagnostics": args.diagnostics,
                     "latency": "in-process decide CPU/wall duration; not network latency or realtime pacing",
                     "pairing": "same world and role RNG seeds, fresh policies, camps swapped",
                     "determinism": "all evaluation factories receive scalar game clocks; policy wall-time/global RNG "

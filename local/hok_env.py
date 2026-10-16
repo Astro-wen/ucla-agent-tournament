@@ -13,6 +13,8 @@ import os
 os.environ["ARENA_RECORD"] = "0"  # Set before importing any candidate.
 
 import hashlib
+import builtins
+import copy
 import importlib
 import importlib.abc
 import importlib.util
@@ -59,6 +61,8 @@ class _CandidateSourceLoader(importlib.abc.MetaPathFinder, importlib.abc.Loader)
         is_package = location + "/__init__.py" in sources
         name = location + "/__init__.py" if is_package else location + ".py"
         if name not in sources:
+            if any(key.startswith(location + "/") for key in sources):
+                return importlib.machinery.ModuleSpec(fullname, loader=None, is_package=True)
             return None
         return importlib.util.spec_from_loader(fullname, self, is_package=is_package,
                                                origin=_CANDIDATE_ORIGINS[namespace] + "/" + name)
@@ -70,6 +74,17 @@ class _CandidateSourceLoader(importlib.abc.MetaPathFinder, importlib.abc.Loader)
         namespace, _, suffix = module.__name__.partition(".")
         name = suffix.replace(".", "/") + ("/__init__.py" if hasattr(module, "__path__") else ".py")
         module.__file__ = module.__spec__.origin
+        # Import redirection is local to this frozen module's builtins, NOT a
+        # global monkeypatch. Captured roots cannot accidentally import a live
+        # agent/local package from another worktree.
+        roots = {key.split("/", 1)[0].removesuffix(".py") for key in _CANDIDATE_SOURCES[namespace]}
+        def snapshot_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if level == 0 and name.split(".", 1)[0] in roots:
+                redirected = namespace + "." + name
+                result = builtins.__import__(redirected, globals, locals, fromlist, 0)
+                return result if fromlist else sys.modules[namespace + "." + name.split(".", 1)[0]]
+            return builtins.__import__(name, globals, locals, fromlist, level)
+        module.__dict__["__builtins__"] = {**vars(builtins), "__import__": snapshot_import}
         exec(compile(_CANDIDATE_SOURCES[namespace][name], module.__file__, "exec"), module.__dict__)
 
 
@@ -84,7 +99,7 @@ def _source_digest(sources: dict[str, bytes]) -> str:
     return hasher.hexdigest()
 
 
-def _load_snapshot(sources: dict[str, bytes], origin: str) -> Factory:
+def _load_snapshot(sources: dict[str, bytes], origin: str, module="policy", attr="HokPolicy") -> Factory:
     namespace = "_offline_hok_" + hashlib.sha256(origin.encode()).hexdigest()[:12] \
         + "_" + _source_digest(sources)[:16] + "_" + str(len(_CANDIDATE_SOURCES))
     _CANDIDATE_SOURCES[namespace] = dict(sources)
@@ -94,7 +109,10 @@ def _load_snapshot(sources: dict[str, bytes], origin: str) -> Factory:
     package = types.ModuleType(namespace)
     package.__path__ = [origin]
     sys.modules[namespace] = package
-    return importlib.import_module(namespace + ".policy").HokPolicy
+    factory = getattr(importlib.import_module(namespace + "." + module), attr)
+    if not callable(factory):
+        raise ValueError("snapshot factory is not callable")
+    return factory
 
 
 def accepts_clock(factory: Callable) -> bool:
@@ -209,6 +227,62 @@ def candidate_revision_factory(repository: str | Path, revision: str) -> tuple[F
                      "requested_revision": revision}
 
 
+def frozen_import_factory(spec: str, root: str | Path, revision: str | None = None) -> tuple[Factory, dict]:
+    """Freeze any source factory package and its relative imports. Capture agent/
+    too for research factories importing agent.hok. SDK/third-party modules retain
+    their real identities; dependencies outside captured roots are not frozen."""
+    os.environ["ARENA_RECORD"] = "0"
+    module, sep, attr = spec.partition(":")
+    if not sep or not module or not attr or not all(p.isidentifier() for p in module.split(".")):
+        raise ValueError("factory must be a dotted source module:callable")
+    top = module.split(".", 1)[0]
+    if top == "altruagent":
+        raise ValueError("the SDK cannot be a candidate source namespace")
+    root = Path(root).resolve()
+    scopes = list(dict.fromkeys([top, "agent"]))
+    commit = None
+    if revision is not None:
+        def git(*args):
+            return subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True).stdout
+        commit = git("rev-parse", "--verify", "--end-of-options", revision + "^{commit}").decode().strip()
+        names = git("ls-tree", "-r", "--name-only", commit, "--", *scopes, top + ".py").decode().splitlines()
+        sources = {name: git("show", f"{commit}:{name}") for name in names if name.endswith(".py")}
+        origin, kind = f"git:{commit}", "git_snapshot"
+        live_scopes = []
+    else:
+        live_scopes = [root / s for s in scopes if (root / s).is_dir()]
+        if (root / (top + ".py")).is_file():
+            live_scopes.append(root / (top + ".py"))
+        files = [file for scope in live_scopes
+                 for file in (scope.rglob("*.py") if scope.is_dir() else [scope])]
+        sources = {file.relative_to(root).as_posix(): file.read_bytes() for file in files}
+        origin, kind = str(root), "directory_snapshot"
+    factory = _load_snapshot(sources, origin, module, attr)
+    info = _snapshot_info(factory, sources, origin, kind)
+    info.update(source=origin + "/" + module.replace(".", "/") + ".py", source_root=None,
+                source_scopes=[str(p) for p in live_scopes], entrypoint=spec,
+                hash_scope="factory top-level package plus agent/ Python sources",
+                loading="immutable bytes; relative and captured-root absolute imports isolated; no global patch")
+    if commit:
+        info.update(git_commit=commit, requested_revision=revision)
+    return factory, info
+
+
+def configured_factory(factory: Factory, config: dict) -> Factory:
+    """Fresh, validated per-instance options; never change policy module globals."""
+    if not isinstance(config, dict) or any(k in config for k in ("seed", "clock")):
+        raise ValueError("factory config must be an object without seed/clock overrides")
+    params = inspect.signature(factory).parameters
+    if not any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        unknown = set(config) - set(params)
+        if unknown:
+            raise ValueError("factory config contains unsupported arguments")
+    frozen = copy.deepcopy(config)
+    def make(seed=0, clock=None):
+        return _construct(factory, seed=seed, clock=clock, **copy.deepcopy(frozen))
+    return make
+
+
 def source_info(factory: Callable, source_root: Path | None = None) -> dict:
     path = inspect.getsourcefile(factory)
     files = sorted(source_root.rglob("*.py")) if source_root else ([Path(path)] if path else [])
@@ -236,6 +310,12 @@ def source_unchanged(info: dict) -> bool:
     try:
         if root and {str(p) for p in Path(root).rglob("*.py")} != set(manifest):
             return False
+        scopes = info.get("source_scopes")
+        if scopes:
+            actual = {str(file) for scope in map(Path, scopes)
+                      for file in (scope.rglob("*.py") if scope.is_dir() else [scope])}
+            if actual != set(manifest):
+                return False
         return all(hashlib.sha256(Path(path).read_bytes()).hexdigest() == sha for path, sha in manifest.items())
     except OSError:
         return False
@@ -265,7 +345,8 @@ def _new_stats() -> dict:
     return {"calls": 0, "accepted": 0, "invalid": 0, "waits": 0, "exceptions": {},
             "local_validation_errors": 0, "resignations": 0, "callback_exceptions": {},
             "accepted_by_seat": {}, "action_kind_counts": {}, "_latency_ms": [],
-            "reserved_decision_slots": 0, "budget_exhaustions": 0, "nonpending_updates": 0}
+            "reserved_decision_slots": 0, "budget_exhaustions": 0, "nonpending_updates": 0,
+            "standing_order_changes": 0, "same_macro_reissues": 0, "cancelled_standing_orders": 0}
 
 
 def _count_error(stats: dict, key: str, exc: Exception):
@@ -295,6 +376,101 @@ class GameClock:
 
     def __call__(self) -> float:
         return self.seconds
+
+
+class DiagnosticTelemetry:
+    """Bounded omniscient POST-HOC summaries, never supplied to either policy.
+    No observations, raw actions, tags, positions or per-call traces are retained.
+    Tick-start order occupancy is in hero-seconds (five heroes for 1s = 5 hero-s).
+    It is sampled before respawn/movement, not an exact effect-duration trace.
+    """
+    def __init__(self, config: SimConfig):
+        self.config = config
+        self.teams = {c: {"standing_hero_s": {}, "attack_attempts": {}, "damage_dealt": {},
+                         "alive_hero_s": 0.0, "dead_hero_s": 0.0, "cooldown_blocked_hero_s": 0.0,
+                         "ready_combat_hero_s": 0.0, "idle_alive_hero_s": 0.0,
+                         "advance_with_attack_offer_hero_s": 0.0, "retreat_at_home_hero_s": 0.0,
+                         "retreat_at_full_hp_hero_s": 0.0, "enemy_half_hero_s": 0.0,
+                         "first_objective_damage_step": None, "deaths": 0} for c in (1, 2)}
+        self.death_events: list[dict] = []
+        self.objective_events: list[dict] = []
+        self.snapshots: list[dict] = []
+        self.interval = max(1, math.ceil(config.max_steps / 12))
+
+    def __call__(self, event: dict):
+        team = self.teams[event["camp"]]
+        kind = event["kind"]
+        if kind == "attack_attempt":
+            key = event["macro"] + ":" + event["target"]
+            team["attack_attempts"][key] = team["attack_attempts"].get(key, 0) + 1
+        elif kind == "damage":
+            key = event["source"] + "_to_" + event["target"]
+            team["damage_dealt"][key] = team["damage_dealt"].get(key, 0.0) + event["amount"]
+            if event["target"] != "hero" and event["amount"] > 0 and team["first_objective_damage_step"] is None:
+                team["first_objective_damage_step"] = event["tick_start_step"]
+        elif kind == "death":
+            team["deaths"] += 1
+            if len(self.death_events) < 12:
+                self.death_events.append(dict(event))
+        elif kind == "objective_destroyed":
+            if len(self.objective_events) < 4:  # the frozen model has exactly four objectives
+                self.objective_events.append(dict(event))
+
+    def before_tick(self, game: DiagnosticGame):
+        dt = self.config.step_s
+        for h in game.heroes.values():
+            team = self.teams[h.camp]
+            if h.hp <= 0:
+                team["dead_hero_s"] += dt
+                continue
+            team["alive_hero_s"] += dt
+            macro = game.standing.get(h.seat, "none")
+            team["standing_hero_s"][macro] = team["standing_hero_s"].get(macro, 0.0) + dt
+            if macro == "none":
+                team["idle_alive_hero_s"] += dt
+            if (h.camp == 1 and h.x > 0) or (h.camp == 2 and h.x < 0):
+                team["enemy_half_hero_s"] += dt
+            if macro == "macro_retreat":
+                base_x = -self.config.half_length if h.camp == 1 else self.config.half_length
+                if math.hypot(h.x - base_x, h.z) <= self.config.base_heal_radius:
+                    team["retreat_at_home_hero_s"] += dt
+                if h.hp >= h.max_hp:
+                    team["retreat_at_full_hp_hero_s"] += dt
+            if macro == "macro_advance" and game._can_use(h, "macro_attack"):
+                team["advance_with_attack_offer_hero_s"] += dt
+            if macro in ("macro_attack", "macro_skill1", "macro_skill2", "macro_skill3"):
+                if h.ready.get(macro, 0.0) > game.now + 1e-9:
+                    team["cooldown_blocked_hero_s"] += dt
+                elif game._can_use(h, macro):
+                    team["ready_combat_hero_s"] += dt
+
+    def capture(self, game: DiagnosticGame):
+        if game.step % self.interval and not game.terminal:
+            return
+        sample = {"step": game.step, "game_s": game.now, "teams": {}}
+        for camp in (1, 2):
+            heroes = [h for h in game.heroes.values() if h.camp == camp]
+            sample["teams"][str(camp)] = {
+                "alive": sum(h.hp > 0 for h in heroes), "hero_hp_total": sum(h.hp for h in heroes),
+                "retreating": sum(h.hp > 0 and game.standing.get(h.seat) == "macro_retreat" for h in heroes),
+                "objective_damage": game.structure_damage[camp], "kills": game.kills[camp],
+                "healing": game.healed[camp],
+                "own_structure_hp": {s.type: s.hp for s in game.structures.values() if s.camp == camp}}
+        if self.snapshots and self.snapshots[-1]["step"] == game.step:
+            return
+        if len(self.snapshots) < 13:
+            self.snapshots.append(sample)
+        elif game.terminal:
+            self.snapshots[-1] = sample
+
+    def report(self, game: DiagnosticGame) -> dict:
+        return {"scope": "omniscient post-hoc instrumentation; never policy input",
+                "units": "pre-respawn/movement tick-start occupancy in hero-seconds; capped damage split "
+                         "proportionally by source type; attack attempts are exact model effects, not decisions",
+                "teams": {str(c): {**self.teams[c], "healing": game.healed[c], "respawns": game.respawns[c]}
+                          for c in (1, 2)},
+                "first_deaths": self.death_events, "objective_events": self.objective_events,
+                "snapshots": self.snapshots, "max_records": {"first_deaths": 12, "objectives": 4, "snapshots": 13}}
 
 
 def _policy_call(policy, game: DiagnosticGame, camp: int, stats: dict) -> tuple[bool, dict | None]:
@@ -331,6 +507,9 @@ def _policy_call(policy, game: DiagnosticGame, camp: int, stats: dict) -> tuple[
             return False, {"camp": camp, "kind": "lockstep_wait"}
         return False, None
     sent = normalized.action if normalized.action is not None else normalized.action_id
+    decoded = game._decode(sent)
+    seat_hint = decoded.get("seat") if decoded is not None else None
+    before = game.standing.get(seat_hint) if type(seat_hint) is int else None
     result = game.submit(camp, sent, raw["state_version"])
     failure = None
     if result.get("error"):
@@ -344,6 +523,10 @@ def _policy_call(policy, game: DiagnosticGame, camp: int, stats: dict) -> tuple[
             stats["nonpending_updates"] += 1
         stats["accepted_by_seat"][str(seat)] = stats["accepted_by_seat"].get(str(seat), 0) + 1
         accepted = game.fresh[seat]
+        after = game.standing.get(seat)
+        stats["standing_order_changes"] += before != after
+        stats["same_macro_reissues"] += accepted.get("macro") is not None and before == after
+        stats["cancelled_standing_orders"] += before is not None and after is None
         kind = accepted.get("macro", f"button_{accepted.get('which_button')}")
         stats["action_kind_counts"][kind] = stats["action_kind_counts"].get(kind, 0) + 1
     callback = getattr(policy, "on_result", None)
@@ -358,7 +541,7 @@ def _policy_call(policy, game: DiagnosticGame, camp: int, stats: dict) -> tuple[
 
 def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None = None,
               seed: int = 0, candidate_camp: int = 1, decision_steps: int = 1,
-              calls_per_step: int = 6) -> dict:
+              calls_per_step: int = 6, diagnostics: bool = False) -> dict:
     """Run one deterministic diagnostic leg. Fresh policy objects per game.
 
     Server-refused realtime orders get on_result and may retry. The actual SDK
@@ -375,7 +558,11 @@ def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None
         raise ValueError("decision_steps must be a positive integer")
     if type(calls_per_step) is not int or calls_per_step < 5:
         raise ValueError("calls_per_step must be at least five")
-    game = DiagnosticGame(config, seed)
+    config = config or SimConfig()
+    telemetry = DiagnosticTelemetry(config) if diagnostics else None
+    game = DiagnosticGame(config, seed, event_sink=telemetry)
+    if telemetry:
+        telemetry.capture(game)
     game.seats(candidate_camp)
     factories = {candidate_camp: candidate, 3 - candidate_camp: opponent}
     # The role gets the same RNG seed in both legs; only its camp changes.
@@ -414,7 +601,11 @@ def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None
             for camp in active:
                 stats[camp]["budget_exhaustions"] += 1
         if not game.terminal:
+            if telemetry:
+                telemetry.before_tick(game)
             game.tick()
+        if telemetry:
+            telemetry.capture(game)
         trajectory.update(game.state_hash().encode())
     return {"seed": seed, "candidate_camp": candidate_camp, "steps": game.step,
             "elapsed_game_s": game.now, "result": game.result(),
@@ -425,4 +616,5 @@ def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None
             "stats": {"candidate": _final_stats(stats[candidate_camp]),
                       "opponent": _final_stats(stats[3 - candidate_camp])},
             "healing": game.healed, "respawns": game.respawns,
+            "diagnostics": telemetry.report(game) if telemetry else None,
             "final_state_sha256": game.state_hash(), "trajectory_sha256": trajectory.hexdigest()}

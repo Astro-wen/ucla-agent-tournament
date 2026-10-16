@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from local.hok_env import (Baseline, candidate_factory, candidate_revision_factory, opponent_factory,
-                           play_game, source_unchanged)
+from local.hok_env import (Baseline, candidate_factory, candidate_revision_factory, configured_factory,
+                           frozen_import_factory, opponent_factory, play_game, source_unchanged)
 from local.hok_sim import DiagnosticGame, PROFILES, SimConfig, profile_config
 from scripts.hok_eval import evaluate, parser
 
@@ -534,3 +534,80 @@ def test_mode_changes_no_other_physics_parameters_and_all_policies_receive_clock
             assert all(leg["clock_injected"].values())
             assert leg["stats"]["candidate"]["reserved_decision_slots"] \
                 == leg["stats"]["opponent"]["reserved_decision_slots"]
+
+
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+def test_telemetry_is_bounded_and_does_not_change_frozen_v3_trajectory(mode):
+    bot, _ = opponent_factory("research:opportunistic_combat")
+    config = SimConfig(mode=mode, max_steps=170)
+    plain = play_game(bot, bot, config=config, seed=1101)
+    observed = play_game(bot, bot, config=config, seed=1101, diagnostics=True)
+    assert plain["trajectory_sha256"] == observed["trajectory_sha256"]
+    assert plain["final_state_sha256"] == observed["final_state_sha256"]
+    assert plain["result"] == observed["result"]
+    diagnostic = observed["diagnostics"]
+    assert len(diagnostic["snapshots"]) <= 13
+    assert len(diagnostic["first_deaths"]) <= 12
+    assert len(diagnostic["objective_events"]) <= 4
+    assert diagnostic["snapshots"][-1]["step"] == observed["steps"]
+    assert '"action_id"' not in json.dumps(diagnostic) and '"observation"' not in json.dumps(diagnostic)
+    for camp, stats in diagnostic["teams"].items():
+        damage = sum(v for k, v in stats["damage_dealt"].items() if k != "hero_to_hero" and k != "tower_to_hero")
+        assert damage == pytest.approx(observed["result"]["outcome"]["score"][camp]["enemy_structure_damage"])
+        assert stats["alive_hero_s"] + stats["dead_hero_s"] == pytest.approx(observed["elapsed_game_s"] * 5)
+
+
+def test_arbitrary_factory_freezes_relative_and_agent_imports_without_global_patch(tmp_path):
+    import builtins
+    import sys
+    original_import = builtins.__import__
+    package = tmp_path / "research"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "helper.py").write_text("ACTION = 'macro_advance'\n")
+    (package / "factory.py").write_text(
+        "from .helper import ACTION\n"
+        "def make_bot(seed=0, clock=None, config=None):\n"
+        "    class Bot:\n"
+        "        def decide(self, raw):\n"
+        "            return {'seat': raw['seats'][0], 'macro': ACTION}, None\n"
+        "    config['seen'].append(seed)\n"
+        "    assert len(config['seen']) == 1\n"
+        "    return Bot()\n")
+    factory, info = frozen_import_factory("research.factory:make_bot", tmp_path)
+    (package / "helper.py").write_text("ACTION = 'macro_retreat'\n")
+    configured = configured_factory(factory, {"config": {"seen": []}})
+    idle, _ = opponent_factory("idle")
+    for seed in (1101, 1102):
+        result = play_game(configured, idle, seed=seed, config=SimConfig(max_steps=2))
+        assert result["stats"]["candidate"]["action_kind_counts"] == {"macro_advance": 12}
+    assert builtins.__import__ is original_import
+    assert "research.factory" not in sys.modules
+    assert not source_unchanged(info)
+    assert not (package / "__pycache__").exists()
+
+
+def test_git_factory_snapshot_and_json_instance_configuration():
+    root = Path(__file__).resolve().parents[2]
+    factory, info = frozen_import_factory("agent.hok.policy:HokPolicy", root, "HEAD")
+    assert info["source_kind"] == "git_snapshot"
+    assert info["entrypoint"] == "agent.hok.policy:HokPolicy"
+    assert source_unchanged(info)
+    random_bot, _ = opponent_factory("random")
+    result = play_game(factory, random_bot, config=SimConfig(max_steps=2))
+    assert result["protocol_failure"] is None
+    with pytest.raises(ValueError):
+        configured_factory(factory, {"clock": 5})
+    with pytest.raises(ValueError):
+        configured_factory(factory, {"unsupported_option": True})
+
+
+@pytest.mark.parametrize("action", [{"macro": "macro_advance"}, {"seat": [], "macro": "macro_advance"}])
+def test_malformed_server_action_is_counted_even_with_order_churn_instrumentation(action):
+    class Bad:
+        def decide(self, raw):
+            return action, None
+    idle, _ = opponent_factory("idle")
+    result = play_game(Bad, idle, config=SimConfig(max_steps=1), diagnostics=True)
+    assert result["stats"]["candidate"]["invalid"] == 6
+    assert result["protocol_failure"] is None
