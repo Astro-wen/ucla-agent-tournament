@@ -37,6 +37,7 @@ from __future__ import annotations
 import math
 import re
 import time
+from itertools import islice
 from typing import Any, Callable
 
 GAME_TYPE = "honor_of_kings_5v5"
@@ -50,8 +51,12 @@ TOWER_RANGE = 8800     # cautious proximity heuristic, not an asserted tower wea
 SKILL_RANGE = 8000     # conservative skill-distance heuristic; exact hero ranges are not published
 ATTACK_RANGE = 9000    # distance heuristic from the official example, not a universal weapon range
 HOLD_S = 0.6           # an order younger than this is kept, unless the hero must retreat
+ACK_GRACE_S = 2.0      # tolerate a few lagging snapshots, not an indefinitely missing standing order
 RETRY_S = 0.4          # give a refused macro two nominal steps before reconsidering on a fresh view
 MAX_BYPASS = 4         # a continuously waiting hero gets priority after four other dispatches
+MAX_LABEL = 512        # labels and identifiers are untrusted metadata, not arbitrary-length instructions
+MAX_ACTIONS = 1024
+MAX_ACTORS = 256
 
 _SEAT_ID = re.compile(r"^s([0-9]):([^:\s]+)$")
 _DISTANCE = re.compile(r",\s*(\d+(?:\.\d+)?)\s+away\)", re.IGNORECASE)
@@ -65,15 +70,43 @@ TAGS = {"macro_retreat": "Falling back to heal", "macro_advance": "Pushing the n
 # -- reading the state (pure; never raise) ------------------------------------------------------------------------
 
 
+def _small_int(value: Any, low: int, high: int) -> int | None:
+    """Bounded normalization for integer identifiers; never coerce booleans or arbitrary objects."""
+    if type(value) is int:
+        return value if low <= value <= high else None
+    if isinstance(value, str) and len(value) <= 8:
+        text = value.strip()
+        if text and all("0" <= c <= "9" for c in text):
+            number = int(text)
+            return number if low <= number <= high else None
+    return None
+
+
+def _seat(value: Any) -> int | None:
+    return _small_int(value, 0, 9)
+
+
+def _camp(value: Any) -> int | None:
+    return _small_int(value, 1, 2)
+
+
+def _actions(raw: dict) -> list[dict]:
+    if not isinstance(raw, dict):
+        return []
+    legal = raw.get("legal_actions")
+    actions = legal.get("actions") if isinstance(legal, dict) else legal
+    return actions[:MAX_ACTIONS] if isinstance(actions, list) else []
+
+
 def offers_by_seat(actions: list[dict]) -> dict[int, dict[str, Any]]:
     """{seat: {"macros": {macro: label}, "ids": {macro: action_id}, "raw": [action dict, ...]}} from the seat-tagged
     legal actions."""
     out: dict[int, dict[str, Any]] = {}
-    for a in actions if isinstance(actions, list) else []:
+    for a in actions[:MAX_ACTIONS] if isinstance(actions, list) else []:
         if not isinstance(a, dict):
             continue
         action_id = a.get("action_id")
-        m = _SEAT_ID.fullmatch(action_id) if isinstance(action_id, str) else None
+        m = _SEAT_ID.fullmatch(action_id) if isinstance(action_id, str) and len(action_id) <= 64 else None
         if not m:
             continue
         seat, base = int(m.group(1)), m.group(2)
@@ -81,16 +114,21 @@ def offers_by_seat(actions: list[dict]) -> dict[int, dict[str, Any]]:
             continue
         payload = a.get("input")
         act = payload.get("action") if isinstance(payload, dict) else None
-        if isinstance(act, dict) and "seat" in act and (type(act["seat"]) is not int or act["seat"] != seat):
+        if isinstance(act, dict) and len(act) > 64:
+            continue
+        if isinstance(act, dict) and "seat" in act and _seat(act["seat"]) != seat:
             continue
         if isinstance(act, dict) and "macro" in act and act["macro"] != base:
             continue
         if base.startswith("button_") and isinstance(act, dict) and "which_button" in act \
-                and (type(act["which_button"]) is not int or base != f"button_{act['which_button']}"):
+                and base != f"button_{_small_int(act['which_button'], 0, 999999)}":
             continue
+        if base in MACROS and isinstance(act, dict) \
+                and any(isinstance(k, str) and k.startswith("legal_") for k in act):
+            continue  # macros are complete offers; a contradictory raw template is not a safe macro ID
         entry = out.setdefault(seat, {"macros": {}, "ids": {}, "raw": []})
         if base in MACROS:
-            entry["macros"][base] = a["label"] if isinstance(a.get("label"), str) else base
+            entry["macros"][base] = a["label"][:MAX_LABEL] if isinstance(a.get("label"), str) else base
             entry["ids"][base] = a["action_id"]
         else:
             entry["raw"].append(a)
@@ -99,9 +137,9 @@ def offers_by_seat(actions: list[dict]) -> dict[int, dict[str, Any]]:
 
 def is_hok_shape(actions: list[dict]) -> bool:
     """Legal actions shaped like Honor of Kings': every one seat-tagged (`s3:macro_attack`, `s3:button_0`)."""
-    if not isinstance(actions, list) or not actions:
+    if not isinstance(actions, list) or not actions or len(actions) > MAX_ACTIONS:
         return False
-    return all(isinstance(a, dict) and isinstance(a.get("action_id"), str)
+    return all(isinstance(a, dict) and isinstance(a.get("action_id"), str) and len(a["action_id"]) <= 64
                and re.fullmatch(r"s[0-9]:(?:macro_(?:advance|retreat|attack|skill[123])|button_[0-9]+)",
                                 a["action_id"]) for a in actions)
 
@@ -116,17 +154,32 @@ def standing_orders(raw: dict) -> dict[int, str]:
         return {}
     sim = raw.get("simultaneous") if isinstance(raw.get("simultaneous"), dict) else {}
     orders = sim.get("standing_orders") if isinstance(sim.get("standing_orders"), dict) else {}
-    return {int(k): v for k, v in orders.items() if re.fullmatch(r"[0-9]", str(k)) and isinstance(v, str)}
+    out = {}
+    for k, v in islice(orders.items(), 64):
+        seat = _seat(k)
+        if seat is not None and isinstance(v, str) and len(v) <= 64:
+            out[seat] = v
+    return out
 
 
-def pending_seats(raw: dict, offers: dict[int, Any]) -> list[int]:
+def _pending_only(raw: dict, offers: dict[int, Any]) -> list[int]:
+    """Strict pending eligibility for lockstep and the exception fallback, without reading telemetry."""
     if not isinstance(raw, dict):
-        return sorted(offers)
+        return []
+    owned = set(_seat_list(raw))
+    eligible = owned.intersection(offers)
     sim = raw.get("simultaneous") if isinstance(raw.get("simultaneous"), dict) else {}
     pending = sim.get("your_pending_seats")
     if isinstance(pending, list):
-        return sorted({s for s in pending if type(s) is int and s in offers})
-    return sorted(offers)
+        return sorted({_seat(s) for s in pending[:64]}.intersection(eligible))
+    return sorted(eligible)  # absent metadata: the contract's owned legal offers are our only pending evidence
+
+
+def pending_seats(raw: dict, offers: dict[int, Any]) -> list[int]:
+    """Policy eligibility: real time can replace any owned legal order; lockstep answers pending seats only."""
+    if realtime(raw):
+        return sorted(set(_seat_list(raw)).intersection(offers))
+    return _pending_only(raw, offers)
 
 
 def summary_of(raw: dict, seat: int) -> dict:
@@ -141,7 +194,7 @@ def summary_of(raw: dict, seat: int) -> dict:
 
 def distance_of(label: str) -> float:
     """Macro labels end "(... 4123 away)"; inf without one."""
-    m = _DISTANCE.search(label) if isinstance(label, str) else None
+    m = _DISTANCE.search(label[:MAX_LABEL]) if isinstance(label, str) else None
     return float(m.group(1)) if m else math.inf
 
 
@@ -151,7 +204,7 @@ def target_is_hero(label: str) -> bool:
 
 def target_kind(label: str) -> str | None:
     """Only classify the offered target description, never hero IDs or unseen world state."""
-    m = _NEAREST.search(label) if isinstance(label, str) else None
+    m = _NEAREST.search(label[:MAX_LABEL]) if isinstance(label, str) else None
     if not m:
         return None
     words = set(re.findall(r"[a-z]+", m.group(1).lower()))
@@ -166,7 +219,7 @@ def _near_enough(label: str, limit: float) -> bool:
     # The official guide guarantees a listed macro is legal. If the optional distance text is missing,
     # trust that offer instead of silently leaving a hero advancing forever. Explicit distances still
     # use the starter's conservative heuristic; they are not a claim about a particular hero's range.
-    return not isinstance(label, str) or _DISTANCE.search(label) is None or distance_of(label) <= limit
+    return not isinstance(label, str) or _DISTANCE.search(label[:MAX_LABEL]) is None or distance_of(label) <= limit
 
 
 def _num(x) -> float | None:
@@ -198,7 +251,17 @@ def hp_share(me: dict) -> float | None:
 
 
 def _dict_list(value: Any) -> list[dict]:
-    return [x for x in value if isinstance(x, dict)] if isinstance(value, list) else []
+    return [x for x in value[:MAX_ACTORS] if isinstance(x, dict)] if isinstance(value, list) else []
+
+
+def _actor_id(value: Any):
+    if type(value) is int and -(2 ** 63) <= value < 2 ** 63:
+        return value
+    if isinstance(value, str) and len(value) <= 64:
+        if 0 < len(value) <= 20 and all("0" <= c <= "9" for c in value):
+            return int(value)
+        return value or None
+    return None
 
 
 class Team:
@@ -206,14 +269,14 @@ class Team:
 
     def __init__(self, raw: dict, seats: list[int]) -> None:
         raw = raw if isinstance(raw, dict) else {}
-        self.camp = raw.get("camp") if type(raw.get("camp")) is int and raw["camp"] in (1, 2) else None
+        self.camp = _camp(raw.get("camp"))
         self.allies: dict[int, tuple[float, float]] = {}
         self.enemies: dict[Any, tuple[float, float]] = {}
         self.towers: list[tuple[float, float]] = []
         summaries = [summary_of(raw, seat) for seat in seats]
         if self.camp is None:
-            camps = {s["my_hero"].get("camp") for s in summaries if isinstance(s.get("my_hero"), dict)
-                     and type(s["my_hero"].get("camp")) is int and s["my_hero"]["camp"] in (1, 2)}
+            camps = {_camp(s["my_hero"].get("camp")) for s in summaries if isinstance(s.get("my_hero"), dict)}
+            camps.discard(None)
             self.camp = next(iter(camps)) if len(camps) == 1 else None
         towers: set[tuple[float, float]] = set()
         for seat, s in zip(seats, summaries):
@@ -223,17 +286,19 @@ class Team:
                 self.allies[seat] = p
             for o in _dict_list(s.get("other_heroes")):
                 if o.get("visible") is not True or self.camp is None \
-                        or type(o.get("camp")) is not int or o["camp"] != 3 - self.camp:
+                        or _camp(o.get("camp")) != 3 - self.camp:
                     continue
                 q = _pos(o)
                 if q is not None and (_num(o.get("hp")) is None or o["hp"] > 0):
-                    identity = o.get("runtime_id")
-                    key = ("id", identity) if type(identity) in (int, str) else ("position", q)
+                    # IDs may be absent or collide. Distinct currently visible positions must not collapse;
+                    # repeated observations with identical IDs and coordinates must not multiply threats.
+                    key = (_actor_id(o.get("runtime_id")), _actor_id(o.get("hero_id")), q)
                     self.enemies[key] = q
             for st in _dict_list(s.get("structures")):
-                if self.camp is not None and type(st.get("camp")) is int and st["camp"] == 3 - self.camp \
+                kind = st.get("type")
+                if self.camp is not None and _camp(st.get("camp")) == 3 - self.camp \
                         and st.get("visible") is not False \
-                        and "TOWER" in str(st.get("type") or "").upper() and (_num(st.get("hp")) or 0) > 0:
+                        and isinstance(kind, str) and "TOWER" in kind[:64].upper() and (_num(st.get("hp")) or 0) > 0:
                     q = _pos(st)
                     if q is not None:
                         towers.add(q)
@@ -281,49 +346,95 @@ def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, 
     return next((m for m in MACROS if m in macros and m != "macro_retreat"), next(iter(macros)))
 
 
+def _wire_scalar(value: Any) -> bool:
+    if value is None or type(value) is bool:
+        return True
+    if isinstance(value, str):
+        return len(value) <= 256
+    if type(value) is int:
+        return -(2 ** 63) <= value < 2 ** 63
+    return type(value) is float and math.isfinite(value)
+
+
+def _complete_raw(entry: dict, seat: int):
+    """Complete only listed scalar domains. A raw template's ID is never returned unfilled."""
+    action_id = entry["action_id"]
+    payload = entry.get("input")
+    act = payload.get("action") if isinstance(payload, dict) else None
+    if act is None and action_id == f"s{seat}:button_0":
+        return action_id
+    if not isinstance(act, dict) or len(act) > 64:
+        return None
+    button = _small_int(act.get("which_button", 0 if action_id == f"s{seat}:button_0" else None), 0, 999999)
+    if button is None or action_id != f"s{seat}:button_{button}":
+        return None
+    out: dict[str, Any] = {"seat": seat, "which_button": button}
+    has_domains = False
+    for k, v in act.items():
+        if not isinstance(k, str) or len(k) > 64:
+            return None
+        if k.startswith("legal_"):
+            has_domains = True
+            field = k[6:]
+            if not field or field == "macro" or field.startswith("legal_") or not isinstance(v, list) or not v:
+                return None
+            values = v[:256]
+            if field in ("seat", "which_button"):
+                target = seat if field == "seat" else button
+                limit = 9 if field == "seat" else 999999
+                if not any(_small_int(x, 0, limit) == target for x in values):
+                    return None
+                continue
+            if field in act:
+                fixed = act[field]
+                if not _wire_scalar(fixed) or not any(type(x) is type(fixed) and x == fixed for x in values):
+                    return None
+                out[field] = fixed
+            else:
+                usable = next((x for x in values if _wire_scalar(x)), ...)
+                if usable is ...:
+                    return None
+                out[field] = usable
+        elif k not in ("seat", "which_button"):
+            if not _wire_scalar(v):
+                return None
+            out[k] = v
+    if button == 0 and not has_domains:
+        return action_id
+    return out
+
+
 def idle_action(raw_actions: list[dict], seat: int):
-    """A playable do-nothing for a hero without macros (lockstep only): the listed `s<seat>:button_0`, else the first
-    raw button with the first legal value of each field."""
+    """A listed button_0, else a fully populated raw button, else None; never invent movement coordinates."""
     listed = offers_by_seat(raw_actions).get(seat, {}).get("raw", [])
-    for a in listed:
-        if a["action_id"] == f"s{seat}:button_0":
-            payload = a.get("input")
-            act = payload.get("action") if isinstance(payload, dict) else None
-            if not isinstance(act, dict) or (act.get("which_button", 0) == 0
-                                             and not any(str(k).startswith("legal_") for k in act)):
-                return a["action_id"]
-    for a in listed:
-        payload = a.get("input")
-        act = payload.get("action") if isinstance(payload, dict) else None
-        if not isinstance(act, dict) or type(act.get("which_button")) is not int:
-            continue
-        if a["action_id"] != f"s{seat}:button_{act['which_button']}":
-            continue
-        out: dict[str, Any] = {"seat": seat}
-        valid = True
-        for k, v in act.items():
-            if not isinstance(k, str):
-                valid = False
-                break
-            if k.startswith("legal_"):
-                if not isinstance(v, list) or not v or not k[len("legal_"):]:
-                    valid = False
-                    break
-                field = k[len("legal_"):]
-                if field == "seat":
-                    valid = seat in v
-                    if not valid:
-                        break
+    for entry in sorted(listed, key=lambda a: a["action_id"] != f"s{seat}:button_0"):
+        action = _complete_raw(entry, seat)
+        if action is not None:
+            return action
+    return None
+
+
+def safe_fallback_action(raw: dict):
+    """Pure exception fallback: current owned pending seat only; no observation, Team, clock, or policy state.
+
+    Prefer a playable button_0 anywhere on the team, then another fillable raw button, then a complete macro.
+    Unlike the real-time tactical policy, this emergency helper deliberately honors an explicit pending list.
+    """
+    offers = offers_by_seat(_actions(raw))
+    pending = _pending_only(raw, offers)
+    for idle_only in (True, False):
+        for seat in pending:
+            for entry in offers[seat]["raw"]:
+                if (entry["action_id"] == f"s{seat}:button_0") != idle_only:
                     continue
-                if field in act and act[field] not in v:
-                    valid = False
-                    break
-                out[field] = act.get(field, v[0])
-            elif k != "seat":
-                out[k] = v
-        if valid:
-            return out
-    return None  # No listed, fillable action: do not invent a button or a coordinate.
+                action = _complete_raw(entry, seat)
+                if action is not None:
+                    return action
+    for seat in pending:
+        for macro in MACROS:
+            if macro in offers[seat]["ids"]:
+                return offers[seat]["ids"][macro]
+    return None
 
 
 # -- one match's decisions -----------------------------------------------------------------------------------------
@@ -353,11 +464,9 @@ class HokPolicy:
         self.views += 1
         if not isinstance(raw, dict):
             return None, None
-        actions = (raw.get("legal_actions") or {}).get("actions") if isinstance(raw.get("legal_actions"), dict) else []
-        offers = offers_by_seat(actions or [])
+        offers = offers_by_seat(_actions(raw))
         owned = _seat_list(raw)
-        if isinstance(raw.get("seats"), list):
-            offers = {seat: entry for seat, entry in offers.items() if seat in owned}
+        offers = {seat: entry for seat, entry in offers.items() if seat in owned}
         if not offers:
             return None, None
         rt = realtime(raw)
@@ -463,5 +572,7 @@ class HokPolicy:
 
 
 def _seat_list(raw: dict) -> list[int]:
-    seats = raw.get("seats")
-    return sorted({s for s in seats if type(s) is int and 0 <= s <= 9}) if isinstance(seats, list) else []
+    seats = raw.get("seats") if isinstance(raw, dict) else None
+    normalized = {_seat(s) for s in seats[:64]} if isinstance(seats, list) else set()
+    normalized.discard(None)
+    return sorted(normalized)

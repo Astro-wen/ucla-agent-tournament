@@ -247,7 +247,7 @@ def test_unknown_and_malformed_action_ids_are_not_sent(action_id):
     assert hok.offers_by_seat([{"action_id": action_id}]) == {}
 
 
-@pytest.mark.parametrize("bad_seat", [True, "0", 1, [], {}])
+@pytest.mark.parametrize("bad_seat", [True, "bad", 1, [], {}])
 def test_conflicting_payload_seat_is_not_sent(bad_seat):
     actions = [{"action_id": "s0:macro_advance", "input": {"action": {"seat": bad_seat}}}]
     assert hok.offers_by_seat(actions) == {}
@@ -332,9 +332,97 @@ def test_malformed_nested_state_samples_never_raise():
 def test_state_reading_helpers_fail_closed_on_malformed_containers(malformed):
     assert not hok.realtime(malformed)
     assert hok.standing_orders(malformed) == {}
-    assert hok.pending_seats(malformed, {3: {}}) == [3]
+    assert hok.pending_seats(malformed, {3: {}}) == []
     assert hok.summary_of(malformed, 0) == {}
     assert hok.hp_share(malformed) is None
     assert hok.rule_macro(malformed, {"macro_advance": "a"}) == "macro_advance"
     assert hok.rule_macro({}, malformed) is None
     assert hok.Team(malformed, [0]).enemies == {}
+
+
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+def test_numeric_string_seats_camps_and_action_payloads_are_normalized(mode):
+    raw = payload(seats=(5, 6, 7, 8, 9), mode=mode, pending=["5"],
+                  actions=entries(5, ("macro_advance",)) + entries(0, ("macro_advance",)))
+    raw["seats"] = ["5", "6", "7", "8", "9"]
+    raw["camp"] = "2"
+    for action in raw["legal_actions"]["actions"]:
+        action["input"]["action"]["seat"] = str(action["input"]["action"]["seat"])
+    enemy = {"visible": True, "camp": "1", "runtime_id": None, "x": 0, "z": 1}
+    raw["observation"]["seats"]["5"]["summary"]["other_heroes"] = [enemy]
+    assert hok.HokPolicy(clock=Clock()).decide(raw)[0] == "s5:macro_advance"
+    assert hok.safe_fallback_action(raw) == "s5:button_0"
+    assert len(hok.Team(raw, [5]).enemies) == 1
+
+
+def test_realtime_rescans_all_owned_legal_seats_even_with_empty_pending():
+    raw = payload(pending=[], actions=entries(0, ("macro_advance",)) + entries(4),
+                  summaries={4: summary(4, hp=100)})
+    assert hok.HokPolicy(clock=Clock()).decide(raw)[0] == "s4:macro_retreat"
+    assert hok.safe_fallback_action(raw) is None  # the exception helper intentionally remains pending-only
+    raw["pacing"]["mode"] = "lockstep"
+    assert hok.HokPolicy(clock=Clock()).decide(raw) == (None, None)
+
+
+def test_realtime_does_not_treat_pending_as_an_exclusive_control_grant():
+    raw = payload(pending=[0], actions=entries(0, ("macro_advance",)) + entries(4),
+                  summaries={4: summary(4, hp=100)})
+    assert hok.HokPolicy(clock=Clock()).decide(raw)[0] == "s4:macro_retreat"
+
+
+@pytest.mark.parametrize("runtime_id", [None, 0, "0", "collision", [], {}])
+def test_missing_or_colliding_runtime_ids_keep_distinct_visible_enemies(runtime_id):
+    foes = [{"runtime_id": runtime_id, "visible": True, "camp": "2", "hp": 1000, "x": x, "z": 1000}
+            for x in range(3)]
+    raw = payload(summaries={seat: summary(seat, enemies=foes) for seat in range(5)})
+    assert len(hok.Team(raw, list(range(5))).enemies) == 3  # not one, and not fifteen repeated view entries
+
+
+@pytest.mark.parametrize("owned", [None, False, "0", {}, [], [None, True, "unknown"]])
+def test_unknown_or_malformed_ownership_fails_closed(owned):
+    raw = payload()
+    raw["seats"] = owned
+    assert hok.HokPolicy(clock=Clock()).decide(raw) == (None, None)
+    assert hok.safe_fallback_action(raw) is None
+
+
+def test_safe_fallback_is_exported_and_never_reads_telemetry(monkeypatch):
+    from agent.hok import safe_fallback_action
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("the exception fallback must not parse telemetry")
+
+    monkeypatch.setattr(hok, "Team", forbidden)
+    monkeypatch.setattr(hok, "summary_of", forbidden)
+    raw = payload(mode="lockstep", pending=["4"], actions=entries(9) + entries(0) + entries(4))
+    raw["observation"] = {"seats": [float("nan"), 10 ** 1000, "broken"]}
+    assert safe_fallback_action(raw) == "s4:button_0"
+
+
+def test_safe_fallback_globally_prefers_noop_then_complete_raw_then_macro():
+    raw_move = {"action_id": "s1:button_2", "input": {"action": {
+        "seat": 1, "which_button": 2, "legal_move_x": [float("nan"), 4], "legal_move_z": [7]}}}
+    attack = {"action_id": "s0:macro_attack", "input": {"action": {"seat": 0, "macro": "macro_attack"}}}
+    raw = payload(mode="lockstep", actions=[attack, raw_move] + entries(4, ()))
+    assert hok.safe_fallback_action(raw) == "s4:button_0"
+    raw["legal_actions"]["actions"] = [attack, raw_move]
+    assert hok.safe_fallback_action(raw) == {"seat": 1, "which_button": 2, "move_x": 4, "move_z": 7}
+    raw_move["input"]["action"]["legal_move_x"] = []
+    assert hok.safe_fallback_action(raw) == "s0:macro_attack"
+
+
+def test_button_zero_with_required_domains_is_filled_not_sent_as_an_id():
+    action = {"action_id": "s0:button_0", "input": {"action": {
+        "seat": "0", "which_button": "0", "legal_target": [3]}}}
+    expected = {"seat": 0, "which_button": 0, "target": 3}
+    assert hok.idle_action([action], 0) == expected
+    assert hok.safe_fallback_action(payload(actions=[action])) == expected
+
+
+def test_huge_and_nonfinite_metadata_does_not_enter_fallback_output():
+    raw = payload(mode="lockstep", pending=["9" * 100000, 4])
+    raw["seats"] = ["9" * 100000, "4"]
+    raw["simultaneous"]["standing_orders"] = {10 ** 10000: "macro_advance", "4": []}
+    raw["legal_actions"]["actions"].insert(0, {"action_id": "s0:button_" + "9" * 100000})
+    assert hok.safe_fallback_action(raw) == "s4:button_0"
+    assert hok.HokPolicy(clock=Clock()).decide(raw)[0].startswith("s4:")
