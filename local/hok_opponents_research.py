@@ -44,6 +44,27 @@ Seeded bots use a private random.Random, never process-global randomness. The
 five non-random baselines intentionally ignore the seed for action selection.
 All thresholds below are unvalidated research heuristics, NOT engine mechanics.
 Nothing here imports the candidate policy, SDK, evaluator, or simulator.
+
+PHASE 2: BOT_NAMES remains the frozen eight-opponent development suite.
+HELDOUT_NAMES is separate; do not silently pool it into development results.
+Definitions and parameters below were fixed before any held-out scoring:
+* relay_pressure: at most ONE routine recovery permit, assigned to the lowest
+  observed own-team HP share (seeded seat priority breaks ties). Emergency
+  retreat <=20% bypasses the permit; request below 60%, release at 85%.
+  After 12 owner opportunities without a net one-percentage-point HP gain,
+  release the permit and defer that hero's routine requests for 10 of its own
+  opportunities. Other heroes use offered attack, otherwise advance.
+* counterpunch_interceptor: conserve skills until a currently attackable,
+  explicitly visible enemy is <=45% HP (only with observed max_hp), lost >=20%
+  of its previous visible HP, or moved >=10% closer to our PREVIOUS position.
+  Burst only with offered skills whose labels name that same nearest hero;
+  skill preference is seeded. Hold for an approaching enemy at most three
+  opportunities per continuously visible target, then attack/advance. Retreat
+  at own HP <=25%. Fog immediately discards that target's history and wait count.
+Neither claims arbitrary focus fire, selectable routes, guaranteed regeneration,
+known minion timings, or a 5v5 raw-button mapping. Counts are decision
+opportunities, not inferred engine seconds; optional clocks do not affect them.
+Seeds 8101/8102 are reserved for a parent-frozen candidate, not smoke tests.
 """
 
 from __future__ import annotations
@@ -65,6 +86,24 @@ BASELINE_NAMES = (
 )
 STRESS_NAMES = ("pulse_pressure", "split_pressure")
 BOT_NAMES = BASELINE_NAMES + STRESS_NAMES
+HELDOUT_NAMES = ("relay_pressure", "counterpunch_interceptor")
+ALL_BOT_NAMES = BOT_NAMES + HELDOUT_NAMES
+WEAK_CONTROL_SCOPE = {
+    "idle": "Explicit offered no-op control, not a model of a novice human.",
+    "first_legal": "Input-order control; its behavior depends on menu order, not strategic ability.",
+    "uniform_random": "Uniform current macro IDs plus one idle; not uniform raw inputs or human behavior.",
+}
+HELDOUT_PARAMETERS = {
+    "relay_pressure": {
+        "emergency_hp": 0.20, "request_hp": 0.60, "release_hp": 0.85,
+        "minimum_net_hp_gain": 0.01, "stagnant_owner_opportunities": 12,
+        "routine_cooldown_opportunities": 10, "routine_permits": 1,
+    },
+    "counterpunch_interceptor": {
+        "emergency_hp": 0.25, "vulnerable_hp": 0.45, "observed_hp_loss": 0.20,
+        "approach_fraction": 0.10, "hold_opportunities_per_visible_target": 3,
+    },
+}
 _ALIASES = {
     "random": "uniform_random",
     "rusher": "objective_rusher",
@@ -250,10 +289,12 @@ def _combat(choices: list[_Choice], *, structures_only: bool = False) -> _Choice
 class ResearchBot:
     """One team's match-scoped opponent. Create a NEW instance for every match."""
 
+    NAMES = BOT_NAMES
+
     def __init__(self, name: str, seed: int | str = 0,
                  clock: Callable[[], float] | None = None) -> None:
-        if name not in BOT_NAMES:
-            raise ValueError(f"Unknown HoK opponent {name!r}; choose from {', '.join(BOT_NAMES)}")
+        if name not in self.NAMES:
+            raise ValueError(f"Unknown HoK opponent {name!r}; choose from {', '.join(self.NAMES)}")
         self.name = name
         self.seed = seed
         self._clock = clock  # No timed rules yet; never substitute wall-clock time.
@@ -379,10 +420,184 @@ class ResearchBot:
                 f"idles={self.idles} refused={self.refused}")
 
 
+def _health_share(entity: dict) -> float | None:
+    hp, maximum = _number(entity.get("hp")), _number(entity.get("max_hp"))
+    if hp is None or maximum is None or maximum <= 0:
+        return None
+    return max(0.0, min(1.0, hp / maximum))
+
+
+def _own_team(raw: dict, seat: int) -> list[int]:
+    """Read only granted own-team summaries, never the other camp's summaries."""
+    team = set(range(0, 5) if seat < 5 else range(5, 10))
+    if "seats" in raw:
+        roster = raw["seats"] if isinstance(raw["seats"], list) else []
+        team &= {number for value in roster if (number := _seat(value)) is not None}
+    return sorted(team)
+
+
+def _hero_id(value: Any) -> str | None:
+    if type(value) is int and 0 <= value < 10**20:
+        return str(value)
+    if isinstance(value, str) and re.fullmatch(r"[0-9]{1,20}", value.strip()):
+        return str(int(value.strip()))
+    return None
+
+
+def _label_hero(choice: _Choice | None) -> str | None:
+    if choice is None:
+        return None
+    target, _ = _target(choice)
+    if any(word in target for word in ("ally", "allied", "friendly")):
+        return None
+    match = re.search(r"\bhero\s+([0-9]{1,20})\b", target)
+    return _hero_id(match[1]) if match else None
+
+
+@dataclass(frozen=True)
+class _SeenHero:
+    position: tuple[float, float] | None
+    hp: float | None
+    share: float | None
+
+
+class HeldoutBot(ResearchBot):
+    """Separate phase-2 policies; the original eight dispatch paths are unchanged."""
+
+    NAMES = HELDOUT_NAMES
+
+    def __init__(self, name: str, seed: int | str = 0,
+                 clock: Callable[[], float] | None = None) -> None:
+        super().__init__(name, seed=seed, clock=clock)
+        self._priority = list(range(5))
+        self._skill_preference = ["macro_skill1", "macro_skill2", "macro_skill3"]
+        if name == "relay_pressure":
+            self._rng.shuffle(self._priority)
+        else:
+            self._rng.shuffle(self._skill_preference)
+        self._relay_owner: int | None = None
+        self._relay_best = 0.0
+        self._relay_stagnant = 0
+        self._relay_cooldown: dict[int, int] = {}
+        self._sight: dict[int, tuple[tuple[float, float] | None, dict[str, _SeenHero]]] = {}
+        self._waits: dict[int, dict[str, int]] = {}
+
+    def _choose(self, role: str, raw: dict, seat: int, choices: list[_Choice]) -> _Choice:
+        if role == "relay_pressure":
+            return self._relay(raw, seat, choices)
+        return self._counterpunch(raw, seat, choices)
+
+    def _release_permit(self, *, cooldown: bool = False) -> None:
+        if cooldown and self._relay_owner is not None:
+            owner = self._relay_owner
+            self._relay_cooldown[owner] = (
+                self._turns.get(owner, 0) + 1
+                + HELDOUT_PARAMETERS["relay_pressure"]["routine_cooldown_opportunities"])
+        self._relay_owner = None
+        self._relay_stagnant = 0
+
+    def _relay(self, raw: dict, seat: int, choices: list[_Choice]) -> _Choice:
+        params = HELDOUT_PARAMETERS["relay_pressure"]
+        shares = {member: _health_share(_mapping(_summary(raw, member).get("my_hero")))
+                  for member in _own_team(raw, seat)}
+        if self._relay_owner is not None:
+            current = shares.get(self._relay_owner)
+            if current is None or current <= params["emergency_hp"] or current >= params["release_hp"]:
+                self._release_permit()
+        if self._relay_owner is None:
+            requesting = [member for member, hp in shares.items()
+                          if hp is not None and params["emergency_hp"] < hp < params["request_hp"]
+                          and self._turns.get(member, 0) >= self._relay_cooldown.get(member, 0)]
+            if requesting:
+                self._relay_owner = min(requesting, key=lambda member: (
+                    shares[member], self._priority.index(member % 5)))
+                self._relay_best = shares[self._relay_owner]
+        share = shares.get(seat)
+        if share is not None and share <= 0:
+            return _idle(choices) or choices[0]
+        can_retreat = any(choice.base == "macro_retreat" for choice in choices)
+        if share is not None and share <= params["emergency_hp"] and can_retreat:
+            return _prefer(choices, "macro_retreat")
+        if seat == self._relay_owner:
+            if share is not None and share >= self._relay_best + params["minimum_net_hp_gain"]:
+                self._relay_best, self._relay_stagnant = share, 0
+            else:
+                self._relay_stagnant += 1
+            if can_retreat and self._relay_stagnant < params["stagnant_owner_opportunities"]:
+                return _prefer(choices, "macro_retreat")
+            self._release_permit(cooldown=True)
+        return _prefer(choices, "macro_attack", "macro_advance", "macro_skill1", "macro_skill2", "macro_skill3")
+
+    def _counterpunch(self, raw: dict, seat: int, choices: list[_Choice]) -> _Choice:
+        params = HELDOUT_PARAMETERS["counterpunch_interceptor"]
+        summary = _summary(raw, seat)
+        me = _mapping(summary.get("my_hero"))
+        position = _position(me)
+        camp = _camp(raw.get("camp")) or (1 if seat < 5 else 2)
+        previous_position, previous = self._sight.get(seat, (None, {}))
+        visible: dict[str, _SeenHero] = {}
+        heroes = summary.get("other_heroes")
+        for hero in heroes if isinstance(heroes, list) else []:
+            if not isinstance(hero, dict) or hero.get("visible") is not True:
+                continue
+            other_camp = _camp(hero.get("camp"))
+            identity = _hero_id(hero.get("runtime_id"))
+            hp = _number(hero.get("hp"))
+            if other_camp is None or other_camp == camp or identity is None or (hp is not None and hp <= 0):
+                continue
+            visible[identity] = _SeenHero(_position(hero), hp, _health_share(hero))
+        # Only consecutive, explicitly visible observations can establish a trend.
+        self._sight[seat] = (position, visible)
+        waits = {identity: count for identity, count in self._waits.get(seat, {}).items() if identity in visible}
+        self._waits[seat] = waits
+        closing: dict[str, float] = {}
+        opportunities: set[str] = set()
+        for identity, hero in visible.items():
+            old = previous.get(identity)
+            if hero.share is not None and hero.share <= params["vulnerable_hp"]:
+                opportunities.add(identity)
+            if old is None:
+                continue
+            if hero.hp is not None and old.hp is not None and hero.hp <= old.hp * (1 - params["observed_hp_loss"]):
+                opportunities.add(identity)
+            if previous_position is not None and old.position is not None and hero.position is not None:
+                before = math.dist(previous_position, old.position)
+                after = math.dist(previous_position, hero.position)
+                if before > 0 and after <= before * (1 - params["approach_fraction"]):
+                    opportunities.add(identity)
+                    closing[identity] = math.dist(position, hero.position) if position is not None else after
+        share = _health_share(me)
+        if share is not None and share <= 0:
+            return _idle(choices) or choices[0]
+        if share is not None and share <= params["emergency_hp"] \
+                and any(choice.base == "macro_retreat" for choice in choices):
+            return _prefer(choices, "macro_retreat")
+        attack = next((choice for choice in choices if choice.base == "macro_attack"), None)
+        target = _label_hero(attack)
+        if target is not None:
+            if target in opportunities:
+                for skill in self._skill_preference:
+                    matching = next((choice for choice in choices if choice.base == skill
+                                     and _label_hero(choice) == target), None)
+                    if matching is not None:
+                        return matching
+            return attack
+        waiting_for = [identity for identity in closing
+                       if waits.get(identity, 0) < params["hold_opportunities_per_visible_target"]]
+        idle = _idle(choices)
+        if waiting_for and idle is not None:
+            identity = min(waiting_for, key=lambda item: (closing[item], item))
+            waits[identity] = waits.get(identity, 0) + 1
+            return idle
+        return _prefer(choices, "macro_attack", "macro_advance", "macro_skill1", "macro_skill2", "macro_skill3")
+
+
 def make_bot(name: str, seed: int | str = 0,
              clock: Callable[[], float] | None = None) -> ResearchBot:
     """Match factory; clock injection is optional and does not alter turn cadence."""
     if not isinstance(name, str):
         raise ValueError("HoK opponent name must be a string")
     normalized = name.strip().lower().replace("-", "_")
-    return ResearchBot(_ALIASES.get(normalized, normalized), seed=seed, clock=clock)
+    canonical = _ALIASES.get(normalized, normalized)
+    bot_type = HeldoutBot if canonical in HELDOUT_NAMES else ResearchBot
+    return bot_type(canonical, seed=seed, clock=clock)
