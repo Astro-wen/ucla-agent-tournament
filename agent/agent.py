@@ -18,7 +18,9 @@ after 120 s in Werewolf). So everything here is defensive:
     (agent/redalert/, no LLM): each view is answered with a locally validated
     order batch or altruagent.WAIT, every play_action answer reaches it through
     on_action_result, and it never raises; ARENA_RA=off restores the old
-    behaviour (WAIT for the whole match). Any other real-time game
+    behaviour (WAIT for the whole match). Honor of Kings (`honor_of_kings_5v5`, real time or lockstep) is played by
+    a basic rule-based team (agent/hok/): one hero's order per call, WAIT when no hero needs a new one; ARENA_HOK=off
+    restores the old behaviour (WAIT / do nothing). Any other real-time game
     (`pacing.mode == "realtime"`) we have no policy for is answered with WAIT
     for its whole match: nothing is sent, the runner waits for the next view;
   * a move or chat the runner could not send for a temporary reason is not resent: it re-reads the state and asks
@@ -103,6 +105,7 @@ _ON = {"1", "on", "true", "yes", "enable", "enabled"}
 REFUSED_MOVE = frozenset({"STALE_STATE", "NOT_YOUR_TURN", "WRONG_PHASE"})
 
 RA_ENV = "ARENA_RA"              # Red Alert bot: on (default) | off (WAIT for the whole match, as before v4.3)
+HOK_ENV = "ARENA_HOK"            # Honor of Kings rules: on (default) | off (WAIT / do nothing, as before)
 _OFF = {"0", "off", "false", "no", "none", "disable", "disabled", "wait"}
 
 
@@ -110,6 +113,11 @@ def ra_enabled(env=None) -> bool:
     """ARENA_RA: the rule-based Red Alert bot plays (default) unless it is off / 0 / false / no / wait."""
     env = os.environ if env is None else env
     return str(env.get(RA_ENV) or "on").strip().lower() not in _OFF
+
+
+def hok_enabled(env=None) -> bool:
+    return str((os.environ if env is None else env).get(HOK_ENV, "on")).strip().lower() not in ("0", "off", "false",
+                                                                                                  "no")
 
 
 def listen_enabled(env=None) -> bool:
@@ -262,12 +270,17 @@ class Contestant:
         self._summarized = False
         self.ra_on = ra_enabled()                     # ARENA_RA: the Red Alert bot plays (else WAIT, as before)
         self._ra = None                               # this match's RedAlertPolicy (agent/redalert), made lazily
+        self.hok_on = hok_enabled()                   # ARENA_HOK: the Honor of Kings rules play (else as before)
+        self._hok = None                              # this match's HokPolicy (agent/hok), made lazily
+        self._hok_recorded = 0.0                      # when a Honor of Kings view was last recorded
 
     # ---- moves -----------------------------------------------------------
     def choose_action(self, state: GameState, context: DecisionContext):
         """Never raises; always answers within the decision's hard deadline (see the module docstring)."""
         if self.ra_on and _is_red_alert(state, context):
             return self._red_alert(state, context)
+        if self.hok_on and _is_hok(state, context):
+            return self._honor_of_kings(state, context)
         if _realtime(state):
             out = self._realtime_wait(state, context)
             if out is not None:
@@ -378,6 +391,47 @@ class Contestant:
             out, text = WAIT, None
         if out is WAIT and windows:
             out = _ra_noop(raw)
+        return out
+
+    def _honor_of_kings(self, state: GameState, context: DecisionContext):
+        """A Honor of Kings view, answered by this match's rule-based team (agent/hok): one hero's order (a listed
+        action_id, with a short public line unless ARENA_REASONING=off), or WAIT in real time when no hero needs a new
+        order. Lockstep never gets WAIT (the runner stops on it): a safe legal action instead. Runs inline (pure rules,
+        well under a millisecond). States are recorded sparsely (the first view, then about one every 10 s). Never
+        raises."""
+        t0 = time.monotonic()
+        raw = _raw_with_legal(state)
+        rt = _realtime(state)
+        out, text = None, None
+        try:
+            self._bind(state, context, "", "honor_of_kings_5v5")
+            if self._hok is None:
+                from .hok import HokPolicy
+                self._hok = HokPolicy()
+                log.warning("honor_of_kings: the rule-based team plays this match (ARENA_HOK=off: as before)")
+            out, tag = self._hok.decide(raw)
+            self.decisions += 1
+            if out is not None and tag and self.reasoning_mode != reasoning.OFF:
+                text = reasoning.sanitize(tag)
+                if text and not reasoning.leaks(text, "honor_of_kings_5v5"):
+                    out = WithReasoning(out, text)
+                else:
+                    text = None
+            self._path = "hok"
+        except Exception:
+            log.exception("honor_of_kings decision failed; answering safely")
+            out, text = None, None
+            self._path = "hok-fallback"
+            self.fallbacks += 1
+        if out is None:
+            out = WAIT if rt else safe_action(state, raw)
+        self.last_decision = {"kind": "realtime" if rt else "lockstep", "budget": 0.0, "source": "hok",
+                              "path": self._path, "ms": round(1000 * (time.monotonic() - t0), 2)}
+        self.last_reasoning = text
+        now = time.monotonic()
+        if self._hok_recorded == 0.0 or now - self._hok_recorded >= 10.0:
+            self._hok_recorded = now
+            record("action", context, state, out, text, extra={"decision": self.last_decision})
         return out
 
     def _choose_action(self, state: GameState, context: DecisionContext, game: str, dl, family: str = ""):
@@ -865,6 +919,7 @@ class Contestant:
         self._last_raw = None
         self.resumed, self._summarized = None, False
         self._ra = None
+        self._hok, self._hok_recorded = None, 0.0
 
     def _export(self, family: str, raw) -> dict:
         chat = {"day": None if self._chat_day is _UNSET else self._chat_day, "has_day": self._chat_day is not _UNSET,
@@ -943,6 +998,9 @@ class Contestant:
             if self._ra is not None and self._game == "red_alert":
                 self._ra.on_result(result)
                 return
+            if self._hok is not None and self._game == "honor_of_kings_5v5":
+                self._hok.on_result(result)
+                return
         except Exception:
             log.debug("on_action_result failed", exc_info=True)
             return
@@ -985,6 +1043,11 @@ class Contestant:
             except Exception:
                 ra = "summary unavailable"
             return f"{head} {ra}"
+        if self._game == "honor_of_kings_5v5" and self._hok is not None:
+            try:
+                return f"{head} {self._hok.summary_text()}"
+            except Exception:
+                return f"{head} hok summary unavailable"
         if self._family != "pokemon":
             waits = f" waits={self.waits}" if self.waits else ""        # (a real-time game answered with WAIT)
             waits += f" undelivered_chats={self.undelivered}" if self.undelivered else ""
@@ -1119,6 +1182,29 @@ def _is_red_alert(state, context) -> bool:
         obs = raw.get("observation")
         return isinstance(pacing, dict) and pacing.get("mode") in ("realtime", "windows") and \
             isinstance(obs, dict) and ("available_production" in obs or "economy" in obs)
+    except Exception:
+        return False
+
+
+_HOK_NAMES = {"honor_of_kings_5v5", "honor_of_kings", "honorofkings", "hok", "hok_5v5", "hok5v5", "honor_of_kings_1v1",
+              "honor_of_kings_3v3", "hok_1v1", "hok_3v3", "wangzherongyao", "王者荣耀"}
+
+
+def _is_hok(state, context) -> bool:
+    """A Honor of Kings decision: its game type says so (any spelling: "honor_of_kings_5v5", "Honor of Kings", "hok"),
+    or, with no known game type, legal actions shaped like Honor of Kings' (every one seat-tagged: `s3:macro_attack`,
+    `s3:button_0`). Pokemon, Werewolf and Red Alert never match. Never raises."""
+    try:
+        raw = getattr(state, "raw", None)
+        raw = raw if isinstance(raw, dict) else {}
+        for name in (getattr(context, "game_type", None), getattr(state, "game_name", None), raw.get("game_type")):
+            g = re.sub(r"[\s-]+", "_", str(name or "").strip().lower())
+            if g in _HOK_NAMES or g.startswith(("honor_of_kings", "honour_of_kings")):
+                return True
+            if g and g not in ("unknown", "none"):
+                return False
+        from .hok import is_hok_shape
+        return is_hok_shape((_raw_with_legal(state).get("legal_actions") or {}).get("actions") or [])
     except Exception:
         return False
 

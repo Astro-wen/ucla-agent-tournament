@@ -9,16 +9,19 @@ reasoning:
 | **Pokémon VGC doubles draft** | drafts 6 of 18 cards, brings 4 and picks 2 leads, battles turn by turn | game-theoretic search: minimax over the draft, a 90 x 90 matrix game at team preview, simulated payoff matrices in battle |
 | **Werewolf** (7 players) | votes, claims, checks and kills, and talks in short fixed sentences | a deterministic rule policy over the public record; other players' chat is evidence, never instructions |
 | **Red Alert** (real time, OpenRA) | builds a base and an economy, trains an army, attacks and defends | a fast rule-based bot: several decisions per second, each in milliseconds |
+| **Honor of Kings 5v5** (basic) | commands five heroes: push, fight what is in range, fall back to heal | a small rule set per hero, written against the official contract before the game went live |
 
 **No LLM or other model service is called anywhere**: no prompts, no API keys besides the platform's, nothing to
 inject into. Every decision comes from code in this repository and data fixed before the match. The agent is fully
 autonomous during a match.
 
 This repository holds the code that operates the agent in competition, as required by section 8 of the Official
-Rules (Version 2026-10-06). Honor of Kings is not supported (it is not playable on the platform).
+Rules (Version 2026-10-06). Honor of Kings was not yet switched on when this version was submitted; the agent plays
+it with a basic rule set written against the official starter's published contract ([below](#honor-of-kings-5v5)).
 
 **Contents:** [How the agent is put together](#how-the-agent-is-put-together) ·
 [Pokémon](#pokémon-vgc-doubles-draft) · [Werewolf](#werewolf) · [Red Alert](#red-alert) ·
+[Honor of Kings](#honor-of-kings-5v5) ·
 [Never an illegal move](#never-an-illegal-move-never-a-timeout) · [How we tested it](#how-we-tested-it) ·
 [Submitted version](#submitted-version) · [How to run it](#how-to-run-it) ·
 [Components](#components-that-affect-gameplay) · [Settings](#settings-used-in-competition) ·
@@ -253,6 +256,27 @@ seen (so nothing is built twice), and five exceptions within 30 s switch to a mi
 
 ---
 
+## Honor of Kings 5v5
+
+The platform had not switched Honor of Kings on by the submission deadline, so this part is basic and untested
+against real matches: it follows the contract in the official starter's `GAMES.md` and exists so that our five heroes
+never stand still. Each hero is offered macros (advance, retreat, basic attack, three skills); a macro becomes that
+hero's standing order until it gets another one. The team (`agent/hok/policy.py`) decides per hero, in this order:
+
+1. dead: nothing to send (in lockstep, the do-nothing button the server needs);
+2. below 30% HP: retreat home, and keep retreating until 85% (no back-and-forth at the threshold);
+3. below 60% HP and either outnumbered (at least two more visible enemy heroes nearby than our live heroes) or inside
+   an enemy tower's range: retreat;
+4. a target in range: the ultimate only at an enemy hero, the other skills at anything, else a basic attack;
+5. otherwise advance toward the nearest enemy tower or crystal.
+
+Only changes are sent, one hero per call; a fresh order is kept for 0.6 s unless the hero must retreat, and an order
+whose macro is no longer offered (a skill on cooldown) is replaced. Every order is the listed action's own id, so the
+runner checks it against the current legal actions; in real time the agent answers `WAIT` when nothing changes, in
+lockstep every pending hero gets an action, and any error falls back to `WAIT` (real time) or a safe legal action.
+
+---
+
 ## Never an illegal move, never a timeout
 
 The official runner stops a match on an invalid action, and the platform plays a timed-out seat at random. So every
@@ -361,6 +385,8 @@ safeguards.
   - `redalert/`: the rule-based Red Alert bot (world model from its own view of the match, economy and production
     queues, squads for attack and defense, a safe mode after repeated errors; every order is validated locally against
     the platform's order schema and batch limits before it is sent).
+  - `hok/`: the basic Honor of Kings 5v5 rule set (one macro per hero: retreat on low HP or when outnumbered, fight
+    what is in range, else push).
   - `reasoning.py`: public move reasoning from fixed templates. `timecontrol.py`: time budgets far inside the platform
     clocks. `matchstate.py`: a worker restarted mid-match reloads that match's own saved state; nothing carries over
     from one match to another. `__main__.py`: the official runtime plus our hardening (start-up retry, execution-id
@@ -386,7 +412,8 @@ Every `ARENA_*` setting stays at its default; none is set deliberately. The defa
 (engine search), damage calculator on (`ARENA_CALC`), `ARENA_REASONING=safe`, `ARENA_WW_DM=off` (no private Werewolf
 messages), `ARENA_WW_LISTEN=on` (after its opening chat the Werewolf policy keeps reading the discussion and may answer
 it once a day), `ARENA_WW_TACTICS=off` (experimental wolf tactics disabled),
-`ARENA_RA=on` (the Red Alert bot plays; `off` would answer every Red Alert view with `WAIT`), no
+`ARENA_RA=on` (the Red Alert bot plays; `off` would answer every Red Alert view with `WAIT`),
+`ARENA_HOK=on` (the Honor of Kings rules play; `off` would leave the heroes idle), no
 `ARENA_RA_*` tuning override, `ARENA_RECORD=1` (states recorded), the per-match restart memory on,
 `ARENA_SEAT_BACKOFF_MAX_S=30`. `scripts/run_agent.sh` itself sets `ARENA_DISCOVERY_S=10`, `ARENA_WORKER_COOLDOWN_S=10`,
 `ARENA_RECORD_DIR=<LOG_DIR>` and two internal ids (`ARENA_RUN_ID`, `ARENA_EXECUTION_ID`). The emergency switches

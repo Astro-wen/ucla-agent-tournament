@@ -67,7 +67,7 @@ def test_which_states_count_as_red_alert():
     for g in ("red_alert", "Red Alert", "red-alert", "redalert", "RED_ALERT"):
         assert _is_red_alert(rt, ctx(g))
     assert _is_red_alert(rt, ctx(None))                            # no game type: the state's shape says so
-    assert not _is_red_alert(rt, ctx("honor_of_kings"))            # another real-time game keeps the WAIT path
+    assert not _is_red_alert(rt, ctx("other_realtime_game"))       # another real-time game keeps the WAIT path
     ww = GameState.from_mcp_state({"session_id": "w", "game_type": "werewolf", "phase": "night", "state_version": 1,
                                    "is_current_actor": True, "legal_actions": {"actions": []}})
     assert not _is_red_alert(ww, ctx("werewolf"))
@@ -78,7 +78,7 @@ def test_which_states_count_as_red_alert():
 
 
 def test_another_real_time_game_still_waits():
-    other = DecisionContext(session_id="x", tournament_id=None, game_type="honor_of_kings", agent_id="a")
+    other = DecisionContext(session_id="x", tournament_id=None, game_type="other_realtime_game", agent_id="a")
     assert Contestant().choose_action(ra_state(), other) is WAIT
 
 
