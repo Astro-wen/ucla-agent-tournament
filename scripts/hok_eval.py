@@ -45,7 +45,8 @@ def parser() -> argparse.ArgumentParser:
 
 def evaluate(args) -> dict:
     root = Path(__file__).resolve().parents[1]
-    source_paths = (root / "local/hok_sim.py", root / "local/hok_env.py", Path(__file__).resolve())
+    source_paths = (root / "local/hok_sim.py", root / "local/hok_env.py", Path(__file__).resolve(),
+                    root / "altruagent/runner.py", root / "altruagent/models.py")
     def source_digests():
         return {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
                 for path in source_paths}

@@ -490,7 +490,7 @@ class DiagnosticGame:
         if destroyed:
             self.finish(3 - next(iter(destroyed)) if len(destroyed) == 1 else None, "crystal_destroyed")
         elif self.step >= c.max_steps or self.now + 1e-9 >= c.time_limit_s:
-            scores = {camp: (round(self.structure_damage[camp], 8), self.kills[camp]) for camp in (1, 2)}
+            scores = {camp: (self.structure_damage[camp], self.kills[camp]) for camp in (1, 2)}
             winner = None if scores[1] == scores[2] else max(scores, key=scores.get)
             self.finish(winner, "step_limit" if self.step >= c.max_steps else "time_limit")
 

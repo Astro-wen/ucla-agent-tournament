@@ -145,6 +145,7 @@ def test_healing_capped_and_dead_heroes_do_not_heal():
 
 
 @pytest.mark.parametrize("damage,kills,winner", [({1: 5, 2: 4}, {1: 0, 2: 20}, 1),
+                                                ({1: 4.000000001, 2: 4}, {1: 0, 2: 20}, 1),
                                                 ({1: 4, 2: 4}, {1: 0, 2: 1}, 2),
                                                 ({1: 4, 2: 4}, {1: 0, 2: 0}, None)])
 def test_official_scoring_priority(damage, kills, winner):
@@ -246,7 +247,7 @@ def test_malformed_and_foreign_seat_errors_notify_policy_without_recording_paylo
     class Refused:
         results = []
         def decide(self, raw):
-            return "s9:macro_advance", "SECRET_TAG"
+            return {"seat": 9, "macro": "macro_advance"}, "SECRET_TAG"
         def on_result(self, result):
             self.results.append(result)
     idle, _ = opponent_factory("idle")
@@ -392,3 +393,30 @@ def test_independently_supplied_research_factory_interface(monkeypatch):
     assert calls == [("external-bot", 1016), ("external-bot", 1001019)]
     assert info["name"] == "external-bot"
     assert result["protocol_failure"] is None
+
+
+@pytest.mark.parametrize("action", ["s9:macro_advance", False, 17, object(),
+                                   {"seat": 0, "macro": "macro_advance", "unsendable": object()}])
+def test_sdk_local_validation_failures_are_fatal_even_in_realtime(action):
+    class Bad:
+        def decide(self, raw):
+            return action, None
+    push, _ = opponent_factory("push")
+    result = play_game(Bad, push, config=SimConfig(max_steps=2))
+    assert result["protocol_failure"] == {"camp": 1, "kind": "local_validation_error"}
+    assert result["stats"]["candidate"]["local_validation_errors"] == 1
+    assert result["stats"]["candidate"]["invalid"] == 1
+
+
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+def test_sdk_resign_is_a_concession_not_protocol_failure(mode):
+    from altruagent import RESIGN
+    class Resigner:
+        def decide(self, raw):
+            return RESIGN, None
+    push, _ = opponent_factory("push")
+    result = play_game(Resigner, push, config=SimConfig(mode=mode, max_steps=2))
+    assert result["protocol_failure"] is None
+    assert result["result"]["termination_reason"] == "resignation"
+    assert result["stats"]["candidate"]["resignations"] == 1
+    assert result["candidate_score"] == 0.0

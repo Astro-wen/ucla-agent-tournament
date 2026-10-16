@@ -17,6 +17,7 @@ import importlib
 import importlib.abc
 import importlib.util
 import inspect
+import json
 import math
 from pathlib import Path
 import random
@@ -25,6 +26,8 @@ import time
 import types
 from typing import Callable, Protocol
 
+from altruagent import GameState, RESIGN, WAIT
+from altruagent.runner import _validate_decision
 from local.hok_sim import DiagnosticGame, SimConfig
 
 
@@ -208,7 +211,8 @@ def opponent_factory(name: str) -> tuple[Factory, dict]:
 
 def _new_stats() -> dict:
     return {"calls": 0, "accepted": 0, "invalid": 0, "waits": 0, "exceptions": {},
-            "callback_exceptions": {}, "accepted_by_seat": {}, "action_kind_counts": {}, "_latency_ms": []}
+            "local_validation_errors": 0, "resignations": 0, "callback_exceptions": {},
+            "accepted_by_seat": {}, "action_kind_counts": {}, "_latency_ms": []}
 
 
 def _count_error(stats: dict, key: str, exc: Exception):
@@ -233,8 +237,10 @@ def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None
               calls_per_step: int = 6) -> dict:
     """Run one deterministic diagnostic leg. Fresh policy objects per game.
 
-    Illegal realtime orders get on_result and may retry; illegal lockstep
-    orders, exceptions and lockstep WAIT are *evaluation protocol forfeits*.
+    Server-refused realtime orders get on_result and may retry. The actual SDK
+    validator rejects unlisted IDs/types locally (fatal even in realtime).
+    Those errors, illegal lockstep orders, exceptions and lockstep WAIT are
+    *evaluation protocol forfeits*.
     This does not pretend to reproduce the platform's random takeover after
     a worker dies. Call-budget exhaustion is likewise a harness forfeit in
     lockstep, not evidence of an in-game defeat.
@@ -273,15 +279,30 @@ def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None
                     break
                 finally:
                     st["_latency_ms"].append((time.perf_counter_ns() - start) / 1e6)
-                # SDK WAIT is supported alongside HokPolicy's None.
-                from altruagent import WAIT
-                if action is None or action is WAIT:
+                try:
+                    normalized = _validate_decision(WAIT if action is None else action,
+                                                    GameState.from_mcp_state(raw).legal_actions)
+                    if normalized is not WAIT and normalized is not RESIGN and normalized.action is not None:
+                        # Like MCP transport, reject locally unsendable objects
+                        # before treating them as recoverable server refusals.
+                        json.dumps(normalized.action, allow_nan=False)
+                except Exception:
+                    st["invalid"] += 1
+                    st["local_validation_errors"] += 1
+                    protocol_failure = {"camp": camp, "kind": "local_validation_error"}
+                    break
+                if normalized is RESIGN:
+                    st["resignations"] += 1
+                    game.resign(camp)
+                    break
+                if normalized is WAIT:
                     st["waits"] += 1
                     if game.config.mode == "lockstep":
                         st["invalid"] += 1
                         protocol_failure = {"camp": camp, "kind": "lockstep_wait"}
                     break
-                result = game.submit(camp, action, raw["state_version"])
+                result = game.submit(camp, normalized.action if normalized.action is not None
+                                     else normalized.action_id, raw["state_version"])
                 if result.get("error"):
                     st["invalid"] += 1
                     if game.config.mode == "lockstep":
@@ -302,10 +323,13 @@ def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None
                         protocol_failure = {"camp": camp, "kind": "callback_exception"}
                 if protocol_failure:
                     break
-            if not protocol_failure and game.config.mode == "lockstep" and set(game.seats(camp)) & game.pending:
+            if not protocol_failure and not game.terminal and game.config.mode == "lockstep" \
+                    and set(game.seats(camp)) & game.pending:
                 protocol_failure = {"camp": camp, "kind": "call_budget_exhausted"}
             if protocol_failure:
                 game.finish(3 - camp, "evaluation_protocol_forfeit")
+                break
+            if game.terminal:
                 break
         if not game.terminal:
             game.tick()
