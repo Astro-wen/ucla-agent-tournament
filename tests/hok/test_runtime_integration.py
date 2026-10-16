@@ -18,7 +18,7 @@ from agent.hok.policy import HokPolicy
 from altruagent import DecisionContext
 from altruagent.runner import run_game
 from local.hok_fake_session import (
-    CONTEXT, SEATS, HokFakeSession, assert_legal_submission, entries, payload,
+    CONTEXT, SEATS, Clock, HokFakeSession, assert_legal_submission, entries, payload,
 )
 
 
@@ -43,7 +43,7 @@ def play(game, monkeypatch, *, context=CONTEXT, agent=None):
     monkeypatch.setattr(deployed, "time", SimpleNamespace(monotonic=game.clock, time=time.time))
     agent = agent or deployed.Contestant()
     result = run_game(game, context, agent, sleep=lambda _: None, now=game.clock, log=lambda _: None)
-    assert result.is_terminal and result.termination_reason == "completed"
+    assert result.is_terminal and result.termination_reason == "step_limit"
     return agent
 
 
@@ -319,7 +319,7 @@ def test_repeated_identical_errors_have_a_bounded_recording_allowance(monkeypatc
 
 
 def test_contract_peer_rejects_nonpending_seat_and_unfilled_templates():
-    raw = payload(pending=[4], actions=entries(0) + entries(4))
+    raw = payload(mode="lockstep", pending=[4], actions=entries(0) + entries(4))
     with pytest.raises(AssertionError, match="non-pending"):
         assert_legal_submission(raw, action_id="s0:button_0")
     raw = payload(pending=[4], actions=[{
@@ -329,3 +329,187 @@ def test_contract_peer_rejects_nonpending_seat_and_unfilled_templates():
         assert_legal_submission(raw, action_id="s4:button_2")
     with pytest.raises(AssertionError, match="not offered"):
         assert_legal_submission(raw, action={"seat": 4, "which_button": 2, "move_x": 99})
+
+
+# Current /skill/hok guide: pending is a lockstep obligation, not a real-time
+# permission list. A fresh order may replace an already-ordered hero's macro.
+@pytest.mark.parametrize("seats", [tuple(range(5)), tuple(range(5, 10))], ids=["camp1", "camp2"])
+@pytest.mark.parametrize("empty_pending", [False, True], ids=["other-heroes-pending", "nobody-pending"])
+def test_realtime_urgent_order_can_replace_a_nonpending_heros_standing_order(monkeypatch, seats, empty_pending):
+    urgent = seats[0]
+
+    def frames():
+        for version in range(12):
+            pending = [] if empty_pending else list(seats[1:])
+            actions = [a for s in seats for a in entries(
+                s, ("macro_advance", "macro_retreat") if s == urgent else ("macro_advance",))]
+            raw = payload(version, seats=seats, pending=pending, standing=game.standing, actions=actions)
+            raw["is_current_actor"] = True  # playable real-time moving view, even with no pending obligations
+            raw["observation"]["seats"][str(urgent)]["summary"]["my_hero"]["hp"] = 100
+            yield raw
+
+    game = HokFakeSession(frames())
+    game.standing = {str(s): "macro_advance" for s in seats}
+    play(game, monkeypatch)
+    assert [(c["seat"], c["command"]) for c in game.accepted] == [(urgent, "macro_retreat")]
+
+
+def test_lockstep_still_ignores_an_urgent_but_nonpending_hero(monkeypatch):
+    raw = payload(mode="lockstep", pending=[4], actions=entries(0, ("macro_retreat",)) + entries(4))
+    raw["observation"]["seats"]["0"]["summary"]["my_hero"]["hp"] = 100
+    game = HokFakeSession([raw])
+    play(game, monkeypatch)
+    assert [(c["seat"], c["command"]) for c in game.accepted] == [(4, "macro_advance")]
+
+
+@pytest.mark.parametrize("button,fields", [
+    (0, {"legal_target": [0]}),
+    (2, {"legal_move_x": [0, 15], "legal_move_z": [7, 15]}),
+    (3, {"legal_target": [1, 8], "legal_offset_x": [4], "legal_offset_z": [9]}),
+])
+def test_every_raw_legal_field_is_completed_even_for_a_button_zero_entry(monkeypatch, button, fields):
+    action = {"action_id": f"s4:button_{button}", "input": {"action": {
+        "seat": 4, "which_button": button, **fields}}}
+    game = HokFakeSession([payload(mode="lockstep", pending=[4], actions=[action])])
+    game.standing["4"] = "macro_advance"
+    play(game, monkeypatch)
+    assert len(game.accepted) == 1
+    sent = game.accepted[0]
+    assert sent["action_id"] is None and isinstance(sent["action"], dict), "a template ID is not a complete move"
+    assert "4" not in game.standing, "the current guide says a raw action clears its standing order"
+
+
+@pytest.mark.parametrize("unfillable_values", [[], None, "not-a-list"])
+def test_lockstep_uses_another_playable_offer_instead_of_an_unfillable_raw_template(monkeypatch, unfillable_values):
+    broken = {"action_id": "s4:button_2", "input": {"action": {
+        "seat": 4, "which_button": 2, "legal_move_x": unfillable_values}}}
+    playable = {"action_id": "s4:button_3", "input": {"action": {
+        "seat": 4, "which_button": 3, "legal_target": [7]}}}
+    game = HokFakeSession([payload(mode="lockstep", pending=[4], actions=[broken, playable])])
+    play(game, monkeypatch)
+    assert [(c["seat"], c["command"]) for c in game.accepted] == [(4, "button_3")]
+
+
+def test_empty_raw_value_range_is_an_invalid_server_fixture_not_a_playable_action():
+    # Deliberately do NOT call the contestant here. An active lockstep seat
+    # whose only offer has an empty required domain has no legal client answer,
+    # just like an active seat with no offers at all. These are server-contract
+    # violations, not liveness regressions that an agent can possibly satisfy.
+    raw = payload(mode="lockstep", pending=[4], actions=[{
+        "action_id": "s4:button_2", "input": {"action": {
+            "seat": 4, "which_button": 2, "legal_move_x": []}}}])
+    with pytest.raises(AssertionError, match="unfilled"):
+        assert_legal_submission(raw, action_id="s4:button_2")
+    with pytest.raises(AssertionError, match="not offered"):
+        assert_legal_submission(raw, action={"seat": 4, "which_button": 2, "move_x": 0})
+
+
+def test_authoritative_clear_after_an_unobserved_death_overrides_old_local_order(monkeypatch):
+    def frames():
+        for view in range(30):
+            if view == 10:
+                game.standing.pop("0", None)
+            # Polling may miss the complete death/respawn interval. Before the
+            # gap we observed the server acknowledge the order; after the gap
+            # it authoritatively reports no order for that revived hero.
+            version = view if view < 10 else view + 100
+            raw = payload(version, standing=game.standing)
+            raw["observation"]["seats"]["0"]["summary"]["my_hero"]["deaths"] = int(view >= 10)
+            yield raw
+
+    game = HokFakeSession(frames())
+    play(game, monkeypatch)
+    before = [c for c in game.accepted if c["seat"] == 0 and c["version"] < 10]
+    after = [c for c in game.accepted if c["seat"] == 0 and c["version"] >= 110]
+    assert len(before) == 1 and len(after) == 1, "a confirmed-then-cleared order must be installed again"
+
+
+@pytest.mark.parametrize("game_type", [None, "unknown", "none", "honor_of_kings_unrelated"])
+def test_unknown_game_type_with_hok_shaped_data_is_not_claimed(monkeypatch, game_type):
+    raw = payload()
+    raw["game_type"] = game_type
+    context = DecisionContext(session_id=CONTEXT.session_id, tournament_id=None, game_type=game_type,
+                              agent_id=CONTEXT.agent_id)
+    game = HokFakeSession([raw])
+    agent = play(game, monkeypatch, context=context)
+    assert not game.calls and agent._hok is None, "payload shape or name prefix cannot authorize HoK actions"
+
+
+def _recorded_rows(directory):
+    files = list(directory.glob("*.jsonl"))
+    assert len(files) == 1, "exercise the actual recorder in the test's temporary directory"
+    rows = [json.loads(line) for line in files[0].read_text().splitlines()]
+    assert rows
+    return rows
+
+
+@pytest.mark.parametrize("scenario", [
+    "zero-monotonic", "no-game-progress", "equivalent-clock-encodings", "slow-step-interval",
+])
+def test_recording_clock_boundaries_cannot_turn_every_view_into_a_sample(monkeypatch, tmp_path, scenario):
+    monkeypatch.setenv("ARENA_RECORD", "1")
+    monkeypatch.setattr(deployed, "RECORD_DIR", str(tmp_path))
+    progress = scenario in ("zero-monotonic", "slow-step-interval")
+
+    def frames():
+        for view in range(3000):
+            version = view if progress else 0
+            raw = payload(version, standing=game.standing)
+            if scenario == "equivalent-clock-encodings":
+                # Equivalent data or absent optional fields must not reset the
+                # sampling anchor on every alternation. SDK state_version is
+                # still integer zero; the raw value may be JSON "0".
+                raw["state_version"] = "0" if view % 2 else 0
+                raw["pacing"]["step_interval_s"] = "0.2" if view % 2 else 0.2
+                if view % 3:
+                    raw.pop("seconds_left")
+                else:
+                    raw["seconds_left"] = "600"
+                for entry in raw["observation"]["seats"].values():
+                    entry["summary"]["frame_no"] = "0" if view % 2 else 0
+            elif scenario == "slow-step-interval":
+                # The guide fixes a step at 0.2 *game* seconds; this field is
+                # server pacing, not permission to record five times as much.
+                raw["pacing"]["step_interval_s"] = 1.0
+            yield raw
+
+    game = HokFakeSession(frames(), clock=Clock(0.0 if scenario == "zero-monotonic" else 100.0),
+                          wall_seconds_per_view=0.0 if scenario == "zero-monotonic" else 1.0)
+    play(game, monkeypatch)
+    rows = _recorded_rows(tmp_path)
+    budget = 62 if progress else 3
+    assert len(rows) <= budget, f"{scenario}: {len(rows)} rows for 3000 views, budget={budget}"
+
+
+def test_first_policy_fault_is_recorded_promptly_but_repeated_fault_details_are_bounded(
+        monkeypatch, tmp_path, caplog):
+    monkeypatch.setenv("ARENA_RECORD", "1")
+    monkeypatch.setattr(deployed, "RECORD_DIR", str(tmp_path))
+    caplog.set_level(logging.CRITICAL, logger="agent")
+    original = HokPolicy.decide
+
+    def fault_after_initial_sample(policy, raw):
+        if raw["state_version"] >= 1:
+            raise RuntimeError(f"same failing policy path, varying detail {raw['state_version']}")
+        return original(policy, raw)
+
+    monkeypatch.setattr(HokPolicy, "decide", fault_after_initial_sample)
+    game = HokFakeSession(payload(version) for version in range(200))
+    play(game, monkeypatch)
+    rows = _recorded_rows(tmp_path)
+    assert len(rows) <= 7, "varying details of one fault must not create an unbounded diagnostic stream"
+    assert any(row["raw"]["state_version"] == 1 for row in rows), "first fault was lost between periodic samples"
+
+
+def test_recorded_hok_reasoning_keeps_the_underlying_action_machine_readable(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARENA_RECORD", "1")
+    monkeypatch.setenv("ARENA_REASONING", "safe")
+    monkeypatch.setattr(deployed, "RECORD_DIR", str(tmp_path))
+    game = HokFakeSession([payload(pending=[4])])
+    play(game, monkeypatch)
+    assert len(game.accepted) == 1
+    sent = game.accepted[0]
+    row = _recorded_rows(tmp_path)[0]
+    expected = sent["action_id"] if sent["action_id"] is not None else sent["action"]
+    assert row["out"] == expected, "recording must not store a WithReasoning repr instead of the legal action"
+    assert row.get("reasoning_summary") == sent["reasoning_summary"] and row["reasoning_summary"]

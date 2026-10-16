@@ -1,7 +1,9 @@
 """Offline HoK contract peer for tests of the *official* runner.
 
 This is not a combat simulator. Frames follow upstream/main:tests/test_hok.py
-and GAMES.md; assertions check the server's advertised actions, not our policy.
+and the current public /skill/hok guide; assertions check the server's
+advertised actions, not our policy. In real time pending is informational:
+an already-ordered owned hero can receive a new order.
 No transport, credentials, model provider, or production-policy import is used.
 """
 from __future__ import annotations
@@ -50,7 +52,7 @@ def entries(seat, macros=("macro_advance",), *, distance=12000, idle=True):
         out.append({
             "action_id": f"s{seat}:{macro}",
             "label": f"[seat {seat}] {macro} (nearest: enemy hero 169, {distance} away)",
-            "input": {"action": {"which_button": 3, "seat": seat}},
+            "input": {"action": {"macro": macro, "seat": seat}},
         })
     return out
 
@@ -69,11 +71,20 @@ def payload(version=0, *, seats=SEATS, pending=None, standing=None, mode="realti
     }
 
 
+def _integer_id(value):
+    """Normalize serialized metadata IDs, but never treat booleans as seats."""
+    if type(value) is int:
+        return value
+    if isinstance(value, str) and re.fullmatch(r"[0-9]+", value):
+        return int(value)
+    return None
+
+
 def assert_legal_submission(raw, *, action_id=None, action=None):
     """Independently validate IDs *and* structured actions (the SDK only checks IDs).
 
-    In particular, a legal-looking ID for a non-pending/non-owned hero is not a
-    safe fallback. Raw buttons must fill each legal_* field with an offered value.
+    Non-owned heroes are always forbidden; non-pending heroes are forbidden
+    in lockstep only. Raw buttons must fill each legal_* field with an offered value.
     Returns (seat, macro-or-button) for invariant checks independent of encoding.
     """
     assert (action_id is None) != (action is None), "send exactly one action encoding"
@@ -105,16 +116,19 @@ def assert_legal_submission(raw, *, action_id=None, action=None):
             assert set(action) == fields, f"unfilled or extra fields: {action}, expected {fields}"
             for key, value in template.items():
                 if key.startswith("legal_"):
-                    assert action[key[6:]] in value, f"value not offered for {key}: {action}"
+                    assert isinstance(value, list) and value and action[key[6:]] in value, \
+                        f"value not offered for {key}: {action}"
+                elif key == "seat":
+                    assert action[key] == _integer_id(value)
                 else:
                     assert action[key] == value
     owned = raw.get("seats")
     if isinstance(owned, list):
-        assert seat in owned, f"acted for unowned seat {seat}: owned={owned}"
+        assert seat in {_integer_id(s) for s in owned}, f"acted for unowned seat {seat}: owned={owned}"
     simultaneous = raw.get("simultaneous")
     pending = simultaneous.get("your_pending_seats") if isinstance(simultaneous, dict) else None
-    if isinstance(pending, list):
-        valid_pending = [s for s in pending if type(s) is int]
+    if isinstance(pending, list) and raw.get("pacing", {}).get("mode") != "realtime":
+        valid_pending = {_integer_id(s) for s in pending}
         assert seat in valid_pending, f"acted for non-pending seat {seat}: pending={pending}"
     return seat, command
 
@@ -164,12 +178,12 @@ class HokFakeSession:
         raise AssertionError("frames must embed their legal actions")
 
     def play_action(self, *, action_id=None, action=None, state_version, reasoning_summary=None):
-        assert state_version == self.current["state_version"], "sent a stale state's version"
+        assert state_version == int(self.current["state_version"]), "did not use the SDK's latest version"
         seat, command = assert_legal_submission(self.current, action_id=action_id, action=action)
         if reasoning_summary is not None:
             assert isinstance(reasoning_summary, str) and len(reasoning_summary) <= 1024
         call = {"seat": seat, "command": command, "version": state_version, "view": self.views,
-                "action_id": action_id, "action": deepcopy(action)}
+                "action_id": action_id, "action": deepcopy(action), "reasoning_summary": reasoning_summary}
         self.calls.append(call)
         code = self.reject(call) if self.reject else None
         if code:
@@ -177,12 +191,14 @@ class HokFakeSession:
         self.accepted.append(call)
         if command.startswith("macro_"):
             self.standing[str(seat)] = command
+        else:
+            self.standing.pop(str(seat), None)
         return {"session_id": SESSION, "status": "in_progress", "state_version": state_version,
                 "accepted": True, "stepped": False}
 
     def get_result(self):
         return {"session_id": SESSION, "is_terminal": True, "status": "completed",
-                "returns": {"us": 1.0, "them": 0.0}, "termination_reason": "completed"}
+                "returns": {"us": 1.0, "them": 0.0}, "termination_reason": "step_limit"}
 
     def resign(self):
         raise AssertionError("HoK must never resign")

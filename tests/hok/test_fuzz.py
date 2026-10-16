@@ -177,3 +177,52 @@ def test_unowned_seat_in_malformed_pending_and_offers_is_never_controlled(monkey
     assert all(c["seat"] in SEATS for c in game.accepted)
     if mode == "lockstep":
         assert [c["seat"] for c in game.accepted] == [4]
+
+
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+@pytest.mark.parametrize("representation", ["owned", "pending", "action-seat", "mixed"])
+def test_numeric_string_seat_metadata_preserves_playable_owned_hero(monkeypatch, mode, representation):
+    raw = payload(mode=mode, pending=[4], actions=entries(4))
+    if representation in ("owned", "mixed"):
+        raw["seats"] = ["0", 1, "2", 3, "4"]
+    if representation in ("pending", "mixed"):
+        raw["simultaneous"]["your_pending_seats"] = ["4"]
+    if representation in ("action-seat", "mixed"):
+        for action in raw["legal_actions"]["actions"]:
+            action["input"]["action"]["seat"] = "4"
+    game = HokFakeSession([raw])
+    play(game, monkeypatch)
+    assert [(c["seat"], c["command"]) for c in game.accepted] == [(4, "macro_advance")]
+
+
+@pytest.mark.parametrize("representation", ["own-camp", "enemy-camp", "mixed-camps"])
+def test_numeric_string_camp_metadata_does_not_change_visible_threat_response(monkeypatch, representation):
+    raw = payload(pending=[4], actions=entries(4, ("macro_advance", "macro_retreat")))
+    summary = raw["observation"]["seats"]["4"]["summary"]
+    summary["my_hero"].update(hp=1500, x=0, z=0)
+    summary["other_heroes"] = []
+    summary["structures"] = [{"camp": 2, "type": "ACTOR_TOWER", "hp": 6000, "x": 100, "z": 0}]
+    canonical = HokFakeSession([deepcopy(raw)])
+    play(canonical, monkeypatch)
+    assert len(canonical.accepted) == 1
+    if representation in ("own-camp", "mixed-camps"):
+        raw["camp"] = "1"
+        for entry in raw["observation"]["seats"].values():
+            entry["summary"]["my_hero"]["camp"] = "1"
+    if representation in ("enemy-camp", "mixed-camps"):
+        summary["structures"][0]["camp"] = "2"
+    encoded = HokFakeSession([raw])
+    play(encoded, monkeypatch)
+    # This is a representation-invariance test, not a copied tactical cutoff.
+    assert [(c["seat"], c["command"]) for c in encoded.accepted] == [
+        (c["seat"], c["command"]) for c in canonical.accepted
+    ], "integer and numeric-string camp IDs describe exactly the same visible threat"
+
+
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+def test_stringified_current_ownership_never_permits_an_extra_offered_enemy_seat(monkeypatch, mode):
+    raw = payload(mode=mode, pending=["9", "4"], actions=entries(9) + entries(4))
+    raw["seats"] = ["0", "1", "2", "3", "4"]
+    game = HokFakeSession([raw])
+    play(game, monkeypatch)
+    assert [(c["seat"], c["command"]) for c in game.accepted] == [(4, "macro_advance")]
