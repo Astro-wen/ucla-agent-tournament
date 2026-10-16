@@ -1,0 +1,36 @@
+{
+  "scope": "One completed Testing spectator record; no candidate-version or command/receipt evidence",
+  "candidate_strength_test": false,
+  "source_sha256": "7d44cc3123eddd0854919127361a112f849cd6159cb841bd3b56248ea0c60b6d",
+  "event_counts": {
+    "game_created": 1,
+    "move": 540,
+    "game_completed": 1
+  },
+  "unique_observed_steps": 540,
+  "step_first_last": [
+    0,
+    3000
+  ],
+  "max_steps_terminal": 3000,
+  "contract_based_game_span_seconds": 600.0,
+  "draw": true,
+  "winning_camp": null,
+  "termination_reason": "step_limit",
+  "both_camp_all_score_fields_zero_at_all_samples": true,
+  "all_ten_seats_present_at_every_state_sample": true,
+  "evidence_absent": [
+    "Submitted action IDs or macro/raw-button choices",
+    "Per-decision legal actions and agent-specific observations/visibility",
+    "Standing orders, pending-seat sets and server order results/rejections",
+    "Skill casts, skill cooldowns, hit attribution, healing source",
+    "A replay-attested runtime source revision"
+  ],
+  "limitations": [
+    "Spectator samples are not action logs; move events must not be counted as hero commands.",
+    "Unchanged sampled coordinates do not rule out unsampled movement or stale position telemetry.",
+    "HP gains accompanying max-HP changes are not by themselves evidence of healing.",
+    "Zero recorded structure damage does not establish whether any skill was cast or can damage buildings.",
+    "No causal failure or code defect can be established from this replay alone."
+  ]
+}

@@ -1,0 +1,3528 @@
+{
+  "archive_at_08": {
+    "add_audit": "<local-artifact>/hok-independent-evidence-audit-1016.json",
+    "add_for_development_reproduction": [
+      "<local-artifact>/hok-development-public-paired-index.json",
+      "<local-artifact>/evaluator-44e3a65-source.tar.gz",
+      "<local-artifact>/v3-original-86a6f0a-source.tar.gz",
+      "research/source/b05f069/<the four exact Python overlay paths>",
+      "research/source/b05f069/manifest.json (base revision, full captured-package hashes, overlay hashes, factory profiles)",
+      "optional research/source/b05f069/agent/hok/RESEARCH.md and tests/hok/test_research_profiles.py"
+    ],
+    "exclude": [
+      "*-810*-*.json raw run reports",
+      "*.log",
+      "private-command-plan.json",
+      "raw observations/actions/credentials",
+      "unselected research variants in deployed agent"
+    ],
+    "final_bundle": "<local-artifact>/hok-final-public-safe.tar.gz",
+    "final_bundle_members": [
+      "public-duration-examples.json",
+      "public-hero-durations.csv",
+      "public-paired-index.json",
+      "public-provenance.json",
+      "public-results-summary.json",
+      "public-source-manifest.json",
+      "source/current_main/agent/hok/__init__.py",
+      "source/evaluator/local/hok_env.py",
+      "source/evaluator/local/hok_sim.py",
+      "source/evaluator/scripts/hok_eval.py",
+      "source/evaluator/tests/hok/test_sim.py",
+      "source/final_candidate/agent/hok/__init__.py",
+      "source/final_candidate/agent/hok/policy.py",
+      "source/opponents/local/hok_opponents_research.py"
+    ],
+    "optional_audit_script": "<local-artifact>/hok-independent-evidence-audit-1016.py",
+    "sdk_note": "Final tar omits SDK sources, but their recorded hashes were checked against base 0785a42; base snapshot supplies them."
+  },
+  "audit_program": {
+    "command": "<local-artifact>/hok-independent-evidence-audit-1016.py",
+    "game_or_scoring_execution": false,
+    "path": "<local-artifact>/hok-independent-evidence-audit-1016.py",
+    "repository_writes": false,
+    "safe_tar_action": "list members and read approved regular-member bytes in memory only",
+    "sha256": "080a6b0bc33d2eddc7cd54f28774765d560e287154963ef0a0123ec35f6bc5a6"
+  },
+  "checks": {
+    "failed": 0,
+    "failures": [],
+    "mirrored_pair_checks_passed": 1448,
+    "other_checks": [
+      {
+        "actual": 141,
+        "expected": 141,
+        "name": "development.report_count",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "development.all_pair_report_references_resolve",
+        "passed": true
+      },
+      {
+        "actual": 2496,
+        "expected": 2496,
+        "name": "development.recorded_count.unique_generated_legs",
+        "passed": true
+      },
+      {
+        "actual": 1248,
+        "expected": 1248,
+        "name": "development.recorded_count.unique_paired_records",
+        "passed": true
+      },
+      {
+        "actual": 208,
+        "expected": 208,
+        "name": "development.recorded_count.unique_condition_keys_across_policies",
+        "passed": true
+      },
+      {
+        "actual": 2532,
+        "expected": 2532,
+        "name": "development.recorded_count.raw_leg_records",
+        "passed": true
+      },
+      {
+        "actual": 1266,
+        "expected": 1266,
+        "name": "development.recorded_count.raw_paired_records",
+        "passed": true
+      },
+      {
+        "actual": 18,
+        "expected": 18,
+        "name": "development.recorded_count.duplicate_pairs_removed",
+        "passed": true
+      },
+      {
+        "actual": [
+          1101,
+          1102
+        ],
+        "expected": [
+          1101,
+          1102
+        ],
+        "name": "development.recorded_count.world_seeds",
+        "passed": true
+      },
+      {
+        "actual": 1248,
+        "expected": 1248,
+        "name": "development.no_duplicate_policy_condition_key",
+        "passed": true
+      },
+      {
+        "actual": 2496,
+        "expected": 2496,
+        "name": "development.no_duplicate_leg_key",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "development.invalid_actions_zero",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "development.protocol_failures_zero",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "development.native_policy_errors_zero",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "development.unclean_outcomes_zero",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "development.source_changed_reports_zero",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "development.interface_error_reports_zero",
+        "passed": true
+      },
+      {
+        "actual": 8,
+        "expected": 8,
+        "name": "final.report_count",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "final.all_pair_report_references_resolve",
+        "passed": true
+      },
+      {
+        "actual": 400,
+        "expected": 400,
+        "name": "final.recorded_count.unique_generated_legs",
+        "passed": true
+      },
+      {
+        "actual": 200,
+        "expected": 200,
+        "name": "final.recorded_count.unique_paired_records",
+        "passed": true
+      },
+      {
+        "actual": 100,
+        "expected": 100,
+        "name": "final.recorded_count.unique_condition_keys_across_policies",
+        "passed": true
+      },
+      {
+        "actual": 400,
+        "expected": 400,
+        "name": "final.recorded_count.raw_leg_records",
+        "passed": true
+      },
+      {
+        "actual": 200,
+        "expected": 200,
+        "name": "final.recorded_count.raw_paired_records",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.recorded_count.duplicate_pairs_removed",
+        "passed": true
+      },
+      {
+        "actual": [
+          8101,
+          8102
+        ],
+        "expected": [
+          8101,
+          8102
+        ],
+        "name": "final.recorded_count.world_seeds",
+        "passed": true
+      },
+      {
+        "actual": 200,
+        "expected": 200,
+        "name": "final.no_duplicate_policy_condition_key",
+        "passed": true
+      },
+      {
+        "actual": 400,
+        "expected": 400,
+        "name": "final.no_duplicate_leg_key",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.invalid_actions_zero",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.protocol_failures_zero",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.native_policy_errors_zero",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.unclean_outcomes_zero",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.source_changed_reports_zero",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.interface_error_reports_zero",
+        "passed": true
+      },
+      {
+        "actual": 400,
+        "expected": 400,
+        "name": "final.400_records",
+        "passed": true
+      },
+      {
+        "actual": 2,
+        "expected": 2,
+        "name": "final.two_policies",
+        "passed": true
+      },
+      {
+        "actual": 100,
+        "expected": 100,
+        "name": "final.100_conditions",
+        "passed": true
+      },
+      {
+        "actual": [
+          8101,
+          8102
+        ],
+        "expected": [
+          8101,
+          8102
+        ],
+        "name": "final.only_reserved_two_world_seeds",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "final.policies_both_present_for_every_condition",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "final.complete_factorial_grid",
+        "passed": true
+      },
+      {
+        "actual": 400,
+        "expected": 400,
+        "name": "final.factorial_grid_size",
+        "passed": true
+      },
+      {
+        "actual": 400,
+        "expected": 400,
+        "name": "final.summary.generated_legs",
+        "passed": true
+      },
+      {
+        "actual": 100,
+        "expected": 100,
+        "name": "final.summary.matched_conditions",
+        "passed": true
+      },
+      {
+        "actual": {
+          "lockstep": {
+            "draws": 0,
+            "games": 100,
+            "losses": 2,
+            "wins": 98
+          },
+          "realtime": {
+            "draws": 0,
+            "games": 100,
+            "losses": 0,
+            "wins": 100
+          }
+        },
+        "expected": {
+          "lockstep": {
+            "draws": 0,
+            "games": 100,
+            "losses": 2,
+            "wins": 98
+          },
+          "realtime": {
+            "draws": 0,
+            "games": 100,
+            "losses": 0,
+            "wins": 100
+          }
+        },
+        "name": "final.summary.current_main.by_mode",
+        "passed": true
+      },
+      {
+        "actual": {
+          "1": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          },
+          "2": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          }
+        },
+        "expected": {
+          "1": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          },
+          "2": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          }
+        },
+        "name": "final.summary.current_main.by_camp",
+        "passed": true
+      },
+      {
+        "actual": {
+          "counterpunch_interceptor": {
+            "draws": 0,
+            "games": 40,
+            "losses": 2,
+            "wins": 38
+          },
+          "first_legal": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "idle": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "relay_pressure": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "uniform_random": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          }
+        },
+        "expected": {
+          "counterpunch_interceptor": {
+            "draws": 0,
+            "games": 40,
+            "losses": 2,
+            "wins": 38
+          },
+          "first_legal": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "idle": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "relay_pressure": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "uniform_random": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          }
+        },
+        "name": "final.summary.current_main.by_opponent",
+        "passed": true
+      },
+      {
+        "actual": 200,
+        "expected": 200,
+        "name": "final.summary.current_main.games",
+        "passed": true
+      },
+      {
+        "actual": 198,
+        "expected": 198,
+        "name": "final.summary.current_main.wins",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.summary.current_main.draws",
+        "passed": true
+      },
+      {
+        "actual": 2,
+        "expected": 2,
+        "name": "final.summary.current_main.losses",
+        "passed": true
+      },
+      {
+        "actual": {
+          "lockstep": {
+            "draws": 0,
+            "games": 100,
+            "losses": 0,
+            "wins": 100
+          },
+          "realtime": {
+            "draws": 0,
+            "games": 100,
+            "losses": 2,
+            "wins": 98
+          }
+        },
+        "expected": {
+          "lockstep": {
+            "draws": 0,
+            "games": 100,
+            "losses": 0,
+            "wins": 100
+          },
+          "realtime": {
+            "draws": 0,
+            "games": 100,
+            "losses": 2,
+            "wins": 98
+          }
+        },
+        "name": "final.summary.final_candidate.by_mode",
+        "passed": true
+      },
+      {
+        "actual": {
+          "1": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          },
+          "2": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          }
+        },
+        "expected": {
+          "1": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          },
+          "2": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          }
+        },
+        "name": "final.summary.final_candidate.by_camp",
+        "passed": true
+      },
+      {
+        "actual": {
+          "counterpunch_interceptor": {
+            "draws": 0,
+            "games": 40,
+            "losses": 2,
+            "wins": 38
+          },
+          "first_legal": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "idle": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "relay_pressure": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "uniform_random": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          }
+        },
+        "expected": {
+          "counterpunch_interceptor": {
+            "draws": 0,
+            "games": 40,
+            "losses": 2,
+            "wins": 38
+          },
+          "first_legal": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "idle": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "relay_pressure": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "uniform_random": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          }
+        },
+        "name": "final.summary.final_candidate.by_opponent",
+        "passed": true
+      },
+      {
+        "actual": 200,
+        "expected": 200,
+        "name": "final.summary.final_candidate.games",
+        "passed": true
+      },
+      {
+        "actual": 198,
+        "expected": 198,
+        "name": "final.summary.final_candidate.wins",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.summary.final_candidate.draws",
+        "passed": true
+      },
+      {
+        "actual": 2,
+        "expected": 2,
+        "name": "final.summary.final_candidate.losses",
+        "passed": true
+      },
+      {
+        "actual": {
+          "improved": 1,
+          "regressed": 1,
+          "tied": 98
+        },
+        "expected": {
+          "improved": 1,
+          "regressed": 1,
+          "tied": 98
+        },
+        "name": "final.summary.paired_counts",
+        "passed": true
+      },
+      {
+        "actual": {
+          "lockstep": {
+            "improved": 1,
+            "regressed": 0,
+            "tied": 49
+          },
+          "realtime": {
+            "improved": 0,
+            "regressed": 1,
+            "tied": 49
+          }
+        },
+        "expected": {
+          "lockstep": {
+            "improved": 1,
+            "regressed": 0,
+            "tied": 49
+          },
+          "realtime": {
+            "improved": 0,
+            "regressed": 1,
+            "tied": 49
+          }
+        },
+        "name": "final.summary.per_mode_comparison",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "final.all_summary_condition_scores_match_index",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.summary.errors.invalid_actions",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.summary.errors.protocol_failures",
+        "passed": true
+      },
+      {
+        "actual": 0,
+        "expected": 0,
+        "name": "final.summary.errors.native_policy_errors",
+        "passed": true
+      },
+      {
+        "actual": 2000,
+        "expected": 2000,
+        "name": "durations.2000_hero_slots",
+        "passed": true
+      },
+      {
+        "actual": 2000,
+        "expected": 2000,
+        "name": "durations.no_duplicate_hero_slots",
+        "passed": true
+      },
+      {
+        "actual": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "expected": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "name": "durations.hero_role_domain",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.exactly_five_heroes_per_leg",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.leg_keys_match_public_index",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.finite_nonnegative_values",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.idle_plus_retreat_bounded_by_alive",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.alive_total_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.idle_total_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.retreat_total_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.retreat_fraction_of_alive_time",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.largest_cumulative_retreat_s_one_hero",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.longest_stationary_no_gain_idle_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.longest_stationary_no_gain_retreat_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.stationary_no_gain_idle_total_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.stationary_no_gain_retreat_total_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.slots_with_idle_no_progress_ge10s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.slots_with_idle_no_progress_ge30s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.slots_with_retreat_no_progress_ge10s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.current_main.slots_with_retreat_no_progress_ge30s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.alive_total_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.idle_total_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.retreat_total_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.retreat_fraction_of_alive_time",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.largest_cumulative_retreat_s_one_hero",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.longest_stationary_no_gain_idle_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.longest_stationary_no_gain_retreat_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.stationary_no_gain_idle_total_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.stationary_no_gain_retreat_total_s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.slots_with_idle_no_progress_ge10s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.slots_with_idle_no_progress_ge30s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.slots_with_retreat_no_progress_ge10s",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "durations.summary.final_candidate.slots_with_retreat_no_progress_ge30s",
+        "passed": true
+      },
+      {
+        "actual": [],
+        "expected": [],
+        "name": "archive.safe_members",
+        "passed": true
+      },
+      {
+        "actual": 14,
+        "expected": 14,
+        "name": "archive.14_regular_files",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "archive.exact_public_member_allowlist",
+        "passed": true
+      },
+      {
+        "actual": [],
+        "expected": [],
+        "name": "archive.no_raw_runtime_or_credential_json_keys",
+        "passed": true
+      },
+      {
+        "actual": "7727913be02a4faab46ebe247335383f8fd39cbabfba2164b2c0cc25482c3d0e",
+        "expected": "7727913be02a4faab46ebe247335383f8fd39cbabfba2164b2c0cc25482c3d0e",
+        "name": "archive.source_hash.source/current_main/agent/hok/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "9765c9d26dbd7192a904ac5fc69350aa0e66259deace58e663c33ff74f77150a",
+        "expected": "9765c9d26dbd7192a904ac5fc69350aa0e66259deace58e663c33ff74f77150a",
+        "name": "archive.source_hash.source/evaluator/local/hok_env.py",
+        "passed": true
+      },
+      {
+        "actual": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7",
+        "expected": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7",
+        "name": "archive.source_hash.source/evaluator/local/hok_sim.py",
+        "passed": true
+      },
+      {
+        "actual": "7c11cdda782383ed20e57932c9da63869bf84abb424ea96bf9b3e92d47ad8a37",
+        "expected": "7c11cdda782383ed20e57932c9da63869bf84abb424ea96bf9b3e92d47ad8a37",
+        "name": "archive.source_hash.source/evaluator/scripts/hok_eval.py",
+        "passed": true
+      },
+      {
+        "actual": "68d8c16c34835944e36eb5deab18b050af3c93d6c559cb6f45e32f854c057207",
+        "expected": "68d8c16c34835944e36eb5deab18b050af3c93d6c559cb6f45e32f854c057207",
+        "name": "archive.source_hash.source/evaluator/tests/hok/test_sim.py",
+        "passed": true
+      },
+      {
+        "actual": "e193fc68c4f23b4f72bf6bb1f8edb80bdbad894643c9fb9793358554c9a319f6",
+        "expected": "e193fc68c4f23b4f72bf6bb1f8edb80bdbad894643c9fb9793358554c9a319f6",
+        "name": "archive.source_hash.source/final_candidate/agent/hok/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "53de6d67acd3d07c80d28330656f84e1252394ea082d3efc6dc6206f90635f3a",
+        "expected": "53de6d67acd3d07c80d28330656f84e1252394ea082d3efc6dc6206f90635f3a",
+        "name": "archive.source_hash.source/final_candidate/agent/hok/policy.py",
+        "passed": true
+      },
+      {
+        "actual": "67ecc0238f093f5698c3ac7e4994e86aa7a7363fccbb915341bc8a59b45ff651",
+        "expected": "67ecc0238f093f5698c3ac7e4994e86aa7a7363fccbb915341bc8a59b45ff651",
+        "name": "archive.source_hash.source/opponents/local/hok_opponents_research.py",
+        "passed": true
+      },
+      {
+        "actual": "b774be1af9df11a89267c8ea305114da361b633ddf4d64176e87d356f2f03e4a",
+        "expected": "b774be1af9df11a89267c8ea305114da361b633ddf4d64176e87d356f2f03e4a",
+        "name": "archive.public_file_identical.public-duration-examples.json",
+        "passed": true
+      },
+      {
+        "actual": "c043515f4a74ee5a533edd2d87e3d1283f7bc950b96518a69d34336d11b096ae",
+        "expected": "c043515f4a74ee5a533edd2d87e3d1283f7bc950b96518a69d34336d11b096ae",
+        "name": "archive.public_file_identical.public-hero-durations.csv",
+        "passed": true
+      },
+      {
+        "actual": "52cac5fe3f57e8786fa08e669fe4d5f2b5f04df03834fba8874324c36a1ab65a",
+        "expected": "52cac5fe3f57e8786fa08e669fe4d5f2b5f04df03834fba8874324c36a1ab65a",
+        "name": "archive.public_file_identical.public-paired-index.json",
+        "passed": true
+      },
+      {
+        "actual": "935d477228b36e691f915ecd0f30a5ac7115a00bc6218ff80a53609ce01909ac",
+        "expected": "935d477228b36e691f915ecd0f30a5ac7115a00bc6218ff80a53609ce01909ac",
+        "name": "archive.public_file_identical.public-provenance.json",
+        "passed": true
+      },
+      {
+        "actual": "9d01180597077c567eb66aceac280e5e7c691b651bd16796b04e5f12af8a4e06",
+        "expected": "9d01180597077c567eb66aceac280e5e7c691b651bd16796b04e5f12af8a4e06",
+        "name": "archive.public_file_identical.public-results-summary.json",
+        "passed": true
+      },
+      {
+        "actual": "d3b3563463b790929588ca17ed24b629f1afde181d06988fac151166f54faa74",
+        "expected": "d3b3563463b790929588ca17ed24b629f1afde181d06988fac151166f54faa74",
+        "name": "archive.public_file_identical.public-source-manifest.json",
+        "passed": true
+      },
+      {
+        "actual": "9765c9d26dbd7192a904ac5fc69350aa0e66259deace58e663c33ff74f77150a",
+        "expected": "9765c9d26dbd7192a904ac5fc69350aa0e66259deace58e663c33ff74f77150a",
+        "name": "archive.evaluator_provenance.local/hok_env.py",
+        "passed": true
+      },
+      {
+        "actual": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7",
+        "expected": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7",
+        "name": "archive.evaluator_provenance.local/hok_sim.py",
+        "passed": true
+      },
+      {
+        "actual": "7c11cdda782383ed20e57932c9da63869bf84abb424ea96bf9b3e92d47ad8a37",
+        "expected": "7c11cdda782383ed20e57932c9da63869bf84abb424ea96bf9b3e92d47ad8a37",
+        "name": "archive.evaluator_provenance.scripts/hok_eval.py",
+        "passed": true
+      },
+      {
+        "actual": "ba7a3411ac53f5831185d308f550ed5afe2ef346d24746837ab6118287aab8a1",
+        "expected": "ba7a3411ac53f5831185d308f550ed5afe2ef346d24746837ab6118287aab8a1",
+        "name": "reproduction.base_sdk_matches.altruagent/models.py",
+        "passed": true
+      },
+      {
+        "actual": "29f45f8fdc4757551ac54c828756e3321df05a4ded5dc1db5af741239b9b736a",
+        "expected": "29f45f8fdc4757551ac54c828756e3321df05a4ded5dc1db5af741239b9b736a",
+        "name": "reproduction.base_sdk_matches.altruagent/runner.py",
+        "passed": true
+      },
+      {
+        "actual": "7727913be02a4faab46ebe247335383f8fd39cbabfba2164b2c0cc25482c3d0e",
+        "expected": "7727913be02a4faab46ebe247335383f8fd39cbabfba2164b2c0cc25482c3d0e",
+        "name": "archive.git_snapshot.current_main.__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "54c36ae70be6c486f1bc05466a36d9842fc90966db2683fdbd48e4013da15e21",
+        "expected": "54c36ae70be6c486f1bc05466a36d9842fc90966db2683fdbd48e4013da15e21",
+        "name": "archive.package_hash.current_main",
+        "passed": true
+      },
+      {
+        "actual": "e193fc68c4f23b4f72bf6bb1f8edb80bdbad894643c9fb9793358554c9a319f6",
+        "expected": "e193fc68c4f23b4f72bf6bb1f8edb80bdbad894643c9fb9793358554c9a319f6",
+        "name": "archive.git_snapshot.final_candidate.__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "53de6d67acd3d07c80d28330656f84e1252394ea082d3efc6dc6206f90635f3a",
+        "expected": "53de6d67acd3d07c80d28330656f84e1252394ea082d3efc6dc6206f90635f3a",
+        "name": "archive.git_snapshot.final_candidate.policy.py",
+        "passed": true
+      },
+      {
+        "actual": "3a12c0747d551c7f1fac33cd8995e01952e21e8713fbb81edeea0e20cf1a9f67",
+        "expected": "3a12c0747d551c7f1fac33cd8995e01952e21e8713fbb81edeea0e20cf1a9f67",
+        "name": "archive.package_hash.final_candidate",
+        "passed": true
+      },
+      {
+        "actual": "67ecc0238f093f5698c3ac7e4994e86aa7a7363fccbb915341bc8a59b45ff651",
+        "expected": "67ecc0238f093f5698c3ac7e4994e86aa7a7363fccbb915341bc8a59b45ff651",
+        "name": "archive.opponent_snapshot_matches_commit",
+        "passed": true
+      },
+      {
+        "actual": "21b6cecfd3461724bb6b2d6b97a709c5726f2e71a445e22c078ffa74fdfb478a",
+        "expected": "21b6cecfd3461724bb6b2d6b97a709c5726f2e71a445e22c078ffa74fdfb478a",
+        "name": "archive.opponent_captured_package_hash",
+        "passed": true
+      },
+      {
+        "actual": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "name": "archive.opponent_captured_file.agent/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "9e167a157678d82d7f76630f6ee874b66c6f6660c17f3bf9b8c9e1c3528b3864",
+        "expected": "9e167a157678d82d7f76630f6ee874b66c6f6660c17f3bf9b8c9e1c3528b3864",
+        "name": "archive.opponent_captured_file.agent/__main__.py",
+        "passed": true
+      },
+      {
+        "actual": "debb3698ad05fd9743497e938a238c6533fe12eb1c993f3b885473cf9df07c00",
+        "expected": "debb3698ad05fd9743497e938a238c6533fe12eb1c993f3b885473cf9df07c00",
+        "name": "archive.opponent_captured_file.agent/agent.py",
+        "passed": true
+      },
+      {
+        "actual": "de7bbf3d26838356ff69c57e10fae4d1ca88df7465d5bdddc7004cdafc278ee1",
+        "expected": "de7bbf3d26838356ff69c57e10fae4d1ca88df7465d5bdddc7004cdafc278ee1",
+        "name": "archive.opponent_captured_file.agent/fallback.py",
+        "passed": true
+      },
+      {
+        "actual": "db4e1842ecfeffd654b193f0bdc30c2bf9c06cd6a7bcca0cb9172fc1aaf32302",
+        "expected": "db4e1842ecfeffd654b193f0bdc30c2bf9c06cd6a7bcca0cb9172fc1aaf32302",
+        "name": "archive.opponent_captured_file.agent/health.py",
+        "passed": true
+      },
+      {
+        "actual": "6ac5a7e1716ad8603bbf3ceb7b868c268fab55558748bb258de48dc2ac15d202",
+        "expected": "6ac5a7e1716ad8603bbf3ceb7b868c268fab55558748bb258de48dc2ac15d202",
+        "name": "archive.opponent_captured_file.agent/hok/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "0f73ae2bfedb179ffdb7c7e608091f7fa872d125e7a3f6432b8a989f99cacc4a",
+        "expected": "0f73ae2bfedb179ffdb7c7e608091f7fa872d125e7a3f6432b8a989f99cacc4a",
+        "name": "archive.opponent_captured_file.agent/hok/policy.py",
+        "passed": true
+      },
+      {
+        "actual": "ca7efb044419af008cd3893358f58e0ee9e9b4a5c54a2257076333805d00c0d0",
+        "expected": "ca7efb044419af008cd3893358f58e0ee9e9b4a5c54a2257076333805d00c0d0",
+        "name": "archive.opponent_captured_file.agent/matchstate.py",
+        "passed": true
+      },
+      {
+        "actual": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "name": "archive.opponent_captured_file.agent/pokemon/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "a22d0a259c7d519a94d91899bb7ba14957ed37091c7d24d94182758fa467b3b7",
+        "expected": "a22d0a259c7d519a94d91899bb7ba14957ed37091c7d24d94182758fa467b3b7",
+        "name": "archive.opponent_captured_file.agent/pokemon/battlelog.py",
+        "passed": true
+      },
+      {
+        "actual": "cc4e09fa8e145a4c5eff86bd656c1f2916ff8fe3f7dafe0e4324e93ff79274b2",
+        "expected": "cc4e09fa8e145a4c5eff86bd656c1f2916ff8fe3f7dafe0e4324e93ff79274b2",
+        "name": "archive.opponent_captured_file.agent/pokemon/battlestate.py",
+        "passed": true
+      },
+      {
+        "actual": "b1acb5ea0795e1fd06244be798f08bd148c89ea5606d7d2f33357be01b0ac242",
+        "expected": "b1acb5ea0795e1fd06244be798f08bd148c89ea5606d7d2f33357be01b0ac242",
+        "name": "archive.opponent_captured_file.agent/pokemon/calc.py",
+        "passed": true
+      },
+      {
+        "actual": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+        "expected": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+        "name": "archive.opponent_captured_file.agent/pokemon/dex.py",
+        "passed": true
+      },
+      {
+        "actual": "08f65500257abaccabcfb09a76c4f2f91fd254b917e58e3666fa4aaea23566fe",
+        "expected": "08f65500257abaccabcfb09a76c4f2f91fd254b917e58e3666fa4aaea23566fe",
+        "name": "archive.opponent_captured_file.agent/pokemon/drafter.py",
+        "passed": true
+      },
+      {
+        "actual": "5ab618cbfce39b533fb7038dbad8366fdc1775362341cd2dda9446a003e01a5f",
+        "expected": "5ab618cbfce39b533fb7038dbad8366fdc1775362341cd2dda9446a003e01a5f",
+        "name": "archive.opponent_captured_file.agent/pokemon/engine.py",
+        "passed": true
+      },
+      {
+        "actual": "c1cf709b3a31cff4d65026bb19231d892121d3c39ce786c024e7f45bb24dcab0",
+        "expected": "c1cf709b3a31cff4d65026bb19231d892121d3c39ce786c024e7f45bb24dcab0",
+        "name": "archive.opponent_captured_file.agent/pokemon/lookahead.py",
+        "passed": true
+      },
+      {
+        "actual": "a236cacb061c19326c31b23659ba6475fd24be26faf451cfc800658a3a07e146",
+        "expected": "a236cacb061c19326c31b23659ba6475fd24be26faf451cfc800658a3a07e146",
+        "name": "archive.opponent_captured_file.agent/pokemon/matchup.py",
+        "passed": true
+      },
+      {
+        "actual": "99708567c3715ad0495481e91a3e3fbd8a1058aab87d2c3bd35cbc6fe2f75ed2",
+        "expected": "99708567c3715ad0495481e91a3e3fbd8a1058aab87d2c3bd35cbc6fe2f75ed2",
+        "name": "archive.opponent_captured_file.agent/pokemon/policy.py",
+        "passed": true
+      },
+      {
+        "actual": "2d8ecd8597167e725823a1d43387a9d7d06fe798a8a712b0e50c506eb88cbd65",
+        "expected": "2d8ecd8597167e725823a1d43387a9d7d06fe798a8a712b0e50c506eb88cbd65",
+        "name": "archive.opponent_captured_file.agent/pokemon/preview.py",
+        "passed": true
+      },
+      {
+        "actual": "4dbaae167655b463cf79a016adeefeb47ee8dfcf7482d9e5b57fb7a5084c8c28",
+        "expected": "4dbaae167655b463cf79a016adeefeb47ee8dfcf7482d9e5b57fb7a5084c8c28",
+        "name": "archive.opponent_captured_file.agent/pokemon/singles.py",
+        "passed": true
+      },
+      {
+        "actual": "1b78f0cdbf4e9b3d1b4364e1828f0663b0e6eb9cde0fd33bfa42be9d71e0c1a9",
+        "expected": "1b78f0cdbf4e9b3d1b4364e1828f0663b0e6eb9cde0fd33bfa42be9d71e0c1a9",
+        "name": "archive.opponent_captured_file.agent/pokemon/stats.py",
+        "passed": true
+      },
+      {
+        "actual": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+        "expected": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+        "name": "archive.opponent_captured_file.agent/pokemon/typechart.py",
+        "passed": true
+      },
+      {
+        "actual": "ae0738001984b67544cbd873af411ace0a238f46ca43b638ef02b5c889fa0184",
+        "expected": "ae0738001984b67544cbd873af411ace0a238f46ca43b638ef02b5c889fa0184",
+        "name": "archive.opponent_captured_file.agent/reasoning.py",
+        "passed": true
+      },
+      {
+        "actual": "6b01714db1e40f77872ee28662cc913798a9d4e24cc312936af1d46e67250c96",
+        "expected": "6b01714db1e40f77872ee28662cc913798a9d4e24cc312936af1d46e67250c96",
+        "name": "archive.opponent_captured_file.agent/redalert/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "868bb138bc2533026f32b1167328cb572e39f74cade55a78e309a9d0c99c5833",
+        "expected": "868bb138bc2533026f32b1167328cb572e39f74cade55a78e309a9d0c99c5833",
+        "name": "archive.opponent_captured_file.agent/redalert/army.py",
+        "passed": true
+      },
+      {
+        "actual": "6fd9a3fb449b09eafc90ae0aefd887cdb732b0374bffd09b59a01830bcef0ce9",
+        "expected": "6fd9a3fb449b09eafc90ae0aefd887cdb732b0374bffd09b59a01830bcef0ce9",
+        "name": "archive.opponent_captured_file.agent/redalert/counters.py",
+        "passed": true
+      },
+      {
+        "actual": "dfc18b8df5014fa572dd01b0a2ac1816e5965ee4f453926b6232e38379b21ebe",
+        "expected": "dfc18b8df5014fa572dd01b0a2ac1816e5965ee4f453926b6232e38379b21ebe",
+        "name": "archive.opponent_captured_file.agent/redalert/economy.py",
+        "passed": true
+      },
+      {
+        "actual": "3e2ec562bbaefbb80eb3503163611e878eba8e933ed8545020b64b8135cda05f",
+        "expected": "3e2ec562bbaefbb80eb3503163611e878eba8e933ed8545020b64b8135cda05f",
+        "name": "archive.opponent_captured_file.agent/redalert/harvest.py",
+        "passed": true
+      },
+      {
+        "actual": "d7aab57638688d4697dffa2446b8d230e6057f56eba3ef56b33429e4f53afab0",
+        "expected": "d7aab57638688d4697dffa2446b8d230e6057f56eba3ef56b33429e4f53afab0",
+        "name": "archive.opponent_captured_file.agent/redalert/ledger.py",
+        "passed": true
+      },
+      {
+        "actual": "1adef01e009f06038fe4c2f006c3ef6ba7696b2f3d61c8ad34949fccf9078edb",
+        "expected": "1adef01e009f06038fe4c2f006c3ef6ba7696b2f3d61c8ad34949fccf9078edb",
+        "name": "archive.opponent_captured_file.agent/redalert/orders.py",
+        "passed": true
+      },
+      {
+        "actual": "f53d7a5e309678522a3595d16528449ef0cbe398c6fb7210f6983f3d9d55f18d",
+        "expected": "f53d7a5e309678522a3595d16528449ef0cbe398c6fb7210f6983f3d9d55f18d",
+        "name": "archive.opponent_captured_file.agent/redalert/params.py",
+        "passed": true
+      },
+      {
+        "actual": "6da933e276363b35847d48888e4a586acf65d59c59d3e62b1db4fb3913804afc",
+        "expected": "6da933e276363b35847d48888e4a586acf65d59c59d3e62b1db4fb3913804afc",
+        "name": "archive.opponent_captured_file.agent/redalert/production.py",
+        "passed": true
+      },
+      {
+        "actual": "de90c2b082c9cc28e0b8ef3f9d39ae351b28705e7bb79d06ff18a05df71dc67b",
+        "expected": "de90c2b082c9cc28e0b8ef3f9d39ae351b28705e7bb79d06ff18a05df71dc67b",
+        "name": "archive.opponent_captured_file.agent/redalert/safe.py",
+        "passed": true
+      },
+      {
+        "actual": "2b5ea94ba8d943a975ca783b8764bbc50227ac89da568224f70630957c8a93dc",
+        "expected": "2b5ea94ba8d943a975ca783b8764bbc50227ac89da568224f70630957c8a93dc",
+        "name": "archive.opponent_captured_file.agent/redalert/world.py",
+        "passed": true
+      },
+      {
+        "actual": "960b99d826cb3ae5241f0b00bb77c9d05ca087fda275afd787a6786cf556f251",
+        "expected": "960b99d826cb3ae5241f0b00bb77c9d05ca087fda275afd787a6786cf556f251",
+        "name": "archive.opponent_captured_file.agent/timecontrol.py",
+        "passed": true
+      },
+      {
+        "actual": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "name": "archive.opponent_captured_file.agent/werewolf/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "537b6bdb9f376bce2f23ebf193746eda11d956122f66f874e56a2520c0eec0a6",
+        "expected": "537b6bdb9f376bce2f23ebf193746eda11d956122f66f874e56a2520c0eec0a6",
+        "name": "archive.opponent_captured_file.agent/werewolf/policy.py",
+        "passed": true
+      },
+      {
+        "actual": "e07d8691b1271cf35898cfdffd4be692dec653f18040781aa49b18527601a022",
+        "expected": "e07d8691b1271cf35898cfdffd4be692dec653f18040781aa49b18527601a022",
+        "name": "archive.opponent_captured_file.agent/werewolf/state.py",
+        "passed": true
+      },
+      {
+        "actual": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "name": "archive.opponent_captured_file.local/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "fd6bd3e639de9154276edaeb7a47c335424cc30d7c4dc94ace561a1562a5520e",
+        "expected": "fd6bd3e639de9154276edaeb7a47c335424cc30d7c4dc94ace561a1562a5520e",
+        "name": "archive.opponent_captured_file.local/benchmark.py",
+        "passed": true
+      },
+      {
+        "actual": "8b7f6fa89965413e2777922070ab4577b059e24eb9a502a09277a7cd1358142a",
+        "expected": "8b7f6fa89965413e2777922070ab4577b059e24eb9a502a09277a7cd1358142a",
+        "name": "archive.opponent_captured_file.local/eval_pokemon.py",
+        "passed": true
+      },
+      {
+        "actual": "981b839de13e945d85d86124d25e8a48e3a0265bc5bda10941c984402a1316c4",
+        "expected": "981b839de13e945d85d86124d25e8a48e3a0265bc5bda10941c984402a1316c4",
+        "name": "archive.opponent_captured_file.local/eval_werewolf.py",
+        "passed": true
+      },
+      {
+        "actual": "a2865f39df6022ca5de4a37fc04092c1d521101df2960399fbfd236ef02750dc",
+        "expected": "a2865f39df6022ca5de4a37fc04092c1d521101df2960399fbfd236ef02750dc",
+        "name": "archive.opponent_captured_file.local/ext_opp.py",
+        "passed": true
+      },
+      {
+        "actual": "72bf08b7a1742d908671910096d9b01ef81d691998346d00d328e4bf9225d9b6",
+        "expected": "72bf08b7a1742d908671910096d9b01ef81d691998346d00d328e4bf9225d9b6",
+        "name": "archive.opponent_captured_file.local/fake_official.py",
+        "passed": true
+      },
+      {
+        "actual": "39a05ec336580048fcb317590532d097cf819cee94ef05c65b62a669f8040760",
+        "expected": "39a05ec336580048fcb317590532d097cf819cee94ef05c65b62a669f8040760",
+        "name": "archive.opponent_captured_file.local/fake_platform.py",
+        "passed": true
+      },
+      {
+        "actual": "ec7ee87ce0a86bc05a6c22df2f5839278750de93b8ede975cf539bc5b434b596",
+        "expected": "ec7ee87ce0a86bc05a6c22df2f5839278750de93b8ede975cf539bc5b434b596",
+        "name": "archive.opponent_captured_file.local/fake_redalert.py",
+        "passed": true
+      },
+      {
+        "actual": "6a615a35ec2151a19a37498355ac8b9b767a589f339cb71b098dccbc0cd6e77c",
+        "expected": "6a615a35ec2151a19a37498355ac8b9b767a589f339cb71b098dccbc0cd6e77c",
+        "name": "archive.opponent_captured_file.local/field_opps.py",
+        "passed": true
+      },
+      {
+        "actual": "67ecc0238f093f5698c3ac7e4994e86aa7a7363fccbb915341bc8a59b45ff651",
+        "expected": "67ecc0238f093f5698c3ac7e4994e86aa7a7363fccbb915341bc8a59b45ff651",
+        "name": "archive.opponent_captured_file.local/hok_opponents_research.py",
+        "passed": true
+      },
+      {
+        "actual": "2c3655e1769ae1f9374ba20d77d4c1545638b3af011ef54a447c2ba3a47d271b",
+        "expected": "2c3655e1769ae1f9374ba20d77d4c1545638b3af011ef54a447c2ba3a47d271b",
+        "name": "archive.opponent_captured_file.local/ladder.py",
+        "passed": true
+      },
+      {
+        "actual": "8c2913206a18ffa56174c11625a1e9a3941c533a5e3087dcaf0cef174eddc770",
+        "expected": "8c2913206a18ffa56174c11625a1e9a3941c533a5e3087dcaf0cef174eddc770",
+        "name": "archive.opponent_captured_file.local/llm_client.py",
+        "passed": true
+      },
+      {
+        "actual": "d103445613f4d3c9731fc306eee71ea27181bfebcf71e55e1a4eed267eeffbf6",
+        "expected": "d103445613f4d3c9731fc306eee71ea27181bfebcf71e55e1a4eed267eeffbf6",
+        "name": "archive.opponent_captured_file.local/llm_seats.py",
+        "passed": true
+      },
+      {
+        "actual": "65de2a960b38c2aca9eacc07db0ced19caf9f3b9f98f3d725cf4b09c6396869f",
+        "expected": "65de2a960b38c2aca9eacc07db0ced19caf9f3b9f98f3d725cf4b09c6396869f",
+        "name": "archive.opponent_captured_file.local/meta_opp.py",
+        "passed": true
+      },
+      {
+        "actual": "abed1e8d62e31c39ac907701f4951f03c09ba0ffebe7df0c938ababc6f8bd5a0",
+        "expected": "abed1e8d62e31c39ac907701f4951f03c09ba0ffebe7df0c938ababc6f8bd5a0",
+        "name": "archive.opponent_captured_file.local/panel.py",
+        "passed": true
+      },
+      {
+        "actual": "86c656634694a878a79d80fd52a7e89c2b2ecf9326be2024534657862e169693",
+        "expected": "86c656634694a878a79d80fd52a7e89c2b2ecf9326be2024534657862e169693",
+        "name": "archive.opponent_captured_file.local/panel_bots.py",
+        "passed": true
+      },
+      {
+        "actual": "06809343a10319aec35a26a4a77956b0c64ba3691e0290cdfec1289671841678",
+        "expected": "06809343a10319aec35a26a4a77956b0c64ba3691e0290cdfec1289671841678",
+        "name": "archive.opponent_captured_file.local/pokemon_env.py",
+        "passed": true
+      },
+      {
+        "actual": "dd306caac132ed0a1e5388588f5c03c153c35dba3a10109d278d6ef40142d4e9",
+        "expected": "dd306caac132ed0a1e5388588f5c03c153c35dba3a10109d278d6ef40142d4e9",
+        "name": "archive.opponent_captured_file.local/pool.py",
+        "passed": true
+      },
+      {
+        "actual": "378bc5ac7843734edf93922bc2bdea54b0a1ca7e21caf42395697f0d3b95d7d9",
+        "expected": "378bc5ac7843734edf93922bc2bdea54b0a1ca7e21caf42395697f0d3b95d7d9",
+        "name": "archive.opponent_captured_file.local/ra_bots.py",
+        "passed": true
+      },
+      {
+        "actual": "2091d0f421c6264cbc701989ba4d9a58eb03f8f52406f31f18023ba6d596d05f",
+        "expected": "2091d0f421c6264cbc701989ba4d9a58eb03f8f52406f31f18023ba6d596d05f",
+        "name": "archive.opponent_captured_file.local/ra_bots_strong.py",
+        "passed": true
+      },
+      {
+        "actual": "6d9b5ffc4cb6d8c66fe3ae3714c564aee921ddc9c1a15de2bd982bac0143c90f",
+        "expected": "6d9b5ffc4cb6d8c66fe3ae3714c564aee921ddc9c1a15de2bd982bac0143c90f",
+        "name": "archive.opponent_captured_file.local/ra_platform.py",
+        "passed": true
+      },
+      {
+        "actual": "e37f008482bc737d9f5e4f5113c41c0f9befd628f39798c42d154c8a11d9c1cf",
+        "expected": "e37f008482bc737d9f5e4f5113c41c0f9befd628f39798c42d154c8a11d9c1cf",
+        "name": "archive.opponent_captured_file.local/ra_rules.py",
+        "passed": true
+      },
+      {
+        "actual": "56253598979821c26f7ff0b698f58b4d0071edd2fce70105bd884296bfad1022",
+        "expected": "56253598979821c26f7ff0b698f58b4d0071edd2fce70105bd884296bfad1022",
+        "name": "archive.opponent_captured_file.local/ra_server.py",
+        "passed": true
+      },
+      {
+        "actual": "7c110ae24612aedb2119ee3bddfedac2e27e7624b073547d2ef275927ecfce6b",
+        "expected": "7c110ae24612aedb2119ee3bddfedac2e27e7624b073547d2ef275927ecfce6b",
+        "name": "archive.opponent_captured_file.local/ra_sim.py",
+        "passed": true
+      },
+      {
+        "actual": "2c32ff92aa45df207b11ac20bd1992ec7e85110971c1c3ed7798f2be2cc40ec9",
+        "expected": "2c32ff92aa45df207b11ac20bd1992ec7e85110971c1c3ed7798f2be2cc40ec9",
+        "name": "archive.opponent_captured_file.local/redteam_chaos.py",
+        "passed": true
+      },
+      {
+        "actual": "824af98dbf07536fcdabd41d0bc99f72dff762e23182a27648f820c4ade04f8c",
+        "expected": "824af98dbf07536fcdabd41d0bc99f72dff762e23182a27648f820c4ade04f8c",
+        "name": "archive.opponent_captured_file.local/redteam_detective.py",
+        "passed": true
+      },
+      {
+        "actual": "1b612626290e0fe0745ee60aa000918861d0ff82770fbed3dfee9c9000569e35",
+        "expected": "1b612626290e0fe0745ee60aa000918861d0ff82770fbed3dfee9c9000569e35",
+        "name": "archive.opponent_captured_file.local/redteam_measure.py",
+        "passed": true
+      },
+      {
+        "actual": "bbfbe13f50ce9049c6fb0a66742ffce33444fafe50a6475f4d0bca45e6f355c6",
+        "expected": "bbfbe13f50ce9049c6fb0a66742ffce33444fafe50a6475f4d0bca45e6f355c6",
+        "name": "archive.opponent_captured_file.local/redteam_talker.py",
+        "passed": true
+      },
+      {
+        "actual": "9f1c084a8c5df144e8095bcfec539bc326045ea2360027a47ebcb2f74a0b4f45",
+        "expected": "9f1c084a8c5df144e8095bcfec539bc326045ea2360027a47ebcb2f74a0b4f45",
+        "name": "archive.opponent_captured_file.local/redteam_wolfpack.py",
+        "passed": true
+      },
+      {
+        "actual": "d40dc6e30021767cf33255691aeac4a26ea2be4db480beab4b75bb9fe31ca5e9",
+        "expected": "d40dc6e30021767cf33255691aeac4a26ea2be4db480beab4b75bb9fe31ca5e9",
+        "name": "archive.opponent_captured_file.local/showdown.py",
+        "passed": true
+      },
+      {
+        "actual": "572c2c5fa8bfd28fa97743b49779a98b7aa19da49451ef8c6a4c10e702d72d66",
+        "expected": "572c2c5fa8bfd28fa97743b49779a98b7aa19da49451ef8c6a4c10e702d72d66",
+        "name": "archive.opponent_captured_file.local/singles_env.py",
+        "passed": true
+      },
+      {
+        "actual": "253706de66d928c669223f432f948aa8f2729302b3028deea0e8f2b4dafbe940",
+        "expected": "253706de66d928c669223f432f948aa8f2729302b3028deea0e8f2b4dafbe940",
+        "name": "archive.opponent_captured_file.local/singles_eval.py",
+        "passed": true
+      },
+      {
+        "actual": "a4182a6309b3099260d4b4d6606d65969cbb173fd321a0d480cf71085d0c0131",
+        "expected": "a4182a6309b3099260d4b4d6606d65969cbb173fd321a0d480cf71085d0c0131",
+        "name": "archive.opponent_captured_file.local/singles_replay.py",
+        "passed": true
+      },
+      {
+        "actual": "4fd88f513b91dbccb02ff3b3438d2ff53c036906b4a6019bf68ee5e5960650ad",
+        "expected": "4fd88f513b91dbccb02ff3b3438d2ff53c036906b4a6019bf68ee5e5960650ad",
+        "name": "archive.opponent_captured_file.local/sparring/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+        "expected": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+        "expected": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "b1da2849aa2ffadb11e49c741c9f8ce989a2334abee6f52298319087fb960e83",
+        "expected": "b1da2849aa2ffadb11e49c741c9f8ce989a2334abee6f52298319087fb960e83",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/__main__.py",
+        "passed": true
+      },
+      {
+        "actual": "05690c44725bc1503189dca1cdc59c96a49dbac7592a1329861b245b38d563e0",
+        "expected": "05690c44725bc1503189dca1cdc59c96a49dbac7592a1329861b245b38d563e0",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/agent.py",
+        "passed": true
+      },
+      {
+        "actual": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+        "expected": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/pokemon/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "a28b9e20da2e7cdd831dc66983b3c87f94c5cc7344e5b655163ab469c2fd4620",
+        "expected": "a28b9e20da2e7cdd831dc66983b3c87f94c5cc7344e5b655163ab469c2fd4620",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/pokemon/calc.py",
+        "passed": true
+      },
+      {
+        "actual": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+        "expected": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/pokemon/dex.py",
+        "passed": true
+      },
+      {
+        "actual": "268cc567ded76ddf018cdf21751400e9666d6dc28221428dd79770e7c32c6877",
+        "expected": "268cc567ded76ddf018cdf21751400e9666d6dc28221428dd79770e7c32c6877",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/pokemon/lookahead.py",
+        "passed": true
+      },
+      {
+        "actual": "da152b69cb75d702196d5d70d9e159ab4c782262149fdcf4032b555d08fc5c91",
+        "expected": "da152b69cb75d702196d5d70d9e159ab4c782262149fdcf4032b555d08fc5c91",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/pokemon/policy.py",
+        "passed": true
+      },
+      {
+        "actual": "66cdd5980b19a9ff29c6746c70f50177463889412f6583b3045436e0295ea8ab",
+        "expected": "66cdd5980b19a9ff29c6746c70f50177463889412f6583b3045436e0295ea8ab",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/pokemon/stats.py",
+        "passed": true
+      },
+      {
+        "actual": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+        "expected": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/pokemon/typechart.py",
+        "passed": true
+      },
+      {
+        "actual": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+        "expected": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/werewolf/__init__.py",
+        "passed": true
+      },
+      {
+        "actual": "b271c8f2b731bac127f27116c933e87b00c587bce2dbb5787455160ecef38a4c",
+        "expected": "b271c8f2b731bac127f27116c933e87b00c587bce2dbb5787455160ecef38a4c",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/werewolf/policy.py",
+        "passed": true
+      },
+      {
+        "actual": "628c3ad5b6d5ed43dda51c29435285f5757b505d5b2cf573960b8b891c537ffc",
+        "expected": "628c3ad5b6d5ed43dda51c29435285f5757b505d5b2cf573960b8b891c537ffc",
+        "name": "archive.opponent_captured_file.local/sparring/v2_cautious/agent/werewolf/state.py",
+        "passed": true
+      },
+      {
+        "actual": "d059e0466dc3fd29f6030ade73f37b7e558eede18822c6333dfe482a9c87ff26",
+        "expected": "d059e0466dc3fd29f6030ade73f37b7e558eede18822c6333dfe482a9c87ff26",
+        "name": "archive.opponent_captured_file.local/vgcbench_opp.py",
+        "passed": true
+      },
+      {
+        "actual": "354e4a7d1f816a2d1eb3e55d72fdda2ee0002f25e2b73c71c745c1b30f1f427b",
+        "expected": "354e4a7d1f816a2d1eb3e55d72fdda2ee0002f25e2b73c71c745c1b30f1f427b",
+        "name": "archive.opponent_captured_file.local/vgcbench_worker.py",
+        "passed": true
+      },
+      {
+        "actual": "f96b67cd735e8b054456f8f57297324a853394d919473c4718f52312b9ddcd8e",
+        "expected": "f96b67cd735e8b054456f8f57297324a853394d919473c4718f52312b9ddcd8e",
+        "name": "archive.opponent_captured_file.local/werewolf_benchmark.py",
+        "passed": true
+      },
+      {
+        "actual": "bf58c419ab7e4058706f21aee3131e2f8676c75a1a75a8ad8cef9507230cb2a0",
+        "expected": "bf58c419ab7e4058706f21aee3131e2f8676c75a1a75a8ad8cef9507230cb2a0",
+        "name": "archive.opponent_captured_file.local/werewolf_bots.py",
+        "passed": true
+      },
+      {
+        "actual": "a0f878d86d2c7e5acbee74e1c0f43e4180d31717b342b8b1d806c2567c04fb0f",
+        "expected": "a0f878d86d2c7e5acbee74e1c0f43e4180d31717b342b8b1d806c2567c04fb0f",
+        "name": "archive.opponent_captured_file.local/werewolf_env.py",
+        "passed": true
+      },
+      {
+        "actual": "4262b246e604020082d00383324144eb0270fd314b84411231ddc0b748c934c2",
+        "expected": "4262b246e604020082d00383324144eb0270fd314b84411231ddc0b748c934c2",
+        "name": "archive.opponent_captured_file.local/werewolf_guard_bots.py",
+        "passed": true
+      },
+      {
+        "actual": "48405ba5c8da9eb6f3e53fe699a35aa8f99cc64186f769cd3c474e0e11a72828",
+        "expected": "48405ba5c8da9eb6f3e53fe699a35aa8f99cc64186f769cd3c474e0e11a72828",
+        "name": "archive.opponent_captured_file.local/werewolf_platform.py",
+        "passed": true
+      },
+      {
+        "actual": [],
+        "expected": [],
+        "name": "development.source_archive.v3-original-86a6f0a-source.tar.gz.safe",
+        "passed": true
+      },
+      {
+        "actual": "4e98420dea6f2403de4617baf874cd12964d269a9668bd37e033414517742348",
+        "expected": "4e98420dea6f2403de4617baf874cd12964d269a9668bd37e033414517742348",
+        "name": "development.source_archive.v3-original-86a6f0a-source.tar.gz.hash",
+        "passed": true
+      },
+      {
+        "actual": "441fc5c6647998a7d05396083094edf9bf02480bb4db49cbb930037ccba0419f",
+        "expected": "441fc5c6647998a7d05396083094edf9bf02480bb4db49cbb930037ccba0419f",
+        "name": "development.archive_git.86a6f0a.local/hok_env.py",
+        "passed": true
+      },
+      {
+        "actual": "935b1db1319eb241055ce780ab05a54e64ad74dc073dfeca31fbf4e31efde958",
+        "expected": "935b1db1319eb241055ce780ab05a54e64ad74dc073dfeca31fbf4e31efde958",
+        "name": "development.archive_git.86a6f0a.local/hok_sim.py",
+        "passed": true
+      },
+      {
+        "actual": "5feb5ead2521f22d168cd20360b92c496afe5e55edea4a1d86187224d02178cb",
+        "expected": "5feb5ead2521f22d168cd20360b92c496afe5e55edea4a1d86187224d02178cb",
+        "name": "development.archive_git.86a6f0a.scripts/hok_eval.py",
+        "passed": true
+      },
+      {
+        "actual": "129a1ad2f16df885cf2a30979480ee83db65742a9f5dc27056241a736b55ea29",
+        "expected": "129a1ad2f16df885cf2a30979480ee83db65742a9f5dc27056241a736b55ea29",
+        "name": "development.archive_git.86a6f0a.tests/hok/test_sim.py",
+        "passed": true
+      },
+      {
+        "actual": [],
+        "expected": [],
+        "name": "development.source_archive.evaluator-44e3a65-source.tar.gz.safe",
+        "passed": true
+      },
+      {
+        "actual": "e3761a1931ed5de6863a63a351b88a9459f4d332e7d42fbe8f704ebe1f40f981",
+        "expected": "e3761a1931ed5de6863a63a351b88a9459f4d332e7d42fbe8f704ebe1f40f981",
+        "name": "development.source_archive.evaluator-44e3a65-source.tar.gz.hash",
+        "passed": true
+      },
+      {
+        "actual": "e158702afc12aec2574f09d049137bb542029a53cae745722e5c90b7f2b7bf30",
+        "expected": "e158702afc12aec2574f09d049137bb542029a53cae745722e5c90b7f2b7bf30",
+        "name": "development.archive_git.44e3a65.local/hok_env.py",
+        "passed": true
+      },
+      {
+        "actual": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7",
+        "expected": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7",
+        "name": "development.archive_git.44e3a65.local/hok_sim.py",
+        "passed": true
+      },
+      {
+        "actual": "b40f647f7e2ccb736c4d714bae8f695a13d0889e951511f79e766205e370c46d",
+        "expected": "b40f647f7e2ccb736c4d714bae8f695a13d0889e951511f79e766205e370c46d",
+        "name": "development.archive_git.44e3a65.scripts/hok_eval.py",
+        "passed": true
+      },
+      {
+        "actual": "4b01492cb98a891c03c7a3c153c09989781bb593fc4050adcf150965cbd6b630",
+        "expected": "4b01492cb98a891c03c7a3c153c09989781bb593fc4050adcf150965cbd6b630",
+        "name": "development.archive_git.44e3a65.tests/hok/test_sim.py",
+        "passed": true
+      },
+      {
+        "actual": "e158702afc12aec2574f09d049137bb542029a53cae745722e5c90b7f2b7bf30",
+        "expected": "e158702afc12aec2574f09d049137bb542029a53cae745722e5c90b7f2b7bf30",
+        "name": "development.executed_source.local/hok_env.py",
+        "passed": true
+      },
+      {
+        "actual": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7",
+        "expected": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7",
+        "name": "development.executed_source.local/hok_sim.py",
+        "passed": true
+      },
+      {
+        "actual": "b40f647f7e2ccb736c4d714bae8f695a13d0889e951511f79e766205e370c46d",
+        "expected": "b40f647f7e2ccb736c4d714bae8f695a13d0889e951511f79e766205e370c46d",
+        "name": "development.executed_source.scripts/hok_eval.py",
+        "passed": true
+      },
+      {
+        "actual": 2532,
+        "expected": 2532,
+        "name": "development.manifest_raw_legs",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "development.manifest_report_ids_match_public_index",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "final.source_manifest_report_ids_match_public_index",
+        "passed": true
+      },
+      {
+        "actual": 1200,
+        "expected": 1200,
+        "name": "development.v3_legs",
+        "passed": true
+      },
+      {
+        "actual": 1296,
+        "expected": 1296,
+        "name": "development.v4_unique_legs",
+        "passed": true
+      },
+      {
+        "actual": 36,
+        "expected": 36,
+        "name": "development.repeated_pilot_legs_not_extra_evidence",
+        "passed": true
+      },
+      {
+        "actual": "d4bc17e217cc79aa0a2347c7cd9cfe80cee492f5bddac93823e0039763213166",
+        "expected": "d4bc17e217cc79aa0a2347c7cd9cfe80cee492f5bddac93823e0039763213166",
+        "name": "reproduction.development_captured_package_hash",
+        "passed": true
+      },
+      {
+        "actual": [
+          "agent/hok/__init__.py",
+          "agent/hok/policy.py",
+          "local/hok_fake_session.py",
+          "local/hok_policy_research.py"
+        ],
+        "expected": [
+          "agent/hok/__init__.py",
+          "agent/hok/policy.py",
+          "local/hok_fake_session.py",
+          "local/hok_policy_research.py"
+        ],
+        "name": "reproduction.exact_base_overlay_python_files",
+        "passed": true
+      },
+      {
+        "actual": [],
+        "expected": [],
+        "name": "reproduction.no_base_python_deletions",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "reproduction.four_file_overlay_reconstructs_full_captured_package",
+        "passed": true
+      },
+      {
+        "actual": [
+          "local/hok_opponents_research.py"
+        ],
+        "expected": [
+          "local/hok_opponents_research.py"
+        ],
+        "name": "reproduction.opponent_exact_overlay",
+        "passed": true
+      },
+      {
+        "actual": true,
+        "expected": true,
+        "name": "reproduction.b05_dependencies_differ_from_base",
+        "passed": true
+      },
+      {
+        "actual": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+        "expected": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+        "name": "provenance.runtime_tree",
+        "passed": true
+      },
+      {
+        "actual": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+        "expected": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+        "name": "provenance.readme_keeps_runtime_agent_tree",
+        "passed": true
+      },
+      {
+        "actual": [
+          "README.md"
+        ],
+        "expected": [
+          "README.md"
+        ],
+        "name": "provenance.readme_only_changes_README",
+        "passed": true
+      },
+      {
+        "actual": "21326410a26409eba570f1742ce27b48ff3a5988",
+        "expected": "21326410a26409eba570f1742ce27b48ff3a5988",
+        "name": "provenance.frozen_revision_agrees",
+        "passed": true
+      },
+      {
+        "actual": "503c36e5fd5033240ab195ca4038fde05c75019f",
+        "expected": "503c36e5fd5033240ab195ca4038fde05c75019f",
+        "name": "provenance.opponent_revision_agrees",
+        "passed": true
+      }
+    ],
+    "passed": 1699
+  },
+  "development": {
+    "by_policy_model_mode": [
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 32,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "baseline",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 30,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "baseline",
+        "wins": 70
+      },
+      {
+        "draws": 0,
+        "games": 108,
+        "losses": 40,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "baseline",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 108,
+        "losses": 50,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "baseline",
+        "wins": 58
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 32,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "bounded_recovery_v1",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 30,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "bounded_recovery_v1",
+        "wins": 70
+      },
+      {
+        "draws": 0,
+        "games": 108,
+        "losses": 40,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "bounded_recovery_v1",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 108,
+        "losses": 50,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "bounded_recovery_v1",
+        "wins": 58
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 32,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "late_objective_v1",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 30,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "late_objective_v1",
+        "wins": 70
+      },
+      {
+        "draws": 0,
+        "games": 108,
+        "losses": 40,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "late_objective_v1",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 108,
+        "losses": 50,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "late_objective_v1",
+        "wins": 58
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 32,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "objective_guarded_v1",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 30,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "objective_guarded_v1",
+        "wins": 70
+      },
+      {
+        "draws": 0,
+        "games": 108,
+        "losses": 40,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "objective_guarded_v1",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 108,
+        "losses": 50,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "objective_guarded_v1",
+        "wins": 58
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 32,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "observed_damage_v1",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 34,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "observed_damage_v1",
+        "wins": 66
+      },
+      {
+        "draws": 4,
+        "games": 108,
+        "losses": 52,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "observed_damage_v1",
+        "wins": 52
+      },
+      {
+        "draws": 2,
+        "games": 108,
+        "losses": 64,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "observed_damage_v1",
+        "wins": 42
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 32,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "skill_residency_v1",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 30,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "skill_residency_v1",
+        "wins": 70
+      },
+      {
+        "draws": 0,
+        "games": 108,
+        "losses": 40,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "skill_residency_v1",
+        "wins": 68
+      },
+      {
+        "draws": 0,
+        "games": 108,
+        "losses": 50,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "skill_residency_v1",
+        "wins": 58
+      }
+    ],
+    "counting_notes": [
+      "2532 raw leg/report references include 36 repeated pilot legs; 2496 unique legs = 1248 policy-condition pairs.",
+      "208 conditions × 6 policies × 2 mirrored camps = 2496 unique legs.",
+      "The 200 baseline bridge legs and 144 neutral v4 bridge legs are subsets, not additional evidence.",
+      "The development baseline is the b05f069 registered baseline profile, not automatically the final audit's fb421a current_main policy."
+    ],
+    "counts": {
+      "conditions": 208,
+      "duplicate_pair_report_references": 18,
+      "leg_records": 2496,
+      "models": {
+        "hok-contract-diagnostic-v3": 1200,
+        "hok-contract-diagnostic-v4-sensitivity-20261016": 1296
+      },
+      "modes": [
+        "lockstep",
+        "realtime"
+      ],
+      "paired_records": 1248,
+      "policies": 6,
+      "raw_leg_report_references": 2532,
+      "raw_pair_report_references": 1266,
+      "unique_legs": 2496,
+      "unique_policy_condition_pairs": 1248,
+      "world_seeds": [
+        1101,
+        1102
+      ]
+    },
+    "errors": {
+      "interface_error_reports": 0,
+      "invalid_actions": 0,
+      "native_policy_errors": 0,
+      "protocol_failures": 0,
+      "source_changed_reports": 0,
+      "unclean_outcomes": 0
+    },
+    "opponent_coverage_by_model": {
+      "hok-contract-diagnostic-v3": [
+        "cautious_defender",
+        "first_legal",
+        "idle",
+        "objective_rusher",
+        "uniform_random"
+      ],
+      "hok-contract-diagnostic-v4-sensitivity-20261016": [
+        "cautious_defender",
+        "objective_rusher",
+        "uniform_random"
+      ]
+    },
+    "paired_vs_b05_baseline_by_model_mode": [
+      {
+        "improved": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "bounded_recovery_v1",
+        "regressed": 0,
+        "tied": 50
+      },
+      {
+        "improved": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "bounded_recovery_v1",
+        "regressed": 0,
+        "tied": 50
+      },
+      {
+        "improved": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "bounded_recovery_v1",
+        "regressed": 0,
+        "tied": 54
+      },
+      {
+        "improved": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "bounded_recovery_v1",
+        "regressed": 0,
+        "tied": 54
+      },
+      {
+        "improved": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "late_objective_v1",
+        "regressed": 0,
+        "tied": 50
+      },
+      {
+        "improved": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "late_objective_v1",
+        "regressed": 0,
+        "tied": 50
+      },
+      {
+        "improved": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "late_objective_v1",
+        "regressed": 0,
+        "tied": 54
+      },
+      {
+        "improved": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "late_objective_v1",
+        "regressed": 0,
+        "tied": 54
+      },
+      {
+        "improved": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "objective_guarded_v1",
+        "regressed": 0,
+        "tied": 50
+      },
+      {
+        "improved": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "objective_guarded_v1",
+        "regressed": 0,
+        "tied": 50
+      },
+      {
+        "improved": 1,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "objective_guarded_v1",
+        "regressed": 1,
+        "tied": 52
+      },
+      {
+        "improved": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "objective_guarded_v1",
+        "regressed": 0,
+        "tied": 54
+      },
+      {
+        "improved": 3,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "observed_damage_v1",
+        "regressed": 3,
+        "tied": 44
+      },
+      {
+        "improved": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "observed_damage_v1",
+        "regressed": 2,
+        "tied": 48
+      },
+      {
+        "improved": 1,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "observed_damage_v1",
+        "regressed": 9,
+        "tied": 44
+      },
+      {
+        "improved": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "observed_damage_v1",
+        "regressed": 8,
+        "tied": 46
+      },
+      {
+        "improved": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "skill_residency_v1",
+        "regressed": 0,
+        "tied": 50
+      },
+      {
+        "improved": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "skill_residency_v1",
+        "regressed": 0,
+        "tied": 50
+      },
+      {
+        "improved": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "skill_residency_v1",
+        "regressed": 0,
+        "tied": 54
+      },
+      {
+        "improved": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "policy": "skill_residency_v1",
+        "regressed": 0,
+        "tied": 54
+      }
+    ],
+    "source_archives": [
+      {
+        "extracted_to_filesystem": false,
+        "member_sha256": {
+          "local/hok_env.py": "441fc5c6647998a7d05396083094edf9bf02480bb4db49cbb930037ccba0419f",
+          "local/hok_sim.py": "935b1db1319eb241055ce780ab05a54e64ad74dc073dfeca31fbf4e31efde958",
+          "scripts/hok_eval.py": "5feb5ead2521f22d168cd20360b92c496afe5e55edea4a1d86187224d02178cb",
+          "tests/hok/test_sim.py": "129a1ad2f16df885cf2a30979480ee83db65742a9f5dc27056241a736b55ea29"
+        },
+        "members": [
+          {
+            "name": "local",
+            "size": 0,
+            "type": "directory"
+          },
+          {
+            "name": "local/hok_env.py",
+            "size": 20402,
+            "type": "file"
+          },
+          {
+            "name": "local/hok_sim.py",
+            "size": 26662,
+            "type": "file"
+          },
+          {
+            "name": "scripts",
+            "size": 0,
+            "type": "directory"
+          },
+          {
+            "name": "scripts/hok_eval.py",
+            "size": 10391,
+            "type": "file"
+          },
+          {
+            "name": "tests",
+            "size": 0,
+            "type": "directory"
+          },
+          {
+            "name": "tests/hok",
+            "size": 0,
+            "type": "directory"
+          },
+          {
+            "name": "tests/hok/test_sim.py",
+            "size": 24524,
+            "type": "file"
+          }
+        ],
+        "path": "<local-artifact>/v3-original-86a6f0a-source.tar.gz",
+        "recorded_commit": "86a6f0a",
+        "sha256": "4e98420dea6f2403de4617baf874cd12964d269a9668bd37e033414517742348",
+        "unsafe_members": []
+      },
+      {
+        "extracted_to_filesystem": false,
+        "member_sha256": {
+          "local/hok_env.py": "e158702afc12aec2574f09d049137bb542029a53cae745722e5c90b7f2b7bf30",
+          "local/hok_sim.py": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7",
+          "scripts/hok_eval.py": "b40f647f7e2ccb736c4d714bae8f695a13d0889e951511f79e766205e370c46d",
+          "tests/hok/test_sim.py": "4b01492cb98a891c03c7a3c153c09989781bb593fc4050adcf150965cbd6b630"
+        },
+        "members": [
+          {
+            "name": "local",
+            "size": 0,
+            "type": "directory"
+          },
+          {
+            "name": "local/hok_env.py",
+            "size": 31914,
+            "type": "file"
+          },
+          {
+            "name": "local/hok_sim.py",
+            "size": 33262,
+            "type": "file"
+          },
+          {
+            "name": "scripts",
+            "size": 0,
+            "type": "directory"
+          },
+          {
+            "name": "scripts/hok_eval.py",
+            "size": 13335,
+            "type": "file"
+          },
+          {
+            "name": "tests",
+            "size": 0,
+            "type": "directory"
+          },
+          {
+            "name": "tests/hok",
+            "size": 0,
+            "type": "directory"
+          },
+          {
+            "name": "tests/hok/test_sim.py",
+            "size": 34346,
+            "type": "file"
+          }
+        ],
+        "path": "<local-artifact>/evaluator-44e3a65-source.tar.gz",
+        "recorded_commit": "44e3a65",
+        "sha256": "e3761a1931ed5de6863a63a351b88a9459f4d332e7d42fbe8f704ebe1f40f981",
+        "unsafe_members": []
+      }
+    ],
+    "weak_controls_by_policy_model_mode": [
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "baseline",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "baseline",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "baseline",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "baseline",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "baseline",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "baseline",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 36,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "baseline",
+        "wins": 36
+      },
+      {
+        "draws": 0,
+        "games": 36,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "baseline",
+        "wins": 36
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "bounded_recovery_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "bounded_recovery_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "bounded_recovery_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "bounded_recovery_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "bounded_recovery_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "bounded_recovery_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 36,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "bounded_recovery_v1",
+        "wins": 36
+      },
+      {
+        "draws": 0,
+        "games": 36,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "bounded_recovery_v1",
+        "wins": 36
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "late_objective_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "late_objective_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "late_objective_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "late_objective_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "late_objective_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "late_objective_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 36,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "late_objective_v1",
+        "wins": 36
+      },
+      {
+        "draws": 0,
+        "games": 36,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "late_objective_v1",
+        "wins": 36
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "objective_guarded_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "objective_guarded_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "objective_guarded_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "objective_guarded_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "objective_guarded_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "objective_guarded_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 36,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "objective_guarded_v1",
+        "wins": 36
+      },
+      {
+        "draws": 0,
+        "games": 36,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "objective_guarded_v1",
+        "wins": 36
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "observed_damage_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "observed_damage_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "observed_damage_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "observed_damage_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "observed_damage_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "observed_damage_v1",
+        "wins": 20
+      },
+      {
+        "draws": 2,
+        "games": 36,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "observed_damage_v1",
+        "wins": 34
+      },
+      {
+        "draws": 2,
+        "games": 36,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "observed_damage_v1",
+        "wins": 34
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "skill_residency_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "skill_residency_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "skill_residency_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "first_legal",
+        "policy": "skill_residency_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "idle",
+        "policy": "skill_residency_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 20,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "opponent": "uniform_random",
+        "policy": "skill_residency_v1",
+        "wins": 20
+      },
+      {
+        "draws": 0,
+        "games": 36,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "skill_residency_v1",
+        "wins": 36
+      },
+      {
+        "draws": 0,
+        "games": 36,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v4-sensitivity-20261016",
+        "opponent": "uniform_random",
+        "policy": "skill_residency_v1",
+        "wins": 36
+      }
+    ]
+  },
+  "final": {
+    "by_policy_model_mode": [
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 2,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "current_main",
+        "wins": 98
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 0,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "current_main",
+        "wins": 100
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 0,
+        "mode": "lockstep",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "final_candidate",
+        "wins": 100
+      },
+      {
+        "draws": 0,
+        "games": 100,
+        "losses": 2,
+        "mode": "realtime",
+        "model": "hok-contract-diagnostic-v3",
+        "policy": "final_candidate",
+        "wins": 98
+      }
+    ],
+    "counts": {
+      "conditions": 100,
+      "duplicate_pair_report_references": 0,
+      "leg_records": 400,
+      "models": {
+        "hok-contract-diagnostic-v3": 400
+      },
+      "modes": [
+        "lockstep",
+        "realtime"
+      ],
+      "paired_records": 200,
+      "policies": 2,
+      "raw_leg_report_references": 400,
+      "raw_pair_report_references": 200,
+      "unique_legs": 400,
+      "unique_policy_condition_pairs": 200,
+      "world_seeds": [
+        8101,
+        8102
+      ]
+    },
+    "dimensions": {
+      "camps": [
+        1,
+        2
+      ],
+      "modes": [
+        "lockstep",
+        "realtime"
+      ],
+      "opponents": [
+        "counterpunch_interceptor",
+        "first_legal",
+        "idle",
+        "relay_pressure",
+        "uniform_random"
+      ],
+      "profiles": [
+        "advance-attacks",
+        "default",
+        "durable",
+        "punishing-towers",
+        "short-vision"
+      ],
+      "seeds": [
+        8101,
+        8102
+      ],
+      "strategies": [
+        "current_main",
+        "final_candidate"
+      ]
+    },
+    "duration_caution": "Per-hero seconds are tick-start counters. No gain means HP did not rise, including flat full HP; stationary requires <=1e-6 model-unit movement. Death/respawn/max-HP changes reset episodes. Cumulative retreat is not a continuous episode and can be useful travel or defensive holding. These metrics are not automatic working-solution failures.",
+    "duration_row_unit": "400 evaluated-team legs × five evaluated-team hero roles = 2000 rows; not both teams' ten heroes per leg.",
+    "errors": {
+      "interface_error_reports": 0,
+      "invalid_actions": 0,
+      "native_policy_errors": 0,
+      "protocol_failures": 0,
+      "source_changed_reports": 0,
+      "unclean_outcomes": 0
+    },
+    "latency_caution": "Main includes SDK legal-list adapter conversion; final uses raw directly. Local CPU/wall decide timing is not network latency or a clean policy-only performance comparison.",
+    "outcomes": {
+      "current_main": {
+        "by_camp": {
+          "1": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          },
+          "2": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          }
+        },
+        "by_mode": {
+          "lockstep": {
+            "draws": 0,
+            "games": 100,
+            "losses": 2,
+            "wins": 98
+          },
+          "realtime": {
+            "draws": 0,
+            "games": 100,
+            "losses": 0,
+            "wins": 100
+          }
+        },
+        "by_opponent": {
+          "counterpunch_interceptor": {
+            "draws": 0,
+            "games": 40,
+            "losses": 2,
+            "wins": 38
+          },
+          "first_legal": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "idle": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "relay_pressure": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "uniform_random": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          }
+        },
+        "draws": 0,
+        "games": 200,
+        "losses": 2,
+        "wins": 198
+      },
+      "final_candidate": {
+        "by_camp": {
+          "1": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          },
+          "2": {
+            "draws": 0,
+            "games": 100,
+            "losses": 1,
+            "wins": 99
+          }
+        },
+        "by_mode": {
+          "lockstep": {
+            "draws": 0,
+            "games": 100,
+            "losses": 0,
+            "wins": 100
+          },
+          "realtime": {
+            "draws": 0,
+            "games": 100,
+            "losses": 2,
+            "wins": 98
+          }
+        },
+        "by_opponent": {
+          "counterpunch_interceptor": {
+            "draws": 0,
+            "games": 40,
+            "losses": 2,
+            "wins": 38
+          },
+          "first_legal": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "idle": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "relay_pressure": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          },
+          "uniform_random": {
+            "draws": 0,
+            "games": 40,
+            "losses": 0,
+            "wins": 40
+          }
+        },
+        "draws": 0,
+        "games": 200,
+        "losses": 2,
+        "wins": 198
+      }
+    },
+    "paired_comparison": {
+      "by_mode": {
+        "lockstep": {
+          "improved": 1,
+          "regressed": 0,
+          "tied": 49
+        },
+        "realtime": {
+          "improved": 0,
+          "regressed": 1,
+          "tied": 49
+        }
+      },
+      "non_tied_conditions": [
+        {
+          "condition_id": "6f243a638f474e29c6ae404d7b5a6fc59842ff35720527e184a5b43be90d4cca",
+          "final_camp_scores": [
+            1.0,
+            1.0
+          ],
+          "main_camp_scores": [
+            0.0,
+            0.0
+          ],
+          "mode": "lockstep",
+          "opponent": "counterpunch_interceptor",
+          "paired_delta": 1.0,
+          "profile": "advance-attacks",
+          "seed": 8102
+        },
+        {
+          "condition_id": "4b6f028cb4249c2822465aca2f946e27baa6b9e6048dc247b7f3d1a7348b9f73",
+          "final_camp_scores": [
+            0.0,
+            0.0
+          ],
+          "main_camp_scores": [
+            1.0,
+            1.0
+          ],
+          "mode": "realtime",
+          "opponent": "counterpunch_interceptor",
+          "paired_delta": -1.0,
+          "profile": "advance-attacks",
+          "seed": 8102
+        }
+      ],
+      "total": {
+        "improved": 1,
+        "regressed": 1,
+        "tied": 98
+      }
+    },
+    "public_safe_bundle": {
+      "extracted_to_filesystem": false,
+      "member_sha256": {
+        "public-duration-examples.json": "b774be1af9df11a89267c8ea305114da361b633ddf4d64176e87d356f2f03e4a",
+        "public-hero-durations.csv": "c043515f4a74ee5a533edd2d87e3d1283f7bc950b96518a69d34336d11b096ae",
+        "public-paired-index.json": "52cac5fe3f57e8786fa08e669fe4d5f2b5f04df03834fba8874324c36a1ab65a",
+        "public-provenance.json": "935d477228b36e691f915ecd0f30a5ac7115a00bc6218ff80a53609ce01909ac",
+        "public-results-summary.json": "9d01180597077c567eb66aceac280e5e7c691b651bd16796b04e5f12af8a4e06",
+        "public-source-manifest.json": "d3b3563463b790929588ca17ed24b629f1afde181d06988fac151166f54faa74",
+        "source/current_main/agent/hok/__init__.py": "7727913be02a4faab46ebe247335383f8fd39cbabfba2164b2c0cc25482c3d0e",
+        "source/evaluator/local/hok_env.py": "9765c9d26dbd7192a904ac5fc69350aa0e66259deace58e663c33ff74f77150a",
+        "source/evaluator/local/hok_sim.py": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7",
+        "source/evaluator/scripts/hok_eval.py": "7c11cdda782383ed20e57932c9da63869bf84abb424ea96bf9b3e92d47ad8a37",
+        "source/evaluator/tests/hok/test_sim.py": "68d8c16c34835944e36eb5deab18b050af3c93d6c559cb6f45e32f854c057207",
+        "source/final_candidate/agent/hok/__init__.py": "e193fc68c4f23b4f72bf6bb1f8edb80bdbad894643c9fb9793358554c9a319f6",
+        "source/final_candidate/agent/hok/policy.py": "53de6d67acd3d07c80d28330656f84e1252394ea082d3efc6dc6206f90635f3a",
+        "source/opponents/local/hok_opponents_research.py": "67ecc0238f093f5698c3ac7e4994e86aa7a7363fccbb915341bc8a59b45ff651"
+      },
+      "members": [
+        {
+          "name": "public-duration-examples.json",
+          "size": 10806,
+          "type": "file"
+        },
+        {
+          "name": "public-hero-durations.csv",
+          "size": 197436,
+          "type": "file"
+        },
+        {
+          "name": "public-paired-index.json",
+          "size": 302191,
+          "type": "file"
+        },
+        {
+          "name": "public-provenance.json",
+          "size": 1995,
+          "type": "file"
+        },
+        {
+          "name": "public-results-summary.json",
+          "size": 34360,
+          "type": "file"
+        },
+        {
+          "name": "public-source-manifest.json",
+          "size": 17081,
+          "type": "file"
+        },
+        {
+          "name": "source/current_main/agent/hok/__init__.py",
+          "size": 18888,
+          "type": "file"
+        },
+        {
+          "name": "source/evaluator/local/hok_env.py",
+          "size": 39554,
+          "type": "file"
+        },
+        {
+          "name": "source/evaluator/local/hok_sim.py",
+          "size": 33262,
+          "type": "file"
+        },
+        {
+          "name": "source/evaluator/scripts/hok_eval.py",
+          "size": 27765,
+          "type": "file"
+        },
+        {
+          "name": "source/evaluator/tests/hok/test_sim.py",
+          "size": 40346,
+          "type": "file"
+        },
+        {
+          "name": "source/final_candidate/agent/hok/__init__.py",
+          "size": 230,
+          "type": "file"
+        },
+        {
+          "name": "source/final_candidate/agent/hok/policy.py",
+          "size": 30284,
+          "type": "file"
+        },
+        {
+          "name": "source/opponents/local/hok_opponents_research.py",
+          "size": 30239,
+          "type": "file"
+        }
+      ],
+      "path": "<local-artifact>/hok-final-public-safe.tar.gz",
+      "sha256": "dc407afb5e0a5afa82231b00e784a295a4f1116bf01f06d4f186981e9b844702",
+      "unsafe_members": []
+    },
+    "recomputed_durations": {
+      "current_main": {
+        "alive_total_s": 138544.4,
+        "hero_slots": 1000,
+        "idle_total_s": 0.0,
+        "largest_cumulative_retreat_s_one_hero": 345.2,
+        "longest_stationary_no_gain_idle_s": 0.0,
+        "longest_stationary_no_gain_retreat_s": 0.2,
+        "retreat_fraction_of_alive_time": 0.4190743184134473,
+        "retreat_total_s": 58060.4,
+        "slots_with_idle_no_progress_ge10s": 0,
+        "slots_with_idle_no_progress_ge30s": 0,
+        "slots_with_retreat_no_progress_ge10s": 0,
+        "slots_with_retreat_no_progress_ge30s": 0,
+        "stationary_no_gain_idle_total_s": 0.0,
+        "stationary_no_gain_retreat_total_s": 1137.2
+      },
+      "final_candidate": {
+        "alive_total_s": 154616.8,
+        "hero_slots": 1000,
+        "idle_total_s": 0.0,
+        "largest_cumulative_retreat_s_one_hero": 338.8,
+        "longest_stationary_no_gain_idle_s": 0.0,
+        "longest_stationary_no_gain_retreat_s": 6.6,
+        "retreat_fraction_of_alive_time": 0.428463142426955,
+        "retreat_total_s": 66247.6,
+        "slots_with_idle_no_progress_ge10s": 0,
+        "slots_with_idle_no_progress_ge30s": 0,
+        "slots_with_retreat_no_progress_ge10s": 0,
+        "slots_with_retreat_no_progress_ge30s": 0,
+        "stationary_no_gain_idle_total_s": 0.0,
+        "stationary_no_gain_retreat_total_s": 704.8
+      }
+    },
+    "weak_control_limits": "Explicit idle, input-order first-legal, and uniform current macros+idle are defensible controls; they are not a representative population of arbitrary unstrategic humans.",
+    "weak_controls": {
+      "current_main": {
+        "draws": 0,
+        "games": 120,
+        "losses": 0,
+        "wins": 120
+      },
+      "final_candidate": {
+        "draws": 0,
+        "games": 120,
+        "losses": 0,
+        "wins": 120
+      }
+    }
+  },
+  "generated_at_utc": "2026-10-16T14:26:12.143422+00:00",
+  "hash_scope_resolution": {
+    "development_captured_package_sha256": "d4bc17e217cc79aa0a2347c7cd9cfe80cee492f5bddac93823e0039763213166",
+    "initial_module_only_comparison_was_wrong": true,
+    "opponent_captured_package_sha256": "21b6cecfd3461724bb6b2d6b97a709c5726f2e71a445e22c078ffa74fdfb478a",
+    "resolution": "Both revision factories hash all captured local/ + agent/ Python files. Recomputing the documented full scope matches the recorded hashes; no source mismatch was found."
+  },
+  "inputs_sha256": {
+    "<local-artifact>/hok-development-public-paired-index.json": "1d3c28a4e571b7dcc1167c295ffcf1038cef65b6e56e7d48ddabf45c1345579d",
+    "<local-artifact>/public-hero-durations.csv": "c043515f4a74ee5a533edd2d87e3d1283f7bc950b96518a69d34336d11b096ae",
+    "<local-artifact>/public-paired-index.json": "52cac5fe3f57e8786fa08e669fe4d5f2b5f04df03834fba8874324c36a1ab65a",
+    "<local-artifact>/public-provenance.json": "935d477228b36e691f915ecd0f30a5ac7115a00bc6218ff80a53609ce01909ac",
+    "<local-artifact>/public-results-summary.json": "9d01180597077c567eb66aceac280e5e7c691b651bd16796b04e5f12af8a4e06",
+    "<local-artifact>/public-source-manifest.json": "d3b3563463b790929588ca17ed24b629f1afde181d06988fac151166f54faa74",
+    "<local-artifact>/verified-manifest.json": "a91d46eab3be178909435cb3185486c86a042cd18daa65ac7f76ef48c8433a04"
+  },
+  "limits": [
+    "Synthetic diagnostics only; zero independently observed real games.",
+    "Final has two world seeds, not 400 IID samples. Camps, modes, profiles and shared source are correlated.",
+    "Development and final use distinct two-seed sets; four distinct seed labels across both phases is not four independent real-game environments.",
+    "Deduplicated indices expose repeat report references, not all original repeated payloads; recorded zero conflicting repeats cannot be independently rederived without those originals.",
+    "Public source hashes do not by themselves certify that a live server ran this code; no live process was inspected."
+  ],
+  "reproduction": {
+    "base_commit": "0785a42c4983cd8c267e9d6dfc38cf764c3f7357",
+    "captured_package_file_sha256": {
+      "agent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/__main__.py": "9e167a157678d82d7f76630f6ee874b66c6f6660c17f3bf9b8c9e1c3528b3864",
+      "agent/agent.py": "debb3698ad05fd9743497e938a238c6533fe12eb1c993f3b885473cf9df07c00",
+      "agent/fallback.py": "de7bbf3d26838356ff69c57e10fae4d1ca88df7465d5bdddc7004cdafc278ee1",
+      "agent/health.py": "db4e1842ecfeffd654b193f0bdc30c2bf9c06cd6a7bcca0cb9172fc1aaf32302",
+      "agent/hok/__init__.py": "e193fc68c4f23b4f72bf6bb1f8edb80bdbad894643c9fb9793358554c9a319f6",
+      "agent/hok/policy.py": "98ab2d572e72f3037a7c38586fc80233561cb42b08dab2faf8a8c46a8e24d336",
+      "agent/matchstate.py": "ca7efb044419af008cd3893358f58e0ee9e9b4a5c54a2257076333805d00c0d0",
+      "agent/pokemon/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/pokemon/battlelog.py": "a22d0a259c7d519a94d91899bb7ba14957ed37091c7d24d94182758fa467b3b7",
+      "agent/pokemon/battlestate.py": "cc4e09fa8e145a4c5eff86bd656c1f2916ff8fe3f7dafe0e4324e93ff79274b2",
+      "agent/pokemon/calc.py": "b1acb5ea0795e1fd06244be798f08bd148c89ea5606d7d2f33357be01b0ac242",
+      "agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "agent/pokemon/drafter.py": "08f65500257abaccabcfb09a76c4f2f91fd254b917e58e3666fa4aaea23566fe",
+      "agent/pokemon/engine.py": "5ab618cbfce39b533fb7038dbad8366fdc1775362341cd2dda9446a003e01a5f",
+      "agent/pokemon/lookahead.py": "c1cf709b3a31cff4d65026bb19231d892121d3c39ce786c024e7f45bb24dcab0",
+      "agent/pokemon/matchup.py": "a236cacb061c19326c31b23659ba6475fd24be26faf451cfc800658a3a07e146",
+      "agent/pokemon/policy.py": "99708567c3715ad0495481e91a3e3fbd8a1058aab87d2c3bd35cbc6fe2f75ed2",
+      "agent/pokemon/preview.py": "2d8ecd8597167e725823a1d43387a9d7d06fe798a8a712b0e50c506eb88cbd65",
+      "agent/pokemon/singles.py": "4dbaae167655b463cf79a016adeefeb47ee8dfcf7482d9e5b57fb7a5084c8c28",
+      "agent/pokemon/stats.py": "1b78f0cdbf4e9b3d1b4364e1828f0663b0e6eb9cde0fd33bfa42be9d71e0c1a9",
+      "agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "agent/reasoning.py": "ae0738001984b67544cbd873af411ace0a238f46ca43b638ef02b5c889fa0184",
+      "agent/redalert/__init__.py": "6b01714db1e40f77872ee28662cc913798a9d4e24cc312936af1d46e67250c96",
+      "agent/redalert/army.py": "868bb138bc2533026f32b1167328cb572e39f74cade55a78e309a9d0c99c5833",
+      "agent/redalert/counters.py": "6fd9a3fb449b09eafc90ae0aefd887cdb732b0374bffd09b59a01830bcef0ce9",
+      "agent/redalert/economy.py": "dfc18b8df5014fa572dd01b0a2ac1816e5965ee4f453926b6232e38379b21ebe",
+      "agent/redalert/harvest.py": "3e2ec562bbaefbb80eb3503163611e878eba8e933ed8545020b64b8135cda05f",
+      "agent/redalert/ledger.py": "d7aab57638688d4697dffa2446b8d230e6057f56eba3ef56b33429e4f53afab0",
+      "agent/redalert/orders.py": "1adef01e009f06038fe4c2f006c3ef6ba7696b2f3d61c8ad34949fccf9078edb",
+      "agent/redalert/params.py": "f53d7a5e309678522a3595d16528449ef0cbe398c6fb7210f6983f3d9d55f18d",
+      "agent/redalert/production.py": "6da933e276363b35847d48888e4a586acf65d59c59d3e62b1db4fb3913804afc",
+      "agent/redalert/safe.py": "de90c2b082c9cc28e0b8ef3f9d39ae351b28705e7bb79d06ff18a05df71dc67b",
+      "agent/redalert/world.py": "2b5ea94ba8d943a975ca783b8764bbc50227ac89da568224f70630957c8a93dc",
+      "agent/timecontrol.py": "960b99d826cb3ae5241f0b00bb77c9d05ca087fda275afd787a6786cf556f251",
+      "agent/werewolf/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "agent/werewolf/policy.py": "537b6bdb9f376bce2f23ebf193746eda11d956122f66f874e56a2520c0eec0a6",
+      "agent/werewolf/state.py": "e07d8691b1271cf35898cfdffd4be692dec653f18040781aa49b18527601a022",
+      "local/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "local/benchmark.py": "fd6bd3e639de9154276edaeb7a47c335424cc30d7c4dc94ace561a1562a5520e",
+      "local/eval_pokemon.py": "8b7f6fa89965413e2777922070ab4577b059e24eb9a502a09277a7cd1358142a",
+      "local/eval_werewolf.py": "981b839de13e945d85d86124d25e8a48e3a0265bc5bda10941c984402a1316c4",
+      "local/ext_opp.py": "a2865f39df6022ca5de4a37fc04092c1d521101df2960399fbfd236ef02750dc",
+      "local/fake_official.py": "72bf08b7a1742d908671910096d9b01ef81d691998346d00d328e4bf9225d9b6",
+      "local/fake_platform.py": "39a05ec336580048fcb317590532d097cf819cee94ef05c65b62a669f8040760",
+      "local/fake_redalert.py": "ec7ee87ce0a86bc05a6c22df2f5839278750de93b8ede975cf539bc5b434b596",
+      "local/field_opps.py": "6a615a35ec2151a19a37498355ac8b9b767a589f339cb71b098dccbc0cd6e77c",
+      "local/hok_fake_session.py": "35098feaf2678fb67003576dea9ccf0203221395bec607f716d299310f41d0ec",
+      "local/hok_policy_research.py": "822f546c63811c90daa42c821c02103ab90b673ae7c0948a12a5e9a44ad553ac",
+      "local/ladder.py": "2c3655e1769ae1f9374ba20d77d4c1545638b3af011ef54a447c2ba3a47d271b",
+      "local/llm_client.py": "8c2913206a18ffa56174c11625a1e9a3941c533a5e3087dcaf0cef174eddc770",
+      "local/llm_seats.py": "d103445613f4d3c9731fc306eee71ea27181bfebcf71e55e1a4eed267eeffbf6",
+      "local/meta_opp.py": "65de2a960b38c2aca9eacc07db0ced19caf9f3b9f98f3d725cf4b09c6396869f",
+      "local/panel.py": "abed1e8d62e31c39ac907701f4951f03c09ba0ffebe7df0c938ababc6f8bd5a0",
+      "local/panel_bots.py": "86c656634694a878a79d80fd52a7e89c2b2ecf9326be2024534657862e169693",
+      "local/pokemon_env.py": "06809343a10319aec35a26a4a77956b0c64ba3691e0290cdfec1289671841678",
+      "local/pool.py": "dd306caac132ed0a1e5388588f5c03c153c35dba3a10109d278d6ef40142d4e9",
+      "local/ra_bots.py": "378bc5ac7843734edf93922bc2bdea54b0a1ca7e21caf42395697f0d3b95d7d9",
+      "local/ra_bots_strong.py": "2091d0f421c6264cbc701989ba4d9a58eb03f8f52406f31f18023ba6d596d05f",
+      "local/ra_platform.py": "6d9b5ffc4cb6d8c66fe3ae3714c564aee921ddc9c1a15de2bd982bac0143c90f",
+      "local/ra_rules.py": "e37f008482bc737d9f5e4f5113c41c0f9befd628f39798c42d154c8a11d9c1cf",
+      "local/ra_server.py": "56253598979821c26f7ff0b698f58b4d0071edd2fce70105bd884296bfad1022",
+      "local/ra_sim.py": "7c110ae24612aedb2119ee3bddfedac2e27e7624b073547d2ef275927ecfce6b",
+      "local/redteam_chaos.py": "2c32ff92aa45df207b11ac20bd1992ec7e85110971c1c3ed7798f2be2cc40ec9",
+      "local/redteam_detective.py": "824af98dbf07536fcdabd41d0bc99f72dff762e23182a27648f820c4ade04f8c",
+      "local/redteam_measure.py": "1b612626290e0fe0745ee60aa000918861d0ff82770fbed3dfee9c9000569e35",
+      "local/redteam_talker.py": "bbfbe13f50ce9049c6fb0a66742ffce33444fafe50a6475f4d0bca45e6f355c6",
+      "local/redteam_wolfpack.py": "9f1c084a8c5df144e8095bcfec539bc326045ea2360027a47ebcb2f74a0b4f45",
+      "local/showdown.py": "d40dc6e30021767cf33255691aeac4a26ea2be4db480beab4b75bb9fe31ca5e9",
+      "local/singles_env.py": "572c2c5fa8bfd28fa97743b49779a98b7aa19da49451ef8c6a4c10e702d72d66",
+      "local/singles_eval.py": "253706de66d928c669223f432f948aa8f2729302b3028deea0e8f2b4dafbe940",
+      "local/singles_replay.py": "a4182a6309b3099260d4b4d6606d65969cbb173fd321a0d480cf71085d0c0131",
+      "local/sparring/__init__.py": "4fd88f513b91dbccb02ff3b3438d2ff53c036906b4a6019bf68ee5e5960650ad",
+      "local/sparring/v2_cautious/__init__.py": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+      "local/sparring/v2_cautious/agent/__init__.py": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+      "local/sparring/v2_cautious/agent/__main__.py": "b1da2849aa2ffadb11e49c741c9f8ce989a2334abee6f52298319087fb960e83",
+      "local/sparring/v2_cautious/agent/agent.py": "05690c44725bc1503189dca1cdc59c96a49dbac7592a1329861b245b38d563e0",
+      "local/sparring/v2_cautious/agent/pokemon/__init__.py": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+      "local/sparring/v2_cautious/agent/pokemon/calc.py": "a28b9e20da2e7cdd831dc66983b3c87f94c5cc7344e5b655163ab469c2fd4620",
+      "local/sparring/v2_cautious/agent/pokemon/dex.py": "0b1139b54d005ee9c9c49a0318efcf5c6eb6163e1383c095332487e7435435d0",
+      "local/sparring/v2_cautious/agent/pokemon/lookahead.py": "268cc567ded76ddf018cdf21751400e9666d6dc28221428dd79770e7c32c6877",
+      "local/sparring/v2_cautious/agent/pokemon/policy.py": "da152b69cb75d702196d5d70d9e159ab4c782262149fdcf4032b555d08fc5c91",
+      "local/sparring/v2_cautious/agent/pokemon/stats.py": "66cdd5980b19a9ff29c6746c70f50177463889412f6583b3045436e0295ea8ab",
+      "local/sparring/v2_cautious/agent/pokemon/typechart.py": "95e5040942266e734cbef4c46f977049abb8e9de0091a0e3dfc8e0aa90b6edb5",
+      "local/sparring/v2_cautious/agent/werewolf/__init__.py": "114e212338ac1d8ebee88fc42b86176170ba854742319c59c3b4d6e8901fa2c5",
+      "local/sparring/v2_cautious/agent/werewolf/policy.py": "b271c8f2b731bac127f27116c933e87b00c587bce2dbb5787455160ecef38a4c",
+      "local/sparring/v2_cautious/agent/werewolf/state.py": "628c3ad5b6d5ed43dda51c29435285f5757b505d5b2cf573960b8b891c537ffc",
+      "local/vgcbench_opp.py": "d059e0466dc3fd29f6030ade73f37b7e558eede18822c6333dfe482a9c87ff26",
+      "local/vgcbench_worker.py": "354e4a7d1f816a2d1eb3e55d72fdda2ee0002f25e2b73c71c745c1b30f1f427b",
+      "local/werewolf_benchmark.py": "f96b67cd735e8b054456f8f57297324a853394d919473c4718f52312b9ddcd8e",
+      "local/werewolf_bots.py": "bf58c419ab7e4058706f21aee3131e2f8676c75a1a75a8ad8cef9507230cb2a0",
+      "local/werewolf_env.py": "a0f878d86d2c7e5acbee74e1c0f43e4180d31717b342b8b1d806c2567c04fb0f",
+      "local/werewolf_guard_bots.py": "4262b246e604020082d00383324144eb0270fd314b84411231ddc0b748c934c2",
+      "local/werewolf_platform.py": "48405ba5c8da9eb6f3e53fe699a35aa8f99cc64186f769cd3c474e0e11a72828"
+    },
+    "captured_package_scope": "All local/ and agent/ Python files, sorted relative pathname + NUL + bytes, not just the factory module",
+    "captured_package_source_sha256": "d4bc17e217cc79aa0a2347c7cd9cfe80cee492f5bddac93823e0039763213166",
+    "deleted_python_paths": [],
+    "dependency_note": "b05f069 imports from agent.hok.policy, and that dependency differs from 0785a42. Copying only the local module onto base is not an exact reconstruction.",
+    "development_policy_revision": "b05f0692f6234954ebd10d77a2785e13a938febe",
+    "factory": "local.hok_policy_research:make_policy",
+    "factory_config": {
+      "profile": "<one registered profile>"
+    },
+    "manifest_handling": "verified-manifest.json contains local /tmp report paths. Archive a sanitized source-archive/aggregate-count subset if desired; do not copy development raw reports/logs.",
+    "minimal_exact_python_overlay_onto_base": [
+      "agent/hok/__init__.py",
+      "agent/hok/policy.py",
+      "local/hok_fake_session.py",
+      "local/hok_policy_research.py"
+    ],
+    "not_in_final_bundle": [
+      "local/hok_policy_research.py",
+      "local/hok_fake_session.py",
+      "agent/hok/__init__.py",
+      "agent/hok/policy.py",
+      "agent/hok/RESEARCH.md",
+      "tests/hok/test_research_profiles.py"
+    ],
+    "opponent_exact_overlay_onto_base": [
+      "local/hok_opponents_research.py"
+    ],
+    "required_extra_archive_files": [
+      "<local-artifact>/hok-development-public-paired-index.json",
+      "<local-artifact>/evaluator-44e3a65-source.tar.gz",
+      "<local-artifact>/v3-original-86a6f0a-source.tar.gz",
+      "research/source/b05f069/<the four exact Python overlay paths>",
+      "research/source/b05f069/manifest.json (base revision, full captured-package hashes, overlay hashes, factory profiles)",
+      "optional research/source/b05f069/agent/hok/RESEARCH.md and tests/hok/test_research_profiles.py"
+    ],
+    "source_snapshot_sha256": {
+      "agent/hok/RESEARCH.md": "406edbc158f261f2762db47fd2b9e2e0255daf87443d4ade2f529f8e35bfcef6",
+      "agent/hok/__init__.py": "e193fc68c4f23b4f72bf6bb1f8edb80bdbad894643c9fb9793358554c9a319f6",
+      "agent/hok/policy.py": "98ab2d572e72f3037a7c38586fc80233561cb42b08dab2faf8a8c46a8e24d336",
+      "local/hok_fake_session.py": "35098feaf2678fb67003576dea9ccf0203221395bec607f716d299310f41d0ec",
+      "local/hok_policy_research.py": "822f546c63811c90daa42c821c02103ab90b673ae7c0948a12a5e9a44ad553ac",
+      "tests/hok/test_research_profiles.py": "f57eaccd8b92e6a720e76eef879c08d7bfdc8679c0aa2beed78ec103af14b62e"
+    },
+    "steps_not_executed": [
+      "Create a disposable non-deployed checkout/directory at base 0785a42; never overwrite the live worktree.",
+      "Overlay exactly the four hash-listed changed Python files: local/hok_policy_research.py, local/hok_fake_session.py, agent/hok/__init__.py and agent/hok/policy.py. The fake-session file is needed to reproduce the captured-package digest even if the profile does not import it.",
+      "For archived distribution store those files under research/source/b05f069/...; reconstruct only inside a temporary sandbox, not the deployed agent package.",
+      "Use a SEPARATE evaluator sandbox at base plus evaluator-44e3a65 source files. Do not add evaluator local/*.py into the frozen candidate snapshot, because the factory's digest includes all local/ Python files.",
+      "Use a separate opponent snapshot at base plus the archived 503c36e local/hok_opponents_research.py; freeze it with frozen_import_factory and configure make_bot(name=...).",
+      "If immutable Git objects are available, use --candidate-factory local.hok_policy_research:make_policy --factory-root <repo> --factory-revision b05f069 --factory-config '{\"profile\":\"<name>\"}' instead of overlaying the deployment.",
+      "Use --games 2 --seed 1101 --mode both and the public index's exact opponent/profile/model/config/calls_per_step/decision_steps settings. Run v3 and v4 sensitivity cells separately; do not pool them into a real-game win rate.",
+      "Use ARENA_RECORD=0 and Python 3.13.7 with the base SDK hashes. Recheck generated provenance, not wall-clock latency, against archived records.",
+      "With only exported source snapshots and no b05 Git object, frozen_import_factory(..., root=<candidate snapshot>, revision=None) plus configured_factory(profile=...) preserves the captured package hash. The origin label changes from git_snapshot to directory_snapshot; record that honestly."
+    ],
+    "variant_profiles": [
+      "baseline",
+      "bounded_recovery_v1",
+      "late_objective_v1",
+      "objective_guarded_v1",
+      "observed_damage_v1",
+      "skill_residency_v1"
+    ]
+  },
+  "runtime_identity": {
+    "agent_tree": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+    "audit_workers": 1,
+    "frozen_commit": "21326410a26409eba570f1742ce27b48ff3a5988",
+    "identifier_note": "User notation D72b4c314 resolves as commit 72b4c314, not literal Git object d72b4c314.",
+    "provenance_recorded_execution_workers": 4,
+    "readme_agent_tree": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+    "readme_commit_paths": [
+      "README.md"
+    ],
+    "readme_only_commit": "72b4c3145bda1e72fc66b5ea7eadb6c4515e6b18"
+  },
+  "schema": "hok-independent-public-evidence-audit-v1",
+  "scope": "Read-only recomputation of public aggregates/source provenance; no scoring, games, private reports, credentials or repo edits.",
+  "status": "verified_with_archive_scope_caveats"
+}

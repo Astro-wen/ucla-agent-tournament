@@ -1,0 +1,236 @@
+{
+  "by_policy": [
+    {
+      "by_mode": {
+        "lockstep": {
+          "all_public_leg_fields_equal": 20,
+          "equal_trajectory_hash": 20,
+          "matched_pairs": 20
+        },
+        "realtime": {
+          "all_public_leg_fields_equal": 20,
+          "equal_trajectory_hash": 20,
+          "matched_pairs": 20
+        }
+      },
+      "context_stratified_distinct_weak_trajectory_records": 80,
+      "first_random_equal_trajectory_hash": 0,
+      "idle_first_all_public_leg_fields_equal": 40,
+      "idle_first_equal_trajectory_hash": 40,
+      "idle_random_equal_trajectory_hash": 0,
+      "matched_idle_first_leg_pairs": 40,
+      "policy": "current_main",
+      "records_by_control": {
+        "first_legal": 40,
+        "idle": 40,
+        "uniform_random": 40
+      },
+      "redundant_first_legal_records_relative_to_idle": 40,
+      "weak_leg_records": 120,
+      "weak_wins": 120,
+      "wins_by_control": {
+        "first_legal": 40,
+        "idle": 40,
+        "uniform_random": 40
+      }
+    },
+    {
+      "by_mode": {
+        "lockstep": {
+          "all_public_leg_fields_equal": 20,
+          "equal_trajectory_hash": 20,
+          "matched_pairs": 20
+        },
+        "realtime": {
+          "all_public_leg_fields_equal": 20,
+          "equal_trajectory_hash": 20,
+          "matched_pairs": 20
+        }
+      },
+      "context_stratified_distinct_weak_trajectory_records": 80,
+      "first_random_equal_trajectory_hash": 0,
+      "idle_first_all_public_leg_fields_equal": 40,
+      "idle_first_equal_trajectory_hash": 40,
+      "idle_random_equal_trajectory_hash": 0,
+      "matched_idle_first_leg_pairs": 40,
+      "policy": "final_candidate",
+      "records_by_control": {
+        "first_legal": 40,
+        "idle": 40,
+        "uniform_random": 40
+      },
+      "redundant_first_legal_records_relative_to_idle": 40,
+      "weak_leg_records": 120,
+      "weak_wins": 120,
+      "wins_by_control": {
+        "first_legal": 40,
+        "idle": 40,
+        "uniform_random": 40
+      }
+    }
+  ],
+  "combined": {
+    "context_stratified_distinct_weak_trajectory_records": 160,
+    "first_random_equal_trajectory_hash": 0,
+    "idle_first_all_public_leg_fields_equal": 80,
+    "idle_first_equal_trajectory_hash": 80,
+    "idle_random_equal_trajectory_hash": 0,
+    "incomplete_weak_contexts": 0,
+    "matched_idle_first_leg_pairs": 80,
+    "redundant_first_legal_records_relative_to_idle": 80,
+    "weak_leg_records": 240,
+    "weak_wins": 240
+  },
+  "counting_unit": "Same policy + every condition field except opponent_id + same candidate camp.",
+  "definition_question": {
+    "equivalent_game_actions_under_this_archived_menu": true,
+    "full_action_tag_tuple_equivalent": false,
+    "live_or_arbitrarily_reordered_menu_equivalence": "Not established and generally false. The official interface does not guarantee this simulator's menu order.",
+    "reason": "idle chooses an offered idle wherever it occurs; first_legal chooses the first usable offer. A menu ordered [macro_advance, button_0] separates their actions without any game execution.",
+    "source_argument": "DiagnosticGame._entries always starts each eligible hero menu with a complete button_0, including dead heroes. view preserves that order; _offers preserves per-seat order; both controllers share the same scheduler. Thus idle and first_legal choose the same button_0 action for the same scheduled hero.",
+    "tag_difference": "ResearchBot.decide includes self.name in the tag, so the labels differ. _policy_call discards _tag; the tag is not game action data or hashed state.",
+    "universally_equivalent_policy_definitions": false
+  },
+  "differences": [],
+  "generated_at_utc": "2026-10-16T14:50:36.573028+00:00",
+  "inputs": {
+    "<local-artifact>/hok-final-public-safe.tar.gz": "dc407afb5e0a5afa82231b00e784a295a4f1116bf01f06d4f186981e9b844702",
+    "<local-artifact>/public-paired-index.json": "52cac5fe3f57e8786fa08e669fe4d5f2b5f04df03834fba8874324c36a1ab65a"
+  },
+  "limits": [
+    "Two final world seeds, correlated profiles/modes/camps/shared code, zero real-game evidence.",
+    "Raw per-call traces and detailed timing are absent from the permitted public index; their equality is unverified.",
+    "Distinct trajectory hashes do not establish independent gameplay, because config and seed are included in the digest.",
+    "This audit does not relabel or remove records from the original 400; it explains control redundancy."
+  ],
+  "recommended_description": "Each strategy won all 120 listed weak-control legs, but these contain 40 idle/first_legal duplicate-control leg pairs. Under this simulator menu there are two distinct weak-control action rules, explicit idle and uniform current macros-plus-idle, not three. Retaining one idle-equivalent arm leaves 80 listed legs per strategy; those legs remain correlated and are not independent real games.",
+  "schema": "hok-idle-firstlegal-readonly-audit-v1",
+  "scope": "Only public paired index and source archive were read; no rescoring, games, source edits or unsafe extraction.",
+  "source_locations": {
+    "source/evaluator/local/hok_env.py": {
+      "functions": {
+        "_policy_call": [
+          {
+            "end_line": 674,
+            "line": 611
+          }
+        ],
+        "decide": [
+          {
+            "end_line": 38,
+            "line": 38
+          },
+          {
+            "end_line": 182,
+            "line": 163
+          },
+          {
+            "end_line": 284,
+            "line": 283
+          }
+        ],
+        "play_game": [
+          {
+            "end_line": 759,
+            "line": 677
+          }
+        ]
+      },
+      "sha256": "9765c9d26dbd7192a904ac5fc69350aa0e66259deace58e663c33ff74f77150a"
+    },
+    "source/evaluator/local/hok_sim.py": {
+      "functions": {
+        "_entries": [
+          {
+            "end_line": 352,
+            "line": 332
+          }
+        ],
+        "digest": [
+          {
+            "end_line": 60,
+            "line": 58
+          }
+        ],
+        "state_hash": [
+          {
+            "end_line": 622,
+            "line": 613
+          }
+        ],
+        "view": [
+          {
+            "end_line": 398,
+            "line": 360
+          }
+        ]
+      },
+      "sha256": "c31b5513e9bbd8cff9bf1c07583f87bbdbf8058d061784d3db32d3874e9ae5e7"
+    },
+    "source/opponents/local/hok_opponents_research.py": {
+      "functions": {
+        "_choose": [
+          {
+            "end_line": 357,
+            "line": 337
+          },
+          {
+            "end_line": 515,
+            "line": 512
+          }
+        ],
+        "_offers": [
+          {
+            "end_line": 220,
+            "line": 182
+          }
+        ],
+        "decide": [
+          {
+            "end_line": 335,
+            "line": 316
+          },
+          {
+            "end_line": 510,
+            "line": 500
+          }
+        ]
+      },
+      "sha256": "67ecc0238f093f5698c3ac7e4994e86aa7a7363fccbb915341bc8a59b45ff651"
+    }
+  },
+  "status": "verified_conditional_action_redundancy_and_recorded_hash_equality",
+  "trajectory_question": {
+    "all_matched_public_leg_records_equal": true,
+    "excluded_or_not_proven": [
+      "all intermediate calls/actions between snapshots",
+      "reasoning tags",
+      "policy-private memory",
+      "local latency/CPU timing",
+      "network behavior",
+      "unrecorded engine/internal RNG state"
+    ],
+    "hash_construction": "SHA256 initialized with initial state_hash string, then updated once per outer play_game iteration after tick/terminal handling with the new state_hash string.",
+    "not_a_per_call_action_log": true,
+    "scope_warning": "Equal recorded hashes are evidence of equal covered snapshot trajectories, not a separate proof of byte-identical per-call traces. Action equivalence here is additionally inferred from the archived menu and controller source.",
+    "state_hash_fields": [
+      "config.config_hash",
+      "seed",
+      "step",
+      "heroes",
+      "structures",
+      "standing",
+      "fresh",
+      "pending",
+      "damage",
+      "kills",
+      "healed",
+      "respawns",
+      "fallback",
+      "terminal",
+      "winner",
+      "reason"
+    ],
+    "state_hash_serialization": "SHA256 of JSON with sorted keys, compact separators, allow_nan=False."
+  }
+}

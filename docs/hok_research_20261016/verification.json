@@ -1,0 +1,36 @@
+{
+  "runtime_revision": "21326410a26409eba570f1742ce27b48ff3a5988",
+  "runtime_agent_tree": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+  "sdk_tree": "fb6dd7891182f7710dbd5266afb4700f21f5176d",
+  "READY_package_revision": "72b4c3145bda1e72fc66b5ea7eadb6c4515e6b18",
+  "READY_package_tree": "bb21a3c7f55c1f97c91a55818f993283c2a56829",
+  "exported_source_paths_equal_to_READY_package": 135,
+  "full_pytest": {
+    "passed": 3454,
+    "skipped": 39,
+    "failed": 0
+  },
+  "strict_ci_lint_errors": 0,
+  "other_game_replays": {
+    "commit": "72b4c3145bda1e72fc66b5ea7eadb6c4515e6b18",
+    "checks": [
+      {
+        "mode": "normal",
+        "returncode": 0,
+        "seconds": 549.57
+      },
+      {
+        "mode": "no-calc",
+        "returncode": 0,
+        "seconds": 495.85
+      }
+    ]
+  },
+  "remaining_target_host_checks": [
+    "Linux pinned-Node bundle",
+    "real systemd service behavior"
+  ],
+  "no_live_matches_created": true,
+  "no_runtime_model_calls_added": true,
+  "no_force_push": true
+}

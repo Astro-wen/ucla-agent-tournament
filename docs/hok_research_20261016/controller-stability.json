@@ -1,0 +1,1039 @@
+{
+  "agent_tree": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+  "aggregate_decide_latency": {
+    "max_ms": 2.434667,
+    "median_ms": 0.103084,
+    "p95_ms": 0.222625,
+    "p99_ms": 2.1255,
+    "samples": 51065
+  },
+  "audit_script_sha256": "aebeea29031e8007ed97b32f14592710903ab54edf488f0b4d04e61d6304f9a5",
+  "cases": [
+    {
+      "callback_errors": 0,
+      "calls": 40,
+      "classification": "valid_contract_views",
+      "decide_latency": {
+        "max_ms": 0.349458,
+        "median_ms": 0.204875,
+        "p95_ms": 0.24125,
+        "p99_ms": 0.341375,
+        "samples": 40
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 40,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 0,
+        "_retreating": 0,
+        "_sent": 5,
+        "_waiting_since": 0,
+        "by_macro": 1
+      },
+      "metamorphic_pairs": 0,
+      "name": "repeated_and_stale_realtime_views",
+      "rejections_injected": 0,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3297,
+          "call": 40
+        }
+      ],
+      "sends": 10,
+      "validation_failures": 0,
+      "waits": 30
+    },
+    {
+      "callback_errors": 0,
+      "calls": 1000,
+      "classification": "valid_contract_views_and_callbacks",
+      "decide_latency": {
+        "max_ms": 0.181125,
+        "median_ms": 0.0935,
+        "p95_ms": 0.102834,
+        "p99_ms": 0.122417,
+        "samples": 1000
+      },
+      "dispatches_by_relative_seat": {
+        "0": 116,
+        "1": 114,
+        "2": 110,
+        "3": 112,
+        "4": 114
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 1000,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 5,
+        "_retreating": 0,
+        "_sent": 5,
+        "_waiting_since": 4,
+        "by_macro": 1
+      },
+      "metamorphic_pairs": 0,
+      "name": "seat_local_refusal_respawn_camp1_realtime",
+      "rejections_injected": 88,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3114,
+          "call": 1
+        },
+        {
+          "bytes": 4358,
+          "call": 251
+        },
+        {
+          "bytes": 4174,
+          "call": 501
+        },
+        {
+          "bytes": 4414,
+          "call": 751
+        },
+        {
+          "bytes": 4282,
+          "call": 1000
+        }
+      ],
+      "sends": 566,
+      "validation_failures": 0,
+      "waits": 434
+    },
+    {
+      "callback_errors": 0,
+      "calls": 1000,
+      "classification": "valid_contract_views_and_callbacks",
+      "decide_latency": {
+        "max_ms": 0.232667,
+        "median_ms": 0.098708,
+        "p95_ms": 0.109958,
+        "p99_ms": 0.144,
+        "samples": 1000
+      },
+      "dispatches_by_relative_seat": {
+        "0": 200,
+        "1": 200,
+        "2": 200,
+        "3": 200,
+        "4": 200
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 1000,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 5,
+        "_retreating": 0,
+        "_sent": 5,
+        "_waiting_since": 4,
+        "by_macro": 1
+      },
+      "metamorphic_pairs": 0,
+      "name": "seat_local_refusal_respawn_camp1_lockstep",
+      "rejections_injected": 143,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3106,
+          "call": 1
+        },
+        {
+          "bytes": 4322,
+          "call": 251
+        },
+        {
+          "bytes": 4274,
+          "call": 501
+        },
+        {
+          "bytes": 4518,
+          "call": 751
+        },
+        {
+          "bytes": 4462,
+          "call": 1000
+        }
+      ],
+      "sends": 1000,
+      "validation_failures": 0,
+      "waits": 0
+    },
+    {
+      "callback_errors": 0,
+      "calls": 1000,
+      "classification": "valid_contract_views_and_callbacks",
+      "decide_latency": {
+        "max_ms": 0.225667,
+        "median_ms": 0.09375,
+        "p95_ms": 0.103667,
+        "p99_ms": 0.123083,
+        "samples": 1000
+      },
+      "dispatches_by_relative_seat": {
+        "0": 116,
+        "1": 114,
+        "2": 110,
+        "3": 112,
+        "4": 114
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 1000,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 5,
+        "_retreating": 0,
+        "_sent": 5,
+        "_waiting_since": 4,
+        "by_macro": 1
+      },
+      "metamorphic_pairs": 0,
+      "name": "seat_local_refusal_respawn_camp2_realtime",
+      "rejections_injected": 88,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3154,
+          "call": 1
+        },
+        {
+          "bytes": 4426,
+          "call": 251
+        },
+        {
+          "bytes": 4242,
+          "call": 501
+        },
+        {
+          "bytes": 4482,
+          "call": 751
+        },
+        {
+          "bytes": 4266,
+          "call": 1000
+        }
+      ],
+      "sends": 566,
+      "validation_failures": 0,
+      "waits": 434
+    },
+    {
+      "callback_errors": 0,
+      "calls": 1000,
+      "classification": "valid_contract_views_and_callbacks",
+      "decide_latency": {
+        "max_ms": 0.189792,
+        "median_ms": 0.097917,
+        "p95_ms": 0.110959,
+        "p99_ms": 0.138792,
+        "samples": 1000
+      },
+      "dispatches_by_relative_seat": {
+        "0": 200,
+        "1": 200,
+        "2": 200,
+        "3": 200,
+        "4": 200
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 1000,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 5,
+        "_retreating": 0,
+        "_sent": 5,
+        "_waiting_since": 4,
+        "by_macro": 1
+      },
+      "metamorphic_pairs": 0,
+      "name": "seat_local_refusal_respawn_camp2_lockstep",
+      "rejections_injected": 143,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3146,
+          "call": 1
+        },
+        {
+          "bytes": 4362,
+          "call": 251
+        },
+        {
+          "bytes": 4286,
+          "call": 501
+        },
+        {
+          "bytes": 4530,
+          "call": 751
+        },
+        {
+          "bytes": 4418,
+          "call": 1000
+        }
+      ],
+      "sends": 1000,
+      "validation_failures": 0,
+      "waits": 0
+    },
+    {
+      "callback_errors": 0,
+      "calls": 12,
+      "classification": "valid_contract_views_and_callbacks",
+      "decide_latency": {
+        "max_ms": 0.262334,
+        "median_ms": 0.214167,
+        "p95_ms": 0.236292,
+        "p99_ms": 0.236292,
+        "samples": 12
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 12,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {
+        "_acknowledged": 5,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 1,
+        "_retreating": 0,
+        "_sent": 5,
+        "_waiting_since": 0,
+        "by_macro": 2
+      },
+      "metamorphic_pairs": 0,
+      "name": "acknowledged_order_disappearance_refusal_and_respawn",
+      "rejections_injected": 1,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3497,
+          "call": 6
+        },
+        {
+          "bytes": 4290,
+          "call": 12
+        }
+      ],
+      "sends": 9,
+      "validation_failures": 0,
+      "waits": 3
+    },
+    {
+      "callback_errors": 0,
+      "calls": 6000,
+      "classification": "synthetic_server_races_not_strategy_outcomes",
+      "decide_latency": {
+        "max_ms": 0.349958,
+        "median_ms": 0.100833,
+        "p95_ms": 0.113375,
+        "p99_ms": 0.134333,
+        "samples": 6000
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 6000,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 30,
+        "_retreating": 0,
+        "_sent": 1,
+        "_waiting_since": 0,
+        "by_macro": 6
+      },
+      "metamorphic_pairs": 0,
+      "name": "all_five_by_six_refusal_keys_remain_bounded",
+      "rejections_injected": 6000,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 8700,
+          "call": 30
+        },
+        {
+          "bytes": 8952,
+          "call": 1500
+        },
+        {
+          "bytes": 9092,
+          "call": 3000
+        },
+        {
+          "bytes": 9092,
+          "call": 6000
+        }
+      ],
+      "sends": 6000,
+      "validation_failures": 0,
+      "waits": 0
+    },
+    {
+      "callback_errors": 0,
+      "calls": 1000,
+      "classification": "valid_owned_pending_raw_offers",
+      "decide_latency": {
+        "max_ms": 0.168375,
+        "median_ms": 0.081542,
+        "p95_ms": 0.092,
+        "p99_ms": 0.112875,
+        "samples": 1000
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 1000,
+      "input_immutability_checks": 10,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 0,
+        "_retreating": 0,
+        "_sent": 0,
+        "_waiting_since": 0,
+        "by_macro": 0
+      },
+      "metamorphic_pairs": 0,
+      "name": "complete_raw_buttons_and_domain_changes",
+      "rejections_injected": 0,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 2632,
+          "call": 1000
+        }
+      ],
+      "sends": 1000,
+      "validation_failures": 0,
+      "waits": 0
+    },
+    {
+      "callback_errors": 0,
+      "calls": 11,
+      "classification": "not_a_strategy_failure_if_WAIT",
+      "decide_latency": {
+        "max_ms": 0.211875,
+        "median_ms": 0.009166,
+        "p95_ms": 0.095667,
+        "p99_ms": 0.095667,
+        "samples": 11
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 11,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {},
+      "metamorphic_pairs": 0,
+      "name": "impossible_or_incomplete_API_without_admissible_action",
+      "no_admissible_input_cases": 11,
+      "rejections_injected": 0,
+      "retained_policy_bytes_samples": [],
+      "sends": 0,
+      "validation_failures": 0,
+      "waits": 11
+    },
+    {
+      "callback_errors": 0,
+      "calls": 2400,
+      "classification": "metamorphic_equal_public_evidence",
+      "decide_latency": {
+        "max_ms": 0.508792,
+        "median_ms": 0.263792,
+        "p95_ms": 0.329541,
+        "p99_ms": 0.364958,
+        "samples": 2400
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 2400,
+      "input_immutability_checks": 24,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 9,
+        "_retreating": 4,
+        "_sent": 5,
+        "_waiting_since": 4,
+        "by_macro": 3
+      },
+      "metamorphic_pairs": 1200,
+      "name": "numeric_ids",
+      "rejections_injected": 160,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 5176,
+          "call": 600
+        },
+        {
+          "bytes": 5523,
+          "call": 1200
+        },
+        {
+          "bytes": 5488,
+          "call": 1800
+        },
+        {
+          "bytes": 5643,
+          "call": 2400
+        }
+      ],
+      "sends": 2114,
+      "validation_failures": 0,
+      "waits": 286
+    },
+    {
+      "callback_errors": 0,
+      "calls": 2400,
+      "classification": "metamorphic_equal_public_evidence",
+      "decide_latency": {
+        "max_ms": 0.351083,
+        "median_ms": 0.190584,
+        "p95_ms": 0.229084,
+        "p99_ms": 0.253542,
+        "samples": 2400
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 2400,
+      "input_immutability_checks": 24,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 9,
+        "_retreating": 4,
+        "_sent": 5,
+        "_waiting_since": 4,
+        "by_macro": 3
+      },
+      "metamorphic_pairs": 1200,
+      "name": "hidden_metadata_and_fog",
+      "rejections_injected": 160,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 5176,
+          "call": 600
+        },
+        {
+          "bytes": 5523,
+          "call": 1200
+        },
+        {
+          "bytes": 5488,
+          "call": 1800
+        },
+        {
+          "bytes": 5643,
+          "call": 2400
+        }
+      ],
+      "sends": 2114,
+      "validation_failures": 0,
+      "waits": 286
+    },
+    {
+      "callback_errors": 0,
+      "calls": 2400,
+      "classification": "metamorphic_equal_public_evidence",
+      "decide_latency": {
+        "max_ms": 0.465042,
+        "median_ms": 0.1925,
+        "p95_ms": 0.231542,
+        "p99_ms": 0.262834,
+        "samples": 2400
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 2400,
+      "input_immutability_checks": 24,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 9,
+        "_retreating": 4,
+        "_sent": 5,
+        "_waiting_since": 4,
+        "by_macro": 3
+      },
+      "metamorphic_pairs": 1200,
+      "name": "offered_order",
+      "rejections_injected": 160,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 5176,
+          "call": 600
+        },
+        {
+          "bytes": 5523,
+          "call": 1200
+        },
+        {
+          "bytes": 5488,
+          "call": 1800
+        },
+        {
+          "bytes": 5643,
+          "call": 2400
+        }
+      ],
+      "sends": 2114,
+      "validation_failures": 0,
+      "waits": 286
+    },
+    {
+      "callback_errors": 0,
+      "calls": 800,
+      "classification": "invalid_telemetry_not_invalid_action_menu",
+      "decide_latency": {
+        "max_ms": 0.354708,
+        "median_ms": 0.206166,
+        "p95_ms": 0.240584,
+        "p99_ms": 0.264667,
+        "samples": 800
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 800,
+      "input_immutability_checks": 8,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 0,
+        "_retreating": 0,
+        "_sent": 5,
+        "_waiting_since": 4,
+        "by_macro": 1
+      },
+      "metamorphic_pairs": 0,
+      "name": "malformed_telemetry_container_shapes_with_usable_menu",
+      "rejections_injected": 0,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3257,
+          "call": 400
+        },
+        {
+          "bytes": 3345,
+          "call": 800
+        }
+      ],
+      "sends": 595,
+      "validation_failures": 0,
+      "waits": 205
+    },
+    {
+      "callback_errors": 0,
+      "calls": 1400,
+      "classification": "invalid_telemetry_not_invalid_action_menu",
+      "decide_latency": {
+        "max_ms": 0.313875,
+        "median_ms": 0.186959,
+        "p95_ms": 0.225083,
+        "p99_ms": 0.252459,
+        "samples": 1400
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 1400,
+      "input_immutability_checks": 8,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 1,
+        "_retreating": 0,
+        "_sent": 5,
+        "_waiting_since": 4,
+        "by_macro": 2
+      },
+      "metamorphic_pairs": 0,
+      "name": "malformed_nonfinite_telemetry_with_valid_offers",
+      "rejections_injected": 84,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3618,
+          "call": 700
+        },
+        {
+          "bytes": 3646,
+          "call": 1400
+        }
+      ],
+      "sends": 1374,
+      "validation_failures": 0,
+      "waits": 26
+    },
+    {
+      "callback_errors": 0,
+      "calls": 2,
+      "classification": "visibility_change_is_public_evidence_not_leakage",
+      "decide_latency": {
+        "max_ms": 0.105875,
+        "median_ms": 0.0975,
+        "p95_ms": 0.0975,
+        "p99_ms": 0.0975,
+        "samples": 2
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 2,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {},
+      "metamorphic_pairs": 0,
+      "name": "visible_enemy_change_negative_control",
+      "rejections_injected": 0,
+      "retained_policy_bytes_samples": [],
+      "sends": 2,
+      "validation_failures": 0,
+      "waits": 0
+    },
+    {
+      "callback_errors": 0,
+      "calls": 150,
+      "classification": "synthetic_cap_boundary_not_asserted_live_maximum",
+      "decide_latency": {
+        "max_ms": 2.353625,
+        "median_ms": 2.167792,
+        "p95_ms": 2.275208,
+        "p99_ms": 2.342459,
+        "samples": 150
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 150,
+      "input_immutability_checks": 2,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 0,
+        "_retreating": 0,
+        "_sent": 4,
+        "_waiting_since": 1,
+        "by_macro": 1
+      },
+      "metamorphic_pairs": 0,
+      "name": "max_parser_boundaries_camp1_realtime",
+      "rejections_injected": 0,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3309,
+          "call": 150
+        }
+      ],
+      "sends": 150,
+      "shape": {
+        "actions": 1024,
+        "actor_entries_per_view": 256,
+        "label_characters": 512,
+        "owned_heroes": 5,
+        "raw_domain_values": 256,
+        "structures_per_view": 256,
+        "unique_enemy_heroes": 5
+      },
+      "validation_failures": 0,
+      "waits": 0
+    },
+    {
+      "callback_errors": 0,
+      "calls": 150,
+      "classification": "synthetic_cap_boundary_not_asserted_live_maximum",
+      "decide_latency": {
+        "max_ms": 2.322958,
+        "median_ms": 2.153583,
+        "p95_ms": 2.262375,
+        "p99_ms": 2.303,
+        "samples": 150
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 150,
+      "input_immutability_checks": 2,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 0,
+        "_retreating": 0,
+        "_sent": 4,
+        "_waiting_since": 4,
+        "by_macro": 1
+      },
+      "metamorphic_pairs": 0,
+      "name": "max_parser_boundaries_camp1_lockstep",
+      "rejections_injected": 0,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3309,
+          "call": 150
+        }
+      ],
+      "sends": 150,
+      "shape": {
+        "actions": 1024,
+        "actor_entries_per_view": 256,
+        "label_characters": 512,
+        "owned_heroes": 5,
+        "raw_domain_values": 256,
+        "structures_per_view": 256,
+        "unique_enemy_heroes": 5
+      },
+      "validation_failures": 0,
+      "waits": 0
+    },
+    {
+      "callback_errors": 0,
+      "calls": 150,
+      "classification": "synthetic_cap_boundary_not_asserted_live_maximum",
+      "decide_latency": {
+        "max_ms": 2.434667,
+        "median_ms": 2.18175,
+        "p95_ms": 2.300834,
+        "p99_ms": 2.403334,
+        "samples": 150
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 150,
+      "input_immutability_checks": 2,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 0,
+        "_retreating": 0,
+        "_sent": 4,
+        "_waiting_since": 1,
+        "by_macro": 1
+      },
+      "metamorphic_pairs": 0,
+      "name": "max_parser_boundaries_camp2_realtime",
+      "rejections_injected": 0,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3337,
+          "call": 150
+        }
+      ],
+      "sends": 150,
+      "shape": {
+        "actions": 1024,
+        "actor_entries_per_view": 256,
+        "label_characters": 512,
+        "owned_heroes": 5,
+        "raw_domain_values": 256,
+        "structures_per_view": 256,
+        "unique_enemy_heroes": 5
+      },
+      "validation_failures": 0,
+      "waits": 0
+    },
+    {
+      "callback_errors": 0,
+      "calls": 150,
+      "classification": "synthetic_cap_boundary_not_asserted_live_maximum",
+      "decide_latency": {
+        "max_ms": 2.375375,
+        "median_ms": 2.162583,
+        "p95_ms": 2.266875,
+        "p99_ms": 2.328834,
+        "samples": 150
+      },
+      "exceptions": 0,
+      "independent_validation_calls": 150,
+      "input_immutability_checks": 2,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 0,
+        "_retreating": 0,
+        "_sent": 4,
+        "_waiting_since": 4,
+        "by_macro": 1
+      },
+      "metamorphic_pairs": 0,
+      "name": "max_parser_boundaries_camp2_lockstep",
+      "rejections_injected": 0,
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3337,
+          "call": 150
+        }
+      ],
+      "sends": 150,
+      "shape": {
+        "actions": 1024,
+        "actor_entries_per_view": 256,
+        "label_characters": 512,
+        "owned_heroes": 5,
+        "raw_domain_values": 256,
+        "structures_per_view": 256,
+        "unique_enemy_heroes": 5
+      },
+      "validation_failures": 0,
+      "waits": 0
+    },
+    {
+      "callback_errors": 0,
+      "calls": 15000,
+      "classification": "synthetic_long_sequence_15000_calls",
+      "decide_latency": {
+        "max_ms": 0.284208,
+        "median_ms": 0.101417,
+        "p95_ms": 0.114625,
+        "p99_ms": 0.126458,
+        "samples": 15000
+      },
+      "declared_calls": 15000,
+      "exceptions": 0,
+      "independent_validation_calls": 15000,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 10,
+        "_retreating": 1,
+        "_sent": 4,
+        "_waiting_since": 4,
+        "by_macro": 6
+      },
+      "metamorphic_pairs": 0,
+      "name": "long_match_state_bound_camp1",
+      "rejections_injected": 5000,
+      "retained_bytes_after_call_5000": [
+        4952,
+        6062,
+        5980
+      ],
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3018,
+          "call": 1
+        },
+        {
+          "bytes": 4130,
+          "call": 1000
+        },
+        {
+          "bytes": 4952,
+          "call": 5000
+        },
+        {
+          "bytes": 6062,
+          "call": 10000
+        },
+        {
+          "bytes": 5980,
+          "call": 15000
+        }
+      ],
+      "sends": 15000,
+      "validation_failures": 0,
+      "waits": 0
+    },
+    {
+      "callback_errors": 0,
+      "calls": 15000,
+      "classification": "synthetic_long_sequence_15000_calls",
+      "decide_latency": {
+        "max_ms": 0.252209,
+        "median_ms": 0.101959,
+        "p95_ms": 0.115291,
+        "p99_ms": 0.122958,
+        "samples": 15000
+      },
+      "declared_calls": 15000,
+      "exceptions": 0,
+      "independent_validation_calls": 15000,
+      "input_immutability_checks": 0,
+      "max_map_sizes": {
+        "_acknowledged": 0,
+        "_deaths": 5,
+        "_last_service": 5,
+        "_rejected": 10,
+        "_retreating": 1,
+        "_sent": 4,
+        "_waiting_since": 4,
+        "by_macro": 6
+      },
+      "metamorphic_pairs": 0,
+      "name": "long_match_state_bound_camp2",
+      "rejections_injected": 5000,
+      "retained_bytes_after_call_5000": [
+        4952,
+        6090,
+        6008
+      ],
+      "retained_policy_bytes_samples": [
+        {
+          "bytes": 3074,
+          "call": 1
+        },
+        {
+          "bytes": 4186,
+          "call": 1000
+        },
+        {
+          "bytes": 4952,
+          "call": 5000
+        },
+        {
+          "bytes": 6090,
+          "call": 10000
+        },
+        {
+          "bytes": 6008,
+          "call": 15000
+        }
+      ],
+      "sends": 15000,
+      "validation_failures": 0,
+      "waits": 0
+    }
+  ],
+  "elapsed_wall_s": 28.12,
+  "failures": [],
+  "frozen_commit": "21326410a26409eba570f1742ce27b48ff3a5988",
+  "generated_at_utc": "2026-10-16T14:39:04.374042+00:00",
+  "independent_validation_calls": 51065,
+  "limits": [
+    "Engineering probes, not win-rate or Tencent engine strength evidence; no simulator/scoring/live calls.",
+    "Independent validator checks current advertised owned/pending actions, not an unseen server's later race state.",
+    "Parser-cap fixtures contain duplicated identical offers/actors; official live API maxima are not documented.",
+    "Nonfinite/ill-typed telemetry is deliberately outside JSON's ordinary finite-number contract.",
+    "WAIT with no admissible action is classified separately from strategy failures.",
+    "Latency is local wall time for decide only, not network/platform latency; no production threshold was changed.",
+    "Retained bytes cover the policy attribute graph excluding callable clock providers and external harness memory."
+  ],
+  "policy_modified_or_thresholds_changed": false,
+  "policy_sha256": "53de6d67acd3d07c80d28330656f84e1252394ea082d3efc6dc6206f90635f3a",
+  "python": "3.13.7",
+  "raw_traces_recorded": false,
+  "repository_modified": false,
+  "schema": "hok-frozen-readonly-stability-v1",
+  "status": "completed",
+  "structural_per_match_map_bounds": {
+    "_acknowledged": 5,
+    "_deaths": 5,
+    "_last_service": 5,
+    "_rejected": 30,
+    "_retreating": 5,
+    "_sent": 5,
+    "_waiting_since": 5,
+    "by_macro": 6
+  },
+  "totals": {
+    "callback_errors": 0,
+    "calls": 51065,
+    "exceptions": 0,
+    "input_immutability_checks": 106,
+    "metamorphic_pairs": 3600,
+    "rejections_injected": 17027,
+    "sends": 49064,
+    "validation_failures": 0,
+    "waits": 2001
+  },
+  "wall_budget_s": 180,
+  "workers": 1
+}

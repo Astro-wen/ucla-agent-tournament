@@ -1,0 +1,1733 @@
+{
+  "all_paired_conditions": [
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8101
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        0.0,
+        0.0
+      ],
+      "mode": "lockstep",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 1.0,
+      "profile": "advance-attacks",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        0.0,
+        0.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": -1.0,
+      "profile": "advance-attacks",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "advance-attacks",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "default",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "durable",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "punishing-towers",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "lockstep",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "counterpunch_interceptor",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "first_legal",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "idle",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "relay_pressure",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8102
+    },
+    {
+      "final_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "main_camp_scores": [
+        1.0,
+        1.0
+      ],
+      "mode": "realtime",
+      "opponent": "uniform_random",
+      "paired_delta": 0.0,
+      "profile": "short-vision",
+      "seed": 8102
+    }
+  ],
+  "approved_final_sha": "21326410a26409eba570f1742ce27b48ff3a5988",
+  "complete": true,
+  "counting_limits": {
+    "conflicting_repeat_pairs": 0,
+    "duplicate_pairs_removed": 0,
+    "independent_real_games": 0,
+    "input_reports": 8,
+    "limits": "No count above asserts independence. Compare policies within the same condition; audit each mode and both camps. Never pool v3/v4 treatment arms into actual win-rate claims. Interface-incompatible entries have no games.",
+    "modes_are_strata": [
+      "lockstep",
+      "realtime"
+    ],
+    "raw_leg_records": 400,
+    "raw_paired_records": 200,
+    "shared_seed_opponent_families": 10,
+    "unique_condition_keys_across_policies": 100,
+    "unique_generated_legs": 400,
+    "unique_paired_records": 200,
+    "world_seeds": [
+      8101,
+      8102
+    ]
+  },
+  "current_main_sha": "fb421a2562c8480add765889ddf11c19cbc926ba",
+  "duration_limits": "Per-hero seconds are tick-start counters. No gain means HP did not rise, including flat full HP; stationary requires <=1e-6 model-unit movement. Death/respawn/max-HP changes reset episodes. Cumulative retreat is not a continuous episode and can be useful travel or defensive holding. These metrics are not automatic working-solution failures.",
+  "generated_legs": 400,
+  "invalid_actions": 0,
+  "latency_limits": "Main includes SDK legal-list adapter conversion; final uses raw directly. Local CPU/wall decide timing is not network latency or a clean policy-only performance comparison.",
+  "matched_conditions": 100,
+  "native_policy_errors": 0,
+  "opponent_revision": "503c36e5fd5033240ab195ca4038fde05c75019f",
+  "paired_comparison": {
+    "by_mode": {
+      "lockstep": {
+        "improved": 1,
+        "regressed": 0,
+        "tied": 49
+      },
+      "realtime": {
+        "improved": 0,
+        "regressed": 1,
+        "tied": 49
+      }
+    },
+    "camp_discordant_conditions_final": 0,
+    "camp_discordant_conditions_main": 0,
+    "improved_conditions": 1,
+    "regressed_conditions": 1,
+    "tied_conditions": 98
+  },
+  "protocol_failures": 0,
+  "retuning_or_reselection_performed": false,
+  "roles": {
+    "current_main": {
+      "by_camp": {
+        "1": {
+          "draws": 0,
+          "games": 100,
+          "losses": 1,
+          "wins": 99
+        },
+        "2": {
+          "draws": 0,
+          "games": 100,
+          "losses": 1,
+          "wins": 99
+        }
+      },
+      "by_mode": {
+        "lockstep": {
+          "draws": 0,
+          "games": 100,
+          "losses": 2,
+          "wins": 98
+        },
+        "realtime": {
+          "draws": 0,
+          "games": 100,
+          "losses": 0,
+          "wins": 100
+        }
+      },
+      "by_opponent": {
+        "counterpunch_interceptor": {
+          "draws": 0,
+          "games": 40,
+          "losses": 2,
+          "wins": 38
+        },
+        "first_legal": {
+          "draws": 0,
+          "games": 40,
+          "losses": 0,
+          "wins": 40
+        },
+        "idle": {
+          "draws": 0,
+          "games": 40,
+          "losses": 0,
+          "wins": 40
+        },
+        "relay_pressure": {
+          "draws": 0,
+          "games": 40,
+          "losses": 0,
+          "wins": 40
+        },
+        "uniform_random": {
+          "draws": 0,
+          "games": 40,
+          "losses": 0,
+          "wins": 40
+        }
+      },
+      "draws": 0,
+      "games": 200,
+      "hero_match_slots": 1000,
+      "latency_ms": {
+        "max_call": 2.938542,
+        "max_leg_p95": 0.1545
+      },
+      "losses": 2,
+      "per_hero_durations": {
+        "alive_total_s": 138544.4,
+        "idle_total_s": 0.0,
+        "largest_cumulative_retreat_s_one_hero": 345.2,
+        "longest_stationary_no_gain_idle_s": 0.0,
+        "longest_stationary_no_gain_retreat_s": 0.2,
+        "retreat_fraction_of_alive_time": 0.4190743184134473,
+        "retreat_total_s": 58060.4,
+        "slots_with_idle_no_progress_ge10s": 0,
+        "slots_with_idle_no_progress_ge30s": 0,
+        "slots_with_retreat_no_progress_ge10s": 0,
+        "slots_with_retreat_no_progress_ge30s": 0,
+        "stationary_no_gain_idle_total_s": 0.0,
+        "stationary_no_gain_retreat_total_s": 1137.2
+      },
+      "wins": 198
+    },
+    "final_candidate": {
+      "by_camp": {
+        "1": {
+          "draws": 0,
+          "games": 100,
+          "losses": 1,
+          "wins": 99
+        },
+        "2": {
+          "draws": 0,
+          "games": 100,
+          "losses": 1,
+          "wins": 99
+        }
+      },
+      "by_mode": {
+        "lockstep": {
+          "draws": 0,
+          "games": 100,
+          "losses": 0,
+          "wins": 100
+        },
+        "realtime": {
+          "draws": 0,
+          "games": 100,
+          "losses": 2,
+          "wins": 98
+        }
+      },
+      "by_opponent": {
+        "counterpunch_interceptor": {
+          "draws": 0,
+          "games": 40,
+          "losses": 2,
+          "wins": 38
+        },
+        "first_legal": {
+          "draws": 0,
+          "games": 40,
+          "losses": 0,
+          "wins": 40
+        },
+        "idle": {
+          "draws": 0,
+          "games": 40,
+          "losses": 0,
+          "wins": 40
+        },
+        "relay_pressure": {
+          "draws": 0,
+          "games": 40,
+          "losses": 0,
+          "wins": 40
+        },
+        "uniform_random": {
+          "draws": 0,
+          "games": 40,
+          "losses": 0,
+          "wins": 40
+        }
+      },
+      "draws": 0,
+      "games": 200,
+      "hero_match_slots": 1000,
+      "latency_ms": {
+        "max_call": 2.639083,
+        "max_leg_p95": 0.134833
+      },
+      "losses": 2,
+      "per_hero_durations": {
+        "alive_total_s": 154616.8,
+        "idle_total_s": 0.0,
+        "largest_cumulative_retreat_s_one_hero": 338.8,
+        "longest_stationary_no_gain_idle_s": 0.0,
+        "longest_stationary_no_gain_retreat_s": 6.6,
+        "retreat_fraction_of_alive_time": 0.428463142426955,
+        "retreat_total_s": 66247.6,
+        "slots_with_idle_no_progress_ge10s": 0,
+        "slots_with_idle_no_progress_ge30s": 0,
+        "slots_with_retreat_no_progress_ge10s": 0,
+        "slots_with_retreat_no_progress_ge30s": 0,
+        "stationary_no_gain_idle_total_s": 0.0,
+        "stationary_no_gain_retreat_total_s": 704.8
+      },
+      "wins": 198
+    }
+  },
+  "runtime_agent_tree_sha": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+  "schema": "hok-final-confirmation-summary-v1",
+  "warning": "FROZEN SYNTHETIC DIAGNOSTICS ONLY: two world seeds, correlated modes/profiles/camps/code, zero real games."
+}

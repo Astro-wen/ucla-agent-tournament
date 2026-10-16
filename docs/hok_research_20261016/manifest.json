@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "time_local": "2026-10-16T08:00:00.131190-07:00",
+  "execute": true,
+  "runtime_agent_tree": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+  "sdk_tree": "fb6dd7891182f7710dbd5266afb4700f21f5176d",
+  "prearchive_head": "c9fbdb7f313a576f38f39be5b82a088262b72582",
+  "exported_source_paths_equal_to_READY_D": 135,
+  "input_bytes": 1833750,
+  "archived_at_local": "2026-10-16T08:00:19.855581-07:00",
+  "files": {
+    "README.md": {
+      "bytes": 2935,
+      "sha256": "e8dfa320abf74c3de9746e80468c93f8ed1eceb41ce4a0716102e8501442a5ff"
+    },
+    "controller-stability.json": {
+      "bytes": 25860,
+      "sha256": "b3a52db22c1ccb800cf11815e68b98ea830288db3b0499fbd569e07c6533b1b1"
+    },
+    "development-paired-results.json": {
+      "bytes": 1634919,
+      "sha256": "1d3c28a4e571b7dcc1167c295ffcf1038cef65b6e56e7d48ddabf45c1345579d"
+    },
+    "evaluator-development-source.tar.gz": {
+      "bytes": 30612,
+      "sha256": "e3761a1931ed5de6863a63a351b88a9459f4d332e7d42fbe8f704ebe1f40f981"
+    },
+    "evaluator-v3-source.tar.gz": {
+      "bytes": 22983,
+      "sha256": "4e98420dea6f2403de4617baf874cd12964d269a9668bd37e033414517742348"
+    },
+    "final-results-summary.json": {
+      "bytes": 34360,
+      "sha256": "9d01180597077c567eb66aceac280e5e7c691b651bd16796b04e5f12af8a4e06"
+    },
+    "final-source-and-results.tar.gz": {
+      "bytes": 110876,
+      "sha256": "dc407afb5e0a5afa82231b00e784a295a4f1116bf01f06d4f186981e9b844702"
+    },
+    "independent-audit.json": {
+      "bytes": 122119,
+      "sha256": "02364832e428acf9c72299d17371d6ebac7595db0b1a5f13318c84db00d4876d"
+    },
+    "one-completed-real-record.json": {
+      "bytes": 1515,
+      "sha256": "e6890b49acb3d1deb146f519956362702b75e593fd333841f8d41909327b7880"
+    },
+    "pre-release-audit.json": {
+      "bytes": 1146,
+      "sha256": "0971f90bc93e4e9a19a93e32396a05be54ae11024cb588cd7bf56e9565e973bf"
+    },
+    "preregistered-plan.json": {
+      "bytes": 4909,
+      "sha256": "de414716e4a016be3d4067cc5f094dcadc9e5c6297b91514114534ede065bfc0"
+    },
+    "unselected-policy-b05f069-source.tar.gz": {
+      "bytes": 17284,
+      "sha256": "093f8ff3a0d865200ab226ffeaba95a40cbe148f8b97ae89c63c7e341310e85d"
+    },
+    "unselected-policy-source-manifest.json": {
+      "bytes": 592,
+      "sha256": "231d73172a725b29261f85b70da00fa669caf1548158262d146fbbfe4cb619b6"
+    },
+    "verification.json": {
+      "bytes": 1007,
+      "sha256": "be5dfa7cd4c0a7cdf4faef8207c888ff99a2cff5c4b03482b052ee3c6a5aaf4d"
+    },
+    "weak-control-overlap-audit.json": {
+      "bytes": 8305,
+      "sha256": "a47b32ce8d9ecada1e1bdbfd964516e03a4aa85d765d001fbf9162e23fda8898"
+    }
+  }
+}

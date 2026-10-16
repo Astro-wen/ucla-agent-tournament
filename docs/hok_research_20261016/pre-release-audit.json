@@ -1,0 +1,34 @@
+{
+  "checked_at": "2026-10-16T14:48:04.394460+00:00",
+  "archives": [
+    {
+      "name": "hok-final-public-safe.tar.gz",
+      "members": 14,
+      "expanded_bytes": 784437,
+      "sha256": "dc407afb5e0a5afa82231b00e784a295a4f1116bf01f06d4f186981e9b844702"
+    },
+    {
+      "name": "evaluator-44e3a65-source.tar.gz",
+      "members": 8,
+      "expanded_bytes": 112857,
+      "sha256": "e3761a1931ed5de6863a63a351b88a9459f4d332e7d42fbe8f704ebe1f40f981"
+    },
+    {
+      "name": "v3-original-86a6f0a-source.tar.gz",
+      "members": 8,
+      "expanded_bytes": 81979,
+      "sha256": "4e98420dea6f2403de4617baf874cd12964d269a9668bd37e033414517742348"
+    }
+  ],
+  "repository_writes": false,
+  "official_contract": {
+    "http_status": 200,
+    "url": "https://api.altruagent-game.com/skill/hok",
+    "bytes": 6509,
+    "sha256": "49168a46a941ceef29f704437c214383ef3b5ebebb67f8aac112901261728ba4",
+    "unchanged_since_initial_capture": true
+  },
+  "remote_main": "fb421a2562c8480add765889ddf11c19cbc926ba\trefs/heads/main",
+  "agent_tree": "139fcf59bfbdddb752424f726af77b2e59b0322b",
+  "sdk_tree": "fb6dd7891182f7710dbd5266afb4700f21f5176d"
+}

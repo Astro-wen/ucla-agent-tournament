@@ -1,0 +1,11 @@
+{
+  "revision": "b05f069",
+  "reconstruction_base": "0785a42",
+  "files_sha256": {
+    "agent/hok/__init__.py": "e193fc68c4f23b4f72bf6bb1f8edb80bdbad894643c9fb9793358554c9a319f6",
+    "agent/hok/policy.py": "98ab2d572e72f3037a7c38586fc80233561cb42b08dab2faf8a8c46a8e24d336",
+    "local/hok_fake_session.py": "35098feaf2678fb67003576dea9ccf0203221395bec607f716d299310f41d0ec",
+    "local/hok_policy_research.py": "822f546c63811c90daa42c821c02103ab90b673ae7c0948a12a5e9a44ad553ac"
+  },
+  "warning": "Research only. Extract over an isolated baseline checkout, never over deployed agent code."
+}
