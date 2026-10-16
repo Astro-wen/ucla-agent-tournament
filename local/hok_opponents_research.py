@@ -461,6 +461,21 @@ class _SeenHero:
     share: float | None
 
 
+def _visible_foes(summary: dict, camp: int) -> dict[str, _SeenHero]:
+    visible: dict[str, _SeenHero] = {}
+    heroes = summary.get("other_heroes")
+    for hero in heroes if isinstance(heroes, list) else []:
+        if not isinstance(hero, dict) or hero.get("visible") is not True:
+            continue
+        other_camp = _camp(hero.get("camp"))
+        identity = _hero_id(hero.get("runtime_id"))
+        hp = _number(hero.get("hp"))
+        if other_camp is None or other_camp == camp or identity is None or (hp is not None and hp <= 0):
+            continue
+        visible[identity] = _SeenHero(_position(hero), hp, _health_share(hero))
+    return visible
+
+
 class HeldoutBot(ResearchBot):
     """Separate phase-2 policies; the original eight dispatch paths are unchanged."""
 
@@ -481,6 +496,18 @@ class HeldoutBot(ResearchBot):
         self._relay_cooldown: dict[int, int] = {}
         self._sight: dict[int, tuple[tuple[float, float] | None, dict[str, _SeenHero]]] = {}
         self._waits: dict[int, dict[str, int]] = {}
+
+    def decide(self, raw: dict) -> tuple[str | dict[str, Any] | None, str | None]:
+        if self.name == "counterpunch_interceptor":
+            # A fog gap can arrive while another hero gets this call's order.
+            # Prune it now, without granting that hero another decision turn.
+            public = _mapping(raw)
+            for seat, (position, previous) in list(self._sight.items()):
+                camp = _camp(public.get("camp")) or (1 if seat < 5 else 2)
+                visible = _visible_foes(_summary(public, seat), camp) if seat in _own_team(public, seat) else {}
+                self._sight[seat] = (position, {key: hero for key, hero in previous.items() if key in visible})
+                self._waits[seat] = {key: count for key, count in self._waits.get(seat, {}).items() if key in visible}
+        return super().decide(raw)
 
     def _choose(self, role: str, raw: dict, seat: int, choices: list[_Choice]) -> _Choice:
         if role == "relay_pressure":
@@ -535,17 +562,7 @@ class HeldoutBot(ResearchBot):
         position = _position(me)
         camp = _camp(raw.get("camp")) or (1 if seat < 5 else 2)
         previous_position, previous = self._sight.get(seat, (None, {}))
-        visible: dict[str, _SeenHero] = {}
-        heroes = summary.get("other_heroes")
-        for hero in heroes if isinstance(heroes, list) else []:
-            if not isinstance(hero, dict) or hero.get("visible") is not True:
-                continue
-            other_camp = _camp(hero.get("camp"))
-            identity = _hero_id(hero.get("runtime_id"))
-            hp = _number(hero.get("hp"))
-            if other_camp is None or other_camp == camp or identity is None or (hp is not None and hp <= 0):
-                continue
-            visible[identity] = _SeenHero(_position(hero), hp, _health_share(hero))
+        visible = _visible_foes(summary, camp)
         # Only consecutive, explicitly visible observations can establish a trend.
         self._sight[seat] = (position, visible)
         waits = {identity: count for identity, count in self._waits.get(seat, {}).items() if identity in visible}

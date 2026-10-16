@@ -507,7 +507,7 @@ def research_evaluator(monkeypatch):
         pytest.skip("local.hok_env unavailable; set HOK_EVALUATOR_ROOT for integration coverage")
 
 
-@pytest.mark.parametrize("name", opponents.BOT_NAMES)
+@pytest.mark.parametrize("name", opponents.ALL_BOT_NAMES)
 @pytest.mark.parametrize("mode", ["realtime", "lockstep"])
 @pytest.mark.parametrize("candidate_camp", [1, 2])
 def test_actual_evaluator_factory_short_camp_swapped_matrix(research_evaluator, name, mode, candidate_camp):
@@ -571,3 +571,223 @@ def test_actual_evaluator_realtime_keeps_owned_offers_after_all_heroes_are_fresh
     result = game.submit(camp, action, raw["state_version"])
     assert not result.get("error")
     bot.on_result(result)
+
+
+def test_development_catalog_stays_frozen_and_heldout_definitions_are_separate():
+    assert opponents.BOT_NAMES == (
+        "idle", "first_legal", "uniform_random", "objective_rusher",
+        "opportunistic_combat", "cautious_defender", "pulse_pressure", "split_pressure")
+    assert opponents.HELDOUT_NAMES == ("relay_pressure", "counterpunch_interceptor")
+    assert not set(opponents.BOT_NAMES) & set(opponents.HELDOUT_NAMES)
+    assert opponents.ALL_BOT_NAMES == opponents.BOT_NAMES + opponents.HELDOUT_NAMES
+    assert opponents.HELDOUT_PARAMETERS == {
+        "relay_pressure": {
+            "emergency_hp": 0.20, "request_hp": 0.60, "release_hp": 0.85,
+            "minimum_net_hp_gain": 0.01, "stagnant_owner_opportunities": 12,
+            "routine_cooldown_opportunities": 10, "routine_permits": 1,
+        },
+        "counterpunch_interceptor": {
+            "emergency_hp": 0.25, "vulnerable_hp": 0.45, "observed_hp_loss": 0.20,
+            "approach_fraction": 0.10, "hold_opportunities_per_visible_target": 3,
+        },
+    }
+    assert set(opponents.WEAK_CONTROL_SCOPE) == {"idle", "first_legal", "uniform_random"}
+    assert all("human" in description or "strategic" in description
+               for description in opponents.WEAK_CONTROL_SCOPE.values())
+
+
+def visible_foe(*, x=4000, hp=100, maximum=100, visible=True, identity=42):
+    return {"runtime_id": identity, "camp": "2", "x": x, "z": 0,
+            "hp": hp, "max_hp": maximum, "visible": visible}
+
+
+def heldout_view(seats=(0, 1, 2, 3, 4), *, mode="realtime", hp=50):
+    raw = view(seats, mode=mode, hp=hp, pending=[] if mode == "realtime" else list(seats))
+    for entry in raw["observation"]["seats"].values():
+        foe = visible_foe(hp=35)
+        foe["camp"] = str(3 - raw["camp"])
+        entry["summary"]["other_heroes"] = [foe]
+    return raw
+
+
+@pytest.mark.parametrize("name", opponents.HELDOUT_NAMES)
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+@pytest.mark.parametrize("seats", [tuple(range(5)), tuple(range(5, 10))])
+def test_heldout_shared_legality_five_seat_rotation_and_disappearing_actions(name, mode, seats):
+    raw = heldout_view(seats, mode=mode)
+    raw["seats"] = [str(seat) for seat in seats]
+    raw["simultaneous"]["standing_orders"] = {str(seat): "macro_skill3" for seat in seats}
+    original = copy.deepcopy(raw)
+    bot = opponents.make_bot(name, seed=1707)
+    actions = [bot.decide(raw)[0] for _ in range(25)]
+    assert [int(action.split(":")[0][1:]) for action in actions] == list(seats) * 5
+    assert set(actions) <= {action["action_id"] for action in raw["legal_actions"]["actions"]}
+    assert raw == original
+    seat = seats[-1]
+    raw["simultaneous"]["your_pending_seats"] = [str(seat)]
+    raw["legal_actions"]["actions"] = [
+        offer(seat, "button_2", template={"which_button": 2, "legal_move_x": [3, 4], "legal_move_z": [5]})]
+    assert bot.decide(raw)[0] == {"seat": seat, "which_button": 2, "move_x": 3, "move_z": 5}
+    raw["legal_actions"]["actions"] = [offer(seat, "button_0")]
+    assert bot.decide(raw)[0] == f"s{seat}:button_0"
+    raw["legal_actions"]["actions"] = []
+    assert bot.decide(raw) == (None, None)
+
+
+@pytest.mark.parametrize("name", opponents.HELDOUT_NAMES)
+def test_heldout_seed_reproduction_camp_symmetry_and_fair_clock(name):
+    def irrelevant_clock():
+        raise AssertionError("Held-out policies count opportunities, not time or hidden state")
+
+    sequences = []
+    for seed in (17, 17, 18, 19, 20, 21):
+        bot = opponents.make_bot(name, seed=seed, clock=irrelevant_clock)
+        raw = heldout_view()
+        sequences.append([bot.decide(raw)[0] for _ in range(60)])
+    assert sequences[0] == sequences[1]
+    assert any(sequence != sequences[0] for sequence in sequences[2:])
+    mirror = opponents.make_bot(name, seed=17, clock=lambda: 10**6)
+    raw = heldout_view(tuple(range(5, 10)))
+    mirrored = [mirror.decide(raw)[0].split(":")[1] for _ in range(60)]
+    assert mirrored == [action.split(":")[1] for action in sequences[0]]
+
+
+@pytest.mark.parametrize("name", opponents.HELDOUT_NAMES)
+def test_heldout_fog_and_unowned_summaries_cannot_change_decisions(name):
+    raw = heldout_view()
+    poisoned = copy.deepcopy(raw)
+    poisoned.update({"hidden_state": {"enemy_hp": 0}, "candidate_policy_name": "never_read",
+                     "future_actions": ["macro_attack"]})
+    poisoned["observation"]["seats"]["5"] = {"summary": {"my_hero": {"hp": 1, "max_hp": 100}}}
+    for entry in poisoned["observation"]["seats"].values():
+        entry["summary"].setdefault("other_heroes", []).extend([
+            visible_foe(x=0, hp=1, visible=False, identity=100),
+            visible_foe(x=1, hp=0, visible=True, identity=101),
+        ])
+    a, b = opponents.make_bot(name, seed=1707), opponents.make_bot(name, seed=1707)
+    assert [a.decide(raw) for _ in range(60)] == [b.decide(poisoned) for _ in range(60)]
+
+
+def test_relay_grants_only_one_routine_permit_but_allows_emergency_retreats():
+    raw = heldout_view()
+    bot = opponents.make_bot("relay_pressure", seed=22)
+    first = [bot.decide(raw)[0].split(":")[1] for _ in range(5)]
+    assert Counter(first) == {"macro_retreat": 1, "macro_attack": 4}
+    for seat in (0, 1):
+        my_summary(raw, seat)["my_hero"]["hp"] = 15
+    second = [bot.decide(raw)[0].split(":")[1] for _ in range(5)]
+    assert second[:2] == ["macro_retreat", "macro_retreat"]
+    assert second[2:].count("macro_retreat") == 1
+
+
+def test_relay_releases_stalled_recovery_and_applies_owner_opportunity_cooldown():
+    raw = heldout_view((0,), hp=50)
+    bot = opponents.make_bot("relay_pressure", seed=1)
+    assert [bot.decide(raw)[0] for _ in range(11)] == ["s0:macro_retreat"] * 11
+    assert bot.decide(raw)[0] == "s0:macro_attack"
+    assert [bot.decide(raw)[0] for _ in range(10)] == ["s0:macro_attack"] * 10
+    assert bot.decide(raw)[0] == "s0:macro_retreat"
+
+
+def test_relay_observed_healing_extends_recovery_and_death_or_recovery_releases_it():
+    raw = heldout_view((0,), hp=50)
+    bot = opponents.make_bot("relay_pressure", seed=1)
+    for _ in range(11):
+        assert bot.decide(raw)[0] == "s0:macro_retreat"
+    my_summary(raw)["my_hero"]["hp"] = 52
+    assert bot.decide(raw)[0] == "s0:macro_retreat"
+    my_summary(raw)["my_hero"]["hp"] = 85
+    assert bot.decide(raw)[0] == "s0:macro_attack"
+    my_summary(raw)["my_hero"]["hp"] = 0
+    assert bot.decide(raw)[0] == "s0:button_0"
+    my_summary(raw)["my_hero"]["hp"] = 100
+    assert bot.decide(raw)[0] == "s0:macro_attack"
+
+
+def test_counterpunch_conserves_skills_until_visible_target_opportunity():
+    raw = heldout_view((0,), hp=100)
+    foe = my_summary(raw)["other_heroes"][0]
+    foe["hp"] = 100
+    bot = opponents.make_bot("counterpunch_interceptor", seed=5)
+    assert bot.decide(raw)[0] == "s0:macro_attack"
+    foe["hp"] = 70  # Publicly observed damage, not simulator HP access.
+    assert ":macro_skill" in bot.decide(raw)[0]
+    foe["visible"] = False
+    assert bot.decide(raw)[0] == "s0:macro_attack"
+    foe.update(visible=True, hp=100)
+    assert bot.decide(raw)[0] == "s0:macro_attack"  # No cross-fog damage inference.
+
+
+def test_counterpunch_never_redirects_nearest_target_or_infers_unknown_max_hp():
+    raw = heldout_view((0,), hp=100)
+    foe = my_summary(raw)["other_heroes"][0]
+    foe.update(hp=20, max_hp=None)
+    bot = opponents.make_bot("counterpunch_interceptor", seed=5)
+    assert bot.decide(raw)[0] == "s0:macro_attack"  # 20 is not assumed to mean 20%.
+    foe["hp"] = 10
+    assert ":macro_skill" in bot.decide(raw)[0]  # But a visible 50% HP drop is observable.
+    for action in raw["legal_actions"]["actions"]:
+        if ":macro_skill" in action["action_id"]:
+            action["label"] = "Skill (nearest: enemy hero 99, 100 away)"
+    foe["max_hp"] = 100
+    assert bot.decide(raw)[0] == "s0:macro_attack"  # No selectable/fabricated focus-fire target.
+
+
+def test_counterpunch_waiting_is_bounded_and_own_motion_is_not_enemy_approach():
+    raw = heldout_view((0,), hp=100)
+    raw["legal_actions"]["actions"] = [offer(0, base) for base in ("macro_advance", "macro_retreat", "button_0")]
+    foe = my_summary(raw)["other_heroes"][0]
+    foe.update(x=10000, hp=100)
+    bot = opponents.make_bot("counterpunch_interceptor", seed=5)
+    assert bot.decide(raw)[0] == "s0:macro_advance"
+    my_summary(raw)["my_hero"]["x"] = 2000
+    assert bot.decide(raw)[0] == "s0:macro_advance"  # Only we moved.
+    for x in (8000, 6000, 4000):
+        foe["x"] = x
+        assert bot.decide(raw)[0] == "s0:button_0"
+    foe["x"] = 3000
+    assert bot.decide(raw)[0] == "s0:macro_advance"  # Three waits exhausted.
+    foe["visible"] = False
+    assert bot.decide(raw)[0] == "s0:macro_advance"
+    foe.update(visible=True, x=2100)
+    assert bot.decide(raw)[0] == "s0:macro_advance"  # Fog erased the old approach.
+
+
+def test_counterpunch_fog_on_another_heros_turn_also_breaks_consecutive_tracking():
+    raw = heldout_view(hp=100)
+    raw["legal_actions"]["actions"] = [action for action in raw["legal_actions"]["actions"]
+                                       if action["action_id"].split(":")[1]
+                                       in ("macro_advance", "macro_retreat", "button_0")]
+    foe = my_summary(raw)["other_heroes"][0]
+    foe.update(x=10000, hp=100)
+    bot = opponents.make_bot("counterpunch_interceptor", seed=5)
+    assert bot.decide(raw)[0] == "s0:macro_advance"
+    foe.update(visible=False, x=1, hp=1)
+    assert bot.decide(raw)[0].startswith("s1:")
+    foe.update(visible=True, x=5000, hp=100)
+    for seat in (2, 3, 4):
+        assert bot.decide(raw)[0].startswith(f"s{seat}:")
+    assert bot.decide(raw)[0] == "s0:macro_advance"  # Not a continuously observed approach.
+
+
+@pytest.mark.parametrize("name", opponents.HELDOUT_NAMES)
+def test_heldout_helpers_ignore_malformed_or_hidden_entity_fields(name):
+    class Hidden(dict):
+        def get(self, key, default=None):
+            if key != "visible":
+                raise AssertionError("A hidden hero's other fields must not be read")
+            return False
+
+    raw = heldout_view((0,))
+    my_summary(raw)["other_heroes"] = [Hidden(), None, {"visible": True, "camp": [], "runtime_id": {}}]
+    bot = opponents.make_bot(name, seed=17)
+    assert bot.decide(raw)[0] in {action["action_id"] for action in raw["legal_actions"]["actions"]}
+    bot.on_result({"error": "synthetic refusal", "hidden_state": Hidden()})
+    assert bot.refused == 1
+    assert bot.decide(raw)[0] in {action["action_id"] for action in raw["legal_actions"]["actions"]}
+
+
+def test_heldout_actual_evaluator_contract_model_is_v3(research_evaluator):
+    from local.hok_sim import MODEL_VERSION
+
+    assert MODEL_VERSION == "hok-contract-diagnostic-v3"
