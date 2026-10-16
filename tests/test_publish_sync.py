@@ -19,6 +19,9 @@ needs_git = pytest.mark.skipif(
     not sys.platform.startswith("linux") or shutil.which("bash") is None or shutil.which("git") is None
     or shutil.which("realpath") is None or not (ROOT / ".git").exists(),
     reason="publish_sync.sh exports from this git checkout (Linux, bash, git)")
+needs_listing = pytest.mark.skipif(
+    shutil.which("bash") is None or shutil.which("git") is None,
+    reason="read-only export listing needs bash and git (no Linux deployment tools)")
 
 
 def run(*args, timeout=300):
@@ -28,6 +31,89 @@ def run(*args, timeout=300):
 def git(*args, cwd=ROOT):
     return subprocess.run(["git", "-c", "core.autocrlf=false", *args], cwd=cwd, capture_output=True, text=True,
                           check=True).stdout
+
+
+@pytest.fixture
+def readme_history(tmp_path):
+    """Selected-commit fixtures, with both README names before the public rename."""
+    root = tmp_path / "source"
+    root.mkdir()
+    # Minimal files for every mandatory export path; no live runtime or dependencies.
+    paths = (
+        "agent/hok/policy.py", "altruagent/__init__.py", "assets/art.txt", "data/cards.json",
+        "deploy/Dockerfile", "scripts/run_agent.sh", "scripts/selfcheck.py", "scripts/check_connection.py",
+        "scripts/replay_real.py", "scripts/bundle.sh", "local/js/package.json", "local/js/package-lock.json",
+        "docs/deploy.md", "docs/restart_load.md", "pyproject.toml", "requirements.lock", ".env.example",
+        ".gitignore", ".gitattributes", ".dockerignore", "GAMES.md", "NOTICE",
+    )
+    for name in paths:
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    shutil.copyfile(SCRIPT, root / "scripts" / "publish_sync.sh")
+    (root / "README.md").write_text("Legacy internal README: must never be exported.\n", encoding="utf-8")
+    (root / "PUBLIC_README.md").write_text("Legacy public README.\n", encoding="utf-8")
+    git("init", "-q", cwd=root)
+    git("add", "-A", cwd=root)
+    git("-c", "user.name=Aaron Wen", "-c", "user.email=siyuanwe@g.ucla.edu",
+        "-c", "commit.gpgsign=false", "commit", "-qm", "Legacy public README", cwd=root)
+    legacy = git("rev-parse", "HEAD", cwd=root).strip()
+    (root / "PUBLIC_README.md").unlink()
+    (root / "README.md").write_text("Current public README.\n", encoding="utf-8")
+    (root / "LICENSE").write_text("Committed license fixture.\n", encoding="utf-8")
+    git("add", "-A", cwd=root)
+    git("-c", "user.name=Aaron Wen", "-c", "user.email=siyuanwe@g.ucla.edu",
+        "-c", "commit.gpgsign=false", "commit", "-qm", "Rename public README and add license", cwd=root)
+    current = git("rev-parse", "HEAD", cwd=root).strip()
+    # Neither a dirty README/LICENSE nor an untracked legacy filename may influence selection.
+    for name in ("README.md", "PUBLIC_README.md", "LICENSE"):
+        (root / name).write_text(f"Working-tree-only {name}.\n", encoding="utf-8")
+    return root, legacy, current
+
+
+@needs_listing
+@pytest.mark.parametrize("revision,readme,licensed", [(1, "PUBLIC_README.md", False), (2, "README.md", True)])
+def test_listing_selects_readme_and_optional_license_from_the_requested_commit(readme_history, revision, readme,
+                                                                            licensed):
+    root = readme_history[0]
+    before = git("status", "--porcelain", cwd=root)
+    result = subprocess.run(
+        ["bash", str(root / "scripts" / "publish_sync.sh"), "--list", "--commit", readme_history[revision]],
+        cwd=root, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    lines = result.stdout.splitlines()
+    assert f"README.md  (from {readme})" in lines
+    assert ("LICENSE" in lines) is licensed
+    assert {"agent/hok/policy.py", "assets/art.txt", "NOTICE"} <= set(lines)
+    assert "PUBLIC_README.md" not in lines
+    assert git("status", "--porcelain", cwd=root) == before
+
+
+@needs_git
+@pytest.mark.parametrize("revision,readme,licensed", [(1, "PUBLIC_README.md", False), (2, "README.md", True)])
+def test_export_uses_committed_readme_license_and_not_dirty_files(readme_history, tmp_path, revision, readme, licensed):
+    root = readme_history[0]
+    commit = readme_history[revision]
+    out = tmp_path / "export"
+    result = subprocess.run(
+        ["bash", str(root / "scripts" / "publish_sync.sh"), "--commit", commit, "--out", str(out), "--no-verify"],
+        cwd=root, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "scan: clean" in result.stdout and "READY:" in result.stdout
+    assert "every exported path is identical to commit" in result.stdout
+    assert (out / "README.md").read_text(encoding="utf-8") == git("show", f"{commit}:{readme}", cwd=root)
+    assert not (out / "PUBLIC_README.md").exists()
+    assert (out / "LICENSE").exists() is licensed
+    if licensed:
+        assert (out / "LICENSE").read_text(encoding="utf-8") == git("show", f"{commit}:LICENSE", cwd=root)
+    assert (out / "assets/art.txt").is_file() and (out / "NOTICE").is_file()
+    assert not (out / ".env").exists()
+    tree = re.search(r"^  tree ([0-9a-f]{40})$", result.stdout, re.M).group(1)
+    git("init", "-q", cwd=out)
+    git("add", "-A", cwd=out)
+    assert git("write-tree", cwd=out).strip() == tree
 
 
 @needs_git
@@ -64,12 +150,19 @@ def test_the_export_holds_only_the_competition_files_of_the_commit(tmp_path):
     r = run("--out", str(out), "--no-verify")
     # 3 = findings are reported (e.g. wording still to neutralize in agent/); never a crash or a refusal
     assert r.returncode in (0, 3), r.stdout + r.stderr
-    assert (out / "README.md").read_text(encoding="utf-8") == git("show", "HEAD:PUBLIC_README.md")
+    assert (out / "README.md").read_text(encoding="utf-8") == git("show", "HEAD:README.md")
     for p in ("agent/agent.py", "agent/js/search.js", "altruagent/runner.py", "data/vgc_cards.json",
               "deploy/Dockerfile", "scripts/run_agent.sh", "scripts/selfcheck.py", "scripts/bundle.sh",
               "local/js/package-lock.json", "docs/deploy.md", "NOTICE", "requirements.lock", ".env.example",
               ".gitignore", "tests/conftest.py"):
         assert (out / p).is_file(), p
+    assert (out / "agent/hok/policy.py").is_file()
+    for image in re.findall(r"!\[[^\]]*\]\((assets/[^)\s]+)\)", git("show", "HEAD:README.md")):
+        assert (out / image).is_file(), image
+    if "LICENSE" in git("ls-tree", "--name-only", "HEAD").splitlines():
+        assert (out / "LICENSE").read_text(encoding="utf-8") == git("show", "HEAD:LICENSE")
+    else:
+        assert not (out / "LICENSE").exists()
     for p in ("CLAUDE.md", "PUBLIC_README.md", "scripts/publish_sync.sh", "scripts/freeze_champion.sh",
               "docs/HANDOFF.md", "docs/competition_brief.md", "docs/progress.md", "docs/platform", "champion",
               "versions", "examples", "local/fake_platform.py", "local/js/bridge.js", ".env", ".github"):
@@ -121,7 +214,7 @@ def test_list_names_the_exported_paths_without_writing_anything(tmp_path):
     r = run("--list")
     assert r.returncode == 0, r.stdout + r.stderr
     lines = r.stdout.splitlines()
-    assert "agent/agent.py" in lines and "scripts/run_agent.sh" in lines and "README.md  (from PUBLIC_README.md)" in lines
+    assert "agent/agent.py" in lines and "scripts/run_agent.sh" in lines and "README.md  (from README.md)" in lines
     assert not any(x.startswith(("local/", "docs/")) and x not in (
         "local/js/package.json", "local/js/package-lock.json", "docs/deploy.md", "docs/restart_load.md")
         for x in lines)

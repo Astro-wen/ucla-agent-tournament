@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Export the competition code of ONE commit of this (private) repository into a directory, for a separate public
-# repository (Official Rules section 8; option C of the 10-08 pre-publication scan: this repository stays private and a
-# clean public repository carries only what operates the agent). Everything comes from `git archive <commit>`, never
+# Export the competition code of ONE commit of this repository into a directory, for a separate public
+# repository (Official Rules section 8: the export carries only what operates the agent, regardless of the source
+# repository's visibility). Everything comes from `git archive <commit>`, never
 # from the working tree, so an untracked .env or scratch file can never be exported. It never pushes, never creates or
 # changes a GitHub repository and never contacts the platform: committing and pushing the export is the owner's step.
 #
@@ -15,10 +15,11 @@
 #   bash scripts/publish_sync.sh --scan-only DIR            # only the secret / sensitive-string scan of DIR
 #
 # What is exported (the same set scripts/bundle.sh ships, plus the tests that run on their own): agent/ altruagent/
-# data/ deploy/, the run / check scripts and bundle.sh, local/js/package*.json (the pin of the pokemon-showdown package
+# assets/ data/ deploy/, the run / check scripts and bundle.sh, local/js/package*.json (the pin of the pokemon-showdown package
 # the engine search loads; nothing else of local/), docs/deploy.md and docs/restart_load.md (the runbook bundle.sh
-# ships), pyproject.toml requirements.lock .env.example .gitignore .gitattributes .dockerignore GAMES.md NOTICE, one
-# recorded real match (both seats, the one bundle.sh picks) for selfcheck's replay, PUBLIC_README.md as README.md, and
+# ships), pyproject.toml requirements.lock .env.example .gitignore .gitattributes .dockerignore GAMES.md NOTICE,
+# LICENSE when present in that commit, one recorded real match (both seats, the one bundle.sh picks) for selfcheck's
+# replay, the public README (older commits: PUBLIC_README.md; after its rename: README.md) as README.md, and
 # the tests whose imports and paths are all inside the export (and whose imported test modules are exported too),
 # minus NON_ISOLATED_TESTS (they fail outside this repository). Not exported: this script, CLAUDE.md, the other docs, local/ code, champion/, versions/, examples/,
 # the other scripts, recordings, history.
@@ -46,7 +47,7 @@ EXPORT_PATHS=(agent altruagent assets data deploy
   local/js/package.json local/js/package-lock.json
   docs/deploy.md docs/restart_load.md
   pyproject.toml requirements.lock .env.example .gitignore .gitattributes .dockerignore GAMES.md NOTICE)
-PUBLIC_README=PUBLIC_README.md          # exported as README.md
+PUBLIC_README=README.md               # older commits' PUBLIC_README.md is selected below, before validating paths
 # tests that pass in this repository but not in the export (they read files the export does not have); found by the
 # install check, which lists any other failing test file
 NON_ISOLATED_TESTS=()
@@ -140,6 +141,14 @@ cd "$ROOT"
 git rev-parse --git-dir >/dev/null 2>&1 || die "$ROOT is not a git checkout"
 COMMIT="$(git rev-parse --verify --quiet "$COMMIT_REV^{commit}")" || die "no such commit: $COMMIT_REV"
 SUBJECT="$(git log -1 --format=%s "$COMMIT")"
+# An older commit may also have an internal README.md: prefer its explicitly public file.
+# Select from this commit only, never from a dirty or untracked file in the working tree.
+if git cat-file -e "$COMMIT:PUBLIC_README.md" 2>/dev/null; then
+  PUBLIC_README=PUBLIC_README.md
+fi
+if git cat-file -e "$COMMIT:LICENSE" 2>/dev/null; then
+  EXPORT_PATHS+=(LICENSE)
+fi
 for p in "${EXPORT_PATHS[@]}" "$PUBLIC_README"; do
   git cat-file -e "$COMMIT:$p" 2>/dev/null || die "$p is not in commit ${COMMIT:0:12} (every exported path must be)"
 done
@@ -179,7 +188,9 @@ test_deps() {   # a test file -> the test files it imports (from test_x / .test_
   } || true
 }
 in_tests() { local x; for x in "${TEST_FILES[@]+"${TEST_FILES[@]}"}"; do [ "$x" = "$1" ] && return 0; done; return 1; }
-mapfile -t TEST_FILES < <(select_tests)
+# Keep the read-only --list path usable on Bash 3.2 too; exports still need the Linux/GNU tools below.
+TEST_FILES=()
+while IFS= read -r t; do TEST_FILES+=("$t"); done < <(select_tests)
 changed=1                                   # drop tests that import a test that is not exported, until none does
 while [ "$changed" = 1 ]; do
   changed=0; keep=()
