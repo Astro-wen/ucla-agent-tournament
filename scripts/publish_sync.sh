@@ -41,7 +41,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-EXPORT_PATHS=(agent altruagent data deploy
+EXPORT_PATHS=(agent altruagent assets data deploy
   scripts/run_agent.sh scripts/selfcheck.py scripts/check_connection.py scripts/replay_real.py scripts/bundle.sh
   local/js/package.json local/js/package-lock.json
   docs/deploy.md docs/restart_load.md
