@@ -1098,13 +1098,32 @@ def test_split_fire_sends_tanks_and_rockets_at_the_enemy_tank_not_the_nearest_ri
 
 
 # ---- v4.9 candidate: the upgraded Tom_2026 (docs/redalert_design.md section 20) -------------------------------------
-V49_SWITCHES = ("open_fast", "pre_weap_float", "weap2_s", "ea_lazy", "no3x_early", "prior_hold")
+V49_OFF = ("open_fast", "pre_weap_float", "weap2_s", "ea_lazy", "no3x_early", "split_gate")    # tried, left off
+V48 = {"ARENA_RA_RALLY_STEP": "0", "ARENA_RA_PRIOR_HOLD": "0"}     # every v4.9 switch off: the v4.8 defaults
 
 
-def test_v49_switches_are_off_by_default():
+def test_v49_defaults_rally_step_and_prior_hold_on_the_rest_off():
     p = load_params({})
-    assert all(getattr(p, k) == 0 for k in V49_SWITCHES), {k: getattr(p, k) for k in V49_SWITCHES}
-    assert p.weap2_cash == 1200 and p.anchor2                       # (v4.8 defaults unchanged)
+    assert all(getattr(p, k) == 0 for k in V49_OFF), {k: getattr(p, k) for k in V49_OFF}
+    assert p.rally_step == 5 and p.prior_hold == 1
+    assert p.weap2_cash == 1200 and p.anchor2 and not p.split_fire  # (v4.8 defaults unchanged)
+    off = load_params(V48)
+    assert off.rally_step == 0 and off.prior_hold == 0
+
+
+def test_v49_off_set_plays_the_v48_game_order_for_order(monkeypatch):
+    # lockstep simulator: the off set and an explicit "rally cell 8" give the same orders as each other, and the
+    # defaults differ (the attack group gathers elsewhere)
+    logs = []
+    for env in (V48, {"ARENA_RA_RALLY_STEP": "8", "ARENA_RA_PRIOR_HOLD": "0"}, {}):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params(env))
+        rec = []
+        drive(srv, pol, 200, record=rec)
+        logs.append([(sv, orders) for sv, orders, _r in rec])
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+    assert logs[0] == logs[1]
+    assert logs[0] != logs[2]
 
 
 def test_open_fast_puts_the_war_factory_before_the_second_refinery(monkeypatch):
@@ -1150,7 +1169,7 @@ def test_no3x_early_after_early_army_signs(monkeypatch):
 
 
 def test_prior_hold_keeps_the_blind_prior_after_prior_until_s():
-    for env, held in (({}, False), ({"ARENA_RA_PRIOR_HOLD": "1"}, True)):
+    for env, held in ((V48, False), ({}, True)):
         pol, v = _late_view(env, game_s=950.0)
         p = pol.p
         assert pol.army.prior(v) == (min(p.prior_late_cap, p.prior_rate * (950 - 90)) if held else 0.0)
@@ -1179,17 +1198,17 @@ def test_pre_weap_float_turns_idle_money_into_rifles_before_the_war_factory():
 
 def test_rally_step_moves_the_attack_groups_gathering_point_toward_home():
     rallies = {}
-    for env in ({}, {"ARENA_RA_RALLY_STEP": "8"}, {"ARENA_RA_RALLY_STEP": "5"}):
+    for env in ({"ARENA_RA_RALLY_STEP": "0"}, {"ARENA_RA_RALLY_STEP": "8"}, {}):
         srv = server()
         pol = RedAlertPolicy(params=load_params(env))
         drive(srv, pol, 2)
         st = pol.static
-        rallies[env.get("ARENA_RA_RALLY_STEP", "0")] = st.rally
+        rallies[env.get("ARENA_RA_RALLY_STEP", "default")] = st.rally
         assert st.rally in st.path
         assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
     assert rallies["0"] == rallies["8"]                             # 0 = the old rule (path cell 8)
     path = pol.static.path
-    assert path.index(rallies["5"]) == 5 and path.index(rallies["0"]) == 8
+    assert path.index(rallies["default"]) == 5 and path.index(rallies["0"]) == 8
     assert pol.static.guard == path[5]                               # (the home guard's point: unchanged)
 
 
