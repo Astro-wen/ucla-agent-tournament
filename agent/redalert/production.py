@@ -133,6 +133,11 @@ class Production:
             target = min(target, int(p.pre_weap_infantry) + (2 if army.threatened else 0)
                          + (int(p.early_army_infantry) if army.early_army else 0)
                          + (int(p.early_army_infantry) if army.two_barracks else 0))
+            if p.pre_weap_float > 0 and v.money > p.pre_weap_float:
+                # v4.9: the Building queue is the bottleneck before the war factory (simulator vs tom2: 1800-2600
+                # floating at 2:00-2:30); the float becomes rifles
+                target = max(target, min(FLOAT_INFANTRY_MAX, target + int(v.money - p.pre_weap_float) // 100))
+                idle_money = False
         elif p.econ_first and not late and self.pol.first.get("weap") and v.money > FLOAT_MONEY:
             # money piling up (one war factory cannot spend two refineries' income): more infantry rather than an
             # idle bank before the first big fight (v4.5 tuning seed 507008: 2500 floating at 4:30-6:00 and an army
