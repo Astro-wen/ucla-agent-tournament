@@ -6,6 +6,7 @@ oracles. The peer checks current legal offers and pending/owned seats.
 from __future__ import annotations
 
 import json
+import logging
 import socket
 import time
 from types import SimpleNamespace
@@ -97,6 +98,26 @@ def test_lockstep_fills_raw_button_template_from_current_legal_values(monkeypatc
     assert all(c["command"] == "button_2" for c in game.accepted)
 
 
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+def test_runner_fetches_omitted_legal_actions_and_sends_the_fresh_version(monkeypatch, mode):
+    raw = payload(10, mode=mode, pending=[4])
+    del raw["legal_actions"]
+
+    class SplitReadSession(HokFakeSession):
+        def get_legal_actions(self):
+            legal = {"state_version": 11, "actions": entries(4)}
+            # The peer has moved on between the state and legal-action reads.
+            # The contestant still sees the original raw state plus the SDK's
+            # refreshed state.legal_actions and state.state_version.
+            self.current["legal_actions"] = legal
+            self.current["state_version"] = 11
+            return legal
+
+    game = SplitReadSession([raw])
+    play(game, monkeypatch)
+    assert [(c["seat"], c["version"]) for c in game.accepted] == [(4, 11)]
+
+
 def test_realtime_dead_hero_does_not_block_living_heroes_and_revives(monkeypatch):
     def frames():
         for version in range(25):
@@ -142,6 +163,13 @@ def test_lagging_standing_order_acknowledgements_do_not_duplicate_or_block_team(
     assert len(game.accepted) == 5, "brief acknowledgement lag must not cause resends"
 
 
+def test_new_worker_respects_all_existing_server_standing_orders(monkeypatch):
+    standing = {str(s): "macro_advance" for s in SEATS}
+    game = HokFakeSession(payload(version, standing=standing) for version in range(10))
+    play(game, monkeypatch)
+    assert not game.calls and game.waits == 10
+
+
 @pytest.mark.parametrize("error", ["INVALID_ACTION", "STALE_STATE", "NOT_YOUR_TURN"])
 def test_runner_recovers_refusal_and_revalidates_changed_offers(monkeypatch, error):
     def frames():
@@ -156,6 +184,19 @@ def test_runner_recovers_refusal_and_revalidates_changed_offers(monkeypatch, err
     assert {c["seat"] for c in game.accepted} == set(SEATS)
     assert all(c["command"] == "macro_advance" for c in game.accepted)
     assert len(game.accepted) == 5
+
+
+@pytest.mark.parametrize("error", ["INVALID_ACTION", "STALE_STATE", "NOT_YOUR_TURN"])
+def test_refused_unacknowledged_order_is_retried_when_still_legal(monkeypatch, error):
+    def frames():
+        for version in range(20):
+            yield payload(version, standing=game.standing)
+
+    game = HokFakeSession(frames(), reject=lambda call: error if call["view"] == 1 else None)
+    play(game, monkeypatch)
+    assert len(game.calls) == 6, "one refusal plus one accepted order for each hero"
+    assert len(game.accepted) == 5
+    assert {c["seat"] for c in game.accepted} == set(SEATS)
 
 
 def test_stale_standing_order_is_replaced_without_starving_other_heroes(monkeypatch):
@@ -252,6 +293,29 @@ def test_3000_steps_record_at_most_about_one_row_per_ten_game_seconds(
     # a slow wall clock or many pending seats must not multiply recordings.
     assert len(rows) <= 62, f"3000 steps wrote {len(rows)} rows (budget 62)"
     assert len(game.accepted) == 5
+
+
+@pytest.mark.parametrize("trouble", ["malformed-telemetry", "repeated-refusal"])
+def test_repeated_identical_errors_have_a_bounded_recording_allowance(monkeypatch, tmp_path, caplog, trouble):
+    monkeypatch.setenv("ARENA_RECORD", "1")
+    monkeypatch.setattr(deployed, "RECORD_DIR", str(tmp_path))
+    caplog.set_level(logging.CRITICAL, logger="agent")
+
+    def frames():
+        for version in range(3000):
+            raw = payload(version, pending=[0])
+            if trouble == "malformed-telemetry":
+                raw["observation"]["seats"]["0"]["summary"]["other_heroes"] = 7
+            yield raw
+
+    game = HokFakeSession(frames(), reject=lambda _: "INVALID_ACTION" if trouble == "repeated-refusal" else None)
+    play(game, monkeypatch)
+    files = list(tmp_path.glob("*.jsonl"))
+    assert len(files) == 1
+    rows = files[0].read_text().splitlines()
+    # One new error class may add a few diagnostic samples, not one per view.
+    assert 1 <= len(rows) <= 65, f"one repeated {trouble} wrote {len(rows)} rows"
+    assert game.views == 3000
 
 
 def test_contract_peer_rejects_nonpending_seat_and_unfilled_templates():
