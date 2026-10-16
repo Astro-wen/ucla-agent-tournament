@@ -23,7 +23,8 @@ os.environ["ARENA_RECORD"] = "0"
 from local.hok_env import (accepts_clock, candidate_factory, candidate_revision_factory, configured_factory,
                            frozen_import_factory, opponent_factory, play_game, source_unchanged)
 from local.hok_sim import (ASSUMPTIONS, MODEL_VERSION, OFFICIAL_GUIDE_SHA256, OFFICIAL_REFERENCE, PROFILES,
-                           UPSTREAM_REFERENCE, digest, profile_config)
+                           SENSITIVITY_PROFILES, SENSITIVITY_REGISTRATION, SENSITIVITY_REGISTRATION_SHA256,
+                           SENSITIVITY_VERSION, UPSTREAM_REFERENCE, digest, profile_config)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -43,6 +44,10 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--mode", choices=("realtime", "lockstep", "both"),
                    help="override config mode (default config value, otherwise realtime)")
     p.add_argument("--profile", choices=(*PROFILES, "all"), default="default")
+    p.add_argument("--model", choices=("v3", "v4"), default="v3",
+                   help="frozen v3 baseline or separately preregistered v4 sensitivity extension")
+    p.add_argument("--sensitivity", choices=tuple(SENSITIVITY_PROFILES),
+                   help="v4 treatment (default neutral skill-1_heal-1); not permitted in v3")
     p.add_argument("--config", help="JSON file with explicit SimConfig overrides (recorded in report)")
     p.add_argument("--max-steps", type=int)
     p.add_argument("--decision-steps", type=int, default=1, help="realtime decision interval in model steps")
@@ -63,6 +68,10 @@ def evaluate(args) -> dict:
         raise ValueError("--games must be positive")
     if args.decision_steps < 1 or args.calls_per_step < 5:
         raise ValueError("decision-steps >= 1 and calls-per-step >= 5 required")
+    if args.model == "v3" and args.sensitivity is not None:
+        raise ValueError("v4 sensitivity must not be silently applied to v3")
+    treatment_name = (args.sensitivity or "skill-1_heal-1") if args.model == "v4" else None
+    sensitivity = SENSITIVITY_PROFILES[treatment_name] if treatment_name else None
     if args.candidate_revision:
         candidate, candidate_info = candidate_revision_factory(root, args.candidate_revision)
     elif args.candidate_factory:
@@ -98,7 +107,8 @@ def evaluate(args) -> dict:
                 for i in range(args.games):
                     legs = [play_game(candidate, opponent, config=config, seed=args.seed + i,
                                       candidate_camp=camp, decision_steps=args.decision_steps,
-                                      calls_per_step=args.calls_per_step, diagnostics=args.diagnostics)
+                                      calls_per_step=args.calls_per_step, diagnostics=args.diagnostics,
+                                      sensitivity=sensitivity)
                             for camp in (1, 2)]
                     pairs.append({"seed": args.seed + i, "legs": legs,
                                   "candidate_pair_score": statistics.mean(g["candidate_score"] for g in legs)})
@@ -109,6 +119,12 @@ def evaluate(args) -> dict:
                     "opponent_source_unchanged": source_unchanged(opponent_info),
                     "config_sha256": config.config_hash, "pairs": pairs,
                     "physics_config_sha256": digest({k: v for k, v in asdict(config).items() if k != "mode"}),
+                    "sensitivity_name": treatment_name,
+                    "sensitivity": asdict(sensitivity) if sensitivity else None,
+                    "treatment_sha256": sensitivity.treatment_hash if sensitivity else None,
+                    "effective_physics_sha256": digest({
+                        "base": {k: v for k, v in asdict(config).items() if k != "mode"},
+                        "treatment": asdict(sensitivity) if sensitivity else None}),
                     "summary": {
                         "paired_seeds": len(pairs), "games": len(games), "valid_games": len(valid),
                         "protocol_forfeits": len(games) - len(valid),
@@ -122,12 +138,16 @@ def evaluate(args) -> dict:
                 })
                 if args.progress:
                     print(json.dumps({"progress": True, "opponent": name, "profile": profile, "mode": mode,
+                                      "policy_config": factory_config, "sensitivity": treatment_name,
                                       **cells[-1]["summary"]}, sort_keys=True), file=sys.stderr, flush=True)
     source_hashes_end = source_digests()
     unchanged = (source_hashes == source_hashes_end and source_unchanged(candidate_info)
                  and all(source_unchanged(c["opponent"]) for c in cells))
     report = {
-        "schema_version": 2, "model": MODEL_VERSION, "fidelity": "uncalibrated_contract_diagnostic_only",
+        "schema_version": 3, "model": SENSITIVITY_VERSION if sensitivity else MODEL_VERSION,
+        "base_model": MODEL_VERSION, "fidelity": "uncalibrated_contract_diagnostic_only",
+        "sensitivity_registration": SENSITIVITY_REGISTRATION if sensitivity else None,
+        "sensitivity_registration_sha256": SENSITIVITY_REGISTRATION_SHA256 if sensitivity else None,
         "warning": "Synthetic outcomes are NOT evidence of live HoK strength; no promotion claim is justified.",
         "official_reference": OFFICIAL_REFERENCE, "official_reference_checked": "2026-10-16",
         "official_guide_sha256": OFFICIAL_GUIDE_SHA256,

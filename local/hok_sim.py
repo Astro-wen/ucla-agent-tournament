@@ -188,6 +188,30 @@ def profile_config(name: str = "default", **overrides) -> SimConfig:
     return replace(SimConfig(**PROFILES[name]), **overrides)
 
 
+@dataclass(frozen=True)
+class SensitivityConfig:
+    """Separate preregistered v4 treatment; never adds fields to frozen v3 config."""
+    building_skill_multiplier: float = 1.0
+    base_healing_multiplier: float = 1.0
+
+    def __post_init__(self):
+        for name, value in asdict(self).items():
+            if type(value) not in (float, int) or value not in (0, 0.25, 1):
+                raise ValueError(f"{name} must be one of the preregistered levels 0, 0.25, 1")
+            object.__setattr__(self, name, float(value))
+
+    @property
+    def treatment_hash(self) -> str:
+        return digest({"model": SENSITIVITY_VERSION, "registration": SENSITIVITY_REGISTRATION_SHA256,
+                       "treatment": asdict(self)})
+
+
+SENSITIVITY_PROFILES = {
+    f"skill-{skill:g}_heal-{heal:g}": SensitivityConfig(skill, heal)
+    for skill in (0.0, 0.25, 1.0) for heal in (0.0, 0.25, 1.0)
+}
+
+
 @dataclass
 class Hero:
     seat: int
@@ -450,6 +474,14 @@ class DiagnosticGame:
             # Scalars/categories only, no hero objects, observations or action payloads.
             self._event_sink({"kind": kind, "tick_start_step": self.step, **data})
 
+    def _skill_damage_against(self, amount: float, target) -> float:
+        """v3 identity hook; the separately named v4 subclass changes only this."""
+        return amount
+
+    def _base_healing_fraction(self) -> float:
+        """v3 identity hook; does not replace or mutate any SimConfig field."""
+        return self.config.base_heal_fraction_per_s
+
     def tick(self, *, timeout: bool = False):
         if self.terminal:
             raise RuntimeError("cannot step a terminal game")
@@ -498,6 +530,7 @@ class DiagnosticGame:
             else:
                 i = int(macro[-1]) - 1
                 amount, cooldown = c.skill_damage[i], c.skill_cooldowns_s[i]
+                amount = self._skill_damage_against(amount, target)
             h.ready[macro] = self.now + cooldown
             key = ("hero", target.seat) if isinstance(target, Hero) else ("structure", target.runtime_id)
             hits.setdefault(key, []).append((h.camp, h.seat, amount))
@@ -546,7 +579,7 @@ class DiagnosticGame:
         for h in self.heroes.values():
             base_x = -c.half_length if h.camp == 1 else c.half_length
             if h.hp > 0 and math.hypot(h.x - base_x, h.z) <= c.base_heal_radius:
-                healed = min(h.max_hp - h.hp, h.max_hp * c.base_heal_fraction_per_s * c.step_s)
+                healed = min(h.max_hp - h.hp, h.max_hp * self._base_healing_fraction() * c.step_s)
                 h.hp += healed
                 self.healed[h.camp] += healed
         self.step += 1
@@ -578,7 +611,8 @@ class DiagnosticGame:
         }
 
     def state_hash(self) -> str:
-        """Full-state digest for reproducibility; never returns raw decisions."""
+        """Physical-state digest; never returns raw decisions. The v4 treatment
+        identity is hashed separately so the neutral bridge can match v3 exactly."""
         return digest({"config": self.config.config_hash, "seed": self.seed, "step": self.step,
                        "heroes": [asdict(h) for h in self.heroes.values()],
                        "structures": [asdict(s) for s in self.structures.values()],
@@ -586,3 +620,25 @@ class DiagnosticGame:
                        "damage": self.structure_damage, "kills": self.kills, "healed": self.healed,
                        "respawns": self.respawns, "fallback": self.last_fallback_players,
                        "terminal": self.terminal, "winner": self.winner_camp, "reason": self.termination_reason})
+
+
+class SensitivityGame(DiagnosticGame):
+    """Explicit v4 experiment, NOT a replacement/fidelity upgrade for v3.
+
+    All other mechanics, observation fields, legal actions, clocks and budgets
+    are inherited unchanged. Intervention identity is not revealed to policies.
+    """
+    def __init__(self, config: SimConfig | None = None, seed: int = 0, *,
+                 sensitivity: SensitivityConfig, event_sink=None):
+        self.sensitivity = sensitivity
+        super().__init__(config, seed, event_sink=event_sink)
+
+    def _skill_damage_against(self, amount: float, target) -> float:
+        scale = self.sensitivity.building_skill_multiplier
+        # Explicit identity branch preserves even integer/float representation.
+        return amount if scale == 1 or not isinstance(target, Structure) else amount * scale
+
+    def _base_healing_fraction(self) -> float:
+        scale = self.sensitivity.base_healing_multiplier
+        base = self.config.base_heal_fraction_per_s
+        return base if scale == 1 else base * scale

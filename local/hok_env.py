@@ -31,7 +31,7 @@ from typing import Callable, Protocol
 
 from altruagent import GameState, RESIGN, WAIT
 from altruagent.runner import _validate_decision
-from local.hok_sim import DiagnosticGame, SimConfig
+from local.hok_sim import DiagnosticGame, SensitivityConfig, SensitivityGame, SimConfig
 
 
 class Policy(Protocol):
@@ -544,7 +544,8 @@ def _policy_call(policy, game: DiagnosticGame, camp: int, stats: dict) -> tuple[
 
 def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None = None,
               seed: int = 0, candidate_camp: int = 1, decision_steps: int = 1,
-              calls_per_step: int = 6, diagnostics: bool = False) -> dict:
+              calls_per_step: int = 6, diagnostics: bool = False,
+              sensitivity: SensitivityConfig | None = None) -> dict:
     """Run one deterministic diagnostic leg. Fresh policy objects per game.
 
     Server-refused realtime orders get on_result and may retry. The actual SDK
@@ -563,7 +564,8 @@ def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None
         raise ValueError("calls_per_step must be at least five")
     config = config or SimConfig()
     telemetry = DiagnosticTelemetry(config) if diagnostics else None
-    game = DiagnosticGame(config, seed, event_sink=telemetry)
+    game = (DiagnosticGame(config, seed, event_sink=telemetry) if sensitivity is None else
+            SensitivityGame(config, seed, event_sink=telemetry, sensitivity=sensitivity))
     if telemetry:
         telemetry.capture(game)
     game.seats(candidate_camp)

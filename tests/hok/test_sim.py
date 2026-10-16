@@ -7,7 +7,9 @@ import pytest
 
 from local.hok_env import (Baseline, candidate_factory, candidate_revision_factory, configured_factory,
                            frozen_import_factory, opponent_factory, play_game, source_unchanged)
-from local.hok_sim import DiagnosticGame, PROFILES, SimConfig, profile_config
+from local.hok_sim import (DiagnosticGame, PROFILES, SENSITIVITY_PROFILES, SENSITIVITY_REGISTRATION,
+                           SENSITIVITY_REGISTRATION_SHA256, SensitivityConfig, SensitivityGame,
+                           SimConfig, digest, profile_config)
 from scripts.hok_eval import evaluate, parser
 
 
@@ -667,3 +669,62 @@ def test_raw_movement_is_not_reported_as_idle_occupancy():
     team = result["diagnostics"]["teams"]["1"]
     assert team["raw_movement_hero_s"] == pytest.approx(0.8)
     assert team["idle_alive_hero_s"] == pytest.approx(3.2)
+
+
+@pytest.mark.parametrize("profile", list(PROFILES))
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+def test_v4_neutral_bridge_preserves_v3_physical_trajectory(profile, mode):
+    bot, _ = opponent_factory("research:opportunistic_combat")
+    config = profile_config(profile, mode=mode, max_steps=130)
+    v3 = play_game(bot, bot, config=config, seed=1101, diagnostics=True)
+    v4 = play_game(bot, bot, config=config, seed=1101, diagnostics=True, sensitivity=SensitivityConfig())
+    assert v3["trajectory_sha256"] == v4["trajectory_sha256"]
+    assert v3["final_state_sha256"] == v4["final_state_sha256"]
+    assert v3["result"] == v4["result"]
+    assert v3["diagnostics"] == v4["diagnostics"]
+
+
+@pytest.mark.parametrize("scale", [0, 0.25, 1])
+def test_v4_skill_multiplier_affects_only_buildings_not_masks_or_hero_damage(scale):
+    cfg = SimConfig(tower_damage=0)
+    game = SensitivityGame(cfg, sensitivity=SensitivityConfig(scale, 1))
+    reference = DiagnosticGame(cfg)
+    assert game.view(1) == reference.view(1)
+    hero = game.heroes[0]
+    hero.x, hero.z = game.structures[200].x, 0
+    assert game._skill_damage_against(100, hero) == 100
+    assert not game.submit(1, "s0:macro_skill1", 0).get("error")
+    game.tick()
+    assert game.structures[200].hp == pytest.approx(cfg.tower_hp - cfg.skill_damage[0] * scale)
+    assert hero.ready["macro_skill1"] == cfg.skill_cooldowns_s[0]  # even a zero-effect cast consumes cooldown
+
+
+@pytest.mark.parametrize("scale", [0, 0.25, 1])
+def test_v4_healing_multiplier_does_not_remove_full_hp_respawn(scale):
+    cfg = SimConfig()
+    game = SensitivityGame(cfg, sensitivity=SensitivityConfig(1, scale))
+    game.heroes[0].hp = 1000
+    game.heroes[1].hp, game.heroes[1].revive_at = 0, 0
+    game.tick()
+    assert game.heroes[0].hp == pytest.approx(1000 + cfg.hero_hp * cfg.base_heal_fraction_per_s * cfg.step_s * scale)
+    assert game.heroes[1].hp == cfg.hero_hp
+
+
+def test_v4_registration_is_fixed_and_separate_from_v3():
+    assert len(SENSITIVITY_PROFILES) == 9
+    assert SENSITIVITY_REGISTRATION_SHA256 == digest(SENSITIVITY_REGISTRATION)
+    assert SENSITIVITY_REGISTRATION_SHA256 == "1cc51ff9998f7c652124707e52ac0494545ba10f1095684997c296778924a7fb"
+    assert SENSITIVITY_REGISTRATION["excluded_selection_and_confirmation_seeds"] == [1201, 8101, 8102]
+    with pytest.raises(ValueError):
+        SensitivityConfig(0.5, 1)  # not a registered arm
+    with pytest.raises(ValueError):
+        SensitivityConfig(True, 1)
+    args = parser().parse_args(["--games", "1", "--max-steps", "2", "--sensitivity", "skill-0_heal-0"])
+    with pytest.raises(ValueError):
+        evaluate(args)
+    args.model = "v4"
+    report = evaluate(args)
+    assert report["model"] != report["base_model"]
+    assert report["sensitivity_registration_sha256"] == SENSITIVITY_REGISTRATION_SHA256
+    assert report["cells"][0]["sensitivity"] == {"building_skill_multiplier": 0.0, "base_healing_multiplier": 0.0}
+    assert report["cells"][0]["treatment_sha256"] == SensitivityConfig(0, 0).treatment_hash
