@@ -2,7 +2,8 @@
 # Build a self-contained tarball of the deployed agent for a machine we do not control (e.g. handed to the
 # organizers): code, data, draft model, the damage calculator's node_modules (vendored; pure JavaScript), a pinned
 # official Node.js build for Linux x64 (node/bin/node), the pinned Python requirements, the runbook scripts, the
-# Dockerfile and one recorded real match for the self-check. Without node the agent wins only ~12% against itself
+# Dockerfile, public README assets, NOTICE (and LICENSE when present), and one recorded real match for the self-check.
+# Without node the agent wins only ~12% against itself
 # with the calculator, so node ships by default. Never contains keys: .env files are excluded and the staged tree
 # is scanned; the build fails on anything key-like. Its COMMIT file names the full commit id it was built from (and
 # says so when the checkout had uncommitted changes); scripts/run_agent.sh logs that line at every start.
@@ -113,9 +114,10 @@ node_tarball() {   # prints the path of a verified node-$NODE_VERSION-linux-x64 
 }
 
 # ---- what goes in (an allowlist: nothing else from the checkout is copied) ------------------------------------
-INCLUDE=(agent altruagent data deploy pyproject.toml requirements.lock .env.example README.md GAMES.md docs/deploy.md
+INCLUDE=(agent altruagent assets data deploy pyproject.toml requirements.lock .env.example README.md GAMES.md NOTICE docs/deploy.md
          docs/restart_load.md
          scripts/run_agent.sh scripts/selfcheck.py scripts/check_connection.py scripts/replay_real.py)
+if [ -f LICENSE ]; then INCLUDE+=(LICENSE); fi
 for p in "${INCLUDE[@]}"; do
   [ -e "$p" ] || { echo "missing $p" >&2; exit 1; }
   mkdir -p "$DEST/$(dirname "$p")"

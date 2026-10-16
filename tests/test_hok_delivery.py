@@ -1,16 +1,20 @@
 """HoK delivery contracts, including checks that must also run on macOS.
 
-The full export and bundle integration tests need Linux. These checks read their
-allowlists without executing deployment scripts, and never read a key file,
-start an agent, contact a service, or install a dependency.
+The full export and bundle integration tests need Linux. Portable checks read
+their allowlists; bundle checks operate only on a temporary fixture without
+downloading Node or dependencies. No check reads a production key, starts an
+agent, contacts a service, or installs a dependency.
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -83,6 +87,40 @@ def test_delivery_preserves_readme_image_assets(script, variable):
 @pytest.mark.parametrize("script,variable", DELIVERY)
 def test_delivery_preserves_third_party_notices(script, variable):
     assert _covered("NOTICE", _allowlist(script, variable)), f"{script} omits third-party license notices"
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux") or shutil.which("bash") is None,
+                    reason="bundle artifact checks require Linux/GNU tools")
+@pytest.mark.parametrize("licensed", [False, True])
+def test_bundle_artifact_preserves_hok_art_notices_and_optional_license(tmp_path, licensed):
+    from tests.test_deploy import _mini_checkout
+
+    root = _mini_checkout(tmp_path / "source")
+    license_path = root / "LICENSE"
+    if licensed:
+        license_path.write_text("Committed license fixture.\n", encoding="utf-8")
+    else:
+        license_path.unlink(missing_ok=True)
+    out = tmp_path / "dist"
+    result = subprocess.run(
+        ["bash", str(root / "scripts/bundle.sh"), "--out", str(out), "--no-node",
+         "--no-node-modules", "--no-sample-logs"],
+        cwd=root, env={"PATH": os.environ["PATH"], "HOME": str(tmp_path), "ARENA_RECORD": "0"},
+        capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    images = re.findall(r"!\[[^\]]*\]\((assets/[^)\s]+)\)", (root / "README.md").read_text(encoding="utf-8"))
+    assert images
+    with tarfile.open(next(out.glob("*.tar.gz")), "r:gz") as bundle:
+        names = bundle.getnames()
+        top = names[0].split("/")[0]
+        for path in ["agent/hok/__init__.py", "agent/hok/policy.py", "README.md", "NOTICE", *images]:
+            assert bundle.extractfile(f"{top}/{path}").read() == (root / path).read_bytes(), path
+        assert (f"{top}/LICENSE" in names) is licensed
+        if licensed:
+            assert bundle.extractfile(f"{top}/LICENSE").read() == license_path.read_bytes()
+        assert not [name for name in names if "/.env" in name and not name.endswith("/.env.example")]
+        assert "secret scan clean" in result.stdout
 
 
 @pytest.mark.parametrize("mode", ["realtime", "lockstep"])

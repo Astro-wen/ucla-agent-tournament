@@ -1996,13 +1996,13 @@ def test_realistic_payloads_match_the_recorded_shape():
 
 
 # ---- packaging ------------------------------------------------------------------------------------------------------
-BUNDLE_FILES = ["agent", "altruagent", "data", "deploy", "pyproject.toml", "requirements.lock", ".env.example",
-                "README.md", "GAMES.md", "docs/deploy.md", "docs/restart_load.md", "scripts/run_agent.sh",
+BUNDLE_FILES = ["agent", "altruagent", "assets", "data", "deploy", "pyproject.toml", "requirements.lock", ".env.example",
+                "README.md", "GAMES.md", "NOTICE", "docs/deploy.md", "docs/restart_load.md", "scripts/run_agent.sh",
                 "scripts/selfcheck.py", "scripts/check_connection.py", "scripts/replay_real.py", "scripts/bundle.sh"]
 
 
 def _mini_checkout(dst: Path) -> Path:
-    for p in BUNDLE_FILES:
+    for p in BUNDLE_FILES + (["LICENSE"] if (ROOT / "LICENSE").is_file() else []):
         src = ROOT / p
         (dst / p).parent.mkdir(parents=True, exist_ok=True)
         if src.is_dir():
