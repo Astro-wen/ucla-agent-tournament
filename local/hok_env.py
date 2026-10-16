@@ -41,6 +41,13 @@ class Policy(Protocol):
 
 Factory = Callable[..., Policy]
 
+
+class PolicyInterfaceError(ValueError):
+    """Setup incompatibility, never a simulated loss or protocol forfeit."""
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(code)
+
 _CANDIDATE_SOURCES: dict[str, dict[str, bytes]] = {}
 _CANDIDATE_ORIGINS: dict[str, str] = {}
 
@@ -71,8 +78,9 @@ class _CandidateSourceLoader(importlib.abc.MetaPathFinder, importlib.abc.Loader)
         return None
 
     def exec_module(self, module):
-        namespace, _, suffix = module.__name__.partition(".")
-        name = suffix.replace(".", "/") + ("/__init__.py" if hasattr(module, "__path__") else ".py")
+        namespace, dot, suffix = module.__name__.partition(".")
+        name = (suffix.replace(".", "/") + ("/__init__.py" if hasattr(module, "__path__") else ".py")
+                if dot else "__init__.py")
         module.__file__ = module.__spec__.origin
         # Import redirection is local to this frozen module's builtins, NOT a
         # global monkeypatch. Captured roots cannot accidentally import a live
@@ -109,9 +117,19 @@ def _load_snapshot(sources: dict[str, bytes], origin: str, module="policy", attr
     package = types.ModuleType(namespace)
     package.__path__ = [origin]
     sys.modules[namespace] = package
-    factory = getattr(importlib.import_module(namespace + "." + module), attr)
+    if module:
+        loaded = importlib.import_module(namespace + "." + module)
+    else:
+        if "__init__.py" not in sources:
+            raise PolicyInterfaceError("missing_package_initializer")
+        package.__package__ = namespace
+        package.__spec__ = importlib.util.spec_from_loader(
+            namespace, _SOURCE_LOADER, is_package=True, origin=origin + "/__init__.py")
+        _SOURCE_LOADER.exec_module(package)
+        loaded = package
+    factory = getattr(loaded, attr, None)
     if not callable(factory):
-        raise ValueError("snapshot factory is not callable")
+        raise PolicyInterfaceError("missing_callable_policy")
     return factory
 
 
@@ -219,12 +237,69 @@ def candidate_revision_factory(repository: str | Path, revision: str) -> tuple[F
     prefix = "agent/hok/"
     names = git("ls-tree", "-r", "--name-only", commit, "--", prefix).decode().splitlines()
     sources = {name[len(prefix):]: git("show", f"{commit}:{name}") for name in names if name.endswith(".py")}
-    if "policy.py" not in sources:
-        raise ValueError("revision does not contain agent/hok/policy.py")
+    entry = "policy" if "policy.py" in sources else "" if "__init__.py" in sources else None
+    if entry is None:
+        raise PolicyInterfaceError("missing_hok_source_package")
     origin = f"git:{commit}:agent/hok"
-    factory = _load_snapshot(sources, origin)
-    return factory, {**_snapshot_info(factory, sources, origin, "git_snapshot"), "git_commit": commit,
-                     "requested_revision": revision}
+    factory = _load_snapshot(sources, origin, module=entry)
+    info = {**_snapshot_info(factory, sources, origin, "git_snapshot"), "git_commit": commit,
+            "requested_revision": revision, "source": origin + ("/policy.py" if entry else "/__init__.py")}
+    if not entry:
+        info["loading"] = "immutable source snapshot; package __init__ executed as policy entrypoint"
+    return adapt_policy_interface(factory, info)
+
+
+def adapt_policy_interface(factory: Factory, info: dict) -> tuple[Factory, dict]:
+    """Faithful package-era adapter (fb421a2): supply the SDK LegalAction list.
+    No tactical overrides, global patch, wall clock substitution or simulated
+    outcome is used to establish compatibility.
+    """
+    decide = getattr(factory, "decide", None)
+    if decide is None:
+        raise PolicyInterfaceError("missing_decide_method")
+    signature = inspect.signature(decide)
+    try:
+        signature.bind(None, {})
+    except TypeError:
+        try:
+            signature.bind(None, {}, [])
+        except TypeError as exc:
+            raise PolicyInterfaceError("unsupported_decide_signature") from exc
+        if "legal_actions" not in signature.parameters:
+            raise PolicyInterfaceError("unknown_second_decide_argument")
+        try:
+            constructor = inspect.signature(factory)
+            supplied = {key: value for key, value in {"clock": None, "seed": 0}.items()
+                        if key in constructor.parameters
+                        or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in constructor.parameters.values())}
+            constructor.bind(**supplied)
+        except TypeError as exc:
+            raise PolicyInterfaceError("unsupported_legacy_constructor") from exc
+
+        class SDKListAdapter:
+            def __init__(self, clock=None, seed=0):
+                self.native = _construct(factory, clock=clock, seed=seed)
+                self.clock = clock  # Native implementation uses raw.state_version, not wall time.
+            def decide(self, raw):
+                return self.native.decide(raw, GameState.from_mcp_state(raw).legal_actions)
+            def on_result(self, result):
+                callback = getattr(self.native, "on_result", None)
+                if callback:
+                    callback(result)
+            @property
+            def native_errors(self):
+                return getattr(self.native, "errors", 0)
+
+        return SDKListAdapter, {**info, "interface_status": "compatible_with_adapter",
+                                "interface_adapter": "raw_plus_sdk_legal_actions",
+                                "native_clock_parameter": info["clock_parameter"], "clock_parameter": True,
+                                "clock_binding": "injected_scalar_game_clock" if accepts_clock(factory)
+                                else "native raw.state_version; scalar clock retained by adapter",
+                                "latency_note": "Measured decide duration includes SDK legal-list conversion"}
+    if not accepts_clock(factory):
+        raise PolicyInterfaceError("clock_injection_not_supported")
+    return factory, {**info, "interface_status": "compatible", "interface_adapter": "none",
+                     "clock_binding": "injected_scalar_game_clock"}
 
 
 def frozen_import_factory(spec: str, root: str | Path, revision: str | None = None) -> tuple[Factory, dict]:
@@ -321,8 +396,19 @@ def source_unchanged(info: dict) -> bool:
         return False
 
 
-def opponent_factory(name: str) -> tuple[Factory, dict]:
+def opponent_factory(name: str, *, revision: str | None = None,
+                     repository: str | Path | None = None) -> tuple[Factory, dict]:
     os.environ["ARENA_RECORD"] = "0"
+    if revision is not None:
+        root = Path(repository or Path(__file__).resolve().parents[1])
+        if ":" in name and not name.startswith("research:"):
+            factory, info = frozen_import_factory(name, root, revision)
+            return factory, {**info, "name": name}
+        bot_name = name.removeprefix("research:")
+        make_bot, info = frozen_import_factory("local.hok_opponents_research:make_bot", root, revision)
+        def make(seed=0, clock=None):
+            return _construct(make_bot, seed=seed, clock=clock, name=bot_name)
+        return make, {**info, "name": bot_name}
     if name in ("random", "first-legal", "idle", "push"):
         def make(seed=0, clock=None):
             return Baseline(name, seed=seed, clock=clock)
@@ -397,6 +483,45 @@ class DiagnosticTelemetry:
         self.objective_events: list[dict] = []
         self.snapshots: list[dict] = []
         self.interval = max(1, math.ceil(config.max_steps / 12))
+        self.per_hero = {str(s): {
+            "camp": 1 if s < 5 else 2, "role": s % 5, "alive_s": 0.0,
+            "retreat_s": 0.0, "idle_s": 0.0,
+            "no_hp_gain_retreat_s": 0.0, "no_hp_gain_idle_s": 0.0,
+            "stationary_no_gain_retreat_s": 0.0, "stationary_no_gain_idle_s": 0.0,
+            "max_stationary_no_gain_retreat_s": 0.0, "max_stationary_no_gain_idle_s": 0.0,
+        } for s in range(10)}
+        self._hero_previous: dict[int, tuple] = {}
+        self._hero_streaks = {s: {"retreat": 0.0, "idle": 0.0} for s in range(10)}
+
+    def _sample_hero(self, game, hero):
+        """Read-only, fixed-memory own-HP/motion comparison. A no-HP-gain
+        retreat may still be useful travel; the stationary field is separate."""
+        seat, dt = hero.seat, self.config.step_s
+        current = (hero.hp, hero.max_hp, hero.x, hero.z, hero.deaths, hero.hp > 0)
+        previous = self._hero_previous.get(seat)
+        self._hero_previous[seat] = current
+        row = self.per_hero[str(seat)]
+        comparable = (previous is not None and previous[5] and current[5]
+                      and previous[1] == current[1] and previous[4] == current[4])
+        no_gain = comparable and current[0] <= previous[0]
+        stationary = comparable and math.hypot(current[2] - previous[2], current[3] - previous[3]) <= 1e-6
+        macro = game.standing.get(seat)
+        kind = ("retreat" if macro == "macro_retreat" else "idle"
+                if macro is None and game.fresh.get(seat, {}).get("which_button") != 2 else None)
+        if current[5]:
+            row["alive_s"] += dt
+        for category in ("retreat", "idle"):
+            active = current[5] and kind == category
+            if active:
+                row[category + "_s"] += dt
+                if no_gain:
+                    row["no_hp_gain_" + category + "_s"] += dt
+            stalled = active and no_gain and stationary
+            self._hero_streaks[seat][category] = self._hero_streaks[seat][category] + dt if stalled else 0.0
+            if stalled:
+                row["stationary_no_gain_" + category + "_s"] += dt
+            row["max_stationary_no_gain_" + category + "_s"] = max(
+                row["max_stationary_no_gain_" + category + "_s"], self._hero_streaks[seat][category])
 
     def __call__(self, event: dict):
         team = self.teams[event["camp"]]
@@ -420,6 +545,7 @@ class DiagnosticTelemetry:
     def before_tick(self, game: DiagnosticGame):
         dt = self.config.step_s
         for h in game.heroes.values():
+            self._sample_hero(game, h)
             team = self.teams[h.camp]
             if h.hp <= 0:
                 team["dead_hero_s"] += dt
@@ -472,6 +598,12 @@ class DiagnosticTelemetry:
                          "proportionally by source type; attack attempts are exact model effects, not decisions",
                 "teams": {str(c): {**self.teams[c], "healing": game.healed[c], "respawns": game.respawns[c]}
                           for c in (1, 2)},
+                "per_hero": self.per_hero,
+                "per_hero_definition": "Tick-start seconds. No gain means own HP did not increase at unchanged "
+                                       "max HP/life; stationary means displacement <=1e-6 model units. "
+                                       "Death/respawn/max-HP changes reset streaks. Idle means no standing macro "
+                                       "and no fresh raw movement, not attack cooldown. Flat HP at full HP also "
+                                       "counts. No-HP-gain travel is NOT called stationary stagnation.",
                 "first_deaths": self.death_events, "objective_events": self.objective_events,
                 "snapshots": self.snapshots, "max_records": {"first_deaths": 12, "objectives": 4, "snapshots": 13}}
 
@@ -620,6 +752,8 @@ def play_game(candidate: Factory, opponent: Factory, *, config: SimConfig | None
                                "opponent": clock_injected[3 - candidate_camp]},
             "stats": {"candidate": _final_stats(stats[candidate_camp]),
                       "opponent": _final_stats(stats[3 - candidate_camp])},
+            "native_policy_errors": {"candidate": getattr(policies[candidate_camp], "native_errors", 0),
+                                     "opponent": getattr(policies[3 - candidate_camp], "native_errors", 0)},
             "healing": game.healed, "respawns": game.respawns,
             "diagnostics": telemetry.report(game) if telemetry else None,
             "final_state_sha256": game.state_hash(), "trajectory_sha256": trajectory.hexdigest()}

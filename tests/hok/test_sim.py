@@ -5,12 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from local.hok_env import (Baseline, candidate_factory, candidate_revision_factory, configured_factory,
-                           frozen_import_factory, opponent_factory, play_game, source_unchanged)
+from local.hok_env import (Baseline, DiagnosticTelemetry, PolicyInterfaceError, adapt_policy_interface,
+                           candidate_factory, candidate_revision_factory, configured_factory,
+                           frozen_import_factory, opponent_factory, play_game, source_info, source_unchanged)
 from local.hok_sim import (DiagnosticGame, PROFILES, SENSITIVITY_PROFILES, SENSITIVITY_REGISTRATION,
                            SENSITIVITY_REGISTRATION_SHA256, SensitivityConfig, SensitivityGame,
                            SimConfig, digest, profile_config)
-from scripts.hok_eval import evaluate, parser
+from scripts.hok_eval import (ReservedSeedError, evaluate, interface_report, parser, prepare_final_plan,
+                              public_archive_index)
 
 
 def idle_all(game):
@@ -728,3 +730,122 @@ def test_v4_registration_is_fixed_and_separate_from_v3():
     assert report["sensitivity_registration_sha256"] == SENSITIVITY_REGISTRATION_SHA256
     assert report["cells"][0]["sensitivity"] == {"building_skill_multiplier": 0.0, "base_healing_multiplier": 0.0}
     assert report["cells"][0]["treatment_sha256"] == SensitivityConfig(0, 0).treatment_hash
+
+
+def test_legacy_sdk_list_adapter_is_thin_and_clock_metadata_is_explicit():
+    from altruagent import LegalAction
+    class Legacy:
+        def __init__(self):
+            self.errors = 0
+        def decide(self, raw, legal_actions):
+            assert all(isinstance(action, LegalAction) for action in legal_actions)
+            return legal_actions[0], None
+    adapter, info = adapt_policy_interface(Legacy, source_info(Legacy))
+    assert info["interface_adapter"] == "raw_plus_sdk_legal_actions"
+    assert info["native_clock_parameter"] is False
+    assert "state_version" in info["clock_binding"]
+    push, _ = opponent_factory("push")
+    report = play_game(adapter, push, config=SimConfig(max_steps=2))
+    assert report["protocol_failure"] is None
+    assert report["native_policy_errors"] == {"candidate": 0, "opponent": 0}
+
+
+def test_unsupported_interface_is_not_a_simulated_loss():
+    class Unsupported:
+        def decide(self, raw, unknown, required):
+            return None, None
+    with pytest.raises(PolicyInterfaceError, match="unsupported_decide_signature"):
+        adapt_policy_interface(Unsupported, source_info(Unsupported))
+
+
+def test_protected_seed_gate_fails_before_any_game_is_constructed(monkeypatch):
+    import scripts.hok_eval as cli
+    def forbidden(*args, **kwargs):
+        raise AssertionError("a protected game must not start")
+    monkeypatch.setattr(cli, "play_game", forbidden)
+    for seed in (1201, 8101, 8102):
+        args = parser().parse_args(["--seed", str(seed), "--games", "1"])
+        with pytest.raises(ReservedSeedError):
+            evaluate(args)
+    args.authorize_reserved_with_final_sha = "{FINAL_SHA}"
+    with pytest.raises(ReservedSeedError):
+        evaluate(args)
+
+
+def test_interface_check_is_metadata_only(monkeypatch):
+    import scripts.hok_eval as cli
+    def forbidden(*args, **kwargs):
+        raise AssertionError("interface checks must not run matches")
+    monkeypatch.setattr(cli, "play_game", forbidden)
+    args = parser().parse_args(["--candidate-revision", "HEAD", "--check-interface"])
+    result = interface_report(args)
+    assert result["games"] == 0 and result["seed_used"] is None
+    assert result["status"] == "interface_compatible_static_check"
+
+
+def test_per_hero_metrics_separate_travel_from_stationary_no_gain_and_reset_on_life_changes():
+    config = SimConfig(base_heal_fraction_per_s=0, max_steps=30)
+    telemetry = DiagnosticTelemetry(config)
+    game = DiagnosticGame(config)
+    hero = game.heroes[0]
+    hero.hp, hero.x, hero.z = 1000, -config.half_length + 3600, 0
+    game.standing[0] = "macro_retreat"
+    for _ in range(12):
+        telemetry.before_tick(game)
+        game.tick()
+    row = telemetry.per_hero["0"]
+    assert row["retreat_s"] == pytest.approx(2.4)
+    assert row["no_hp_gain_retreat_s"] > row["stationary_no_gain_retreat_s"] > 0
+    assert row["max_stationary_no_gain_retreat_s"] > 0
+    old = row["max_stationary_no_gain_retreat_s"]
+    hero.hp = 1100  # observed improvement resets the live streak
+    telemetry.before_tick(game)
+    assert telemetry._hero_streaks[0]["retreat"] == 0
+    hero.hp, hero.deaths = 0, 1
+    telemetry.before_tick(game)
+    hero.hp = hero.max_hp
+    telemetry.before_tick(game)
+    assert telemetry._hero_streaks[0]["retreat"] == 0
+    assert row["max_stationary_no_gain_retreat_s"] == old
+
+
+def test_per_hero_metrics_do_not_change_policy_physics_or_inputs():
+    bot, _ = opponent_factory("push")
+    plain = play_game(bot, bot, config=SimConfig(max_steps=100), diagnostics=False)
+    measured = play_game(bot, bot, config=SimConfig(max_steps=100), diagnostics=True)
+    assert plain["trajectory_sha256"] == measured["trajectory_sha256"]
+    assert set(measured["diagnostics"]["per_hero"]) == {str(s) for s in range(10)}
+    assert "per_hero" not in DiagnosticGame().view(1)
+
+
+def test_public_index_deduplicates_pairs_and_marks_correlated_units_without_private_paths():
+    args = parser().parse_args(["--games", "1", "--max-steps", "2", "--mode", "both"])
+    report = evaluate(args)
+    index = public_archive_index([report, report])
+    counts = index["counting"]
+    assert counts["raw_leg_records"] == 8 and counts["unique_generated_legs"] == 4
+    assert counts["duplicate_pairs_removed"] == 2
+    assert counts["world_seeds"] == [0] and counts["shared_seed_opponent_families"] == 1
+    assert counts["independent_real_games"] == 0
+    text = json.dumps(index)
+    assert "/tmp/" not in text and "/private/" not in text
+    assert '"observation"' not in text and '"action_id"' not in text
+    incompatible = {"status": "interface_incompatible", "interface_error": "unsupported_decide_signature",
+                    "games": 0, "cells": [], "candidate_revision": "missing"}
+    assert public_archive_index([incompatible])["counting"]["unique_generated_legs"] == 0
+
+
+def test_final_plan_is_gated_metadata_and_never_executes_reserved_commands(monkeypatch):
+    import scripts.hok_eval as cli
+    monkeypatch.setattr(cli, "resolve_revision", lambda root, rev: {"fb421a2": "a" * 40,
+                                                                 "503c36e": "b" * 40}[rev])
+    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k: None)
+    monkeypatch.setattr(cli, "candidate_revision_factory", lambda *a: (None, {"git_commit": "a" * 40}))
+    monkeypatch.setattr(cli, "opponent_factory", lambda name, **kwargs: (None, {"name": name, "git_commit": "b" * 40}))
+    plan = prepare_final_plan()
+    assert plan["games_run"] == 0 and plan["autostart"] is False
+    assert len(plan["commands"]) == 8 and plan["max_workers"] == 4
+    for task in plan["commands"]:
+        assert task["seed"] in (8101, 8102)
+        assert "{FINAL_SHA}" in task["argv"]
+        assert "--authorize-reserved-with-final-sha" in task["argv"]
