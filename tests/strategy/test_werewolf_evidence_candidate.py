@@ -43,6 +43,59 @@ def test_qualified_and_attributed_verdicts_are_not_investigation_results(text):
 
 
 @pytest.mark.parametrize("text", [
+    "Wolf is Player1, 5 or 6.",
+    "Wolf is Player1, Player5 or Player6.",
+    "Wolf is Player1, 5, or 6.",
+    "Wolf is Player1,5,or 6.",
+    "The wolf is Player1 or Player5 or Player6.",
+    "Player1 or Player5 is a wolf.",
+    "Player1, Player5 or Player6 is a villager.",
+    "Either Player1 is a wolf or Player5 is a wolf.",
+    "Player1 is a wolf, or Player5 is a wolf.",
+    "Player1 is a villager, or Player5 is a villager.",
+    "I checked Player1 or Player5: wolf.",
+    "Player1 or Player5. They're a wolf.",
+    "Wolf is player one, seat five or p6.",
+    "Wolf is Alice, 5 or Gus.",
+])
+def test_alternative_seats_are_not_individual_verdicts(text):
+    facts = read_chat(text, sender=4, names={1: "Alice", 6: "Gus"})
+    assert not facts.wolves
+    assert not facts.clears
+
+
+@pytest.mark.parametrize("text,wolves,clears", [
+    ("I am the Seer. Player0 is a villager; wolf is Player1, 5 or 6.", set(), {0}),
+    ("Player1 or Player5 is a wolf. I checked Player1: wolf.", {1}, set()),
+    ("I checked Player1 and Player5: both are wolves.", {1, 5}, set()),
+    ("Player1 and Player5 are villagers.", set(), {1, 5}),
+    ("Wolf is Player1, Player5 is clear.", {1}, {5}),
+    ("Player1 is a wolf, and Player5 is a villager.", {1}, {5}),
+])
+def test_alternatives_do_not_erase_independent_or_conjunctive_results(text, wolves, clears):
+    facts = read_chat(text, sender=4)
+    assert facts.wolves == wolves
+    assert facts.clears == clears
+
+
+def test_real_seer_candidate_list_does_not_become_a_trusted_wolf():
+    # Completed match 3daaf630, day 2: the seer cleared our seat but only narrowed the remaining wolf to 1/5/6.
+    view = View(me=3, role="villager", day=2, sub_phase="day_vote", alive=[1, 3, 4, 5, 6],
+                dead={0: "villager", 2: "wolf"}, dead_cause={0: "night_kill", 2: "vote"}, messages=[
+                    {"seq": 0, "sender": 4, "type": "chat",
+                     "content": "I'm the seer. Checks: Player0 villager, Player3 villager. Player2 was a wolf."},
+                    {"seq": 1, "sender": 4, "type": "chat",
+                     "content": "Player1, Player3 is a cleared villager. I checked Player3 myself, so a Player3 "
+                                "vote is a wolf move. Player0 backed me, and Player1 also wanted Player3 gone. "
+                                "Player3, Player6, vote Player1 with me. Wolf is Player1, 5 or 6."},
+                ])
+    claims = WerewolfPolicy.claims(view)
+    assert claims.trusted == 4
+    assert claims.trusted_wolves(view.alive) == []
+    assert 3 in claims.clears[4]
+
+
+@pytest.mark.parametrize("text", [
     "Did I say I am the seer?",
     "Am I right that my role is seer?",
     "I checked Player5 and wonder whether they are a wolf.",
