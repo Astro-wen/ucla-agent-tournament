@@ -137,7 +137,9 @@ SEARCH_KNOBS = {"samples": ("ARENA_SEARCH_SAMPLES", int), "rollout": ("ARENA_SEA
                 "margin": ("ARENA_SEARCH_MARGIN", float), "delta": ("ARENA_SEARCH_DELTA", float),
                 "blend_w": ("ARENA_SEARCH_BLEND_W", float), "guard": ("ARENA_SEARCH_GUARD", int),
                 "guard_delta": ("ARENA_SEARCH_GUARD_DELTA", float), "free_delta": ("ARENA_SEARCH_FREE_DELTA", float),
-                "fixed": ("ARENA_SEARCH_FIXED", int)}
+                "fixed": ("ARENA_SEARCH_FIXED", int),
+                # 10-15: rows with our Sucker Punch keep (1 - q) of the greedy weight (agent/js/search.js blend)
+                "sucker_q": ("ARENA_SEARCH_SUCKER", float)}
 
 
 def search_params() -> dict:

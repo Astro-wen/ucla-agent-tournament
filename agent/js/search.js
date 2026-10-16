@@ -55,10 +55,13 @@ const PROTECT = new Set(['protect', 'detect', 'spikyshield', 'banefulbunker', 's
   'kingsshield', 'obstruct']);
 const FIRST_TURN = new Set(['fakeout', 'firstimpression', 'matblock']);
 const ALLY_HEAL = new Set(['pollenpuff']);
+// moves that work only when the target attacks this turn (Sucker Punch fails into a status move, a Protect, a switch,
+// a redirection or a faster priority move): the greedy column (the target always attacks) overrates them
+const NEEDS_FOE_ATTACK = new Set(['suckerpunch', 'thunderclap', 'upperhand']);
 const WIN = 8;
 const DEFAULTS = {samples: 2, rollout: 1, keep: 8, slot_keep: 3, probes: 2, budget_ms: 2500, mode: 'nash',
   min_prob: 0.05, iters: 1500, margin: 0.6, rng: 1, delta: 0, blend_w: 0.5, guard: 0, guard_delta: 0.08,
-  free_delta: 0.4, fixed: 0, hard_ms: 0};
+  free_delta: 0.4, fixed: 0, hard_ms: 0, sucker_q: 0};
 
 // ------------------------------------------------------------------------------------------------ helpers
 function mulberry(seed) {
@@ -949,12 +952,21 @@ function search(battle, sideIdx, st, params, t0) {
     // best reply to a mix of the equilibrium opponent and the opponent's greedy (max-damage) joint action: most
     // agents mostly attack; w = blend_w on the greedy column (the equilibrium alone when it was pruned away)
     const w = gcol >= 0 ? Math.max(0, Math.min(1, ctx.p.blend_w)) : 0;
+    // sucker_q > 0 (ARENA_SEARCH_SUCKER): a row where one of our slots uses a move that needs the target to attack
+    // (Sucker Punch) keeps only (1 - q) of the greedy weight; the rest goes to the equilibrium mix. Real opponents
+    // made 25 of 35 of our Sucker Punches fail (10-15), the greedy column assumes none. 0 = unchanged.
+    const sq = Math.max(0, Math.min(1, Number(ctx.p.sucker_q) || 0));
+    const needsAttack = r => !!(r && r.parts && r.parts.some(o => o && o.kind === 'move' && NEEDS_FOE_ATTACK.has(o.move)));
+    let nSucker = 0;
     let bv = -Infinity;
     M.forEach((r, i) => {
+      let wi = w;
+      if (sq > 0 && w > 0 && needsAttack(rows[i])) { wi = w * (1 - sq); nSucker++; }
       let v = 0;
-      for (let j = 0; j < r.length; j++) v += r[j] * ((1 - w) * sol.y[j] + (j === gcol ? w : 0));
+      for (let j = 0; j < r.length; j++) v += r[j] * ((1 - wi) * sol.y[j] + (j === gcol ? wi : 0));
       if (v > bv) { bv = v; pick = i; }
     });
+    if (sq > 0) info.sucker_rows = nSucker;
   } else if (ctx.p.mode === 'maximin') {
     let bv = -Infinity;
     M.forEach((r, i) => { const w = Math.min(...r); if (w > bv) { bv = w; pick = i; } });
