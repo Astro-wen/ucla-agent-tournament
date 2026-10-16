@@ -61,9 +61,9 @@ def test_all_bots_same_five_seat_opportunity_and_only_current_offers(name, mode,
 
 
 @pytest.mark.parametrize("name", opponents.BOT_NAMES)
-def test_pending_and_vanishing_offers_cannot_produce_stale_actions(name):
+def test_lockstep_pending_and_vanishing_offers_cannot_produce_stale_actions(name):
     bot = opponents.make_bot(name, seed=4)
-    raw = view(pending=[4, 2, 2, True, "0", 99])
+    raw = view(mode="lockstep", pending=[4, "2", 2, True, "0.0", 99])
     assert [bot.decide(raw)[0].split(":")[0] for _ in range(4)] == ["s2", "s4"] * 2
     raw["simultaneous"]["your_pending_seats"] = []
     assert bot.decide(raw) == (None, None)
@@ -244,12 +244,13 @@ def test_factory_validation_aliases_and_import_independence():
 
 
 @pytest.mark.parametrize("name", opponents.BOT_NAMES)
-def test_many_sparse_changing_offers_always_select_current_pending_seat(name):
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+def test_many_sparse_changing_offers_select_current_eligible_seat(name, mode):
     """A synthetic input/legality check, not a simulator or win-rate sample."""
     generator = random.Random(256)
     bot = opponents.make_bot(name, seed=51)
     for _ in range(160):
-        raw = view()
+        raw = view(mode=mode)
         actions = []
         for seat in range(5):
             menu = [*MACROS, "button_0", "macro_future"]
@@ -258,13 +259,14 @@ def test_many_sparse_changing_offers_always_select_current_pending_seat(name):
         generator.shuffle(actions)
         raw["legal_actions"]["actions"] = actions
         pending = generator.sample(range(5), generator.randrange(6))
-        raw["simultaneous"] = {"your_pending_seats": pending}
+        raw["simultaneous"] = {"your_pending_seats": [str(seat) for seat in pending],
+                               "standing_orders": {str(seat): "macro_skill3" for seat in range(5)}}
         action, _ = bot.decide(raw)
-        if not pending:
+        if mode == "lockstep" and not pending:
             assert action is None
         else:
             assert action in {item["action_id"] for item in actions}
-            assert int(action.split(":")[0][1:]) in pending
+            assert int(action.split(":")[0][1:]) in (pending if mode == "lockstep" else range(5))
         bot.on_result({"error": "synthetic refusal"} if generator.random() < 0.1 else {})
 
 
@@ -281,3 +283,116 @@ def test_unusual_observation_values_and_unknown_labels_do_not_crash(name):
         action["label"] = {"unexpected": "object"}
     assert opponents.make_bot(name, seed=2).decide(raw)[0] in {
         action["action_id"] for action in raw["legal_actions"]["actions"]}
+
+
+@pytest.mark.parametrize("name", opponents.BOT_NAMES)
+@pytest.mark.parametrize("pending", [[], ["1", "3"], [4, 2, True, "bad"]])
+@pytest.mark.parametrize("start", [0, 5])
+def test_realtime_pending_is_not_permission_and_owned_five_seats_still_rotate(name, pending, start):
+    seats = tuple(range(start, start + 5))
+    raw = view(seats, pending=pending)
+    raw["seats"] = [str(seat) for seat in reversed(seats)]
+    raw["camp"] = str(raw["camp"])
+    raw["simultaneous"]["standing_orders"] = {str(seat): "macro_advance" for seat in seats}
+    # Even if an extraneous offer is present, it is not an owned hero.
+    raw["legal_actions"]["actions"].append(offer((start + 5) % 10, "macro_advance"))
+    raw["legal_actions"]["actions"].reverse()
+    original = copy.deepcopy(raw)
+    bot = opponents.make_bot(name, seed=27)
+    actual = [bot.decide(raw)[0] for _ in range(15)]
+    assert [int(action.split(":")[0][1:]) for action in actual] == list(seats) * 3
+    assert raw == original
+
+
+@pytest.mark.parametrize("name", opponents.BOT_NAMES)
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+def test_mixed_pending_standing_orders_and_raw_buttons_never_reuse_disappeared_choices(name, mode):
+    raw = view((2,), mode=mode, pending=["2"])
+    raw["seats"] = ["2"]
+    raw["simultaneous"]["standing_orders"] = {"2": "macro_skill3"}
+    raw["legal_actions"]["actions"] = [
+        offer(2, "button_2", template={"which_button": 2, "seat": "2",
+                                      "legal_move_x": [7, 8], "legal_move_z": [9, 10]})]
+    bot = opponents.make_bot(name, seed=2)
+    assert bot.decide(raw)[0] == {"which_button": 2, "seat": 2, "move_x": 7, "move_z": 9}
+    raw["simultaneous"]["your_pending_seats"] = []
+    if mode == "lockstep":
+        assert bot.decide(raw) == (None, None)
+        raw["simultaneous"]["your_pending_seats"] = [2]
+    else:
+        assert bot.decide(raw)[0] == {"which_button": 2, "seat": 2, "move_x": 7, "move_z": 9}
+    # Same button, different current legal values: no stale completed payload.
+    raw["legal_actions"]["actions"][0]["input"]["action"]["legal_move_x"] = [15]
+    assert bot.decide(raw)[0] == {"which_button": 2, "seat": 2, "move_x": 15, "move_z": 9}
+    # Now neither the standing macro nor the old raw button is available.
+    raw["legal_actions"]["actions"] = [offer(2, "button_0", template={"which_button": 0, "seat": "2"})]
+    assert bot.decide(raw)[0] == "s2:button_0"
+    raw["legal_actions"]["actions"] = [offer(2, "macro_retreat")]
+    assert bot.decide(raw)[0] == "s2:macro_retreat"
+
+
+def test_idle_explicitly_clears_all_five_already_fresh_standing_orders():
+    raw = view(pending=[])
+    raw["simultaneous"]["standing_orders"] = {str(seat): "macro_attack" for seat in range(5)}
+    bot = opponents.make_bot("idle")
+    assert [bot.decide(raw)[0] for _ in range(5)] == [f"s{seat}:button_0" for seat in range(5)]
+
+
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+@pytest.mark.parametrize("bad", [True, False, 0.0, 1.5, "1.0", "1e0", "-1", "99", "", "１", "1" * 5000, None, {}])
+def test_bad_owned_seat_values_are_not_coerced_to_another_players_hero(mode, bad):
+    raw = view(mode=mode, pending=list(range(5)))
+    raw["seats"] = [bad]
+    assert opponents.make_bot("first_legal").decide(raw) == (None, None)
+
+
+def test_ownership_falls_back_to_public_camp_mapping_only_when_roster_absent():
+    raw = view(tuple(range(10)), pending=[])
+    del raw["seats"]
+    raw["camp"] = "2"
+    bot = opponents.make_bot("idle")
+    assert [bot.decide(raw)[0] for _ in range(5)] == [f"s{seat}:button_0" for seat in range(5, 10)]
+    raw["seats"] = []
+    assert bot.decide(raw) == (None, None)
+    raw["seats"] = None
+    assert bot.decide(raw) == (None, None)
+
+
+def test_camp_and_summary_seat_strings_are_normalized_without_inventing_enemies():
+    raw = view((0,))
+    raw["camp"] = "1"
+    summary = my_summary(raw)
+    summary["my_hero"]["camp"] = 1
+    summary["other_heroes"] = [
+        {"runtime_id": index, "camp": camp, "visible": True, "hp": 100, "x": 1, "z": 1}
+        for index, camp in enumerate((1, "1", "2"))
+    ]
+    # Non-canonical decimal spelling is still the same owned seat.
+    raw["observation"]["seats"] = {" 00 ": {"summary": summary}}
+    raw["seats"] = [" 00 "]
+    bot = opponents.make_bot("cautious_defender")
+    assert bot.decide(raw)[0] == "s0:macro_skill3"  # Two allies plus self vs one enemy.
+    summary["other_heroes"] = [
+        {"runtime_id": index, "camp": camp, "visible": True, "hp": 100, "x": 1, "z": 1}
+        for index, camp in enumerate((2, "2"))
+    ]
+    assert bot.decide(raw)[0] == "s0:macro_retreat"
+
+
+@pytest.mark.parametrize("camp", [True, False, 2.0, "2.0", "2e0", "-2", "99", "", [], {}])
+def test_invalid_other_hero_camps_are_unknown_not_hostile(camp):
+    raw = view((0,))
+    my_summary(raw)["other_heroes"] = [
+        {"runtime_id": index, "camp": camp, "visible": True, "hp": 100, "x": 1, "z": 1}
+        for index in range(3)]
+    assert opponents.make_bot("cautious_defender").decide(raw)[0] == "s0:macro_skill3"
+
+
+def test_defender_guards_allied_structure_with_mixed_integer_string_camps():
+    raw = view((0,), distance=20000)
+    raw["camp"] = "1"
+    del my_summary(raw)["my_hero"]["camp"]  # Public guide does not require this field.
+    my_summary(raw)["structures"] = [{"type": "CRYSTAL", "camp": 1, "hp": 100, "x": 100, "z": 0}]
+    my_summary(raw)["other_heroes"] = [
+        {"runtime_id": 42, "camp": "2", "hp": 100, "x": 1000, "z": 0, "visible": True}]
+    assert opponents.make_bot("cautious_defender").decide(raw)[0] == "s0:button_0"

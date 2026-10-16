@@ -5,9 +5,11 @@ Interface: ``make_bot(name, seed=0)`` returns a fresh match-scoped bot with
 offered IDs, or a raw-button payload filled from its current legal values.
 ``(None, None)`` means no eligible offer (the real-time caller may WAIT).
 
-All bots use the SAME round-robin scheduler: one currently eligible seat per
-call, respecting ``simultaneous.your_pending_seats`` when supplied. There is no
-wall clock, standing-order suppression, action batching, or hidden-state access.
+All bots use the SAME round-robin scheduler: one currently legal owned seat per
+call. In REALTIME, pending only tracks heroes without a fresh action this step,
+so already-ordered heroes remain eligible for reevaluation. Only LOCKSTEP
+restricts the scheduler to ``simultaneous.your_pending_seats`` when supplied.
+There is no wall clock, standing-order suppression, batching, or hidden access.
 Repeated orders deliberately receive the same scheduling opportunity as changes.
 The evaluator must provide the same number of decision opportunities to both
 teams; this module does not itself advance a simulator.
@@ -64,7 +66,7 @@ _ALIASES = {
     "defender": "cautious_defender",
 }
 
-_SEAT_ACTION = re.compile(r"^s(\d+):(.+)$")
+_SEAT_ACTION = re.compile(r"^s([0-9]{1,9}):(.+)$")
 _DISTANCE = re.compile(r"(?<![\w.+-])(\d+(?:\.\d+)?)\s+away\b", re.IGNORECASE)
 _TARGET = re.compile(r"nearest:\s*([^,()]*)", re.IGNORECASE)
 _CONTACT = 8000.0
@@ -85,6 +87,24 @@ class _Choice:
 
 def _mapping(value: Any) -> dict:
     return value if isinstance(value, dict) else {}
+
+
+def _integer_id(value: Any, minimum: int, maximum: int) -> int | None:
+    """JSON integer or bounded decimal string, never bool/float/truncation."""
+    if isinstance(value, str):
+        value = value.strip()
+        if not re.fullmatch(r"[0-9]{1,9}", value):
+            return None
+        value = int(value)
+    return value if type(value) is int and minimum <= value <= maximum else None
+
+
+def _seat(value: Any) -> int | None:
+    return _integer_id(value, 0, 9)
+
+
+def _camp(value: Any) -> int | None:
+    return _integer_id(value, 1, 2)
 
 
 def _number(value: Any) -> float | None:
@@ -109,6 +129,8 @@ def _near(a: tuple[float, float], b: tuple[float, float], radius: float) -> bool
 def _summary(raw: dict, seat: int) -> dict:
     seats = _mapping(_mapping(raw.get("observation")).get("seats"))
     entry = _mapping(seats.get(str(seat), seats.get(seat)))
+    if not entry:
+        entry = next((_mapping(value) for key, value in seats.items() if _seat(key) == seat), {})
     return _mapping(entry.get("summary"))
 
 
@@ -128,10 +150,9 @@ def _offers(raw: dict) -> dict[int, list[_Choice]]:
         match = _SEAT_ACTION.fullmatch(action_id)
         if not match:
             continue
-        # Reject pathological IDs without depending on Python's int digit limit.
-        if len(match[1]) > 9:
+        seat, base = _seat(match[1]), match[2]
+        if seat is None:
             continue
-        seat, base = int(match[1]), match[2]
         template = _mapping(_mapping(item.get("input")).get("action"))
         payload: str | dict[str, Any] = action_id
         fields = [key for key in template if isinstance(key, str) and key.startswith("legal_")]
@@ -155,12 +176,25 @@ def _offers(raw: dict) -> dict[int, list[_Choice]]:
 
 
 def _eligible(raw: dict, offers: dict[int, list[_Choice]]) -> list[int]:
+    # An explicit roster is authoritative, including an empty one. When absent,
+    # use the public camp/seat mapping, or the legal list if both are omitted.
+    if "seats" in raw:
+        roster = raw["seats"] if isinstance(raw["seats"], list) else []
+        owned = {seat for value in roster if (seat := _seat(value)) is not None}
+    elif (camp := _camp(raw.get("camp"))) is not None:
+        owned = set(range(0, 5) if camp == 1 else range(5, 10))
+    else:
+        owned = set(offers)
+    eligible = set(offers) & owned
+    # Public HoK guide §§2–4: pending is freshness, NOT permission, in realtime.
+    if _mapping(raw.get("pacing")).get("mode") == "realtime":
+        return sorted(eligible)
     simultaneous = _mapping(raw.get("simultaneous"))
     pending = simultaneous.get("your_pending_seats")
     if isinstance(pending, list):
-        pending = {seat for seat in pending if type(seat) is int}
-        return sorted(seat for seat in offers if seat in pending)
-    return sorted(offers)
+        pending = {seat for value in pending if (seat := _seat(value)) is not None}
+        eligible &= pending
+    return sorted(eligible)
 
 
 def _idle(choices: list[_Choice]) -> _Choice | None:
@@ -284,7 +318,7 @@ class ResearchBot:
             return _prefer(choices, "macro_retreat")
 
         position = _position(me)
-        camp = me.get("camp", raw.get("camp"))
+        camp = _camp(raw.get("camp")) or _camp(me.get("camp")) or (1 if seat < 5 else 2)
         enemies: dict[Any, tuple[float, float]] = {}
         allies: dict[Any, tuple[float, float]] = {}
         heroes = summary.get("other_heroes")
@@ -293,8 +327,8 @@ class ResearchBot:
                 continue
             other_hp = _number(hero.get("hp"))
             location = _position(hero)
-            other_camp = hero.get("camp")
-            if location is None or other_camp is None or camp is None or (other_hp is not None and other_hp <= 0):
+            other_camp = _camp(hero.get("camp"))
+            if location is None or other_camp is None or (other_hp is not None and other_hp <= 0):
                 continue
             identity = hero.get("runtime_id")
             key = ("id", identity) if isinstance(identity, (str, int)) else ("entry", index)
@@ -309,7 +343,7 @@ class ResearchBot:
             return engagement
         structures = summary.get("structures")
         for structure in structures if isinstance(structures, list) else []:
-            if not isinstance(structure, dict) or camp is None or structure.get("camp") != camp:
+            if not isinstance(structure, dict) or _camp(structure.get("camp")) != camp:
                 continue
             health, anchor = _number(structure.get("hp")), _position(structure)
             if health is None or health <= 0 or anchor is None or position is None:
