@@ -631,11 +631,26 @@ def test_matches_are_deterministic_in_lockstep():
     def strip(r):
         out = {k: v for k, v in r.items() if k != "wall_s"}
         for s in ("a", "b"):
-            out[s] = {k: v for k, v in r[s].items() if k not in ("slowest_ms", "mean_ms")}
+            out[s] = {k: v for k, v in r[s].items() if k not in ("slowest_ms", "mean_ms", "p99_ms")}
         return json.dumps(out, sort_keys=True)
     rows = [play_match(make_bot("llm", 3), make_bot("rusher", 4), seed=5, map_id="trapped", max_minutes=4)
             for _ in range(2)]
     assert strip(rows[0]) == strip(rows[1])
+
+
+@pytest.mark.parametrize("changed_field", ["p99_ms", "batches"])
+def test_lockstep_comparison_ignores_timing_but_preserves_game_differences(monkeypatch, changed_field):
+    first = {"wall_s": 1.0, "a": {"p99_ms": 0.0, "batches": 20}, "b": {"p99_ms": 0.0, "batches": 10}}
+    second = json.loads(json.dumps(first))
+    second["wall_s"] = 2.0
+    second["a"][changed_field] += 0.1 if changed_field == "p99_ms" else 1
+    rows = iter((first, second))
+    monkeypatch.setitem(globals(), "play_match", lambda *args, **kwargs: next(rows))
+    if changed_field == "p99_ms":
+        test_matches_are_deterministic_in_lockstep()
+    else:
+        with pytest.raises(AssertionError):
+            test_matches_are_deterministic_in_lockstep()
 
 
 def test_the_llm_like_bot_makes_refused_orders_and_the_runner_keeps_going():
