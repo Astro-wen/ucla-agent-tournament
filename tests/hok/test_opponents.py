@@ -1,4 +1,10 @@
-"""Functional adversarial fixtures, NOT games or evidence of opponent strength."""
+"""Functional adversarial fixtures, NOT evidence of competitive strength.
+
+The final tests import the actual local.hok_env when present. In an isolated
+opponent worktree, set HOK_EVALUATOR_ROOT to a checkout containing that module.
+Its local package is appended read-only; this checkout's opponent implementation
+remains the one under test. Without an evaluator, only those tests are skipped.
+"""
 
 import ast
 import copy
@@ -473,3 +479,95 @@ def test_bounded_runtime_calls_have_stable_rotation_without_quiescence_or_surren
     assert [int(action.split(":")[0][1:]) for action in actions] == [index % 5 for index in range(28)]
     if name == "uniform_random":
         assert len({action.split(":")[1] for action in actions}) > 1
+
+
+@pytest.fixture
+def research_evaluator(monkeypatch):
+    """Use the real evaluator API, never a replacement simulator/test adapter."""
+    import importlib
+    import os
+    import sys
+    from pathlib import Path
+
+    import local
+
+    root = os.environ.get("HOK_EVALUATOR_ROOT")
+    if root:
+        local_path = Path(root).resolve() / "local"
+        if not (local_path / "hok_env.py").is_file():
+            pytest.fail("HOK_EVALUATOR_ROOT must contain local/hok_env.py")
+        monkeypatch.setattr(sys, "dont_write_bytecode", True)
+        monkeypatch.setattr(local, "__path__", [*local.__path__, str(local_path)])
+    monkeypatch.setenv("ARENA_RECORD", "0")
+    try:
+        return importlib.import_module("local.hok_env")
+    except ModuleNotFoundError as error:
+        if error.name != "local.hok_env":
+            raise  # A missing dependency is an incompatibility, not an absent evaluator.
+        pytest.skip("local.hok_env unavailable; set HOK_EVALUATOR_ROOT for integration coverage")
+
+
+@pytest.mark.parametrize("name", opponents.BOT_NAMES)
+@pytest.mark.parametrize("mode", ["realtime", "lockstep"])
+@pytest.mark.parametrize("candidate_camp", [1, 2])
+def test_actual_evaluator_factory_short_camp_swapped_matrix(research_evaluator, name, mode, candidate_camp):
+    """Synthetic interface exercise only; do NOT interpret the scores as strength."""
+    env = research_evaluator
+    # Prefix is required: bare idle/random may select the evaluator's own bots.
+    candidate, metadata = env.opponent_factory(f"research:{name}")
+    other, _ = env.opponent_factory("research:uniform_random")
+    clock = lambda: 0.0
+    probe = candidate(seed=19, clock=clock)
+    assert isinstance(probe, opponents.ResearchBot)
+    assert probe.name == name
+    assert probe._clock is clock
+    assert metadata["clock_parameter"]
+    config = env.SimConfig(mode=mode, max_steps=4)
+    kwargs = dict(config=config, seed=1016, candidate_camp=candidate_camp, calls_per_step=7)
+    report = env.play_game(candidate, other, **kwargs)
+    assert report["protocol_failure"] is None
+    assert report["steps"] == 4
+    assert report["elapsed_game_s"] > 0
+    for stats in report["stats"].values():
+        assert stats["invalid"] == stats["local_validation_errors"] == stats["resignations"] == 0
+        assert not stats["exceptions"]
+        assert not stats["callback_exceptions"]
+    for role, camp in (("candidate", candidate_camp), ("opponent", 3 - candidate_camp)):
+        stats = report["stats"][role]
+        # These bots issue an order on every offered realtime call. Exhausting
+        # a finite budget is normal, and both teams must then advance game time.
+        expected = 4 * (7 if mode == "realtime" else 5)
+        assert stats["calls"] == expected, (
+            "Realtime pending-empty must not end the runtime budget or hide owned offers", role, stats["calls"])
+        assert stats["accepted"] == stats["calls"]
+        counts = stats["accepted_by_seat"]
+        start = 0 if camp == 1 else 5
+        assert set(counts) == {str(seat) for seat in range(start, start + 5)}
+        assert max(counts.values()) - min(counts.values()) <= 1
+    if name == "uniform_random":
+        repeated = env.play_game(candidate, other, **kwargs)
+        assert repeated["trajectory_sha256"] == report["trajectory_sha256"]
+        assert repeated["elapsed_game_s"] == report["elapsed_game_s"]
+
+
+@pytest.mark.parametrize("camp", [1, 2])
+def test_actual_evaluator_realtime_keeps_owned_offers_after_all_heroes_are_fresh(research_evaluator, camp):
+    env = research_evaluator
+    game = env.DiagnosticGame(env.SimConfig(mode="realtime", max_steps=2), seed=1016)
+    factory, _ = env.opponent_factory("research:uniform_random")
+    bot = factory(seed=21, clock=lambda: 0.0)
+    for _ in range(5):
+        raw = game.view(camp)
+        action, _ = bot.decide(raw)
+        result = game.submit(camp, action, raw["state_version"])
+        assert not result.get("error")
+        bot.on_result(result)
+    raw = game.view(camp)
+    assert raw["simultaneous"]["your_pending_seats"] == []
+    offered = {int(action["action_id"].split(":")[0][1:]) for action in raw["legal_actions"]["actions"]}
+    assert offered == set(raw["seats"]), "Realtime fresh heroes must remain offered and updateable"
+    action, _ = bot.decide(raw)
+    assert action is not None
+    result = game.submit(camp, action, raw["state_version"])
+    assert not result.get("error")
+    bot.on_result(result)
