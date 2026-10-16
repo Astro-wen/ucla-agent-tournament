@@ -441,3 +441,35 @@ def test_ready_macro_input_action_does_not_require_raw_button_completion(name):
     raw["legal_actions"]["actions"] = [
         offer(3, "macro_retreat", template={"macro": "macro_retreat", "seat": "3"})]
     assert opponents.make_bot(name).decide(raw)[0] == "s3:macro_retreat"
+
+
+@pytest.mark.parametrize("name", opponents.BOT_NAMES)
+def test_optional_clock_injection_preserves_seeded_opportunity_based_cadence(name):
+    def unnecessary_clock_read():
+        raise AssertionError("Opportunity-based opponents should not read any clock")
+
+    raw = view(pending=[])
+    original = opponents.make_bot(name, seed=41)
+    injected = opponents.make_bot(name, seed=41, clock=unnecessary_clock_read)
+    assert injected._clock is unnecessary_clock_read
+    assert [original.decide(raw) for _ in range(50)] == [injected.decide(raw) for _ in range(50)]
+
+
+@pytest.mark.parametrize("name", opponents.BOT_NAMES)
+def test_bounded_runtime_calls_have_stable_rotation_without_quiescence_or_surrender(name):
+    raw = view(pending=[])
+    raw["simultaneous"]["standing_orders"] = {str(seat): "macro_advance" for seat in range(5)}
+    game_time = [0.0]
+    bot = opponents.make_bot(name, seed=83, clock=lambda: game_time[0])
+    actions = []
+    # The caller, not the policy, owns this finite equal-opportunity budget.
+    for _ in range(4):
+        for _ in range(7):
+            action, _ = bot.decide(raw)
+            assert action in {item["action_id"] for item in raw["legal_actions"]["actions"]}
+            actions.append(action)
+            bot.on_result({"ok": True})
+        game_time[0] += 0.2
+    assert [int(action.split(":")[0][1:]) for action in actions] == [index % 5 for index in range(28)]
+    if name == "uniform_random":
+        assert len({action.split(":")[1] for action in actions}) > 1

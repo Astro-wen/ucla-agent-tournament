@@ -1,6 +1,6 @@
 """Independent, observation-only HoK opponents for LOCAL research, not deployment.
 
-Interface: ``make_bot(name, seed=0)`` returns a fresh match-scoped bot with
+Interface: ``make_bot(name, seed=0, clock=None)`` returns a fresh match-scoped bot with
 ``decide(raw) -> (action, tag)`` and ``on_result(result)``. Actions are current
 offered IDs, or a raw-button payload filled from its current legal values.
 ``(None, None)`` means no eligible offer (the real-time caller may WAIT).
@@ -13,6 +13,12 @@ There is no wall clock, standing-order suppression, batching, or hidden access.
 Repeated orders deliberately receive the same scheduling opportunity as changes.
 The evaluator must provide the same number of decision opportunities to both
 teams; this module does not itself advance a simulator.
+In particular, random can keep choosing forever: cap equal runtime calls per
+team and advance game time, rather than waiting for quiescence or declaring a
+forfeit. One call issues at most one order; five eligible calls cover five seats.
+The optional injected game clock is retained for factory compatibility. These
+opponents have no time-based rules, so they do not read it or a wall clock:
+pulse cadence remains explicitly measured in each hero's decision opportunities.
 
 Baselines:
 * idle: explicitly send the offered no-op, cancelling an old standing order.
@@ -47,7 +53,7 @@ import math
 import random
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 BASELINE_NAMES = (
     "idle",
@@ -244,11 +250,13 @@ def _combat(choices: list[_Choice], *, structures_only: bool = False) -> _Choice
 class ResearchBot:
     """One team's match-scoped opponent. Create a NEW instance for every match."""
 
-    def __init__(self, name: str, seed: int | str = 0) -> None:
+    def __init__(self, name: str, seed: int | str = 0,
+                 clock: Callable[[], float] | None = None) -> None:
         if name not in BOT_NAMES:
             raise ValueError(f"Unknown HoK opponent {name!r}; choose from {', '.join(BOT_NAMES)}")
         self.name = name
         self.seed = seed
+        self._clock = clock  # No timed rules yet; never substitute wall-clock time.
         self._rng = random.Random(seed)
         self._last_seat: int | None = None
         self._recovering: set[int] = set()
@@ -371,9 +379,10 @@ class ResearchBot:
                 f"idles={self.idles} refused={self.refused}")
 
 
-def make_bot(name: str, seed: int | str = 0) -> ResearchBot:
-    """Factory. Canonical names are BOT_NAMES; unknown names fail at setup, not play."""
+def make_bot(name: str, seed: int | str = 0,
+             clock: Callable[[], float] | None = None) -> ResearchBot:
+    """Match factory; clock injection is optional and does not alter turn cadence."""
     if not isinstance(name, str):
         raise ValueError("HoK opponent name must be a string")
     normalized = name.strip().lower().replace("-", "_")
-    return ResearchBot(_ALIASES.get(normalized, normalized), seed=seed)
+    return ResearchBot(_ALIASES.get(normalized, normalized), seed=seed, clock=clock)
