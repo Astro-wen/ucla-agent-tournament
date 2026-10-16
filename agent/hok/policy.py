@@ -45,6 +45,10 @@ MACROS = ("macro_advance", "macro_retreat", "macro_attack", "macro_skill1", "mac
 
 LOW_HP = 0.30          # retreat below this share of max HP ...
 HEALED = 0.85          # ... and go back out only above this one
+SLOW_RECOVERY = True   # False keeps the original 85% recovery rule in every case
+RECOVERY_WAIT_S = 30.0  # observed retreat near our fountain before considering an earlier return
+RECOVERY_MIN_HP = 0.70
+RECOVERY_BASE_RANGE = 4000  # proximity heuristic from real waiting positions, not a verified healing radius
 HURT = 0.60            # "hurt" for tower retreat and wounded-retreat hysteresis
 NEAR = 10000           # game units: heroes this close count for the outnumbered rule
 TOWER_RANGE = 8800     # cautious proximity heuristic, not an asserted tower weapon range
@@ -362,7 +366,8 @@ class Team:
         return any(_dist(p, q) <= TOWER_RANGE for q in self.towers)
 
 
-def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, retreating: bool = False) -> str | None:
+def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, retreating: bool = False,
+               healed: float = HEALED) -> str | None:
     """The rules for one hero (see the module docstring); None for a dead hero (no macros)."""
     if not isinstance(macros, dict) or not macros:
         return None
@@ -373,7 +378,7 @@ def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, 
     if hp is not None and hp <= 0:
         return None
     can_retreat = "macro_retreat" in macros
-    if can_retreat and retreating and (share is None or share < HEALED):
+    if can_retreat and retreating and (share is None or share < healed):
         return "macro_retreat"  # missing HP is not evidence of recovery
     if can_retreat and share is not None:
         if share < LOW_HP:
@@ -501,6 +506,7 @@ class HokPolicy:
     def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self._clock = clock
         self._retreating: set[int] = set()
+        self._healing_since: dict[int, float] = {}
         self._sent: dict[int, tuple[str, float]] = {}       # seat -> (macro, when) of our last order to it
         self._acknowledged: set[int] = set()
         self._deaths: dict[int, int] = {}
@@ -535,8 +541,9 @@ class HokPolicy:
         for seat in pending:
             macros = offers[seat]["macros"]
             summary = summary_of(raw, seat)
-            want = rule_macro(summary, macros, team, seat in self._retreating)
-            self._track_retreat(seat, summary, want)
+            healed = self._recovery_threshold(seat, summary, snapshot, now)
+            want = rule_macro(summary, macros, team, seat in self._retreating, healed=healed)
+            self._track_retreat(seat, summary, want, healed=healed)
             if rt and want is None:
                 self._forget_order(seat)
                 continue
@@ -548,7 +555,7 @@ class HokPolicy:
                 else:
                     available = {m: label for m, label in macros.items()
                                  if not self._blocked(seat, m, version, now)}
-                    want = rule_macro(summary, available, team, seat in self._retreating)
+                    want = rule_macro(summary, available, team, seat in self._retreating, healed=healed)
                     if want == "macro_retreat":
                         want = None                         # do not retreat a healthy hero just because push was refused
             if want is None:
@@ -613,6 +620,7 @@ class HokPolicy:
             if died:
                 self._forget_order(seat)
                 self._retreating.discard(seat)
+                self._healing_since.pop(seat, None)
                 self._rejected = {key: value for key, value in self._rejected.items() if key[0] != seat}
 
     def _current_order(self, seat: int, snapshot: dict[int, str | None] | None, now: float) -> str | None:
@@ -640,19 +648,37 @@ class HokPolicy:
         old_version, until = rejected
         return now < until or (version is not None and old_version == version)
 
-    def _track_retreat(self, seat: int, summary: dict, want: str | None) -> None:
+    def _recovery_threshold(self, seat: int, summary: dict, snapshot: dict | None, now: float) -> float:
+        me = summary.get("my_hero") if isinstance(summary.get("my_hero"), dict) else {}
+        share, camp, pos = hp_share(me), _camp(me.get("camp")), _pos(me)
+        near_home = camp is not None and pos is not None and any(
+            _camp(st.get("camp")) == camp and st.get("type") == "ACTOR_TOWER_SPRING"
+            and (_num(st.get("hp")) or 0) > 0 and _pos(st) is not None
+            and _dist(pos, _pos(st)) <= RECOVERY_BASE_RANGE
+            for st in _dict_list(summary.get("structures")))
+        if not SLOW_RECOVERY or seat not in self._retreating or share is None or not near_home \
+                or snapshot is None or snapshot.get(seat) != "macro_retreat":
+            self._healing_since.pop(seat, None)
+            return HEALED
+        started = self._healing_since.setdefault(seat, now)
+        return RECOVERY_MIN_HP if now - started >= RECOVERY_WAIT_S else HEALED
+
+    def _track_retreat(self, seat: int, summary: dict, want: str | None, healed: float = HEALED) -> None:
         me = summary.get("my_hero") if isinstance(summary.get("my_hero"), dict) else {}
         share = hp_share(me)
         if want == "macro_retreat" and share is not None and share < HURT:
             self._retreating.add(seat)
-        elif (share is not None and share >= HEALED) or (_num(me.get("hp")) is not None and me["hp"] <= 0):
+        elif (share is not None and share >= healed) or (_num(me.get("hp")) is not None and me["hp"] <= 0):
             self._retreating.discard(seat)                    # positively observed recovery or death
+            self._healing_since.pop(seat, None)
 
     def on_result(self, result) -> None:
         if isinstance(result, dict) and result.get("error"):
             self.refused += 1
             if self._inflight is not None:
                 seat, macro, version = self._inflight
+                if macro == "macro_retreat":
+                    self._healing_since.pop(seat, None)
                 self._forget_order(seat)                     # a refusal is not evidence about the other four heroes
                 if macro is not None:
                     self._rejected[(seat, macro)] = (version, self._clock() + RETRY_S)
