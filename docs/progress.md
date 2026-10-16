@@ -1239,6 +1239,6 @@
 
 已知弱点：变差的 4 局（main 组 2 局、cash 组 2 局）逐局复现过，都只由 `rally_step` 引起（`prior_hold` 单独开时 4 局都和基线相同）：3 局是长图 Shadowfiend II 上对 turtle（造塔守家），集结点靠家后后期进攻分成几波零散冲上去，被塔吃掉，按时间到比分输；1 局是开局 10000 钱时 Sidestep 上对 pro。真实对手里很少见纯守塔打法；若比赛后要再改，可以只在路程短的地图（Trapped、Sidestep）用 `rally_step`。
 
-上线检查（合并后的 `agent/` 与被测快照 d4e46b5 逐文件相同）：`scripts/selfcheck.py` ready；`scripts/replay_real.py` 2349 个真实决策 0 失败，`--no-calc` 也 0 失败；全量 pytest 见合并说明。
+上线检查（合并后的 `agent/` 与被测快照 d4e46b5 逐文件相同）：`scripts/selfcheck.py` ready；`scripts/replay_real.py` 2349 个真实决策 0 失败，`--no-calc` 也 0 失败；全量 pytest 2664 个通过、4 个跳过、0 失败（Python 3.13，19 分 40 秒）。
 
 同一晚的宝可梦候选 `pk/lech-1015`（`ARENA_SEARCH_SUCKER`，减少突袭落空）在新种子 197 上显著变差（250 局合计 −4.8 个百分点，p 0.012；meta −6.0，p 0.035），**不合并**，详见分支 `eval/pk-sucker-1015` 的 `docs/overnight_1015/pk1015_fresh_eval.md`。
