@@ -1,3 +1,7 @@
+"""Archived Tom opponent definition with its original helper dependencies made explicit."""
+from local.ra_bots_strong import DEF_PRIO, PROD, Strong, d
+
+
 class Tom(Strong):
     """The real losses of 10-14 / 10-15 to "Tom_2026" (6d0c7844 and f1cd3ba4 on shadowfiend-ii, edf99e95 on sidestep)
     as a script: a fast war factory before the second refinery, a third refinery and a second war factory once money
@@ -127,5 +131,4 @@ class Tom(Strong):
         out += self.push(obs, la, [u for u in army if u["id"] in self.att],
                          (DEF_PRIO, PROD, ("proc",), ("powr", "apwr"), ("fact",)))
         return out
-
 
