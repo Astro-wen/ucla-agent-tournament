@@ -194,8 +194,8 @@ real states are replayed through the agent before every release (`scripts/replay
 ## Submitted version and operation (Official Rules §8–9)
 
 - **Submitted version.** The registered repository's latest commit on `main` at the Submission Deadline
-  (9:30 a.m. PDT, October 16, 2026, as announced on the platform). Selected commits can be exported with
-  `scripts/publish_sync.sh` from their committed contents using `git archive`. The registered submission repository
+  (9:30 a.m. PDT, October 16, 2026, as announced on the platform). Selected commits are exported
+  from their committed contents using `git archive`. The registered submission repository
   stays frozen from the deadline until 30 days after final results.
 - **Run** (Linux x86-64, Python ≥ 3.11, Node.js ≥ 18):
 
