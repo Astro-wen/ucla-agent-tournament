@@ -64,7 +64,8 @@ def install_process_boundary():
 class FakeHokMatch:
     """Small finite protocol peer, not a combat or strength simulator."""
 
-    def __init__(self, mode, *, context, steps, camp=1, reject_first=False, reconnect=False):
+    def __init__(self, mode, *, context, steps, camp=1, reject_first=False, reconnect=False,
+                 pause_after_first_order=False):
         self.mode, self.context, self.steps = mode, context, steps
         self.seats = tuple(range(0, 5)) if camp == 1 else tuple(range(5, 10))
         self.sid = f"hok-{mode}-process"
@@ -85,6 +86,9 @@ class FakeHokMatch:
         self.created = time.monotonic()
         self.seen_versions = set()
         self.last_view = None
+        self.resume_reads = threading.Event()
+        if not pause_after_first_order:
+            self.resume_reads.set()
 
     @property
     def terminal(self):
@@ -217,6 +221,13 @@ class FakeHokOfficial:
 
         @mcp.tool()
         async def get_game_state(session_id: str) -> dict:
+            import asyncio
+            match = self.matches[session_id]
+            # Optional test barrier: stop after one confirmed order so a
+            # worker-loss test can kill exactly its audited worker, then let
+            # the replacement observe the preserved server standing order.
+            while match.accepted and not match.resume_reads.is_set():
+                await asyncio.sleep(0.01)
             with self.lock:
                 self.counters["get_game_state"] += 1
                 return self.matches[session_id].view(advance=True)

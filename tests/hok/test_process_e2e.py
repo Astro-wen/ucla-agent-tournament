@@ -58,7 +58,7 @@ def fake_server(peer):
     sock.listen(128)
     port = sock.getsockname()[1]
     server = uvicorn.Server(uvicorn.Config(peer.build_app(port), host="127.0.0.1", port=port,
-                                         log_level="error", access_log=False))
+                                         log_level="error", access_log=False, timeout_graceful_shutdown=2))
     thread = threading.Thread(target=lambda: server.run(sockets=[sock]), name="owned-hok-fake-server", daemon=True)
     thread.start()
     try:
@@ -126,6 +126,9 @@ def cli_process(temporary, port, *, record=False, block_recording=False):
                         os.kill(pid, signal.SIGKILL)
                     except ProcessLookupError:
                         pass
+            end = time.monotonic() + 2
+            while time.monotonic() < end and any(own_group_member(pid, process.pid) for pid in pids):
+                time.sleep(0.05)
             assert not any(own_group_member(pid, process.pid) for pid in pids), "owned subprocess survived cleanup"
             if not test_failed:
                 assert not forced_children, f"children needed forced cleanup instead of exiting: {forced_children}"
@@ -222,3 +225,40 @@ def test_subprocess_boundary_blocks_external_resolution_and_dotenv_without_readi
     assert result.returncode == 0, result.stdout + result.stderr
     events = audit_rows(tmp_path / "process-boundary.jsonl")
     assert {row["event"] for row in events} >= {"start", "denied-network", "denied-file"}
+
+
+def test_supervisor_replaces_only_its_killed_worker_and_resumes_server_standing_orders(tmp_path):
+    match = FakeHokMatch("realtime", context="tournament", steps=35, pause_after_first_order=True)
+    peer = FakeHokOfficial([match])
+    with fake_server(peer) as port:
+        try:
+            with cli_process(tmp_path, port) as (process, output, audit, env):
+                wait_until(lambda: len(match.accepted) == 1, 20, lambda: output.read_text())
+                initial = re.findall(r"starting \(pid=(\d+)\)", output.read_text())
+                assert len(initial) == 1
+                stopped_pid = int(initial[0])
+                assert stopped_pid in {row["pid"] for row in audit_rows(audit) if row["event"] == "start"}
+                assert own_group_member(stopped_pid, process.pid), "refuse to signal any non-owned PID"
+                # This is the only deliberately stopped match worker. It is
+                # created by this test, never a live agent or a name-based kill.
+                os.kill(stopped_pid, signal.SIGTERM)
+                match.resume_reads.set()
+                wait_until(lambda: match.results == 1 and "[match-summary]" in output.read_text(),
+                           25, lambda: output.read_text())
+                text = output.read_text()
+                workers = [int(pid) for pid in re.findall(r"starting \(pid=(\d+)\)", text)]
+                assert len(workers) == 2 and workers[0] != workers[1], text
+                assert process.poll() is None
+                wait_until(lambda: all(not own_group_member(pid, process.pid) for pid in workers), 8,
+                           "replaced/finished workers must both be reaped")
+                assert match.grants == 2 and not peer.counters["seat_busy"], "replacement must reuse its runtime lease"
+                assert match.connected_s is not None and match.connected_s < 45
+                assert not match.invalid
+                assert len(match.accepted) == 5 and {row["seat"] for row in match.accepted} == set(match.seats)
+                assert "orders=4" in text, "fresh worker should respect the earlier worker's accepted standing order"
+                assert "exit code -15" in text and "finished: your agent" in text
+                assert not list((tmp_path / "logs").iterdir())
+                assert not [row for row in audit_rows(audit) if row["event"].startswith("denied")]
+            assert process.returncode == 0
+        finally:
+            match.resume_reads.set()
