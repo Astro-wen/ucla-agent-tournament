@@ -130,6 +130,8 @@ DEFAULTS: dict[str, float] = {
     "split_e3": 1,                  # split_fire: rocket soldiers too (0: tanks only)
     "anchor2": 1,                   # a second anchor in every batch, on the building farthest from the enemies in
                                     # sight (two real INVALID_ACTIONs while the base was razed; lockstep: no change)
+    "rally_step": 5,                # gather by the home guard and towers (0: original path cell 8)
+    "prior_hold": 1,                # retain the capped unseen-army estimate after prior_until_s while still blind
 }
 
 

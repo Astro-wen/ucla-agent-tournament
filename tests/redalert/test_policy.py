@@ -1095,3 +1095,38 @@ def test_split_fire_sends_tanks_and_rockets_at_the_enemy_tank_not_the_nearest_ri
         a._split_fire(v, [])
         assert not a.split
     assert not load_params(V47).split_fire
+
+
+def test_rally_step_can_gather_the_attack_group_with_the_home_guard():
+    rallies = {}
+    for step in (0, 8, 5):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params({"ARENA_RA_RALLY_STEP": str(step)}))
+        drive(srv, pol, 2)
+        rallies[step] = pol.static.rally
+        assert pol.static.rally in pol.static.path
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+    assert rallies[0] == rallies[8]
+    assert rallies[5] == pol.static.guard
+    assert pol.static.path.index(rallies[5]) == 5
+
+
+def test_rally_rollback_preserves_the_original_orders():
+    logs = []
+    for step in (0, 8):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params({"ARENA_RA_RALLY_STEP": str(step), "ARENA_RA_PRIOR_HOLD": "0"}))
+        rec = []
+        drive(srv, pol, 200, record=rec)
+        logs.append([(version, orders) for version, orders, _response in rec])
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+    assert logs[0] == logs[1]
+
+
+@pytest.mark.parametrize("hold", [0, 1])
+def test_unseen_army_prior_does_not_expire_when_hold_is_enabled(hold):
+    pol, v = _late_view({"ARENA_RA_PRIOR_HOLD": str(hold)}, game_s=950.0)
+    p = pol.p
+    assert pol.army.prior(v) == (min(p.prior_late_cap, p.prior_rate * (950 - 90)) if hold else 0.0)
+    pol.army.intel_tick = v.tick
+    assert pol.army.prior(v) == 0.0

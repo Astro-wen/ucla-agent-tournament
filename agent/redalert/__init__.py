@@ -154,6 +154,9 @@ class RedAlertPolicy:
         v = View(raw, self.static)
         if not self.static.ready:
             self.static.setup(v.base, v.enemy_hint)
+            if self.p.rally_step > 0 and self.static.path:
+                path = self.static.path
+                self.static.rally = path[max(0, min(len(path) - 1, min(int(self.p.rally_step), len(path) // 4)))]
         self.view = v
         self.ledger.update(v)
         self._track(v)
