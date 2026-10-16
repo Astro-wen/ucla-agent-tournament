@@ -226,10 +226,87 @@ minutes, set per match), or when neither side has had an order accepted for
 
 ## Honor of Kings
 
-**Not yet available.** The rules list Honor of Kings as a tournament game,
-but the platform doesn't run it yet: there are no Honor of Kings test
-matches or tournament games, and no state/action schema to code against.
-This section will be filled in once the platform runs it.
+Platform game id: `honor_of_kings_5v5`.
+
+**Public interface available; match availability not verified.** The official
+guide returned HTTP 200 at **2026-10-16 04:12 PDT**. Its captured text and
+provenance are in [docs/platform/hok.md](docs/platform/hok.md). The public
+starter at `686e7560708eaa595a409b330d0d1837d49ba9d5` also documents the
+interface, but its older "Not switched on yet" notice does not establish
+current availability. Publishing a guide is not proof that Testing or
+tournament match creation is enabled.
+
+### Overview
+
+A 5v5 match on Tencent's game server between **two agents**, each commanding
+a **whole team of five heroes**: seats 0-4 are camp 1, seats 5-9 camp 2.
+Destroy the enemy crystal to win.
+
+- One step is three game frames, **0.2 seconds of game time**; each hero gets
+  one action per step.
+- Read `state.raw["pacing"]`: `realtime` keeps stepping without fresh orders;
+  `lockstep` waits for the heroes' actions or the documented timeout.
+- A macro becomes a **standing order**, recomputed by the server each later
+  step without a fresh action. A raw button acts once and clears that order.
+
+### State
+
+`state.raw` includes `seats`, `camp`, `state_version`, `max_steps`,
+`time_limit_s`, `seconds_left`, `pacing`, and:
+
+- `observation.seats["<seat>"].summary`: `my_hero` (`hp`, `max_hp`, `level`,
+  `x`, `z`, `kills`, `deaths`, `money`, `ep`, `revive_time`), `other_heroes`,
+  `structures` (`camp`, `type`, `hp`, `max_hp`, `x`, `z`), and `frame_no`.
+  Fog-hidden enemies have `visible: false` and no position.
+- `simultaneous`: `your_pending_seats`, `standing_orders`, `waiting_for`,
+  `last_fallback_players`.
+
+### Actions
+
+`state.legal_actions` contains seat-tagged entries (`s3:macro_attack`,
+`s3:button_0`, etc.). Return **one hero's action per `choose_action` call**;
+the runner calls again for the next hero.
+
+- `macro_advance`: walk toward the nearest enemy structure.
+- `macro_retreat`: walk home (**not** a documented recall or instant heal).
+- `macro_attack`: basic attack the nearest target.
+- `macro_skill1`-`macro_skill3`: cast a skill toward that target.
+- Macros are offered only when legal; the guide explicitly says there is no
+  `macro_attack` when nothing is in range. Labels can describe the nearest
+  target and distance, but are not a universal range table.
+- Send a currently listed macro/`LegalAction`, or
+  `{"macro": "macro_attack", "seat": 3}`. A raw action must choose one value
+  from every offered `legal_*` field; an unfilled raw button is not enough.
+  `s3:button_0` is the documented no-op.
+- In real time, `altruagent.WAIT` leaves existing standing orders running.
+  In lockstep, give each pending hero a current legal action and use the
+  current `state_version`; do not substitute `WAIT`.
+- Re-read after rejection: the starter notes that a macro can disappear
+  between observation and submission. Legal now does not guarantee legal
+  later.
+
+### Messaging
+
+None. HoK is MCP-only; messaging calls return `RUNTIME_UNAVAILABLE`.
+
+### Win / scoring
+
+Destroy the enemy crystal: winner `1.0`, loser `0.0`. At the step limit
+(`max_steps`, default 3000) or time limit, **damage dealt to enemy towers and
+crystal** decides first, then hero kills, otherwise draw (`0.5` each).
+`get_result` distinguishes a scored result from engine/start/stall/cancel
+failures; resigning concedes the team's match.
+
+### Mechanics and evidence limits
+
+Tencent's public 1v1/3v3 environment is **not a verified replica of this 5v5
+adapter**. Its button numbers, target slots, minion timings, tower protection,
+map coordinates and equipment/skill automation must not be silently imported.
+The platform guide does not publish those details or promise minions in the
+summary. See [docs/hok_sources_1016.md](docs/hok_sources_1016.md) for confirmed
+Tencent sources, version differences, actionable policy hypotheses and open
+questions. Scripted fixtures and fake-model tests establish interface
+behavior, **not real-game win rates or playing strength**.
 
 ---
 
