@@ -111,6 +111,37 @@ def test_realtime_dead_hero_does_not_block_living_heroes_and_revives(monkeypatch
     assert len(game.accepted) == 5
 
 
+def test_respawn_reinstalls_order_that_the_server_cleared_on_death(monkeypatch):
+    def frames():
+        for version in range(35):
+            dead = 10 <= version < 18
+            if dead:
+                game.standing.pop("0", None)
+            actions = [a for s in SEATS for a in entries(s, () if s == 0 and dead else ("macro_advance",))]
+            raw = payload(version, standing=game.standing, actions=actions)
+            raw["observation"]["seats"]["0"]["summary"]["my_hero"]["hp"] = 0 if dead else 3000
+            yield raw
+
+    game = HokFakeSession(frames())
+    play(game, monkeypatch)
+    revived_orders = [c for c in game.accepted if c["seat"] == 0 and c["version"] >= 18]
+    assert revived_orders, "the pre-death local send cache suppressed every order after respawn"
+    assert {c["seat"] for c in game.accepted if c["version"] < 10} == set(SEATS)
+
+
+def test_lagging_standing_order_acknowledgements_do_not_duplicate_or_block_team(monkeypatch):
+    def frames():
+        for version in range(25):
+            # For a few views the server accepts orders but its snapshot still
+            # shows no acknowledgements. Eventually the snapshot catches up.
+            yield payload(version, standing={} if version < 8 else game.standing)
+
+    game = HokFakeSession(frames())
+    play(game, monkeypatch)
+    assert {c["seat"] for c in game.accepted} == set(SEATS)
+    assert len(game.accepted) == 5, "brief acknowledgement lag must not cause resends"
+
+
 @pytest.mark.parametrize("error", ["INVALID_ACTION", "STALE_STATE", "NOT_YOUR_TURN"])
 def test_runner_recovers_refusal_and_revalidates_changed_offers(monkeypatch, error):
     def frames():
