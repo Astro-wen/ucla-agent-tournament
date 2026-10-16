@@ -440,9 +440,9 @@ class Contestant:
                     log.exception("honor_of_kings fallback failed; using the runner-safe fallback")
                     out = None
                 if out is None:
-                    # An active lockstep state must offer a playable pending action. Preserve the generic last
-                    # resort for an inconsistent server response; never invent HoK coordinates or a hero's order.
-                    out = safe_action(state, raw)
+                    # Never let the generic fallback select an owned but non-pending hero.
+                    # This independent selection does not call the failed tactical policy or fallback entry point.
+                    out = _hok_last_resort(raw)
         self.last_decision = {"kind": "realtime" if rt else "lockstep", "budget": 0.0, "source": "hok",
                               "path": self._path, "ms": round(1000 * (time.monotonic() - t0), 2)}
         self.last_reasoning = text
@@ -467,7 +467,11 @@ class Contestant:
             extra = {"decision": self.last_decision}
             if fault is not None:
                 extra["hok_fault"] = fault
-            record("action", context, state, action, text, extra=extra)
+            try:
+                record("action", context, state, action, text, extra=extra)
+            except Exception:
+                # Telemetry must never discard the already-fixed move, including in fatal-on-WAIT lockstep.
+                log.debug("honor_of_kings recording failed; preserving the action", exc_info=True)
         self._hok_refused_record = False
         return out
 
@@ -1246,6 +1250,28 @@ def _is_hok(state, context) -> bool:
         return False
     except Exception:
         return False
+
+
+def _hok_last_resort(raw: dict):
+    """Emergency selection after a HoK fallback fault: only current owned pending legal offers.
+
+    Share bounded parsing/raw-domain completion, not the failed decision or safe_fallback_action entry point.
+    A contract-invalid state with no playable pending offer has no legal answer; do not invent another seat.
+    """
+    try:
+        from .hok.policy import _actions, _pending_only, idle_action, offers_by_seat
+        offers = offers_by_seat(_actions(raw))
+        pending = _pending_only(raw, offers)
+        for seat in pending:
+            action = idle_action(offers[seat]["raw"], seat)
+            if action is not None:
+                return action
+        for seat in pending:
+            if offers[seat]["ids"]:
+                return next(iter(offers[seat]["ids"].values()))
+    except Exception:
+        log.debug("honor_of_kings last-resort selection failed", exc_info=True)
+    return None
 
 
 def _ra_noop(raw: dict):

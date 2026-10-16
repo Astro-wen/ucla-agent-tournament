@@ -14,7 +14,7 @@ Per hero, in order:
   1. dead (no macros): nothing (lockstep: the do-nothing button, the server needs an answer);
   2. retreat home below LOW_HP of its HP, and finish a wounded hero's retreat until HEALED (hysteresis: no
      back-and-forth at the HP threshold or tower boundary);
-  3. retreat when hurt and outnumbered (visible enemy heroes near it at least two more than our live heroes near it),
+  3. retreat when outnumbered (visible enemy heroes near it at least two more than our live heroes near it),
      or hurt under an enemy tower;
   4. basic-attack an offered structure; otherwise use skills in range (ultimate at a hero only), then offered attack;
   5. else advance (toward the nearest enemy tower or crystal).
@@ -45,7 +45,7 @@ MACROS = ("macro_advance", "macro_retreat", "macro_attack", "macro_skill1", "mac
 
 LOW_HP = 0.30          # retreat below this share of max HP ...
 HEALED = 0.85          # ... and go back out only above this one
-HURT = 0.60            # "hurt" for the outnumbered / tower rules
+HURT = 0.60            # "hurt" for tower retreat and wounded-retreat hysteresis
 NEAR = 10000           # game units: heroes this close count for the outnumbered rule
 TOWER_RANGE = 8800     # cautious proximity heuristic, not an asserted tower weapon range
 SKILL_RANGE = 8000     # conservative skill-distance heuristic; exact hero ranges are not published
@@ -346,7 +346,9 @@ def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, 
         if share < LOW_HP:
             return "macro_retreat"
         p = _pos(me)
-        if team is not None and p is not None and share < HURT and (team.outnumbered(p) or team.under_tower(p)):
+        # Conservative integration choice: known numerical overmatch is unsafe even at full HP.
+        # Tower proximity alone still requires a wounded hero; it is not a verified weapon range.
+        if team is not None and p is not None and (team.outnumbered(p) or (share < HURT and team.under_tower(p))):
             return "macro_retreat"
     attack = macros.get("macro_attack")
     if attack is not None and target_kind(attack) == "structure":

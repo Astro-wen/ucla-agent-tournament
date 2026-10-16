@@ -114,7 +114,7 @@ def test_retreat_holds_until_healed():
     assert hok.rule_macro(_summary(0, hp=2000), m, retreating=False) == "macro_advance"
 
 
-def test_hurt_and_outnumbered_or_under_a_tower_retreats():
+def test_numerical_overmatch_retreats_at_full_hp_but_tower_only_remains_hurt_gated():
     m = {"macro_advance": "a", "macro_retreat": "r", "macro_attack": "x (nearest: enemy hero 7, 5000 away)"}
     three = [{"runtime_id": i, "camp": 2, "visible": True, "hp": 3000, "x": 0, "z": 1000 * i} for i in range(3)]
     s = _summary(0, hp=1500, x=0, z=0, enemies=three, towers=[])
@@ -122,11 +122,34 @@ def test_hurt_and_outnumbered_or_under_a_tower_retreats():
     team = hok.Team(raw, SEATS)
     assert team.outnumbered((0, 0))
     assert hok.rule_macro(s, m, team) == "macro_retreat"
-    assert hok.rule_macro(_summary(0, hp=2500, x=0, z=0, enemies=three, towers=[]), m, team) == "macro_attack"
+    assert hok.rule_macro(_summary(0, hp=3000, x=0, z=0, enemies=three, towers=[]), m, team) == "macro_retreat"
     tower = [{"camp": 2, "type": "ACTOR_TOWER", "hp": 6000, "x": 3000, "z": 0}]
     s2 = _summary(0, hp=1500, x=0, z=0, enemies=[], towers=tower)
     team2 = hok.Team(hok_payload(summaries={k: s2 for k in SEATS}), SEATS)
     assert team2.under_tower((0, 0)) and hok.rule_macro(s2, m, team2) == "macro_retreat"
+    assert hok.rule_macro(_summary(0, hp=3000, x=0, z=0, enemies=[], towers=tower), m, team2) == "macro_attack"
+
+
+@pytest.mark.parametrize("scenario", ["one-extra", "allies-near", "hidden", "dead", "far"])
+def test_full_hp_retreat_requires_actual_visible_nearby_numerical_overmatch(scenario):
+    foes = [{"runtime_id": i, "camp": 2, "visible": True, "hp": 3000, "x": 0, "z": 1000 * i}
+            for i in range(3)]
+    if scenario == "one-extra":
+        foes.pop()
+    elif scenario == "hidden":
+        foes[2]["visible"] = False
+    elif scenario == "dead":
+        foes[2]["hp"] = 0
+    elif scenario == "far":
+        foes[2]["x"] = hok.NEAR + 1
+    me = _summary(0, hp=3000, x=0, z=0, enemies=foes, towers=[])
+    allies = {k: _summary(k, x=-60000, z=-60000) for k in SEATS[1:]}
+    if scenario == "allies-near":
+        allies[1] = _summary(1, x=1000, z=0)
+    team = hok.Team(hok_payload(summaries={0: me, **allies}), SEATS)
+    macros = {"macro_advance": "a", "macro_retreat": "r", "macro_attack": "Attack"}
+    assert not team.outnumbered((0, 0))
+    assert hok.rule_macro(me, macros, team) == "macro_attack"
 
 
 # -- real time --------------------------------------------------------------------------------------------------

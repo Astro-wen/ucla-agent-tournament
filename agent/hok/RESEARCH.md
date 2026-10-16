@@ -52,6 +52,11 @@ The guide confirms:
 - **Recovery hysteresis:** once a wounded hero is sent home, complete recovery
   to the existing 85% threshold. This includes the hurt/outnumbered and
   hurt/near-tower cases, avoiding immediate re-entry at the tower boundary.
+  Integration decision (2026-10-16, explicitly approved): an isolated full-HP
+  hero also retreats from a visible nearby numerical overmatch (at least two
+  more enemies than allies). Tower proximity alone remains hurt-gated.
+  This conservatively retains the independently developed main policy's
+  safety intent; it is not evidence of improved real-game strength.
 - **Visible team aggregation:** require explicit `visible: true` for enemy
   heroes, deduplicate shared views, and merge structures from all five views.
   No enemy position is retained across decisions.

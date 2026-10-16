@@ -17,7 +17,7 @@ from altruagent.runner import run_game
 from agent import agent as agent_mod
 from agent.agent import Contestant, _is_hok
 from agent.hok import HokPolicy
-from agent.hok.policy import distance_of, offers_by_seat, target_kind
+from agent.hok.policy import HOLD_S, RETRY_S, distance_of, offers_by_seat, target_kind
 from tests.test_runner import FakeMCPGameSession, result_dict, terminal_state
 
 HOK = DecisionContext(session_id="h", tournament_id=None, game_type="honor_of_kings_5v5", agent_id="a")
@@ -68,10 +68,10 @@ def state(**kw) -> GameState:
     return GameState.from_mcp_state(payload(**kw))
 
 
-def decide(policy, st: GameState):
+def decide(policy, st: GameState, *, now=None):
     # Simulate the old test's game-step progression using the new injectable
     # clock. No real sleeps, and on_result sees the most recent view's time.
-    now = st.raw["state_version"] * 0.2
+    now = st.raw["state_version"] * 0.2 if now is None else now
     policy._clock = lambda: now
     out = policy.decide(st.raw)[0]
     if isinstance(out, str):
@@ -157,13 +157,35 @@ def test_realtime_sends_only_changes_and_waits_otherwise():
 
 def test_realtime_breaking_off_a_fight_waits_for_the_hold_but_retreats_do_not():
     p = HokPolicy()
-    st = {**ALL_ADVANCE, "0": "macro_attack"}
-    assert decide(p, state(standing=st, version=10)) is None   # attack just started: held
-    assert decide(p, state(standing=st, version=20)) == {"macro": "macro_advance", "seat": 0}
+    macros = ("macro_advance", "macro_retreat", "macro_skill1")
+    others = [e for s in SEATS[1:] for e in entries(s)]
+    close = entries(0, macros=macros, near=3000) + others
+    far = entries(0, macros=macros, near=12000) + others
+    st = {**ALL_ADVANCE, "0": "macro_skill1"}
+    # We actually sent this still-offered skill, so its fresh age is known.
+    assert decide(p, state(acts=close), now=0.0) == {"macro": "macro_skill1", "seat": 0}
+    assert decide(p, state(acts=far, standing=st, version=11), now=HOLD_S - 0.01) is None
+    assert decide(p, state(acts=far, standing=st, version=12), now=HOLD_S + 0.01) == \
+        {"macro": "macro_advance", "seat": 0}
     p = HokPolicy()
-    decide(p, state(standing=st, version=10))
-    assert decide(p, state(standing=st, version=11, summaries={0: summary(0, hp=300)})) == \
+    assert decide(p, state(acts=close), now=0.0) == {"macro": "macro_skill1", "seat": 0}
+    assert decide(p, state(acts=far, standing=st, version=11, summaries={0: summary(0, hp=300)}),
+                  now=HOLD_S - 0.01) == \
         {"macro": "macro_retreat", "seat": 0}
+
+
+def test_a_disappeared_command_is_replaced_even_during_its_local_hold():
+    p = HokPolicy()
+    acts = entries(0, macros=("macro_advance", "macro_skill1"), near=3000)
+    assert decide(p, state(pending=[0], acts=acts), now=0.0) == {"macro": "macro_skill1", "seat": 0}
+    assert decide(p, state(pending=[0], standing={"0": "macro_skill1"}, version=11),
+                  now=HOLD_S / 2) == {"macro": "macro_advance", "seat": 0}
+
+
+def test_first_observed_order_is_not_assumed_to_be_locally_fresh():
+    acts = entries(0, macros=("macro_advance", "macro_skill1"), near=12000)
+    assert decide(HokPolicy(), state(pending=[0], acts=acts, standing={"0": "macro_skill1"}), now=0.0) == \
+        {"macro": "macro_advance", "seat": 0}
 
 
 def test_realtime_dead_hero_is_skipped_and_nothing_listed_waits():
@@ -176,10 +198,13 @@ def test_realtime_dead_hero_is_skipped_and_nothing_listed_waits():
 def test_a_refused_order_is_not_repeated_at_once():
     p = HokPolicy()
     acts = entries(0, near=3000) + [e for s in SEATS[1:] for e in entries(s)]
-    assert decide(p, state(acts=acts, standing=ALL_ADVANCE)) == {"macro": "macro_attack", "seat": 0}
+    assert decide(p, state(acts=acts, standing=ALL_ADVANCE), now=0.0) == {"macro": "macro_attack", "seat": 0}
     p.on_result({"error": "INVALID_ACTION", "detail": "gone"})
-    assert decide(p, state(acts=acts, standing=ALL_ADVANCE, version=12)) is None
-    assert decide(p, state(acts=acts, standing=ALL_ADVANCE, version=20)) == {"macro": "macro_attack", "seat": 0}
+    assert decide(p, state(acts=acts, standing=ALL_ADVANCE, version=11), now=RETRY_S - 0.01) is None
+    # Elapsed cooldown alone cannot authorize a retry against the same rejected state.
+    assert decide(p, state(acts=acts, standing=ALL_ADVANCE, version=10), now=RETRY_S) is None
+    assert decide(p, state(acts=acts, standing=ALL_ADVANCE, version=12), now=RETRY_S) == \
+        {"macro": "macro_attack", "seat": 0}
     assert p.refused == 1
 
 

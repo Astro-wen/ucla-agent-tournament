@@ -8,7 +8,7 @@
 
 **10-15 夜间：宝可梦和红警两项升级正在进行，交接见 [`docs/OVERNIGHT_1015.md`](OVERNIGHT_1015.md)（截止已改为 10-16 09:30 PDT）。**
 
-**10-16 凌晨：官方仓库加了王者荣耀 5v5 的接口约定（上游 686e756，SDK 没变）；04:12 PDT 已读到公开平台指南，但是否能建测试赛或正式赛还未验证。远端跟踪 `origin/main` 的 fb421a2 已包含独立规则型队伍 8f507fd；本地预检分支已将它与 `agent/hok/policy.py` 的强化版整合，尚未更新 main、推送或部署。预检仍有明确策略分歧，见 `docs/hok_integration_preflight_1016.md`；两个分支的开发记录都保留在 `docs/progress.md`，当前接口依据见 `GAMES.md`、`docs/platform/hok.md`。**
+**10-16 凌晨：官方仓库加了王者荣耀 5v5 的接口约定（上游 686e756，SDK 没变）；04:12 PDT 已读到公开平台指南，但是否能建测试赛或正式赛还未验证。远端跟踪 `origin/main` 的 fb421a2 已包含独立规则型队伍 8f507fd；本地预检分支已将它与 `agent/hok/policy.py` 的强化版整合，尚未更新 main、推送或部署。06:15 后父 agent 已明确三个策略选择，并加入独立进程/双重故障回归，当前验证见 `docs/hok_integration_preflight_1016.md`；两个分支的开发记录都保留在 `docs/progress.md`，当前接口依据见 `GAMES.md`、`docs/platform/hok.md`。**
 
 ## 0. 一页速览
 
