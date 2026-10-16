@@ -518,3 +518,12 @@ def test_camp_ownership_contradictions_do_not_authorize_opponent_seats():
     raw["simultaneous"]["your_pending_seats"] = ["9"]
     assert hok.safe_fallback_action(raw) is None
     assert hok.HokPolicy(clock=Clock()).decide(raw)[0] == "s0:macro_advance"  # real time: all own legal heroes
+
+
+def test_observation_seat_key_normalization_matches_owned_and_pending_ids():
+    raw = payload(seats=(0,), actions=entries(0))
+    raw["seats"] = [" 0 "]
+    raw["simultaneous"]["your_pending_seats"] = ["00"]
+    raw["observation"]["seats"] = {"00": {"summary": summary(hp=100)}}
+    assert hok.HokPolicy(clock=Clock()).decide(raw)[0] == "s0:macro_retreat"
+    assert hok.Team(raw, ["00", " 0 ", 9]).allies == {0: (0.0, 0.0)}

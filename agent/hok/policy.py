@@ -193,9 +193,15 @@ def pending_seats(raw: dict, offers: dict[int, Any]) -> list[int]:
 def summary_of(raw: dict, seat: int) -> dict:
     if not isinstance(raw, dict):
         return {}
+    seat = _seat(seat)
+    if seat is None:
+        return {}
     obs = raw.get("observation") if isinstance(raw.get("observation"), dict) else {}
     seats = obs.get("seats") if isinstance(obs.get("seats"), dict) else {}
-    entry = seats.get(str(seat)) or seats.get(seat) or {}
+    if str(seat) in seats:
+        entry = seats[str(seat)]
+    else:
+        entry = next((v for k, v in islice(seats.items(), 64) if _seat(k) == seat), {})
     summary = entry.get("summary") if isinstance(entry, dict) else None
     return summary if isinstance(summary, dict) else {}
 
@@ -277,6 +283,8 @@ class Team:
 
     def __init__(self, raw: dict, seats: list[int]) -> None:
         raw = raw if isinstance(raw, dict) else {}
+        requested = {_seat(s) for s in seats[:64]} if isinstance(seats, (list, tuple)) else set()
+        seats = sorted(requested.intersection(_seat_list(raw)))
         self.camp = _camp(raw.get("camp"))
         self.allies: dict[int, tuple[float, float]] = {}
         self.enemies: dict[Any, tuple[float, float]] = {}
