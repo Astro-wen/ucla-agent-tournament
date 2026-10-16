@@ -259,8 +259,10 @@ def rule_macro(summary: dict, macros: dict[str, str], team: Team | None = None, 
     if hp is not None and hp <= 0:
         return None
     can_retreat = "macro_retreat" in macros
+    if can_retreat and retreating and (share is None or share < HEALED):
+        return "macro_retreat"  # missing HP is not evidence of recovery
     if can_retreat and share is not None:
-        if share < LOW_HP or (retreating and share < HEALED):
+        if share < LOW_HP:
             return "macro_retreat"
         p = _pos(me)
         if team is not None and p is not None and share < HURT and (team.outnumbered(p) or team.under_tower(p)):
@@ -442,8 +444,8 @@ class HokPolicy:
         share = hp_share(me)
         if want == "macro_retreat" and share is not None and share < HURT:
             self._retreating.add(seat)
-        elif want is None or (share is not None and share >= HEALED):
-            self._retreating.discard(seat)                    # healed, or dead (revives at home with full HP)
+        elif (share is not None and share >= HEALED) or (_num(me.get("hp")) is not None and me["hp"] <= 0):
+            self._retreating.discard(seat)                    # positively observed recovery or death
 
     def on_result(self, result) -> None:
         if isinstance(result, dict) and result.get("error"):

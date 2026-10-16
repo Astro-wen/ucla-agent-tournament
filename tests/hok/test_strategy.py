@@ -157,6 +157,21 @@ def test_tactical_retreat_finishes_healing_instead_of_reentering_tower_boundary(
     assert policy.decide(raw)[0] == "s0:macro_advance"
 
 
+def test_missing_health_or_temporary_missing_macros_do_not_imply_recovery():
+    clock = Clock()
+    policy = hok.HokPolicy(clock=clock)
+    assert policy.decide(payload(seats=(0,), summaries={0: summary(hp=200)}))[0] == "s0:macro_retreat"
+    clock.now = 2
+    raw = payload(seats=(0,), standing={"0": "macro_retreat"})
+    raw["observation"]["seats"]["0"]["summary"] = {}
+    assert policy.decide(raw) == (None, None)
+    raw["legal_actions"]["actions"] = entries(0, macros=())
+    assert policy.decide(raw) == (None, None)
+    assert 0 in policy._retreating
+    raw["legal_actions"]["actions"] = entries(0)
+    assert policy.decide(raw) == (None, None)
+
+
 @pytest.mark.parametrize("target", ["enemy tower 4", "enemy crystal 8", "enemy structure 12"])
 def test_structure_basic_attack_precedes_unverified_skill_damage(target):
     raw = payload(seats=(0,), actions=entries(0, hok.MACROS, target=target, distance=3000))
