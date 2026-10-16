@@ -968,6 +968,11 @@ class PokemonPolicy:
                 guess = self._guess_opponent_lineup(mine, opp, opp_cards)
             except Exception:
                 log.debug("opponent lineup guess failed", exc_info=True)
+        if os.environ.get("ARENA_PREVIEW_KEEP_FIRST", "0") == "1" and self.cards:
+            # A/B switch (default off): always bring our first draft pick (the first species in the draft memory)
+            first = next(iter(self.cards))
+            if first in sids:
+                knobs = {**(knobs or {}), "keep": sids.index(first)}
         res = preview_matrix.choose(mine, my_cards, opp, opp_cards, seed_text=seed, opp_guess=guess, knobs=knobs)
         if res is None:
             return None

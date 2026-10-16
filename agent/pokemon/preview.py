@@ -1069,6 +1069,23 @@ def choose(my_views: list[dict], my_cards: list[dict | None], opp_views: list[di
         vals = [sum(p * A(r, c) for c, p in supp_c) for r in range(len(A.la))]
         i = max(range(len(vals)), key=lambda r: (vals[r], -r))
         j = R.index(i) if i in R else None
+    keep = kn.get("keep")
+    if keep is not None and keep not in lineups(len(ours))[i] and not deadline.passed():
+        # ARENA_PREVIEW_KEEP_FIRST: best response, among the lineups that bring roster index `keep`, to the column
+        # mix used above; rows already in the restricted game first (cached), anytime (stops at the deadline)
+        mix = supp_c if guess_col is not None else [(C[k], p) for k, p in enumerate(pc) if p > 1e-3]
+        cand = [r for r, t in enumerate(lineups(len(ours))) if keep in t]
+        cand.sort(key=lambda r: r not in R)
+        best = None
+        for r in cand:
+            if deadline.passed():
+                break
+            v = sum(p * A(r, c) for c, p in mix)
+            if best is None or v > best[0]:
+                best = (v, r)
+        if best is not None:
+            i = best[1]
+            j = R.index(i) if i in R else None
     lu = lineups(len(ours))[i]
     info = {"value": round(value, 3), "p": round(pr[j], 3) if j is not None else 0.0, "gap": round(gap, 3),
             "rounds": rounds, "guess": guess_col,
