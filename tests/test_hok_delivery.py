@@ -103,6 +103,18 @@ def test_hok_rules_work_without_site_packages_or_credentials(mode):
     assert json.loads(result.stdout) == "s0:macro_advance"
 
 
+@pytest.mark.parametrize("game_type", ["honor_of_kings_5v5", "Honor of Kings", "honor-of-kings", "HOK_5V5"])
+@pytest.mark.parametrize("source", ["context", "state", "raw"])
+def test_explicit_hok_names_are_recognized_without_a_hok_shaped_state(game_type, source):
+    # A fix for the negative route tests must keep name-based recognition working
+    # even when the current state has no legal actions (e.g. a dead/idle team).
+    state = SimpleNamespace(raw={}, game_name=game_type if source == "state" else None)
+    context = SimpleNamespace(game_type=game_type if source == "context" else None)
+    if source == "raw":
+        state.raw["game_type"] = game_type
+    assert _is_hok(state, context)
+
+
 @pytest.mark.parametrize("game_type", ["red_alert", "pokemon_vgc_doubles_draft", "werewolf", "other_realtime_game"])
 @pytest.mark.parametrize("source", ["context", "state", "raw"])
 def test_an_explicit_other_game_type_cannot_be_overridden_by_hok_action_shape(game_type, source):
