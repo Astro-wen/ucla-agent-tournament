@@ -140,7 +140,7 @@ def test_objective_and_combat_are_distinct_and_use_labelled_current_targets():
     assert opponents.make_bot("objective_rusher").decide(raw)[0] == "s0:macro_advance"
     assert opponents.make_bot("opportunistic_combat").decide(raw)[0] == "s0:macro_skill3"
     raw = view((0,), target="enemy crystal 99")
-    assert opponents.make_bot("objective_rusher").decide(raw)[0] == "s0:macro_skill3"
+    assert opponents.make_bot("objective_rusher").decide(raw)[0] == "s0:macro_attack"
     raw = view((0,), target="enemy hero 42", distance=50000)
     assert opponents.make_bot("opportunistic_combat").decide(raw)[0] == "s0:macro_advance"
     raw = view((0,), target="friendly hero 42")
@@ -241,3 +241,43 @@ def test_factory_validation_aliases_and_import_independence():
         elif isinstance(node, ast.ImportFrom):
             imported.append(node.module)
     assert not any(module.split(".")[0] in {"agent", "champion", "altruagent", "local"} for module in imported)
+
+
+@pytest.mark.parametrize("name", opponents.BOT_NAMES)
+def test_many_sparse_changing_offers_always_select_current_pending_seat(name):
+    """A synthetic input/legality check, not a simulator or win-rate sample."""
+    generator = random.Random(256)
+    bot = opponents.make_bot(name, seed=51)
+    for _ in range(160):
+        raw = view()
+        actions = []
+        for seat in range(5):
+            menu = [*MACROS, "button_0", "macro_future"]
+            generator.shuffle(menu)
+            actions.extend(offer(seat, base) for base in menu[:generator.randrange(1, len(menu) + 1)])
+        generator.shuffle(actions)
+        raw["legal_actions"]["actions"] = actions
+        pending = generator.sample(range(5), generator.randrange(6))
+        raw["simultaneous"] = {"your_pending_seats": pending}
+        action, _ = bot.decide(raw)
+        if not pending:
+            assert action is None
+        else:
+            assert action in {item["action_id"] for item in actions}
+            assert int(action.split(":")[0][1:]) in pending
+        bot.on_result({"error": "synthetic refusal"} if generator.random() < 0.1 else {})
+
+
+@pytest.mark.parametrize("name", opponents.BOT_NAMES)
+def test_unusual_observation_values_and_unknown_labels_do_not_crash(name):
+    raw = view()
+    for entry in raw["observation"]["seats"].values():
+        entry["summary"] = {
+            "my_hero": {"hp": float("nan"), "max_hp": 10**1000, "x": True, "z": float("inf"), "camp": []},
+            "other_heroes": [None, 3, {"visible": True, "x": 1, "z": 2, "camp": [1], "runtime_id": []}],
+            "structures": [None, {"camp": [], "hp": 100, "x": 1, "z": 2, "type": {}}],
+        }
+    for action in raw["legal_actions"]["actions"]:
+        action["label"] = {"unexpected": "object"}
+    assert opponents.make_bot(name, seed=2).decide(raw)[0] in {
+        action["action_id"] for action in raw["legal_actions"]["actions"]}

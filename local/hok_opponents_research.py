@@ -28,6 +28,10 @@ Stress cases (functional coverage, NOT evidence of competitive strength):
 * split_pressure: seeded heterogeneous roles (two rushers, two fighters, one
   defender) across the five seats, exercising simultaneous different orders.
 
+If an idle is absent, idle's safety fallback is the first usable current offer;
+random samples only macros when idle is absent. If neither exists, every bot
+falls back to a usable raw button. No fabricated button_0 is ever submitted.
+
 Seeded bots use a private random.Random, never process-global randomness. The
 five non-random baselines intentionally ignore the seed for action selection.
 All thresholds below are unvalidated research heuristics, NOT engine mechanics.
@@ -67,6 +71,7 @@ _CONTACT = 8000.0
 _NEIGHBOURHOOD = 12000.0
 _GUARD_RADIUS = 16000.0
 _SKILLS_AND_ATTACK = ("macro_skill3", "macro_skill2", "macro_skill1", "macro_attack")
+_STRUCTURE_ACTIONS = ("macro_attack", "macro_skill1", "macro_skill2", "macro_skill3")
 
 
 @dataclass(frozen=True)
@@ -179,6 +184,9 @@ def _target(choice: _Choice) -> tuple[str, float]:
 
 def _combat(choices: list[_Choice], *, structures_only: bool = False) -> _Choice | None:
     candidates: list[tuple[int, int, float, int, _Choice]] = []
+    # For objectives prefer the ordinary attack: ability damage to structures is
+    # not documented, so do not assume an ultimate is a better siege action.
+    ordering = _STRUCTURE_ACTIONS if structures_only else _SKILLS_AND_ATTACK
     for index, choice in enumerate(choices):
         if choice.base not in _SKILLS_AND_ATTACK:
             continue
@@ -190,7 +198,7 @@ def _combat(choices: list[_Choice], *, structures_only: bool = False) -> _Choice
             continue
         # Labels, not access to enemy objects or simulator targeting internals.
         priority = 0 if "hero" in target else 1
-        candidates.append((priority, _SKILLS_AND_ATTACK.index(choice.base), distance, index, choice))
+        candidates.append((priority, ordering.index(choice.base), distance, index, choice))
     return min(candidates, key=lambda item: item[:4])[-1] if candidates else None
 
 
