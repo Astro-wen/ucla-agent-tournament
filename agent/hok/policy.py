@@ -55,6 +55,7 @@ RETRY_S = 0.4          # give a refused macro two nominal steps before reconside
 MAX_BYPASS = 4         # a continuously waiting hero gets priority after four other dispatches
 MAX_LABEL = 512        # labels and identifiers are untrusted metadata, not arbitrary-length instructions
 MAX_ACTIONS = 1024
+RESOLVED_MACRO_INPUTS = True  # False restores rejection of macros carrying legal_* metadata
 MAX_ACTORS = 256
 
 _SEAT_ID = re.compile(r"^s([0-9]):([^:\s]+)$")
@@ -124,7 +125,10 @@ def offers_by_seat(actions: list[dict]) -> dict[int, dict[str, Any]]:
             continue
         if base in MACROS and isinstance(act, dict) \
                 and any(isinstance(k, str) and k.startswith("legal_") for k in act):
-            continue  # macros are complete offers; a contradictory raw template is not a safe macro ID
+            # Real openings ca125797 / 60772282 attach legal_move to an already-filled
+            # movement macro. Its listed ID remains the standing-order command.
+            if not RESOLVED_MACRO_INPUTS or not _resolved_macro_input(act):
+                continue
         entry = out.setdefault(seat, {"macros": {}, "ids": {}, "raw": []})
         if base in MACROS:
             entry["macros"][base] = a["label"][:MAX_LABEL] if isinstance(a.get("label"), str) else base
@@ -132,6 +136,26 @@ def offers_by_seat(actions: list[dict]) -> dict[int, dict[str, Any]]:
         else:
             entry["raw"].append(a)
     return out
+
+
+def _resolved_macro_input(act: dict) -> bool:
+    """Accept domain metadata only when every corresponding value is already legal.
+
+    Never fill a macro template or send its raw expansion: the offered macro ID
+    is what establishes a persistent order. Bound and validate untrusted domains.
+    """
+    for key, domain in act.items():
+        if not isinstance(key, str) or not key.startswith("legal_"):
+            continue
+        field = key[6:]
+        if not field or field in ("seat", "macro") or field.startswith("legal_"):
+            return False
+        value = act.get(field)
+        if not _wire_scalar(value) or value is None or not isinstance(domain, list) or not 0 < len(domain) <= 256:
+            return False
+        if not any(type(value) is type(item) and _wire_scalar(item) and value == item for item in domain):
+            return False
+    return True
 
 
 def is_hok_shape(actions: list[dict]) -> bool:
