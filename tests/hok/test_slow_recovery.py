@@ -253,3 +253,51 @@ def test_eligible_recovery_uses_same_threshold_when_refused_attack_is_reconsider
     before = deepcopy(raw)
     assert policy.decide(raw)[0] == "s0:macro_advance"
     assert raw == before
+
+
+@pytest.mark.parametrize("offers", ["hero", "teammate", "none"])
+@pytest.mark.parametrize("invalid", ["outside", "missing_hp", "unconfirmed"])
+def test_existing_recovery_clock_is_invalidated_even_when_hero_cannot_act(offers, invalid):
+    policy, clock = begin_recovery()
+    clock.now = 20
+    raw = recovery_view(radius=20000 if invalid == "outside" else 2000,
+                        standing=None if invalid == "unconfirmed" else "macro_retreat")
+    if invalid == "missing_hp":
+        del raw["observation"]["seats"]["0"]["summary"]["my_hero"]["hp"]
+    if offers != "hero":
+        raw["legal_actions"]["actions"] = []
+    if offers == "teammate":
+        raw["seats"].append(1)
+        raw["observation"]["seats"]["1"] = {"summary": summary(1)}
+        raw["simultaneous"]["standing_orders"]["1"] = "macro_advance"
+        raw["legal_actions"]["actions"] = entries(1)
+    policy.decide(raw)
+    assert 0 not in policy._healing_since
+    clock.now = 30
+    assert policy.decide(recovery_view()) == (None, None)
+    assert policy._healing_since[0] == 30
+    clock.now = 59.999
+    assert policy.decide(recovery_view()) == (None, None)
+    clock.now = 60
+    assert policy.decide(recovery_view())[0] == "s0:macro_advance"
+
+
+@pytest.mark.parametrize("teammate_offered", [False, True])
+def test_no_new_recovery_clock_is_started_for_unavailable_hero(teammate_offered):
+    policy, clock = begin_recovery(radius=20000)
+    assert 0 not in policy._healing_since
+    clock.now = 60
+    raw = recovery_view()
+    raw["legal_actions"]["actions"] = []
+    if teammate_offered:
+        raw["seats"].append(1)
+        raw["observation"]["seats"]["1"] = {"summary": summary(1)}
+        raw["simultaneous"]["standing_orders"]["1"] = "macro_advance"
+        raw["legal_actions"]["actions"] = entries(1)
+    assert policy.decide(raw) == (None, None)
+    assert 0 not in policy._healing_since
+    clock.now = 90
+    assert policy.decide(recovery_view()) == (None, None)
+    assert policy._healing_since[0] == 90
+    clock.now = 120
+    assert policy.decide(recovery_view())[0] == "s0:macro_advance"

@@ -527,14 +527,20 @@ class HokPolicy:
             return None, None
         owned = _seat_list(raw)
         self._observe_life(raw, owned)                       # death may be visible even with no legal offers
+        now = self._clock()
+        snapshot = _standing_snapshot(raw)
+        # A temporarily unavailable hero can still visibly leave home or lose
+        # confirmation. Invalidate existing clocks before the no-offers return;
+        # only heroes considered below may start a new recovery clock.
+        for seat in tuple(self._healing_since):
+            if seat in owned:
+                self._recovery_threshold(seat, summary_of(raw, seat), snapshot, now)
         offers = offers_by_seat(_actions(raw))
         offers = {seat: entry for seat, entry in offers.items() if seat in owned}
         if not offers:
             return None, None
         rt = realtime(raw)
-        snapshot = _standing_snapshot(raw)
         team = Team(raw, sorted(set(offers) | set(owned)))
-        now = self._clock()
         version = _small_int(raw.get("state_version"), 0, 2 ** 63 - 1)
         pending = pending_seats(raw, offers)
         candidates: dict[int, tuple[str | None, Any, bool]] = {}
