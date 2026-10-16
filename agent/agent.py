@@ -116,8 +116,7 @@ def ra_enabled(env=None) -> bool:
 
 
 def hok_enabled(env=None) -> bool:
-    return str((os.environ if env is None else env).get(HOK_ENV, "on")).strip().lower() not in ("0", "off", "false",
-                                                                                                  "no")
+    return str((os.environ if env is None else env).get(HOK_ENV) or "on").strip().lower() not in _OFF
 
 
 def listen_enabled(env=None) -> bool:
@@ -272,7 +271,10 @@ class Contestant:
         self._ra = None                               # this match's RedAlertPolicy (agent/redalert), made lazily
         self.hok_on = hok_enabled()                   # ARENA_HOK: the Honor of Kings rules play (else as before)
         self._hok = None                              # this match's HokPolicy (agent/hok), made lazily
-        self._hok_recorded = 0.0                      # when a Honor of Kings view was last recorded
+        self._hok_recorded: float | None = None       # wall-clock fallback when no game step is available
+        self._hok_record_version: int | None = None
+        self._hok_record_faults: set[str] = set()
+        self._hok_refused_record = False
 
     # ---- moves -----------------------------------------------------------
     def choose_action(self, state: GameState, context: DecisionContext):
@@ -400,10 +402,11 @@ class Contestant:
         well under a millisecond). States are recorded sparsely (the first view, then about one every 10 s). Never
         raises."""
         t0 = time.monotonic()
-        raw = _raw_with_legal(state)
+        raw = {}
         rt = _realtime(state)
         out, text = None, None
         try:
+            raw = _raw_with_legal(state)
             self._bind(state, context, "", "honor_of_kings_5v5")
             if self._hok is None:
                 from .hok import HokPolicy
@@ -424,14 +427,45 @@ class Contestant:
             self._path = "hok-fallback"
             self.fallbacks += 1
         if out is None:
-            out = WAIT if rt else safe_action(state, raw)
+            if rt:
+                out = WAIT
+            else:
+                try:
+                    from .hok import safe_fallback_action
+                    out = safe_fallback_action(raw)
+                except Exception:
+                    log.exception("honor_of_kings fallback failed; using the runner-safe fallback")
+                    out = None
+                if out is None:
+                    # An active lockstep state must offer a playable pending action. Preserve the generic last
+                    # resort for an inconsistent server response; never invent HoK coordinates or a hero's order.
+                    out = safe_action(state, raw)
         self.last_decision = {"kind": "realtime" if rt else "lockstep", "budget": 0.0, "source": "hok",
                               "path": self._path, "ms": round(1000 * (time.monotonic() - t0), 2)}
         self.last_reasoning = text
         now = time.monotonic()
-        if self._hok_recorded == 0.0 or now - self._hok_recorded >= 10.0:
+        version = raw.get("state_version") if isinstance(raw, dict) else None
+        if type(version) is int:
+            version = version if version >= 0 else None
+        elif isinstance(version, str) and re.fullmatch(r"[0-9]{1,12}", version):
+            version = int(version)
+        else:
+            version = None
+        periodic = (self._hok_record_version is None or version - self._hok_record_version >= 50) \
+            if version is not None else self._hok_recorded is None or now - self._hok_recorded >= 10.0
+        fault = "exception" if self._path == "hok-fallback" else "refused" if self._hok_refused_record else None
+        if periodic or (fault is not None and fault not in self._hok_record_faults):
             self._hok_recorded = now
-            record("action", context, state, out, text, extra={"decision": self.last_decision})
+            if version is not None:
+                self._hok_record_version = version
+            if fault is not None:
+                self._hok_record_faults.add(fault)
+            action = out.action if isinstance(out, WithReasoning) else out
+            extra = {"decision": self.last_decision}
+            if fault is not None:
+                extra["hok_fault"] = fault
+            record("action", context, state, action, text, extra=extra)
+        self._hok_refused_record = False
         return out
 
     def _choose_action(self, state: GameState, context: DecisionContext, game: str, dl, family: str = ""):
@@ -919,7 +953,9 @@ class Contestant:
         self._last_raw = None
         self.resumed, self._summarized = None, False
         self._ra = None
-        self._hok, self._hok_recorded = None, 0.0
+        self._hok, self._hok_recorded, self._hok_record_version = None, None, None
+        self._hok_record_faults = set()
+        self._hok_refused_record = False
 
     def _export(self, family: str, raw) -> dict:
         chat = {"day": None if self._chat_day is _UNSET else self._chat_day, "has_day": self._chat_day is not _UNSET,
@@ -998,8 +1034,11 @@ class Contestant:
             if self._ra is not None and self._game == "red_alert":
                 self._ra.on_result(result)
                 return
-            if self._hok is not None and self._game == "honor_of_kings_5v5":
-                self._hok.on_result(result)
+            if self._game == "honor_of_kings_5v5":
+                if isinstance(result, dict) and result.get("error"):
+                    self._hok_refused_record = True
+                if self._hok is not None:
+                    self._hok.on_result(result)
                 return
         except Exception:
             log.debug("on_action_result failed", exc_info=True)
@@ -1186,25 +1225,22 @@ def _is_red_alert(state, context) -> bool:
         return False
 
 
-_HOK_NAMES = {"honor_of_kings_5v5", "honor_of_kings", "honorofkings", "hok", "hok_5v5", "hok5v5", "honor_of_kings_1v1",
-              "honor_of_kings_3v3", "hok_1v1", "hok_3v3", "wangzherongyao", "王者荣耀"}
+_HOK_NAMES = {"honor_of_kings_5v5", "honor_of_kings", "honour_of_kings_5v5", "honour_of_kings",
+              "honorofkings", "hok", "hok_5v5", "hok5v5", "wangzherongyao", "王者荣耀"}
 
 
 def _is_hok(state, context) -> bool:
-    """A Honor of Kings decision: its game type says so (any spelling: "honor_of_kings_5v5", "Honor of Kings", "hok"),
-    or, with no known game type, legal actions shaped like Honor of Kings' (every one seat-tagged: `s3:macro_attack`,
-    `s3:button_0`). Pokemon, Werewolf and Red Alert never match. Never raises."""
+    """Only explicitly identified HoK game types enter this policy; a similar action shape is not a game identity."""
     try:
         raw = getattr(state, "raw", None)
         raw = raw if isinstance(raw, dict) else {}
         for name in (getattr(context, "game_type", None), getattr(state, "game_name", None), raw.get("game_type")):
             g = re.sub(r"[\s-]+", "_", str(name or "").strip().lower())
-            if g in _HOK_NAMES or g.startswith(("honor_of_kings", "honour_of_kings")):
+            if g in _HOK_NAMES:
                 return True
             if g and g not in ("unknown", "none"):
                 return False
-        from .hok import is_hok_shape
-        return is_hok_shape((_raw_with_legal(state).get("legal_actions") or {}).get("actions") or [])
+        return False
     except Exception:
         return False
 

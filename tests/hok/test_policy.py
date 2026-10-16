@@ -53,8 +53,13 @@ def _entries(seat, macros=("macro_advance", "macro_retreat", "macro_attack"), ne
            {"action_id": f"s{seat}:button_2", "label": f"[seat {seat}] Move",
             "input": {"action": {"which_button": 2, "legal_move_x": [4, 5], "legal_move_z": [7], "seat": seat}}}]
     for macro in macros:
+        # The published platform guide offers basic attack only when a target is in range. Keep the original
+        # far-target advance expectations with a physically consistent offer, rather than asserting against
+        # an already-authorized attack because of a guessed distance threshold.
+        if macro == "macro_attack" and near > 9000:
+            continue
         out.append({"action_id": f"s{seat}:{macro}", "label": f"[seat {seat}] {macro} (nearest: {what}, {near} away)",
-                    "input": {"action": {"which_button": 3, "seat": seat}}})
+                    "input": {"action": {"macro": macro, "seat": seat}}})
     return out
 
 
@@ -83,12 +88,14 @@ def _unwrap(decision):
 # -- the rules for one hero ----------------------------------------------------------------------------------------
 
 
-def test_rules_retreat_fight_in_range_else_push():
+def test_rules_retreat_use_offered_attacks_else_push():
     m = {"macro_advance": "a", "macro_retreat": "r", "macro_attack": "x (nearest: minion 3, 4000 away)"}
     assert hok.rule_macro(_summary(0, hp=500), m) == "macro_retreat"
     assert hok.rule_macro(_summary(0), m) == "macro_attack"
     assert hok.rule_macro(_summary(0), {**m, "macro_skill2": "s (nearest: minion 3, 3000 away)"}) == "macro_skill2"
-    assert hok.rule_macro(_summary(0), {**m, "macro_attack": "x (nearest: y, 20000 away)"}) == "macro_advance"
+    # The live guide makes attack availability authoritative; a display label is not a universal range rule.
+    assert hok.rule_macro(_summary(0), {**m, "macro_attack": "x (nearest: y, 20000 away)"}) == "macro_attack"
+    assert hok.rule_macro(_summary(0), {k: v for k, v in m.items() if k != "macro_attack"}) == "macro_advance"
     assert hok.rule_macro(_summary(0), {}) is None                     # a dead hero has no macros
 
 
@@ -209,7 +216,7 @@ def test_lockstep_dead_hero_plays_the_do_nothing_button():
 
 def test_the_switch():
     assert hok_enabled({}) and hok_enabled({"ARENA_HOK": "on"})
-    for off in ("off", "0", "false", "no", " OFF "):
+    for off in ("off", "0", "false", "no", " OFF ", "none", "disable", "disabled", "wait"):
         assert not hok_enabled({"ARENA_HOK": off})
 
 
@@ -218,7 +225,7 @@ def test_which_states_count_as_hok():
     st = hok_state()
     for g in ("honor_of_kings_5v5", "Honor of Kings", "honor-of-kings", "hok", "HOK_5V5"):
         assert _is_hok(st, ctx(g))
-    assert _is_hok(hok_state(game_type=None), ctx(None))                # no game type: the state's shape says so
+    assert not _is_hok(hok_state(game_type=None), ctx(None))            # unknown games keep their original route
     assert not _is_red_alert(st, ctx("honor_of_kings_5v5"))
     for g in ("red_alert", "werewolf", "pokemon_vgc_doubles_draft"):
         assert not _is_hok(st, ctx(g))
