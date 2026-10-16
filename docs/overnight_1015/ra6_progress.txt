@@ -1,0 +1,67 @@
+v4.9 candidate (RA vs Tom_2026 fast-tank builds) - branch ra/tom-1015 in ~/wt/ra6 (from main 867ec65 = v4.7 + anchor2).
+Report by 04:30 PDT 10-16. Tooling: ~/r6 -> this scratchpad (copied from ra5, paths rewritten). Out ~/wt/_ra6_out,
+snapshots ~/wt/_ra6_snap.
+
+- 19:18 start. Read docs (design 15-19, progress v4.8), ra5 progress + tooling. Worktree ~/wt/ra6 created.
+- 19:20-19:30 (session 2) recordings (bt.py = our build order/spend, en.py = distinct enemy ids seen, tl2.py):
+  OUR build in EVERY recent real game (early_army=1 in all 10-13..10-15 summaries): 2 towers (ftur/pbox, 1200) at
+  90-135 s, 12-13 rifles by 93 s, cash 0 from ~100 s, weap 155-184 s, fix 195-235 s, first tank 246-306 s, 2nd weap
+  ~300-390, harv 2 until ~200 s (harv_180=2 everywhere), 4 by 240; low_power_s 55 / 37 in 335d2a62 / 21bf0e2a.
+  TOM (distinct ids seen, lower bounds): 21bf0e2a first contact 284 s 3 2tnk + 12 e1 + 2 e3 + jeep AT OUR BASE (we had
+  17 e1 2 e3 + 2 ftur, no tank); by 422 s 7 2tnk 31 e1 5 e3 3 jeep; his base at 7:00: 2 proc, 2 tent, 1 weap, fix,
+  dome, 2 powr, 4 harv (no towers). 335d2a62: 2 3tnk+3 e1 at 307, 3 3tnk 13 e1 2 e3 ftrk at 400. edf99e95: 2 3tnk
+  6 e1 at 296; 6 3tnk 16 e1 by 440. => same income class as ours; he spends it on weap+fix+tanks+2 barracks, we on
+  towers / extra rifles / a 2nd weap while broke. NOTE 2tnk/3tnk need fix (config prerequisites).
+- tom2 bot written (local/ra_bots_strong.py Tom2). v1: no fix -> 1tnk only; v2 fix after weap: sim tom2 2tnk at
+  240 s, ore floats ~3000 at 240-300 s, its 271-s attack (2 tanks 18 e1 4 e3) dies to our 26 rifles + 2 ftur in sim.
+  League V47_t2a_tom2 (60 g, seed 1601, snapshot t2a) running to measure.
+- tom2 calibration (60 g each, dev seed 1601, v4.7 = main): t2a post 25% 37/60 (trapped 8/20); t2b home post 45/60
+  (trapped 9/20; early_army fires as in reality); t2c weap-before-proc2 55/60 (weaker, dropped); final t2d: tom2 (home)
+  24/30, tom2p (post 25%) 21/30, trapped 8/20. Commit 51854bb. Loss modes (lossmode.py): 4/15 our 3x-rule wave at
+  271-297 s (17 units ~3k vs 'strength ~1000' = decayed early sighting) into the home army; 11/15 their push at 260-330
+  s beats our 3.5-5.6k army (as in reality). Our sim side floats 1800-2600 cash at 2:00-2:30 (Building queue is the
+  bottleneck before weap) and ~1-2k at 4:00-4:45.
+- switches (commit f3b7fe0, tests 7 pass): open_fast, pre_weap_float, weap2_s/weap2_cash, ea_lazy, no3x_early,
+  prior_hold. Snapshot c1 = these (all off = main). dev6.sh <tag> <set> <cfg..> (sets t2 / t2b / t2c / core / core2).
+  19:49 queues: q_t2 (OFF F P W L N on t2), q_core (OFF F P W L on core). node_modules symlinks added (untracked).
+- 19:58 dev t2 1601 (c1): OFF tom2 24/30 tom2p 21/30. F (open_fast) 15/60 vs 45/60: -50pp (1 better / 31 worse) ->
+  DROPPED (added F to ~/wt/_ra6_out/SKIP). Machine shared with a Pokemon session (pk1015 panels + draft_sim): ~5 min
+  per 60-game league. recall7.py (real recordings, configs) cannot judge build-order switches (it sees the real state).
+- 20:15 dev t2 1601 vs OFF (60 g): P pre_weap_float 1500: -3.3 (2/4); W weap2_s 200: -23.3 (0/14, p .0001) -> dropped;
+  L ea_lazy: 0 (0/0, 55 identical: the towers just come later as safety towers). OFF core baseline (c1): nash 28/30,
+  nb 50/60 (nashball 20/30), pro 29/30, strong 60/60, main 48/48, tom 28/30. fight.py trace 1601031 trapped: tom2p
+  ball (18 e1 6 e3 1-2 3tnk ~4.5-6k) vs our 24 (19 e1 3 2tnk 2 e3 ~5k) at the rally: lost 5000 for 1150 (sim: rifles +
+  rockets beat tanks + rifles). Added hold_home (meet an early push by the towers; c2) and split_gate (split_fire only
+  vs infantry-heavy armies; c3). Queues: q_t2d (D hold_home), q_t2s (S split, SG split + tank_share .35 on c2).
+  FINAL fresh seeds reserved: 1651-1669 (not in docs).
+- 20:30 more dev t2 1601 vs OFF: N no3x_early +1.7 (1/0, 56 identical); D hold_home -10 (0/6, p .03) dropped;
+  S split_fire -3.3 (1/3); SGA split + split_gate .4: same flips as S (gate never closes vs tom2: tanks < 40%).
+  OFF c3 nash = OFF c1 nash 30/30 identical. inc.py: trapped income ~25% lower for BOTH sides (11.5k by 290 s vs
+  15.5-16.5k sidestep); snapat.py: we float ~2600 at 150 s (sim limit = production capacity: Building queue serial,
+  1 barracks), real games are cash-limited (cash 0 from 100 s) -> sim cannot judge tower/rifle spending.
+  Added rally_step param (c4). WARNING: never edit a running dev6.sh (bash reads by offset: queues ran junk after
+  their loop) -> dev7.sh copy for new queues; kq.sh <pattern> kills a queue's process group.
+  Queues: q_rally (R5/R11 t2), q_comb (C = N+H+L core), q_comb2 (C t2), rc (recall7 real recordings -> rc.out).
+- 20:40 R5 (rally_step 5, army gathers at path cell 5 = the guard point instead of 8) vs tom2 1601: +10.0pp (7/1,
+  p .07), trapped +25 (5/0) -> PROMISING. L on core (c1, 288 g): -1.0 (1/4; rusher 1 loss). Recall7 on 37 real
+  recordings (rc.out): N changes 4 (delays/removes WINNING early waves in 656fe845 / e310c9e1: evidence against N);
+  H changes 3: f1cd3ba4 917-s wave gone (the intended fix), 27a6fc3d / bdf39afe first late wave +10 / +42 s (wins).
+  BUG found: split_gate default was int 0 -> env 0.4 parsed as 0 (SGA runs == S): fixed to 0.0 (c5); SGA in SKIP.
+  S on nash1603: -10 (0/3). Commit 08ada0d. Queues: q_r5core (R5 core), q_r5b (OFF R5 R4 R6 on t2b 1602),
+  q_sgb (SGB fixed gate nash), q_comb/q_comb2 (C), q_sgt (OFF/S tomx), q_rally (R11).
+- 20:50 R5 on nb1604: nashball 20/30 -> 28/30 (+26.7, 8/0, p .008), riffo 30/30 =, nash1603 -3.3 (0/1). fight.py
+  1601031 with R5: army waits at (61,67) by the 2 pbox, the same tom2p ball: K 6000 / D 3050 (rally 8: 1150 / 5000),
+  game won. R11 vs tom2: -3.3 (4/6). C (N+H+L) t2: +1.7 (1/0). SGB (split + gate .4 fixed) nash1603: 26/30 identical,
+  0/0 (the gate protects nash; S alone 0/3). Placement: platform falls back to auto-placement when 'at' is blocked
+  (docs/platform/redalert.md place row), so units at the rally cannot make placement fail.
+  final7.sh written (fresh seeds 1651-1666, parts A / B, base = same snapshot with RALLY_STEP=0 PRIOR_HOLD=0).
+- 20:58 DEV RESULTS R5 (rally_step 5): t2 1601 +10 (7/1, p .07); t2b 1602 +20 (12/0, p .0005; OFF there 36/60);
+  core 228 g +2.6 (8/2): nashball +26.7 (8/0), nash -3.3 (0/1), pro(strong) 0/1, rest identical results.
+  H (prior_hold) core partial: nash 0/0, nb 0/0. SGB tom1608 0/1 (split stays off). hold_home removed (bed33b4).
+  CANDIDATE d4e46b5: defaults rally_step=5, prior_hold=1 (off set ARENA_RA_RALLY_STEP=0 ARENA_RA_PRIOR_HOLD=0 = v4.8;
+  test: same orders as explicit rally 8). tests/redalert 88 passed. Snapshot fin = d4e46b5.
+- 21:00 FINAL started: final7.sh fin A / B (queues finA / finB, JOBS 6 each), fresh seeds 1651-1666; base arm fb_*,
+  candidate fin_*. Next: identity check (main snapshot vs fb on nash/main/strong), gate (gate6.sh / ra_e2e6.sh).
+- 21:01 GATE started on d4e46b5 (gate6.sh fixed: BASE 867ec65, ra_e2e6.sh) -> ~/wt/_ra6_gate, log _ra6_out/gate.out.
+  Worktree must not change until the bundle step is done: docs drafted in scratchpad sec20_draft.md / prog_draft.md.
+  ident7.sh (main snapshot on nash_1655 / main_1658 / strong_1657 -> m_*), fsum.sh = final summary.

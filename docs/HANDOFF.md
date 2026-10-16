@@ -6,6 +6,8 @@
 
 ---
 
+**10-15 夜间：宝可梦和红警两项升级正在进行，交接见 [`docs/OVERNIGHT_1015.md`](OVERNIGHT_1015.md)（截止已改为 10-16 09:30 PDT）。**
+
 ## 0. 一页速览
 
 - **我们在做什么**：参加 UCLA Trustworthy AI Lab × SAIR 主办的 **AI Agent Gaming Tournament**（AltruAgent 平台）。我们的参赛作品是一个**自托管（Self Hosted）的 event agent**，平台上显示名 **"Yuriko Red"**，用同一个程序打三个游戏：**宝可梦 VGC 双打选秀、狼人杀、红警**。
