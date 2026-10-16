@@ -16,9 +16,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "publish_sync.sh"
 needs_git = pytest.mark.skipif(
-    not sys.platform.startswith("linux") or shutil.which("bash") is None or shutil.which("git") is None
-    or shutil.which("realpath") is None or not (ROOT / ".git").exists(),
-    reason="publish_sync.sh exports from this git checkout (Linux, bash, git)")
+    not sys.platform.startswith(("linux", "darwin")) or shutil.which("bash") is None or shutil.which("git") is None
+    or not (ROOT / ".git").exists(),
+    reason="publish_sync.sh exports from this git checkout (Linux/macOS, bash, git, Python)")
 needs_listing = pytest.mark.skipif(
     shutil.which("bash") is None or shutil.which("git") is None,
     reason="read-only export listing needs bash and git (no Linux deployment tools)")
@@ -149,6 +149,118 @@ def test_optional_license_is_not_exempt_from_the_secret_scan(readme_history, tmp
     assert result.returncode == 3, result.stdout + result.stderr
     assert "KEY       LICENSE:1" in result.stdout and "NOT READY" in result.stdout
     assert fake_key not in result.stdout + result.stderr
+
+
+@needs_git
+@pytest.mark.parametrize("kind", ["relative", "missing", "dots", "symlink", "dangling", "symlink-parent", "spaces"])
+def test_output_canonicalization_preserves_safe_destinations(readme_history, tmp_path, kind):
+    root, _, commit = readme_history
+    destination = tmp_path / "destination"
+    destination.mkdir()
+    expected = destination / "export"
+    if kind == "relative":
+        supplied = "../destination/export"
+    elif kind == "missing":
+        expected = destination / "not-created" / "export"
+        supplied = str(expected)
+    elif kind == "dots":
+        supplied = str(destination / "not-created" / ".." / "export")
+    elif kind == "spaces":
+        expected = destination / "with spaces" / "export"
+        supplied = str(expected)
+    else:
+        link = tmp_path / "alias"
+        if kind == "symlink":
+            link.symlink_to(destination, target_is_directory=True)
+            supplied = str(link / "export")
+        elif kind == "dangling":
+            link.symlink_to(destination / "not-created", target_is_directory=True)
+            expected = destination / "not-created" / "export"
+            supplied = str(link / "export")
+        else:
+            (destination / "nested").mkdir()
+            link.symlink_to(destination / "nested", target_is_directory=True)
+            supplied = str(link / ".." / "export")
+    # Where GNU realpath is installed, require agreement with the former implementation.
+    if sys.platform.startswith("linux") and shutil.which("realpath"):
+        former = subprocess.run(["realpath", "-m", "--", supplied], cwd=root, capture_output=True, text=True,
+                                check=True).stdout.strip()
+        assert former == str(expected)
+    result = subprocess.run(
+        ["bash", str(root / "scripts/publish_sync.sh"), "--commit", commit, "--out", supplied, "--no-verify"],
+        cwd=root, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"into {expected}:" in result.stdout
+    assert (expected / "README.md").read_text(encoding="utf-8") == git("show", f"{commit}:README.md", cwd=root)
+
+
+@needs_git
+@pytest.mark.parametrize("kind", ["source", "inside", "ancestor", "source-alias", "dangling-inside",
+                                 "symlink-parent", "home-alias"])
+def test_output_guards_resolve_aliases_before_any_replacement(readme_history, tmp_path, kind):
+    root, _, commit = readme_history
+    home = tmp_path / "home"
+    home.mkdir()
+    sentinel = home / "keep.txt"
+    sentinel.write_text("keep home intact\n", encoding="utf-8")
+    if kind == "source":
+        supplied = "."
+    elif kind == "inside":
+        supplied = "agent/../not-created/export"
+    elif kind == "ancestor":
+        supplied = ".."
+    else:
+        link = tmp_path / "alias"
+        target = home if kind == "home-alias" else root
+        if kind == "dangling-inside":
+            target = root / "not-created"
+        elif kind == "symlink-parent":
+            target = root / "agent"
+        link.symlink_to(target, target_is_directory=True)
+        supplied = str(link / ".." / "not-created") if kind == "symlink-parent" else str(link)
+    before = git("status", "--porcelain", cwd=root)
+    result = subprocess.run(
+        ["bash", str(root / "scripts/publish_sync.sh"), "--commit", commit, "--out", supplied,
+         "--no-verify", "--replace"],
+        cwd=root, env=dict(os.environ, HOME=str(home)), capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "refusing --out" in result.stderr
+    assert git("status", "--porcelain", cwd=root) == before
+    assert sentinel.read_text(encoding="utf-8") == "keep home intact\n"
+    assert not (root / "not-created").exists()
+
+
+@needs_git
+@pytest.mark.parametrize("target", ["/", "/home", "/tmp"])
+def test_system_directory_aliases_are_refused_before_export(readme_history, tmp_path, target):
+    root, _, commit = readme_history
+    alias = tmp_path / "system-alias"
+    alias.symlink_to(target, target_is_directory=True)
+    # Never pass --replace for a real system directory, even in a regression test.
+    result = subprocess.run(
+        ["bash", str(root / "scripts/publish_sync.sh"), "--commit", commit,
+         "--out", str(alias), "--no-verify"],
+        cwd=root, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "system directory" in result.stderr
+
+
+@needs_git
+def test_symlink_loop_is_refused_before_creating_an_output(readme_history, tmp_path):
+    root, _, commit = readme_history
+    loop = tmp_path / "loop"
+    loop.symlink_to(loop.name, target_is_directory=True)
+    result = subprocess.run(
+        ["bash", str(root / "scripts/publish_sync.sh"), "--commit", commit,
+         "--out", str(loop / "export"), "--no-verify", "--replace"],
+        cwd=root, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "cannot resolve" in result.stderr
+    assert loop.is_symlink()
 
 
 @needs_git

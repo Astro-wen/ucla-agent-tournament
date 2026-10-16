@@ -188,7 +188,7 @@ test_deps() {   # a test file -> the test files it imports (from test_x / .test_
   } || true
 }
 in_tests() { local x; for x in "${TEST_FILES[@]+"${TEST_FILES[@]}"}"; do [ "$x" = "$1" ] && return 0; done; return 1; }
-# Keep the read-only --list path usable on Bash 3.2 too; exports still need the Linux/GNU tools below.
+# Keep the read-only --list path usable on Bash 3.2 too.
 TEST_FILES=()
 while IFS= read -r t; do TEST_FILES+=("$t"); done < <(select_tests)
 changed=1                                   # drop tests that import a test that is not exported, until none does
@@ -242,13 +242,44 @@ fi
 
 # ---- export --------------------------------------------------------------------------------------------------------
 [ -n "$OUT" ] || die "--out DIR is required (see --help)"
-OUT="$(realpath -m -- "$OUT")"                      # (checked before anything is created)
-ROOT_REAL="$(realpath -- "$ROOT")"
+PY="${PYTHON:-python3}"
+canonical_path() {   # realpath -m for existing/symlink/missing paths, without requiring GNU coreutils
+  "$PY" -I -S - "$1" <<'PY'
+import os
+import sys
+
+try:
+    if "\n" in sys.argv[1] or "\r" in sys.argv[1]:
+        raise ValueError("newlines are not allowed in export paths")
+    resolved = os.path.realpath(sys.argv[1])
+    # Missing tails are allowed. Loops, permission errors and non-directory ancestors
+    # must fail closed instead of being hidden by realpath's non-strict resolution.
+    ancestor = resolved
+    while True:
+        try:
+            os.path.realpath(ancestor, strict=True)
+            break
+        except FileNotFoundError:
+            ancestor = os.path.dirname(ancestor)
+    print(resolved)
+except (OSError, ValueError) as exc:
+    print(f"cannot resolve path: {exc}", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+OUT="$(canonical_path "$OUT")" || die "cannot resolve --out"  # before creating or removing anything
+ROOT_REAL="$(canonical_path "$ROOT")" || die "cannot resolve the source repository"
 case "$OUT/" in
   "$ROOT"/*|"$ROOT_REAL"/*|/|/home/|/tmp/) die "refusing --out $OUT (inside this repository or a system directory)" ;;
 esac
+# /tmp is itself a symlink on macOS; aliases of protected roots must be refused too.
+for system_dir in / /home /tmp; do
+  system_real="$(canonical_path "$system_dir")" || die "cannot resolve a protected system directory"
+  [ "$OUT" = "$system_real" ] && die "refusing --out $OUT (a system directory)"
+done
 case "$ROOT_REAL/" in "$OUT"/*) die "refusing --out $OUT (it contains this repository)" ;; esac
-[ "$OUT" = "$(realpath -m -- "${HOME:-/nonexistent}")" ] && die "refusing --out $OUT (the home directory)"
+HOME_REAL="$(canonical_path "${HOME:-/nonexistent}")" || die "cannot resolve the home directory"
+[ "$OUT" = "$HOME_REAL" ] && die "refusing --out $OUT (the home directory)"
 mkdir -p "$OUT"
 if [ -n "$(ls -A "$OUT" | grep -vx '.git' || true)" ]; then
   [ "$REPLACE" = 1 ] || die "$OUT is not empty (use --replace to replace everything in it except .git)"
@@ -258,7 +289,26 @@ git archive --format=tar "$COMMIT" -- "${ALL_PATHS[@]}" | tar -x -C "$OUT"
 git show "$COMMIT:$PUBLIC_README" > "$OUT/README.md"
 
 FILES="$(cd "$OUT" && find . -path ./.git -prune -o -type f -print | wc -l | tr -d ' ')"
-BYTES="$(cd "$OUT" && find . -path ./.git -prune -o -type f -printf '%s\n' | awk '{ s += $1 } END { print s + 0 }')"
+BYTES="$("$PY" -I -S - "$OUT" <<'PY'
+import os
+import sys
+
+root = sys.argv[1]
+pending = [root]
+total = 0
+while pending:
+    directory = pending.pop()
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            if directory == root and entry.name == ".git":
+                continue
+            if entry.is_dir(follow_symlinks=False):
+                pending.append(entry.path)
+            elif entry.is_file(follow_symlinks=False):
+                total += entry.stat(follow_symlinks=False).st_size
+print(total)
+PY
+)"
 echo "exported commit $COMMIT ($SUBJECT)"
 echo "into $OUT: $FILES files, $BYTES bytes ($(awk -v b="$BYTES" 'BEGIN { printf "%.1f MB", b / 1048576 }')), ${#TEST_FILES[@]} test files, sample match ${best:-none}"
 echo "top level: $(cd "$OUT" && ls -A | grep -vx '.git' | tr '\n' ' ')"
@@ -302,7 +352,6 @@ if [ "$VERIFY" = 1 ]; then
   echo "== install check (clean venv, ${NPM} node_modules, selfcheck$([ "$TESTS" = 1 ] && echo ", ${#TEST_FILES[@]} test files"))"
   WORK="$(mktemp -d)"; CHECK="$WORK/check"; mkdir -p "$CHECK" "$WORK/home" "$WORK/locks" "$WORK/state" "$WORK/tmp"
   cp -a "$OUT/." "$CHECK/"; rm -rf "$CHECK/.git"
-  PY="${PYTHON:-python3}"
   VERIFY_OK=0
   step() { echo "  - $*"; }
   if ! "$PY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'; then
