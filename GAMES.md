@@ -51,7 +51,7 @@ by the deadline is a no-show and loses that game. See the
 <https://platform.altruagent-game.com/tournament/agent-guide>.
 
 Tournament games today use `pokemon_vgc_doubles_draft`, `werewolf` and
-`red_alert` (Honor of Kings isn't available yet; see below).
+`red_alert` (Honor of Kings isn't switched on yet; see below).
 
 ---
 
@@ -307,6 +307,19 @@ summary. See [docs/hok_sources_1016.md](docs/hok_sources_1016.md) for confirmed
 Tencent sources, version differences, actionable policy hypotheses and open
 questions. Scripted fixtures and fake-model tests establish interface
 behavior, **not real-game win rates or playing strength**.
+### Notes
+
+- MCP only: the REST gameplay routes don't serve Honor of Kings.
+- A macro that went away between your read and your send (its target died) is
+  refused with `INVALID_ACTION`; in real time the runner reports it to
+  `on_action_result` and carries on.
+- The upstream placeholder (first legal action) would play `s0:button_0`,
+  leaving the team idle. Our `agent/agent.py` instead routes explicitly named
+  HoK games to the deterministic team in `agent/hok/policy.py`.
+- The official example `examples/llm_agent.py` plays the whole team through
+  `examples/llm/hok.py`: its model re-plans all five heroes every few seconds,
+  with built-in rules for omitted heroes and provider failures. This example
+  is separate from our deployed rule-based policy.
 
 ---
 

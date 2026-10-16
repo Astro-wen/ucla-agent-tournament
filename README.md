@@ -209,6 +209,9 @@ real states are replayed through the agent before every release (`scripts/replay
 
   `bash scripts/bundle.sh` builds a self-contained tarball. `deploy/` holds the systemd unit and the Dockerfile.
   The runbook is `docs/deploy.md` (in Chinese).
+  The owner selects Self Hosted and generates the Official Agent Key on the platform's **Agent Configuration**
+  page. `python -m agent --tournament` handles tournament assignments; `python -m agent --match` handles Testing
+  assignments. The wrapper enables both in one runtime; waiting for assignments uses **no AI tokens**.
 - **Settings.** Every `ARENA_*` setting stays at its default: `ARENA_BATTLE=search`, `ARENA_WW_DM=off`,
   `ARENA_WW_TACTICS=off`, `ARENA_RA=on`, `ARENA_HOK=on` and `ARENA_RECORD=1`. The machine's `.env` holds only the key. Each
   start logs the full commit id and the settings in effect.

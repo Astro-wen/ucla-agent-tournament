@@ -18,9 +18,12 @@ after 120 s in Werewolf). So everything here is defensive:
     (agent/redalert/, no LLM): each view is answered with a locally validated
     order batch or altruagent.WAIT, every play_action answer reaches it through
     on_action_result, and it never raises; ARENA_RA=off restores the old
-    behaviour (WAIT for the whole match). Honor of Kings (`honor_of_kings_5v5`, real time or lockstep) is played by
-    a basic rule-based team (agent/hok/): one hero's order per call, WAIT when no hero needs a new one; ARENA_HOK=off
-    restores the old behaviour (WAIT / do nothing). Any other real-time game
+    behaviour (WAIT for the whole match);
+  * Honor of Kings 5v5 (`honor_of_kings_5v5`, real time or lockstep) is played
+    by our rule-based team (agent/hok/, no LLM): one hero's macro order per
+    call, only the changes in real time (else WAIT), every pending hero an
+    action the state lists in lockstep; ARENA_HOK=off restores the old
+    behaviour (WAIT in real time). Any other real-time game
     (`pacing.mode == "realtime"`) we have no policy for is answered with WAIT
     for its whole match: nothing is sent, the runner waits for the next view;
   * a move or chat the runner could not send for a temporary reason is not resent: it re-reads the state and asks
@@ -1084,9 +1087,9 @@ class Contestant:
             return f"{head} {ra}"
         if self._game == "honor_of_kings_5v5" and self._hok is not None:
             try:
-                return f"{head} {self._hok.summary_text()}"
+                return f"{head} {self._hok.summary_text()} fallbacks={self.fallbacks}"
             except Exception:
-                return f"{head} hok summary unavailable"
+                return f"{head} hok summary unavailable fallbacks={self.fallbacks}"
         if self._family != "pokemon":
             waits = f" waits={self.waits}" if self.waits else ""        # (a real-time game answered with WAIT)
             waits += f" undelivered_chats={self.undelivered}" if self.undelivered else ""

@@ -1,0 +1,85 @@
+# HoK 本地合并预检（2026-10-16）
+
+## 范围与状态
+
+仅在 `integrate/hok-main-preflight-1016` 整合：
+
+- 强化版父提交：`e13bf140e5bff9284b51164d7dc488762ba50b29`。
+- 合入的已存在本地远端跟踪提交：`fb421a2562c8480add765889ddf11c19cbc926ba`，
+  包含独立 HoK 实现 `8f507fd` 和官方上游 `686e756`。
+- 没有 fetch、更新 main、推送、部署、读取密钥或调用真实游戏/模型。
+- **这不是可推广版本：三个策略分歧仍由原断言报错，等待明确决定。**
+  没有删除、跳过或 xfail 这些断言，也没有更改强化版 `agent/hok/policy.py`。
+
+## 冲突处理
+
+1. `agent/hok/__init__.py`：保留强化版的轻量导出，实际策略仍在 `policy.py`。
+2. `agent/agent.py`：保留明确名称路由、只对当前待动座位做纯兜底、50 个游戏步
+   （10 游戏秒）采样、首次异常/拒绝采样及重复故障限流。清除自动合并留下的重复
+   `HOK_ENV` / `hok_enabled`。保留独立实现有用的 `fallbacks=` 对局摘要计数，
+   增加正常与异常两条测试断言；不是打法修改。
+3. `GAMES.md`：以 04:12 PDT 读到的公开指南修正旧“未开放”推断，保留上游的
+   MCP-only、拒绝回调与 LLM 示例说明。公开指南不等于已经能开对局。
+4. `docs/progress.md`：两条开发历史都保留，明确旧记录不代表当前可用性/合并状态。
+
+`examples/`、官方 `tests/test_hok.py`、`docs/STARTER_README.md` 保持合入版本原样。
+旧 `tests/test_hok_team.py` 的接口适配包括：raw 字典输入、合法 action_id 输出、
+注入时钟代替旧步数计时接口、异常测试移至 Contestant 边界、明确名称路由。
+按当前公开契约，远距离 fixture 不再提供不应出现的普攻宏。断言仍核对完整合法动作、
+五个英雄、理由、计数、锁步兜底和官方 runner 的发送结果。
+
+README 只补充一段现有操作说明所缺的 Agent Configuration、两个模式参数和等待不耗
+AI tokens 的事实；原文其余内容、图片、LICENSE、NOTICE 不变。没有改测试来规避
+原有 README 文档检查。
+
+## 必须明确决定的策略差异
+
+下列测试仍失败；不能把“接口适配”当作改变打法的理由。
+
+| 原断言 | `8f507fd` 要求 | 当前强化版 | 决策选择 |
+|---|---|---|---|
+| `test_outnumbered_heroes_back_off_and_a_hurt_hero_leaves_tower_range` | 满血单人面对三个附近敌人也撤退 | 人数/塔下撤退要求 HP < 60%；本例推进 | 保留强化版并明确重订旧测试的满血预期，或授权增加满血以少打多撤退并加边界测试 |
+| `test_realtime_breaking_off_a_fight_waits_for_the_hold_but_retreats_do_not` | 首次观察到交战命令，就认为刚开始并保持 0.6 秒 | 只保持本机近期发出的、仍可用的命令；消失的宏立即替换 | 当前 fixture 的普攻已不在合法列表，不能为过测试保留不可用宏；明确采用“本机已发、仍可用的技能”fixture 检查保持，另保留消失宏立即替换断言，或另行讨论扩大保持范围 |
+| `test_a_refused_order_is_not_repeated_at_once` | 第 10 步被拒绝，第 12 步仍不重试；旧屏蔽为 5 步且到期当步仍屏蔽 | 0.4 秒后且 state_version 已更新即可重试；本例正好到期 | 保留 0.4 秒并明确在到期前/后各测一次，或授权改成至少 1 秒并验证不会损害紧急撤退/活性 |
+
+还核对了没有直接触发现有断言的参数差别：旧版恢复 HP 90%（强化版 85%）、
+附近 12000（10000）、塔邻近 9000（8800）、塔下受伤阈值 45%（60%）、
+一名额外敌人且受伤也撤退（强化版需要多两名）、普攻/技能距离放宽、
+发送确认宽限 1 秒（强化版 2 秒）。没有偷偷迁入任何一项。
+
+强化版新增的紧急指令优先与防饥饿、可见目标去重、输入有界读取、出生/死亡及服务端
+清空指令后的缓存恢复、同一被拒状态不重试、raw 模板完整填值均保留。
+独立实现的额外撤退/错误统计不值得替换这些安全机制；运行边界已有明确 fallback 计数。
+
+## 源码隔离证据
+
+逐文件读取目标提交 blob，与当前文件 bytes 比较：
+
+- 相对 `fb421a2`，除 `agent/agent.py` 和 `agent/hok/` 外，`agent/` 的 **44 个文件相同**。
+- 官方 SDK `altruagent/` **17 个文件相同**。
+- `champion/` 与 `versions/` **157 个文件相同**。
+- 官方 examples、HoK 示例测试、starter README **12 个文件相同**。
+- 相对强化版父提交，HoK policy/导出文件、LICENSE、NOTICE、assets **10 个文件相同**。
+- `agent/agent.py` 中 **50 个其他函数/方法 AST 相同**；差别仅在 HoK 开关/识别、
+  HoK 决策方法以及初始化、重置、回调、摘要中的 HoK bookkeeping。
+
+只读审计脚本位于 `/tmp/hok-integration-isolation-1016.py`，不属于提交或发布内容。
+本次检查时本地 main 仍为 `cda2dd9130c18b403a5f5dc323887f8f38990e1e`，
+`origin/main` 仍为上述 `fb421a2`。
+
+## 离线验证
+
+统一使用 `/tmp/altruagent-fix-venv/bin/python`、本 worktree 的 `PYTHONPATH`、
+`ARENA_RECORD=0`。没有调用 LLM 或真实游戏。录制测试只写 pytest 临时目录。
+
+- 严格 CI lint：
+  `/tmp/altruagent-hok-lint-1016/bin/flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude .git,node_modules`
+  为 **0**，保留父提交修正的 7 个 F821 显式 helper import。
+- `git diff --check` 通过。
+- `tests/hok tests/redalert tests/test_runner.py tests/test_hok_delivery.py`：
+  **822 passed，2 skipped**；跳过的两项要求 Linux/GNU 工具。
+- `tests/test_realtime.py`：**34 passed**。
+- `tests/test_hok.py tests/test_hok_team.py`：**33 passed，3 failed**（上表）。
+- README 补充说明后，
+  `tests/test_main.py tests/test_publish_sync.py tests/test_hok_delivery.py tests/test_hok.py tests/test_hok_team.py`：
+  **127 passed，2 skipped，3 failed**，失败仍仅为上表的三个策略分歧。
