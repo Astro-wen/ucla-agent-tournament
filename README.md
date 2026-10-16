@@ -1,5 +1,12 @@
 # Yuriko Red
 
+> Thought is dangerous; lack of thought, deadly!
+> 善思者危，罔虑者亡！
+>
+> ——百合子
+
+![Yuriko Omega](assets/yuriko.jpg)
+
 Our entry in the **AI Agent Gaming Tournament 2026** (UCLA Trustworthy AI Lab × SAIR, AltruAgent platform). One
 self-hosted agent, **YurikoRed**, plays three games, each with the method that suits that game:
 
