@@ -35,12 +35,36 @@
 - 当前策略、旧团队、独立 runner/进程测试：**112 passed**。
 - 新增边界保护、策略安全、旧团队测试：**137 passed**。
 - 严格 CI flake8 为 **0**，`git diff --check` 通过。
-- 全量带 Node 的 pytest 正在验证，最终结果另列于此处；不能预报全绿。
+- 全量带 Node 的 `python -m pytest -q`：**3387 passed，39 skipped，0 failed**
+  （555.34 秒）。这替代 05:20 缺依赖状态下的失败记录；仍不声称 macOS 已验证
+  Linux/systemd 部署要求，也不把离线模拟/假服务结果当作实战强度证据。
+- 全量之后单独复查 `tests/strategy/test_engine_search.py tests/strategy/test_engine_load.py
+  tests/hok/test_process_e2e.py`：**60 passed，0 skipped**（31.46 秒），明确确认
+  引擎搜索/负载检查和五个隔离进程生命周期用例并未因缺 Node 而跳过。
 
 当前隔离审计仍要求非 HoK agent **44 文件**、SDK **17 文件**、main 已有 data/local
 及 draft-meta 测试 **75 文件**、champion/versions **157 文件**、官方示例等
 **12 文件**与更新 main 完全相同。HoK policy 相对强化版父提交只有 `rule_macro`
 函数 AST 有明确批准的改变；其他策略函数、保持/重试/调度不变。
+
+### 最终源码检查点
+
+- 实现提交：`6411506af6e3100ba0287a4485f035a7013b0893`。
+- 原合并提交：`f313206512939b9ea63dfa0f76ef9aac79829cef`，
+  父节点仍为 `e13bf14` 和 `fb421a2`；祖先检查也包含 `8f507fd`、`686e756`。
+- 全量测试后再次逐文件隔离审计、严格 CI lint、`git diff --check` 均通过；
+  独立三份 process/runtime/fake-server 测试文件与 `b698548c` 逐字节相同。
+- `agent/agent.py` SHA-256：
+  `14a79b69feecccf33f357f24dc83bb61adfbb2d710d4cf560df6de8e3b849b20`。
+- `agent/hok/policy.py` SHA-256：
+  `53de6d67acd3d07c80d28330656f84e1252394ea082d3efc6dc6206f90635f3a`。
+- SDK `altruagent/runner.py` SHA-256：
+  `29f45f8fdc4757551ac54c828756e3321df05a4ded5dc1db5af741239b9b736a`。
+- SDK `altruagent/models.py` SHA-256：
+  `ba7a3411ac53f5831185d308f550ed5afe2ef346d24746837ab6118287aab8a1`。
+
+本检查点没有未解决的策略或结构性失败。后续真正合并/推送 main 仍由父 agent
+在用户批准的 **08:00 PDT 后、08:30 前**窗口处理，本子任务没有执行。
 
 ---
 
