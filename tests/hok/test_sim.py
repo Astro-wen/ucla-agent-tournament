@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from local.hok_env import Baseline, candidate_factory, opponent_factory, play_game
+from local.hok_env import (Baseline, candidate_factory, candidate_revision_factory, opponent_factory,
+                           play_game, source_unchanged)
 from local.hok_sim import DiagnosticGame, PROFILES, SimConfig, profile_config
 from scripts.hok_eval import evaluate, parser
 
@@ -24,7 +25,7 @@ def test_five_seats_pending_and_standing():
     assert game.view(2)["seats"] == list(range(5, 10))
     assert not game.submit(1, "s0:macro_advance", 0).get("error")
     assert 0 not in game.view(1)["simultaneous"]["your_pending_seats"]
-    assert all(not a["action_id"].startswith("s0:") for a in game.view(1)["legal_actions"]["actions"])
+    assert any(a["action_id"].startswith("s0:") for a in game.view(1)["legal_actions"]["actions"])
     x = game.heroes[0].x
     game.tick()
     assert game.heroes[0].x > x
@@ -193,7 +194,8 @@ def test_random_can_choose_macros_and_idle_but_never_unfilled_move():
     bot = Baseline("random", seed=2)
     raw = DiagnosticGame().view(1)
     actions = {bot.decide(raw)[0] for _ in range(100)}
-    assert actions == {"s0:button_0", "s0:macro_advance", "s0:macro_retreat"}
+    assert {a.split(":")[1] for a in actions} == {"button_0", "macro_advance", "macro_retreat"}
+    assert {a.split(":")[0] for a in actions} == {f"s{s}" for s in range(5)}
     assert Baseline("first-legal").decide(raw)[0] == "s0:button_0"
     assert Baseline("push").decide(raw)[0] == "s0:macro_advance"
 
@@ -312,6 +314,7 @@ def test_importable_factory_and_separate_candidate_package(tmp_path):
         "class HokPolicy:\n"
         "    def __init__(self, clock): self.clock = clock\n"
         "    def decide(self, raw):\n"
+        "        if not raw['simultaneous']['your_pending_seats']: return None, None\n"
         "        seat = raw['simultaneous']['your_pending_seats'][0]\n"
         "        return {'seat': seat, 'macro': ACTION}, None\n")
     candidate, info = candidate_factory(tmp_path)
@@ -420,3 +423,114 @@ def test_sdk_resign_is_a_concession_not_protocol_failure(mode):
     assert result["result"]["termination_reason"] == "resignation"
     assert result["stats"]["candidate"]["resignations"] == 1
     assert result["candidate_score"] == 0.0
+
+
+def test_realtime_nonpending_updates_replace_fresh_order_until_tick():
+    game = DiagnosticGame()
+    for seat in game.seats(1):
+        assert not game.submit(1, f"s{seat}:macro_advance", 0).get("error")
+    raw = game.view(1)
+    assert raw["simultaneous"]["your_pending_seats"] == []
+    assert raw["is_current_actor"] is True
+    assert {int(a["action_id"].split(":")[0][1:]) for a in raw["legal_actions"]["actions"]} == set(range(5))
+    assert not game.submit(1, {"seat": 0, "macro": "macro_retreat"}, 0).get("error")
+    assert game.standing[0] == "macro_retreat"
+    assert not game.submit(1, "s0:button_0", 0).get("error")
+    assert 0 not in game.standing
+    x = game.heroes[0].x
+    game.tick()
+    assert game.heroes[0].x == x  # latest raw order, not the earlier advance
+    assert game.heroes[1].x > x
+
+
+def test_lockstep_pending_remains_authoritative_and_duplicate_order_is_refused():
+    game = DiagnosticGame(SimConfig(mode="lockstep"))
+    game.submit(1, "s0:macro_advance", 0)
+    assert not any(a["action_id"].startswith("s0:") for a in game.view(1)["legal_actions"]["actions"])
+    assert game.submit(1, "s0:macro_retreat", 0)["error"] == "INVALID_ACTION"
+    assert game.standing[0] == "macro_advance"
+
+
+@pytest.mark.parametrize("budget", [5, 6, 10])
+@pytest.mark.parametrize("period", [1, 3])
+def test_realtime_equal_budgets_advance_time_without_random_forfeit(budget, period):
+    random_bot, _ = opponent_factory("research:uniform_random")
+    result = play_game(random_bot, random_bot, config=SimConfig(max_steps=7),
+                       calls_per_step=budget, decision_steps=period)
+    assert result["protocol_failure"] is None
+    assert result["steps"] == 7
+    periods = len(range(0, 7, period))
+    for stats in result["stats"].values():
+        assert stats["reserved_decision_slots"] == periods * budget
+        assert stats["calls"] == stats["accepted"] == periods * budget
+        assert stats["budget_exhaustions"] == periods
+        assert stats["nonpending_updates"] == periods * (budget - 5)
+        assert stats["invalid"] == 0
+    assert result["clock_injected"] == {"candidate": True, "opponent": True}
+
+
+def test_wait_voluntarily_releases_slots_but_never_transfers_them_to_other_team():
+    class Waiter:
+        def __init__(self, clock):
+            self.clock = clock
+        def decide(self, raw):
+            assert self.clock() == raw["state_version"] * 0.2
+            assert not hasattr(self.clock, "__closure__")  # no closure containing full world
+            return None, None
+    random_bot, _ = opponent_factory("research:uniform_random")
+    result = play_game(Waiter, random_bot, config=SimConfig(max_steps=4), calls_per_step=10)
+    a, b = result["stats"]["candidate"], result["stats"]["opponent"]
+    assert a["reserved_decision_slots"] == b["reserved_decision_slots"] == 40
+    assert a["calls"] == 4 and a["unused_decision_slots"] == 36
+    assert b["calls"] == 40 and b["budget_exhaustions"] == 4
+
+
+def test_directory_snapshot_freezes_lazy_relative_imports_and_detects_source_edits(tmp_path):
+    helper = tmp_path / "helper.py"
+    helper.write_text("ACTION = 'macro_advance'\n")
+    (tmp_path / "policy.py").write_text(
+        "class HokPolicy:\n"
+        "    def __init__(self, clock):\n"
+        "        from .helper import ACTION\n"
+        "        self.action = ACTION\n"
+        "    def decide(self, raw):\n"
+        "        return {'seat': raw['seats'][0], 'macro': self.action}, None\n")
+    candidate, info = candidate_factory(tmp_path)
+    helper.write_text("ACTION = 'macro_retreat'\n")
+    idle, _ = opponent_factory("idle")
+    result = play_game(candidate, idle, config=SimConfig(max_steps=2))
+    assert result["stats"]["candidate"]["action_kind_counts"] == {"macro_advance": 12}
+    assert result["stats"]["candidate"]["nonpending_updates"] == 10
+    assert not source_unchanged(info)
+    assert info["source_kind"] == "directory_snapshot"
+    assert not (tmp_path / "__pycache__").exists()
+
+
+def test_git_snapshot_reads_exact_commit_without_changing_candidate_tree():
+    import subprocess
+    root = Path(__file__).resolve().parents[2]
+    before = (root / "agent/hok/policy.py").read_bytes()
+    factory, info = candidate_revision_factory(root, "HEAD")
+    resolved = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    assert info["git_commit"] == resolved
+    assert info["source_kind"] == "git_snapshot"
+    assert source_unchanged(info)
+    push, _ = opponent_factory("push")
+    result = play_game(factory, push, config=SimConfig(max_steps=3))
+    assert result["clock_injected"] == {"candidate": True, "opponent": True}
+    assert result["protocol_failure"] is None
+    assert (root / "agent/hok/policy.py").read_bytes() == before
+
+
+def test_mode_changes_no_other_physics_parameters_and_all_policies_receive_clocks():
+    args = parser().parse_args(["--candidate-revision", "HEAD", "--games", "1", "--max-steps", "3",
+                               "--mode", "both", "--opponent", "research:cautious_defender"])
+    report = evaluate(args)
+    one, two = report["cells"]
+    assert one["physics_config_sha256"] == two["physics_config_sha256"]
+    assert one["config_sha256"] != two["config_sha256"]
+    for cell in report["cells"]:
+        for leg in cell["pairs"][0]["legs"]:
+            assert all(leg["clock_injected"].values())
+            assert leg["stats"]["candidate"]["reserved_decision_slots"] \
+                == leg["stats"]["opponent"]["reserved_decision_slots"]

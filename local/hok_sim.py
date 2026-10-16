@@ -27,10 +27,10 @@ import re
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
-# v2 corrects the default death behavior to the guide's literal "stays until
-# you send another action": retain the standing macro through death. Clearing
-# it remains an explicit sensitivity variant, not a fitted combat mechanic.
-MODEL_VERSION = "hok-contract-diagnostic-v2"
+# v2 retained standing macros through death, following "until another action".
+# v3 corrects realtime eligibility: pending measures freshness, not permission.
+# All numerical combat/map profiles are unchanged from the initial version.
+MODEL_VERSION = "hok-contract-diagnostic-v3"
 OFFICIAL_REFERENCE = "https://api.altruagent-game.com/skill/hok"
 OFFICIAL_GUIDE_SHA256 = "49168a46a941ceef29f704437c214383ef3b5ebebb67f8aac112901261728ba4"
 UPSTREAM_REFERENCE = "686e7560708eaa595a409b330d0d1837d49ba9d5"
@@ -51,6 +51,7 @@ ASSUMPTIONS = (
     "Raw controls implement only button_0 and discrete button_2 movement, not the full engine action space.",
     "Lockstep timeout is explicitly invoked after a camp finishes, not a wall-clock server timer.",
     "Simulated time limits use elapsed steps; no network, queue, start failure or live engine timing.",
+    "Within a model step the last fresh order wins; both teams receive equal fixed decision slots before physics.",
 )
 
 
@@ -295,6 +296,7 @@ class DiagnosticGame:
     def view(self, camp: int) -> dict:
         seats = self.seats(camp)
         pending = [s for s in seats if s in self.pending] if not self.terminal else []
+        eligible = (seats if self.config.mode == "realtime" else pending) if not self.terminal else []
         summaries = {}
         structures = [{"runtime_id": s.runtime_id, "camp": s.camp, "type": s.type,
                        "hp": s.hp, "max_hp": s.max_hp, "x": s.x, "z": s.z}
@@ -317,7 +319,7 @@ class DiagnosticGame:
             "session_id": f"diagnostic-{self.seed}", "game_type": GAME_TYPE,
             "status": "finished" if self.terminal else "in_progress",
             "phase": "finished" if self.terminal else "moving",
-            "is_terminal": self.terminal, "is_current_actor": bool(pending),
+            "is_terminal": self.terminal, "is_current_actor": bool(eligible),
             "state_version": self.step, "camp": camp, "seats": seats,
             "max_steps": self.config.max_steps, "time_limit_s": self.config.time_limit_s,
             "seconds_left": max(0.0, self.config.time_limit_s - self.now),
@@ -328,7 +330,7 @@ class DiagnosticGame:
                              "waiting_for": sorted(self.pending) if not self.terminal else [],
                              "last_fallback_players": list(self.last_fallback_players)},
             "observation": {"seats": summaries},
-            "legal_actions": {"actions": [e for s in pending for e in self._entries(s)]},
+            "legal_actions": {"actions": [e for s in eligible for e in self._entries(s)]},
         }
 
     def _decode(self, action: Any) -> dict | None:
@@ -358,7 +360,9 @@ class DiagnosticGame:
         if act is None:
             return refused()
         seat = act.get("seat")
-        if type(seat) is not int or seat not in seats or seat not in self.pending:
+        if type(seat) is not int or seat not in seats:
+            return refused()
+        if self.config.mode == "lockstep" and seat not in self.pending:
             return refused()
         macro = act.get("macro")
         if macro is not None:
@@ -379,7 +383,7 @@ class DiagnosticGame:
                     return refused()
             else:
                 return refused()
-        self.pending.remove(seat)
+        self.pending.discard(seat)
         self.fresh[seat] = act
         if macro is not None:
             self.standing[seat] = macro
