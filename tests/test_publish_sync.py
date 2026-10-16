@@ -152,7 +152,8 @@ def test_optional_license_is_not_exempt_from_the_secret_scan(readme_history, tmp
 
 
 @needs_git
-@pytest.mark.parametrize("kind", ["relative", "missing", "dots", "symlink", "dangling", "symlink-parent", "spaces"])
+@pytest.mark.parametrize("kind", ["relative", "missing", "dots", "symlink", "dangling", "symlink-parent", "spaces",
+                                 "source-prefix-sibling", "via-source-parent"])
 def test_output_canonicalization_preserves_safe_destinations(readme_history, tmp_path, kind):
     root, _, commit = readme_history
     destination = tmp_path / "destination"
@@ -168,6 +169,11 @@ def test_output_canonicalization_preserves_safe_destinations(readme_history, tmp
     elif kind == "spaces":
         expected = destination / "with spaces" / "export"
         supplied = str(expected)
+    elif kind == "source-prefix-sibling":
+        expected = tmp_path / "source-export"
+        supplied = str(expected)
+    elif kind == "via-source-parent":
+        supplied = str(root / "agent" / ".." / ".." / "destination" / "export")
     else:
         link = tmp_path / "alias"
         if kind == "symlink":
@@ -197,7 +203,7 @@ def test_output_canonicalization_preserves_safe_destinations(readme_history, tmp
 
 @needs_git
 @pytest.mark.parametrize("kind", ["source", "inside", "ancestor", "source-alias", "dangling-inside",
-                                 "symlink-parent", "home-alias"])
+                                 "symlink-parent", "missing-before-alias", "home-alias"])
 def test_output_guards_resolve_aliases_before_any_replacement(readme_history, tmp_path, kind):
     root, _, commit = readme_history
     home = tmp_path / "home"
@@ -218,7 +224,12 @@ def test_output_guards_resolve_aliases_before_any_replacement(readme_history, tm
         elif kind == "symlink-parent":
             target = root / "agent"
         link.symlink_to(target, target_is_directory=True)
-        supplied = str(link / ".." / "not-created") if kind == "symlink-parent" else str(link)
+        if kind == "symlink-parent":
+            supplied = str(link / ".." / "not-created")
+        elif kind == "missing-before-alias":
+            supplied = str(tmp_path / "not-created" / ".." / "alias" / "export")
+        else:
+            supplied = str(link)
     before = git("status", "--porcelain", cwd=root)
     result = subprocess.run(
         ["bash", str(root / "scripts/publish_sync.sh"), "--commit", commit, "--out", supplied,
@@ -261,6 +272,28 @@ def test_symlink_loop_is_refused_before_creating_an_output(readme_history, tmp_p
     assert result.returncode == 2, result.stdout + result.stderr
     assert "cannot resolve" in result.stderr
     assert loop.is_symlink()
+
+
+@needs_git
+@pytest.mark.parametrize("kind", ["file-ancestor", "newline"])
+def test_invalid_output_paths_fail_closed(readme_history, tmp_path, kind):
+    root, _, commit = readme_history
+    if kind == "file-ancestor":
+        ancestor = tmp_path / "not-a-directory"
+        ancestor.write_text("keep intact\n", encoding="utf-8")
+        supplied = str(ancestor / "export")
+    else:
+        supplied = str(tmp_path / "export\n")
+    result = subprocess.run(
+        ["bash", str(root / "scripts/publish_sync.sh"), "--commit", commit,
+         "--out", supplied, "--no-verify", "--replace"],
+        cwd=root, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "cannot resolve" in result.stderr
+    assert not (tmp_path / "export").exists()
+    if kind == "file-ancestor":
+        assert ancestor.read_text(encoding="utf-8") == "keep intact\n"
 
 
 @needs_git
