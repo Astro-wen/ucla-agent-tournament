@@ -142,7 +142,7 @@ def test_objective_and_combat_are_distinct_and_use_labelled_current_targets():
     raw = view((0,), target="enemy crystal 99")
     assert opponents.make_bot("objective_rusher").decide(raw)[0] == "s0:macro_attack"
     raw = view((0,), target="enemy hero 42", distance=50000)
-    assert opponents.make_bot("opportunistic_combat").decide(raw)[0] == "s0:macro_advance"
+    assert opponents.make_bot("opportunistic_combat").decide(raw)[0] == "s0:macro_attack"
     raw = view((0,), target="friendly hero 42")
     assert opponents.make_bot("opportunistic_combat").decide(raw)[0] == "s0:macro_advance"
 
@@ -179,6 +179,9 @@ def test_cautious_defender_only_counts_visible_live_heroes_and_deduplicates_ids(
 
 def test_cautious_defender_guards_visibly_threatened_allied_structure():
     raw = view((0,), distance=20000)
+    # No attack is offered: this guard fixture has no attack-ready target.
+    raw["legal_actions"]["actions"] = [action for action in raw["legal_actions"]["actions"]
+                                       if action["action_id"] != "s0:macro_attack"]
     my_summary(raw)["structures"] = [{"type": "TOWER", "camp": 1, "hp": 100, "x": 100, "z": 0}]
     enemy = {"runtime_id": 42, "camp": 2, "hp": 100, "x": 1000, "z": 0, "visible": True}
     my_summary(raw)["other_heroes"] = [enemy]
@@ -390,9 +393,51 @@ def test_invalid_other_hero_camps_are_unknown_not_hostile(camp):
 
 def test_defender_guards_allied_structure_with_mixed_integer_string_camps():
     raw = view((0,), distance=20000)
+    raw["legal_actions"]["actions"] = [action for action in raw["legal_actions"]["actions"]
+                                       if action["action_id"] != "s0:macro_attack"]
     raw["camp"] = "1"
     del my_summary(raw)["my_hero"]["camp"]  # Public guide does not require this field.
     my_summary(raw)["structures"] = [{"type": "CRYSTAL", "camp": 1, "hp": 100, "x": 100, "z": 0}]
     my_summary(raw)["other_heroes"] = [
         {"runtime_id": 42, "camp": "2", "hp": 100, "x": 1000, "z": 0, "visible": True}]
     assert opponents.make_bot("cautious_defender").decide(raw)[0] == "s0:button_0"
+
+
+@pytest.mark.parametrize("name", ["opportunistic_combat", "cautious_defender"])
+@pytest.mark.parametrize("label", [None, "Basic attack", "Basic attack (nearest: enemy hero 42, 50000 away)"])
+def test_offered_attack_readiness_is_not_overruled_by_missing_or_large_label_distance(name, label):
+    raw = view((0,), pending=[], distance=50000)
+    for action in raw["legal_actions"]["actions"]:
+        if action["action_id"] == "s0:macro_attack":
+            action["label"] = label
+    bot = opponents.make_bot(name, seed=3)
+    assert bot.decide(raw)[0] == "s0:macro_attack"
+    raw["legal_actions"]["actions"] = [action for action in raw["legal_actions"]["actions"]
+                                       if action["action_id"] != "s0:macro_attack"]
+    assert bot.decide(raw)[0] == "s0:macro_advance"
+
+
+def test_objective_rusher_uses_offered_structure_attack_without_guessed_attack_radius():
+    raw = view((0,), target="enemy tower 99", distance=50000)
+    assert opponents.make_bot("objective_rusher").decide(raw)[0] == "s0:macro_attack"
+
+
+def test_realtime_defender_reevaluates_already_ordered_hurt_hero_within_one_rotation():
+    raw = view(pending=["4"])
+    raw["simultaneous"]["standing_orders"] = {str(seat): "macro_advance" for seat in range(5)}
+    bot = opponents.make_bot("cautious_defender")
+    assert bot.decide(raw)[0] == "s0:macro_skill3"
+    raw["simultaneous"]["standing_orders"]["0"] = "macro_skill3"
+    my_summary(raw, 0)["my_hero"]["hp"] = 20
+    actions = [bot.decide(raw)[0] for _ in range(5)]
+    assert [int(action.split(":")[0][1:]) for action in actions] == [1, 2, 3, 4, 0]
+    assert actions[-1] == "s0:macro_retreat"
+
+
+@pytest.mark.parametrize("name", opponents.BOT_NAMES)
+def test_ready_macro_input_action_does_not_require_raw_button_completion(name):
+    raw = view((3,), pending=[])
+    raw["seats"] = ["3"]
+    raw["legal_actions"]["actions"] = [
+        offer(3, "macro_retreat", template={"macro": "macro_retreat", "seat": "3"})]
+    assert opponents.make_bot(name).decide(raw)[0] == "s3:macro_retreat"

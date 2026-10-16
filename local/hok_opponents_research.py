@@ -225,7 +225,12 @@ def _combat(choices: list[_Choice], *, structures_only: bool = False) -> _Choice
         if choice.base not in _SKILLS_AND_ATTACK:
             continue
         target, distance = _target(choice)
-        if not target or distance > _CONTACT or any(word in target for word in ("ally", "allied", "friendly")):
+        if any(word in target for word in ("ally", "allied", "friendly")):
+            continue
+        # Public guide §3 explicitly says attack is absent when nothing is in
+        # range. Its current offer is stronger evidence than an optional label
+        # or a guessed universal attack radius. Skill reach is still heuristic.
+        if choice.base != "macro_attack" and (not target or distance > _CONTACT):
             continue
         structure = any(word in target for word in ("tower", "crystal", "structure"))
         if structures_only and not structure:
