@@ -1177,6 +1177,39 @@ def test_pre_weap_float_turns_idle_money_into_rifles_before_the_war_factory():
         assert bool(out) == more, [c.order for c in out]
 
 
+def test_rally_step_moves_the_attack_groups_gathering_point_toward_home():
+    rallies = {}
+    for env in ({}, {"ARENA_RA_RALLY_STEP": "8"}, {"ARENA_RA_RALLY_STEP": "5"}):
+        srv = server()
+        pol = RedAlertPolicy(params=load_params(env))
+        drive(srv, pol, 2)
+        st = pol.static
+        rallies[env.get("ARENA_RA_RALLY_STEP", "0")] = st.rally
+        assert st.rally in st.path
+        assert pol.ledger.invalid_actions == 0 and pol.exceptions == 0
+    assert rallies["0"] == rallies["8"]                             # 0 = the old rule (path cell 8)
+    path = pol.static.path
+    assert path.index(rallies["5"]) == 5 and path.index(rallies["0"]) == 8
+    assert pol.static.guard == path[5]                               # (the home guard's point: unchanged)
+
+
+def test_split_gate_keeps_tanks_in_the_line_against_a_tank_army():
+    for gate, fires in ((0.0, True), (0.4, False)):
+        pol, v = _late_view({"ARENA_RA_SPLIT_FIRE": "1", "ARENA_RA_SPLIT_GATE": str(gate)})
+        a = pol.army
+        ours = [{"id": 860000, "type": "2tnk", "hp": 100, "x": 30, "y": 44, "idle": False}]
+        v.units += ours
+        v.unit_by_id.update({u["id"]: u for u in ours})
+        a.main |= {860000}
+        v.enemies = [{"id": 870000, "type": "e1", "hp": 100, "x": 32, "y": 44},
+                     {"id": 870001, "type": "3tnk", "hp": 100, "x": 34, "y": 44}]
+        _see_tanks(pol, v, 3, "3tnk", 34, 44)                        # tanks are most of what we saw
+        a.enemy_units[870000] = {"type": "e1", "tick": v.tick, "x": 32, "y": 44, "hp": 100}
+        out = []
+        a._split_fire(v, out)
+        assert bool([c for c in out if c.order["cmd"] == "attack"]) == fires
+
+
 def test_weap2_s_builds_the_second_war_factory_earlier():
     for env, item in (({}, None), ({"ARENA_RA_WEAP2_S": "200"}, "weap")):
         pol, v = _late_view(env, game_s=210.0)
